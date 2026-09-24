@@ -583,11 +583,12 @@ previous check has held for a week of real use.
 | # | Milestone | Done when |
 |---|---|---|
 | 1 | **Core, MCP and UI.** Vaults, files and folders, canon/open policies with quorum, log, gate, remote MCP with OAuth, web UI for review, plain export | Andrés uses one vault from ChatGPT, Claude Code and Hermes for a week. Each sees the same files; canon changes are approved in the browser; hostile tests green |
-| 2 | **Shared connections** | One upstream MCP (e.g. Linear) is used from all three clients through Reliquary for a week, with the credential never leaving Reliquary |
-| 3 | **Routines** (can use connections) | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
-| 4 | **Team and clients.** Second person, quorum above 1, environment variables, credential requests, emergency access | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; a real client fills a credential request instead of emailing it; the access logs show all of it |
-| 5 | **Git mirror, version history view** | A one-way mirror stays in sync for a week; a file is restored from its history |
-| 6 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
+| 2 | **Environment variables** (reordered 2026-09-24: the owner's `.env` need comes first, and connections reuse its secret store) | Andrés's projects run with `reliquary run` and no local `.env` for a week; an agent over MCP never sees a value; every read is in the access log |
+| 3 | **Shared connections** (credentials from the same store) | One upstream MCP (e.g. Linear) is used from all three clients through Reliquary for a week, with the credential never leaving Reliquary |
+| 4 | **Routines** (can use connections) | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
+| 5 | **Team and clients.** Second person, quorum above 1, per-member variable grants, credential requests, emergency access | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; a real client fills a credential request instead of emailing it; the access logs show all of it |
+| 6 | **Git mirror, version history view** | A one-way mirror stays in sync for a week; a file is restored from its history |
+| 7 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
 
 ## Open decisions
 

@@ -10,7 +10,11 @@ Milestones and their exit checks are in the design's Build order table. Work
 on the current milestone only. A milestone is done when its check has held
 for a week of real use, not when the code merges.
 
-Current milestone: **1, core, MCP and UI** (vaults, files with canon/open
+Current milestones (owner's decision, 2026-09-24): **1** is built and hosted,
+and in its week of real use; **2, environment variables**, is being built
+alongside it. Nothing from milestone 3 on.
+
+Milestone 1: **core, MCP and UI** (vaults, files with canon/open
 policies, proposals with quorum, log, gate, remote MCP with OAuth, web UI).
 Done so far:
 - core schema, access tokens and search in `supabase/migrations/`, with hostile
