@@ -2,6 +2,7 @@
 // claim) through asPerson(); the database decides what they may see and do.
 // Structure follows docs/research/ux-patterns.md.
 
+import type { Writable } from "node:stream";
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { authorize } from "./oauth.js";
@@ -10,6 +11,7 @@ import { diffMode, diffSection } from "./diffview.js";
 import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
 import { variablesRoutes } from "./variablespage.js";
+import { adminRoutes } from "./vaultadmin.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -36,7 +38,9 @@ export type Ctx = {
   setFlash: (message: string) => void;
 };
 // formAction: one more origin the page's forms may submit (and redirect) to.
-export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string };
+// download: a file streamed as the response (no-store, as an attachment).
+export type Download = { filename: string; type: string; write: (out: Writable) => Promise<void> };
+export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string; download?: Download };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export type Vault = { id: string; name: string; role: string };
@@ -169,7 +173,7 @@ const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "activity" | "rules" | "search" | "variables";
+export type Section = "files" | "proposals" | "activity" | "rules" | "search" | "variables" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   const files = (
@@ -216,6 +220,8 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
 
   const link = (section: Section, href: string, label: Raw | string) =>
     html`<a href="${href}"${current.section === section ? raw(' aria-current="page"') : ""}>${label}</a>`;
+  // Settings holds Rules, so the Rules page marks Settings as current.
+  const settingsLink = () => link(current.section === "rules" ? "rules" : "settings", vaultPath(v.id, "/config"), "Settings");
   const tree = files.length ? renderNode(root, "") : html`<p class="muted small tree-empty">No files yet.</p>`;
   return html`<div class="vault">
     <aside class="side">
@@ -227,14 +233,14 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
         ${link("files", vaultPath(v.id), "Files")}
         ${link("proposals", vaultPath(v.id, "/proposals"), html`Proposals${open ? html`<span class="count">${open}</span>` : ""}`)}
         ${link("activity", vaultPath(v.id, "/activity"), "Activity")}
-        ${link("rules", vaultPath(v.id, "/rules"), "Rules")}
         ${link("variables", vaultPath(v.id, "/variables"), "Variables")}
+        ${settingsLink()}
       </nav>
       <nav class="tree" aria-label="Files">${tree}</nav>
     </aside>
     <details class="tree-mobile"><summary>Browse ${v.name}</summary>
       <nav class="side-links" aria-label="Vault (mobile)">
-        ${link("files", vaultPath(v.id), "Files")}${link("proposals", vaultPath(v.id, "/proposals"), "Proposals")}${link("activity", vaultPath(v.id, "/activity"), "Activity")}${link("rules", vaultPath(v.id, "/rules"), "Rules")}${link("variables", vaultPath(v.id, "/variables"), "Variables")}
+        ${link("files", vaultPath(v.id), "Files")}${link("proposals", vaultPath(v.id, "/proposals"), "Proposals")}${link("activity", vaultPath(v.id, "/activity"), "Activity")}${link("variables", vaultPath(v.id, "/variables"), "Variables")}${settingsLink()}
       </nav>
       <nav class="tree" aria-label="Files (mobile)">${tree}</nav></details>
     <div class="content">${body}</div>
@@ -522,10 +528,11 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
         path: true,
         meta: html`${ruleLine(ctx, id, rule)}
           <p class="meta"><span>Last written by ${who(ctx, f.author, f.agent)}</span><span>${when(f.created_at)}</span></p>`,
-        actions:
+        actions: html`${v.role === "owner" ? moreMenu(id, path) : ""}${
           canWrite(v) && !f.erased_at
             ? html`<a class="button${canon ? "" : " primary"}" href="${vaultPath(id, `/edit?path=${q(path)}`)}">${canon ? "Propose a change" : "Edit"}</a>`
-            : "",
+            : ""
+        }`,
       })}
       ${pending.length
         ? html`<p class="callout info">${pending.length === 1
@@ -545,6 +552,12 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
   if (!data) return notFound(ctx);
   return render(ctx, path, data.shell, "vaults");
 }
+
+// The file page's "More" menu: rare or irreversible actions, each through
+// its own confirm page.
+const moreMenu = (id: string, path: string) =>
+  html`<details class="menu-wrap more-menu"><summary class="button quiet">More</summary>
+    <div class="menu"><a class="danger" href="${vaultPath(id, `/erase?path=${q(path)}`)}">Erase this file…</a></div></details>`;
 
 async function editView(ctx: Ctx, id: string): Promise<Reply> {
   const path = ctx.url.searchParams.get("path") ?? "";
@@ -1386,6 +1399,7 @@ export async function routes(ctx: Ctx): Promise<Reply> {
   if (!get && rest === "/rules") return setRule(ctx, id);
   if (get && rest === "/search") return search(ctx, id);
   if (rest === "/variables" || rest.startsWith("/variables/")) return variablesRoutes(ctx, id, rest);
+  if (rest === "/config" || rest.startsWith("/config/") || rest === "/erase") return adminRoutes(ctx, id, rest);
   const pm = /^\/proposals\/([^/]+)(\/[a-z]+)?$/.exec(rest);
   if (pm) {
     const [, pid, action = ""] = pm;

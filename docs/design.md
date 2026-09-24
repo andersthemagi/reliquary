@@ -436,6 +436,14 @@ that with a vault per engagement:
 
 - **Export:** the whole vault's context as markdown files plus a log file,
   from the UI or `reliquary export`. Available on every plan.
+  - Built (web): an owner, in person, downloads a `.tar.gz` from the vault's
+    Settings: every live file's current text under `files/`, and
+    `reliquary-export.json` with the vault, its default policy and rules,
+    and each file's SHA-256, size and last write. Variable values are never
+    exported, only names and the environments that have one. It streams,
+    a page of files per short transaction, is capped at 100 MiB of text,
+    is `no-store`, and is logged as `vault.export`. Not yet: the log file,
+    earlier versions, proposals, and `reliquary export`.
 - **Git mirror (optional per vault):**
   - every canon change becomes a commit to a configured remote;
   - commits are authored by the person who approved or wrote it, with the
@@ -460,9 +468,39 @@ text and stamps it. A trigger enforces that no other change is possible.
 
 - The log keeps its sequence; the content is gone.
 - Backups still hold it until they age out, which the privacy policy states.
-- Closing a vault erases everything in it after the export window.
+- Deleting a vault erases everything in it at once (below). The export
+  window is before, not after: the delete page offers export first.
 - Per-file encryption keys (crypto-shredding) remain an option if backups
   must forget immediately. Lean v1 doesn't need them.
+
+**Deleting a vault.** Immediate and permanent, by one database function,
+`delete_vault`: an owner, in person, with the vault's name typed (the
+database checks the name too, so no surface can skip it). It deletes the
+vault row, and on delete cascade everything in it: files and every version,
+proposals, approvals, notes and comments, rules, members, the log, the
+variables access log, variables and their ciphertexts. Tokens whose only
+vault it was are revoked; tokens that reach other vaults keep those. What
+remains is one row in `private.vault_deletions`: the vault id, who deleted
+it, when, and counts, with no name, path or text.
+
+Why not a soft delete with a purge later: every policy and function would
+have to learn a "deleted" state, the data would sit in the live database
+for the whole window, and the purge would be a job someone must remember to
+run (and that the product must not depend on a member running). Immediate
+deletion is simpler, is erasure in the GDPR sense the moment it returns,
+and leaves nothing to guard. The cost is that a mistake can't be undone
+from the product; the typed name, the owner-only in-person rule and the
+export offered first are the guard, and backups (which age out) are the
+operator's last resort.
+
+The log, approvals and `env_access_log` are append-only and `file_versions`
+and `proposal_notes` erase-only by trigger. `delete_vault` is the one
+sanctioned path around them: it writes its `vault_deletions` row with the
+current transaction id first, and the triggers allow a `DELETE` only of a
+row whose vault has such a row in the same transaction. Nothing else can
+write that table, a row from another transaction unlocks nothing, and
+`TRUNCATE` is always refused, so outside a deletion append-only holds as
+before, even for the table owner.
 
 **GDPR, from the start:**
 
