@@ -36,6 +36,7 @@ let styleVersion = "";
 export const setStyleVersion = (v: string) => {
   styleVersion = v;
 };
+export const styleHref = () => `/style.css?v=${styleVersion}`;
 
 // How people sign in (AUTH_MODE), set by the server at start: the account
 // menu says "(local)" for the dev.sh stand-in, and offers Sign out otherwise.
@@ -43,6 +44,17 @@ let accountMode: "local" | "supabase" = "local";
 export const setAccountMode = (m: "local" | "supabase") => {
   accountMode = m;
 };
+
+// The public pages every footer links to (site.ts renders them).
+export const LEGAL_LINKS: ReadonlyArray<readonly [string, string]> = [
+  ["/terms", "Terms"],
+  ["/privacy", "Privacy"],
+  ["/dpa", "Data processing"],
+  ["/subprocessors", "Sub-processors"],
+  ["/security", "Security"],
+];
+export const footerLinks = () =>
+  html`<nav class="footer-links" aria-label="Legal">${LEGAL_LINKS.map(([href, label]) => html`<a href="${href}">${label}</a>`)}</nav>`;
 
 export type Nav = "home" | "review" | "vaults" | "activity" | "connect" | "tokens";
 
@@ -68,6 +80,7 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
 <title>${title} · Reliquary</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/fonts/inter-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -109,7 +122,7 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
 ${opts.flash ? html`<p class="callout info flash" role="status">${opts.flash}</p>` : ""}
 ${body}
 </main>
-${opts.user ? html`<footer><span>Reliquary</span><span>Shared context for people and their agents</span></footer>` : ""}
+<footer><span>Reliquary by Red Mage</span>${footerLinks()}</footer>
 </body>
 </html>`.html;
 }
