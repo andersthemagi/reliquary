@@ -21,6 +21,9 @@ Done so far:
   inbox, proposal pages with approve / request changes / reject / edit & approve,
   folder tree, rendered files, rules with a checker, search, Connect page, with
   end-to-end tests (`./web/test.sh`). Structure: `docs/research/ux-patterns.md`.
+  Phase 2 so far: unified / split / rendered diffs with word highlights, and
+  Activity (account-wide and per vault, filterable, paged; a file's History is
+  the same log).
 Both need podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
