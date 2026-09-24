@@ -1,0 +1,169 @@
+# Deploys main: migrations to Supabase, then both Vercel projects, then smoke
+# checks. Runs by hand (Actions > deploy > Run workflow, on main), and after
+# the test workflow passes on a push to main. Plan: docs/research/hosting.md,
+# sections 8 and 10D.
+#
+# Each stage skips with a notice until its settings exist, so main stays
+# green before the hosted projects are set up. A stage with only some of its
+# settings fails, naming what's missing (names only, never values).
+#
+#   stage   repository secrets (Settings > Secrets and variables > Actions)
+#   db      SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF
+#   hooks   VERCEL_DEPLOY_HOOK_WEB, VERCEL_DEPLOY_HOOK_MCP
+#   smoke   repository variables WEB_URL, MCP_URL (origins, e.g.
+#           https://app.example.com); secret KEEPALIVE_TOKEN if the MCP
+#           project has one; variable CHECK_OAUTH=1 once MCP OAuth ships
+#
+# Turn off Vercel's own production deploys from Git for both projects, so
+# code never goes live before its migration: this workflow is the only path.
+# Deploy Hooks build the latest commit on main, not a pinned SHA.
+#
+# First push (manual, once; hosting.md section 8, open question): before it,
+# run this in the Supabase SQL editor as `postgres`:
+#   begin; create role rq_probe nologin; grant authenticated to rq_probe; rollback;
+# If it succeeds, the grants in 20260924130000 and 20260924140000 will too.
+# Then run this workflow by hand and read the dry run, and afterwards set the
+# role passwords (owner step 5). If the probe is refused (PG 16+ needs ADMIN
+# OPTION on `authenticated`, and `postgres` is not superuser), a later
+# migration can't help: `db push` stops at the first failing file, and the
+# grant is inside shipped ones. Then it's a design decision, not a patch:
+# ask Supabase support to grant it, or have the apps become a role of our own
+# instead of `authenticated` (policies and grants move with it).
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      check_oauth:
+        description: Also check that the MCP 401 names resource_metadata
+        type: boolean
+        default: false
+  workflow_run:
+    workflows: [test]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One deploy at a time, and never cancel one halfway through a migration.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Which stages are configured
+        id: cfg
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          VERCEL_DEPLOY_HOOK_WEB: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
+          VERCEL_DEPLOY_HOOK_MCP: ${{ secrets.VERCEL_DEPLOY_HOOK_MCP }}
+          WEB_URL: ${{ vars.WEB_URL }}
+          MCP_URL: ${{ vars.MCP_URL }}
+        run: |
+          # Values that are derived from secrets aren't masked by GitHub on
+          # their own: the URL-encoded password, the hook IDs.
+          [ -z "$SUPABASE_DB_PASSWORD" ] ||
+            echo "::add-mask::$(jq -rn --arg v "$SUPABASE_DB_PASSWORD" '$v|@uri')"
+          for hook in "$VERCEL_DEPLOY_HOOK_WEB" "$VERCEL_DEPLOY_HOOK_MCP"; do
+            [ -z "$hook" ] || echo "::add-mask::${hook##*/}"
+          done
+
+          # stage <name> <var>...: all set runs it, none set skips it,
+          # some set is a configuration mistake.
+          stage() {
+            local name=$1 n=0 v missing=()
+            shift
+            for v in "$@"; do
+              if [ -n "${!v}" ]; then n=$((n + 1)); else missing+=("$v"); fi
+            done
+            if [ "$n" = $# ]; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+              echo "- $name: runs" >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$n" = 0 ]; then
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+              echo "::notice title=deploy $name skipped::not configured yet (${missing[*]})"
+              echo "- $name: skipped, not configured (${missing[*]})" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error title=deploy $name misconfigured::missing ${missing[*]}"
+              return 1
+            fi
+          }
+          stage db SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF
+          stage hooks VERCEL_DEPLOY_HOOK_WEB VERCEL_DEPLOY_HOOK_MCP
+          stage smoke WEB_URL MCP_URL
+
+      - uses: actions/checkout@v7
+        with:
+          # After the test workflow: exactly the commit it tested.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@v3
+        if: steps.cfg.outputs.db == 'true'
+        with:
+          version: 2.117.0
+
+      - name: Link the Supabase project
+        if: steps.cfg.outputs.db == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Migrations, dry run
+        if: steps.cfg.outputs.db == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push --linked --dry-run
+
+      - name: Migrations
+        if: steps.cfg.outputs.db == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push --linked --yes
+
+      - name: Vercel Deploy Hooks (web, mcp)
+        if: steps.cfg.outputs.hooks == 'true'
+        env:
+          HOOK_WEB: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
+          HOOK_MCP: ${{ secrets.VERCEL_DEPLOY_HOOK_MCP }}
+        run: |
+          for app in web mcp; do
+            hook_var="HOOK_${app^^}"
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -X POST "${!hook_var}") || code=000
+            echo "$app deploy hook: HTTP $code"
+            case $code in 2??) ;; *) echo "::error::$app deploy hook failed (HTTP $code)"; exit 1 ;; esac
+          done
+
+      - name: Wait for the builds
+        if: steps.cfg.outputs.hooks == 'true' && steps.cfg.outputs.smoke == 'true'
+        env:
+          SETTLE: ${{ vars.DEPLOY_SETTLE_SECONDS || '120' }}
+        # Deploy Hooks return before the build; without a Vercel API token we
+        # can't watch it, so give it time before checking production.
+        run: sleep "$SETTLE"
+
+      - name: Smoke checks
+        if: steps.cfg.outputs.smoke == 'true'
+        env:
+          WEB_URL: ${{ vars.WEB_URL }}
+          MCP_URL: ${{ vars.MCP_URL }}
+          KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
+          CHECK_OAUTH: ${{ (inputs.check_oauth || vars.CHECK_OAUTH == '1') && '1' || '' }}
+        run: ./scripts/deploy-check.sh

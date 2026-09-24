@@ -77,6 +77,8 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 |---|---|---|---|
 | F33 | Web as hosted (PUBLIC_URL, no public/) | With `PUBLIC_URL=https://...` a POST passes only with exactly that Origin (any other, `null` or none gets 403); session and theme cookies are `__Host-` prefixed, Secure, Path=/, no Domain; the server starts and renders pages without `public/` | `web/test/hosting.test.mjs#hosted:` |
 | F34 | Database TLS and pool for serverless | On Vercel, `DATABASE_URL` without `DATABASE_CA_FILE` is refused at start; with it, TLS is verified against the bundled Supabase CA; TLS parameters in the URL are refused next to a CA; refusals never contain the URL; pools default small (web 3, mcp 5); local runs unchanged | `web/test/db_tls.test.mjs#db tls:`, `web/test/db_tls.test.mjs#db pool:`, `mcp/test/db_tls.test.mjs#db tls:`, `mcp/test/db_tls.test.mjs#db pool:` |
+| F35 | Health and keepalive | `/healthz` answers `ok` without the database; `/healthz?db=1` runs `select 1` and answers only `ok` or 503 `unavailable`, uncached; with `KEEPALIVE_TOKEN` set it needs a matching `x-keepalive` header (constant-time compare), and the token never reaches the log | `mcp/test/healthz.test.mjs#healthz:` |
+| F36 | Role statement timeouts | `reliquary_web` and `reliquary_mcp` log in with a 10s `statement_timeout`, kept across `set local role authenticated` | `supabase/tests/role_timeouts_test.sql#timeout:`, `mcp/test/healthz.test.mjs#timeout:` |
 
 ## Not built yet (no rows until they ship)
 

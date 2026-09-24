@@ -1,0 +1,46 @@
+# Keeps the free Supabase project from pausing (it pauses after 7 days
+# without database activity): a `select 1` through the MCP app every 6 hours.
+# A failed run emails the owner; that is the alert. Plan:
+# docs/research/hosting.md, section 6.
+#
+# Secrets: KEEPALIVE_URL (https://mcp.<domain>/healthz?db=1) and
+# KEEPALIVE_TOKEN (same value as the MCP project's env var; optional). Until
+# KEEPALIVE_URL is set, runs skip with a notice.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: GET /healthz?db=1
+        env:
+          URL: ${{ secrets.KEEPALIVE_URL }}
+          TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "::notice title=keepalive skipped::KEEPALIVE_URL is not set yet"
+            exit 0
+          fi
+          header=()
+          [ -z "$TOKEN" ] || header=(-H @-)
+          for attempt in 1 2; do
+            # The header comes from stdin, so the token is not in the process list.
+            code=$(curl -sS -o body --max-time 30 -w '%{http_code}' "${header[@]}" "$URL" \
+                     <<< "x-keepalive: $TOKEN" 2>/dev/null) || code=000
+            if [ "$code" = 200 ] && [ "$(cat body)" = ok ]; then
+              echo "keepalive ok (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt: HTTP $code"
+            [ "$attempt" = 2 ] || sleep 30
+          done
+          echo "::error title=keepalive failed::HTTP $code from /healthz?db=1; the Supabase project may pause"
+          exit 1

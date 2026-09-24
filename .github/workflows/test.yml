@@ -20,7 +20,7 @@ jobs:
     # trailer. Checks the commits a PR adds, or the commits a push adds.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Registry maps every test file
@@ -49,6 +49,6 @@ jobs:
       # podman when it's installed unless told otherwise.
       CONTAINER_ENGINE: docker
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: All suites (sql, mcp, web) in parallel
         run: ./test.sh

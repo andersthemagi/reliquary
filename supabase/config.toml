@@ -1,0 +1,10 @@
+# Minimal Supabase CLI config, for `supabase link` and `supabase db push`
+# (.github/workflows/deploy.yml). We don't run the local Supabase stack: tests
+# use plain Postgres with supabase/tests/stub.sql, which is never pushed.
+project_id = "reliquary"
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = false
