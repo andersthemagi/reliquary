@@ -4,7 +4,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { diffLines } from "./diff.js";
-import { csrfField, html, page, when, type Raw } from "./html.js";
+import { csrfField, html, page, when, type Raw, type Theme } from "./html.js";
 
 export type Ctx = {
   userId: string;
@@ -13,6 +13,7 @@ export type Ctx = {
   form: URLSearchParams;
   method: string | undefined;
   flash?: string;
+  theme: Theme;
   setFlash: (message: string) => void;
 };
 export type Reply = { status?: number; html?: string; redirect?: string };
@@ -29,13 +30,22 @@ function message(err: unknown): string {
 const who = (ctx: Ctx, id: string | null, agent: string | null) =>
   `${id === ctx.userId ? "you" : id ? id.slice(0, 8) : "system"}${agent ? ` via ${agent}` : ""}`;
 
-const badge = (policy: string) => html`<span class="badge ${policy}">${policy}</span>`;
+const tag = (policy: string) => html`<span class="tag ${policy}">${policy}</span>`;
 
 const vaultPath = (id: string, rest = "") => `/v/${id}${rest}`;
 const filePath = (id: string, path: string) => `/v/${id}/file?path=${encodeURIComponent(path)}`;
 
-function render(ctx: Ctx, title: string, body: Raw): Reply {
-  return { html: page(title, body, { user: ctx.userId, flash: ctx.flash }) };
+function render(ctx: Ctx, title: string, body: Raw, nav?: "vaults" | "tokens"): Reply {
+  return {
+    html: page(title, body, {
+      user: ctx.userId,
+      flash: ctx.flash,
+      theme: ctx.theme,
+      csrf: ctx.csrf,
+      path: ctx.url.pathname + ctx.url.search,
+      nav,
+    }),
+  };
 }
 
 async function vault(c: pg.PoolClient, ctx: Ctx, id: string) {
@@ -51,10 +61,15 @@ async function vault(c: pg.PoolClient, ctx: Ctx, id: string) {
 
 const notFound = (ctx: Ctx): Reply => ({
   status: 404,
-  html: page("Not found", html`<h1>Not found</h1><p>No such vault or file, or it isn't shared with you.</p>`, {
-    user: ctx.userId,
-  }),
+  html: page(
+    "Not found",
+    html`<h1>Not found</h1><p class="lede">There’s no such vault or file, or it isn’t shared with you.</p>
+      <p><a href="/">Back to your vaults</a></p>`,
+    { user: ctx.userId, theme: ctx.theme, csrf: ctx.csrf, path: "/" },
+  ),
 });
+
+const crumb = (id: string, name: string) => html`<p class="crumb"><a href="${vaultPath(id)}">${name}</a></p>`;
 
 // ---------------------------------------------------------------------------
 
@@ -63,7 +78,8 @@ async function home(ctx: Ctx): Promise<Reply> {
     (
       await c.query(
         `select v.id, v.name, m.role,
-                (select count(*) from public.proposals p where p.vault_id = v.id and p.status = 'open') as open
+                (select count(*) from public.proposals p where p.vault_id = v.id and p.status = 'open') as open,
+                (select count(*) from public.files f where f.vault_id = v.id and f.deleted_at is null) as files
            from public.vaults v
            join public.vault_members m on m.vault_id = v.id and m.user_id = $1
           order by v.name`,
@@ -75,14 +91,19 @@ async function home(ctx: Ctx): Promise<Reply> {
     ctx,
     "Vaults",
     html`<h1>Your vaults</h1>
-    ${rows.length === 0 ? html`<p class="muted">No vaults yet. Create one with <code>./mcp/dev.sh vault "Name"</code>.</p>` : ""}
-    ${rows.map(
-      (v) => html`<div class="card">
-        <a href="${vaultPath(v.id)}"><strong>${v.name}</strong></a>
-        <span class="muted small">· ${v.role}</span>
-        ${Number(v.open) > 0 ? html` · <a href="${vaultPath(v.id, "/proposals")}">${v.open} to review</a>` : ""}
-      </div>`,
-    )}`,
+    <p class="lede">Shared context your agents read and propose to. Canon changes wait here for you to approve them.</p>
+    ${rows.length === 0
+      ? html`<div class="empty"><strong>No vaults yet.</strong> Create one with <code>./mcp/dev.sh vault "Name"</code>, then connect an agent from Tokens.</div>`
+      : html`<ul class="rows">${rows.map(
+          (v) => html`<li>
+            <span><a class="name" href="${vaultPath(v.id)}">${v.name}</a>
+              <span class="muted small"> · ${v.role} · ${v.files} ${Number(v.files) === 1 ? "file" : "files"}</span></span>
+            ${Number(v.open) > 0
+              ? html`<a href="${vaultPath(v.id, "/proposals")}">${v.open} to review</a>`
+              : html`<span class="muted small">Nothing to review</span>`}
+          </li>`,
+        )}</ul>`}`,
+    "vaults",
   );
 }
 
@@ -112,39 +133,44 @@ async function vaultHome(ctx: Ctx, id: string): Promise<Reply> {
     ctx,
     v.name,
     html`<h1>${v.name}</h1>
-    <div class="row">
-      <a href="${vaultPath(id, "/proposals")}">Proposals${open ? ` (${open} open)` : ""}</a> ·
-      <a href="${vaultPath(id, "/log")}">Change log</a>
-      ${canWrite ? html` · <a href="${vaultPath(id, "/new")}">New file</a>` : ""}
+    <div class="actions">
+      ${canWrite ? html`<a class="button primary" href="${vaultPath(id, "/new")}">New file</a>` : ""}
+      <a class="button" href="${vaultPath(id, "/proposals")}">Proposals${open ? html`<span class="count">${open}</span>` : ""}</a>
+      <a class="button quiet" href="${vaultPath(id, "/log")}">Change log</a>
     </div>
+
     <h2>Files</h2>
     ${files.length === 0
-      ? html`<p class="muted">No files yet.</p>`
-      : html`<table><tr><th>Path</th><th>Policy</th><th>Updated</th></tr>
+      ? html`<div class="empty"><strong>No files yet.</strong> ${canWrite ? "Create one here, or ask a connected agent to write one." : "Nothing has been shared here yet."}</div>`
+      : html`<div class="table-wrap"><table>
+        <tr><th>Path</th><th>Policy</th><th class="num hide-sm">Updated</th></tr>
         ${files.map(
-          (f) => html`<tr><td><a href="${filePath(id, f.path)}">${f.path}</a></td><td>${badge(f.policy)}</td>
-            <td class="small muted">${when(f.updated_at)}</td></tr>`,
-        )}</table>`}
+          (f) => html`<tr><td><a href="${filePath(id, f.path)}">${f.path}</a></td><td>${tag(f.policy)}</td>
+            <td class="num small muted hide-sm">${when(f.updated_at)}</td></tr>`,
+        )}</table></div>`}
+
     <h2>Policies</h2>
-    <p class="small muted">Vault default: ${badge(def)}. Folder rules end with <code>/</code>; the most specific rule wins.</p>
+    <p class="muted small">Everything is ${tag(def)} unless a rule says otherwise. Folder rules end in <code>/</code>; the most specific rule wins. Canon changes need approval from people; agents can only propose them.</p>
     ${policies.length
-      ? html`<table><tr><th>Path</th><th>Policy</th><th>Approvals needed</th></tr>
+      ? html`<div class="table-wrap"><table><tr><th>Path</th><th>Policy</th><th class="num">Approvals needed</th></tr>
         ${policies.map(
-          (p) => html`<tr><td><code>${p.path}</code></td><td>${badge(p.policy)}</td><td>${p.policy === "canon" ? p.quorum : ""}</td></tr>`,
-        )}</table>`
+          (p) => html`<tr><td><code>${p.path}</code></td><td>${tag(p.policy)}</td><td class="num">${p.policy === "canon" ? p.quorum : ""}</td></tr>`,
+        )}</table></div>`
       : ""}
     ${v.role === "owner"
-      ? html`<form method="post" action="${vaultPath(id, "/policy")}" class="card">
+      ? html`<form method="post" action="${vaultPath(id, "/policy")}" class="panel">
           ${csrfField(ctx.csrf)}
-          <label for="pp">Set a policy</label>
-          <div class="row">
-            <input id="pp" type="text" name="path" placeholder="clients/  or  canon/pricing.md" required>
-            <select name="policy"><option value="canon">canon</option><option value="open">open</option><option value="">remove rule</option></select>
-            <input type="text" name="quorum" value="1" size="3" aria-label="Approvals needed">
-            <button>Save</button>
+          <div class="fields">
+            <div><label for="pp">Path or folder</label>
+              <input id="pp" type="text" name="path" placeholder="canon/  or  clients/acme.md" required></div>
+            <div><label for="pol">Policy</label>
+              <select id="pol" name="policy"><option value="canon">Canon</option><option value="open">Open</option><option value="">Remove rule</option></select></div>
+            <div><label for="q">Approvals</label><input id="q" class="narrow" type="text" name="quorum" value="1" inputmode="numeric"></div>
           </div>
+          <div class="actions"><button>Save rule</button></div>
         </form>`
       : ""}`,
+    "vaults",
   );
 }
 
@@ -180,34 +206,42 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
   return render(
     ctx,
     f.path,
-    html`<p class="small"><a href="${vaultPath(id)}">${v.name}</a></p>
-    <h1>${f.path} ${badge(f.policy)}</h1>
-    <p class="small muted">Last written by ${who(ctx, f.author, f.agent)} · ${when(f.created_at)}
-      ${canon ? ` · changes need ${f.quorum} approval${f.quorum > 1 ? "s" : ""}` : " · open: members and their agents edit directly"}</p>
-    ${f.erased_at ? html`<p class="muted">This file's content was erased.</p>` : html`<pre class="file">${f.body}</pre>`}
+    html`${crumb(id, v.name)}
+    <h1 class="path">${f.path} ${tag(f.policy)}</h1>
+    <p class="meta"><span>Last written by ${who(ctx, f.author, f.agent)}</span><span>${when(f.created_at)}</span>
+      <span>${canon ? `Changes need ${f.quorum} approval${f.quorum > 1 ? "s" : ""}` : "Members and their agents edit directly"}</span></p>
+    ${f.erased_at ? html`<div class="empty">This file’s content was erased.</div>` : html`<div class="file facet">${f.body}</div>`}
+
     ${canWrite && !f.erased_at
       ? html`<h2>${canon ? "Propose a change" : "Edit"}</h2>
-        <form method="post" action="${vaultPath(id, "/file")}">
+        <form method="post" action="${vaultPath(id, "/file")}" class="panel">
           ${csrfField(ctx.csrf)}
           <input type="hidden" name="path" value="${f.path}">
           <input type="hidden" name="action" value="${canon ? "propose" : "write"}">
-          <textarea name="content" aria-label="File text">${f.body}</textarea>
-          ${canon ? html`<label for="r">Reason</label><input id="r" type="text" name="reason" required>` : ""}
-          <div class="row"><button class="primary">${canon ? "Propose" : "Save"}</button></div>
+          <label for="content">Text</label>
+          <textarea id="content" name="content">${f.body}</textarea>
+          ${canon
+            ? html`<label for="r">Why this change</label><input id="r" type="text" name="reason" required>
+              <p class="hint">Reviewers see this next to the diff.</p>`
+            : ""}
+          <div class="actions"><button class="primary">${canon ? "Propose change" : "Save"}</button></div>
         </form>
         <form method="post" action="${vaultPath(id, "/file")}">
           ${csrfField(ctx.csrf)}
           <input type="hidden" name="path" value="${f.path}">
           <input type="hidden" name="action" value="${canon ? "propose-delete" : "delete"}">
           ${canon ? html`<input type="hidden" name="reason" value="Delete ${f.path}">` : ""}
-          <button class="danger">${canon ? "Propose deleting" : "Delete"}</button>
+          <div class="actions"><button class="danger">${canon ? "Propose deleting this file" : "Delete this file"}</button></div>
         </form>`
       : ""}
+
     <h2>History</h2>
-    <table>${history.map(
+    <div class="table-wrap"><table><tr><th>When</th><th>By</th><th></th></tr>
+    ${history.map(
       (h) => html`<tr><td class="small">${when(h.created_at)}</td><td class="small">${who(ctx, h.author, h.agent)}</td>
-        <td class="small muted">${h.erased_at ? "erased" : ""}</td></tr>`,
-    )}</table>`,
+        <td class="small muted">${h.erased_at ? "Erased" : ""}</td></tr>`,
+    )}</table></div>`,
+    "vaults",
   );
 }
 
@@ -217,17 +251,20 @@ async function newFile(ctx: Ctx, id: string): Promise<Reply> {
   return render(
     ctx,
     "New file",
-    html`<p class="small"><a href="${vaultPath(id)}">${v.name}</a></p>
+    html`${crumb(id, v.name)}
     <h1>New file</h1>
-    <form method="post" action="${vaultPath(id, "/file")}">
+    <form method="post" action="${vaultPath(id, "/file")}" class="panel">
       ${csrfField(ctx.csrf)}
       <input type="hidden" name="action" value="create">
       <label for="p">Path</label><input id="p" type="text" name="path" placeholder="notes/standup.md" required>
+      <p class="hint">Folders are part of the path. A path under a canon folder becomes a proposal instead of a file.</p>
       <label for="c">Text</label><textarea id="c" name="content"></textarea>
-      <label for="r">Reason (used if the path is canon and this becomes a proposal)</label>
+      <label for="r">Why (only used if this becomes a proposal)</label>
       <input id="r" type="text" name="reason" value="New file">
-      <div class="row"><button class="primary">Create</button></div>
+      <div class="actions"><button class="primary">Create file</button>
+        <a class="button quiet" href="${vaultPath(id)}">Cancel</a></div>
     </form>`,
+    "vaults",
   );
 }
 
@@ -259,7 +296,7 @@ async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
       return { redirect: vaultPath(id) };
     }
     if (outcome.startsWith("propose")) {
-      ctx.setFlash("Proposed. It applies once enough people approve.");
+      ctx.setFlash("Proposed. It applies once enough people approve it.");
       return { redirect: vaultPath(id, "/proposals") };
     }
     ctx.setFlash(`Saved ${path}.`);
@@ -296,46 +333,53 @@ async function proposals(ctx: Ctx, id: string): Promise<Reply> {
   if (!data) return notFound(ctx);
   const { v, rows } = data;
   const canDecide = v.role === "owner" || v.role === "editor";
-  const tabs = ["open", "applied", "rejected", "stale"].map((s) =>
-    s === status ? html`<strong>${s}</strong>` : html`<a href="${vaultPath(id, `/proposals?status=${s}`)}">${s}</a>`,
+  const tabs = ["open", "applied", "rejected", "stale"].map(
+    (s) => html`<a href="${vaultPath(id, `/proposals?status=${s}`)}"${s === status ? html` aria-current="page"` : ""}>${s}</a>`,
   );
+  const emptyCopy: Record<string, string> = {
+    open: "Nothing waiting. When an agent proposes a change to a canon file, it shows up here.",
+    applied: "No proposals have been applied yet.",
+    rejected: "No proposals have been rejected.",
+    stale: "No stale proposals. A proposal goes stale when its file changed before it was approved.",
+  };
   return render(
     ctx,
     "Proposals",
-    html`<p class="small"><a href="${vaultPath(id)}">${v.name}</a></p>
+    html`${crumb(id, v.name)}
     <h1>Proposals</h1>
-    <div class="row small">${tabs.map((t, i) => html`${i ? " · " : ""}${t}`)}</div>
-    ${rows.length === 0 ? html`<p class="muted">Nothing ${status}.</p>` : ""}
+    <nav class="tabs" aria-label="Proposal status">${tabs}</nav>
+    ${rows.length === 0 ? html`<div class="empty">${emptyCopy[status]}</div>` : ""}
     ${rows.map((p) => {
       const approvals = (p.decisions as { user: string; decision: string }[]).filter((d) => d.decision === "approve");
       const mine = (p.decisions as { user: string }[]).some((d) => d.user === ctx.userId);
       const before = p.current_body ?? "";
       const after = p.kind === "delete" ? "" : p.body ?? "";
       const lines = diffLines(before, after);
-      return html`<div class="card">
-        <div><strong>${p.kind === "delete" ? "Delete" : before ? "Change" : "Create"}</strong>
-          <a href="${filePath(id, p.path)}"><code>${p.path}</code></a></div>
-        <div class="small muted">by ${who(ctx, p.proposed_by, p.agent)} · ${when(p.created_at)}
-          · ${approvals.length}/${p.quorum} approvals</div>
-        <p><em>${p.reason || "No reason given."}</em></p>
-        ${p.agent ? html`<p class="small muted">Proposed by an agent. Read the change itself, not just the reason: text written by agents can contain instructions aimed at reviewers.</p>` : ""}
+      const verb = p.kind === "delete" ? "Delete" : before ? "Change" : "Create";
+      return html`<article class="proposal">
+        <h2>${verb} <a href="${filePath(id, p.path)}">${p.path}</a></h2>
+        <p class="meta"><span>By ${who(ctx, p.proposed_by, p.agent)}</span><span>${when(p.created_at)}</span>
+          <span>${approvals.length} of ${p.quorum} approvals</span></p>
+        <p class="reason">${p.reason || "No reason given."}</p>
+        ${p.agent ? html`<p class="caution">Proposed by an agent. Judge the change itself, not the reason: agent-written text can carry instructions aimed at reviewers.</p>` : ""}
         ${lines
-          ? html`<div class="diff">${lines.map((l) => html`<div class="${l.kind}">${l.text}</div>`)}</div>`
-          : html`<p class="muted">Too large to diff. New text:</p><pre class="file">${after}</pre>`}
+          ? html`<div class="diff facet" aria-label="Changes">${lines.map((l) => html`<div class="${l.kind}"><span>${l.text}</span></div>`)}</div>`
+          : html`<p class="muted">Too large to compare line by line. New text:</p><div class="file facet">${after}</div>`}
         ${p.status === "open" && canDecide && !mine
-          ? html`<div class="row">
-              <form method="post" action="${vaultPath(id, `/proposals/${p.id}`)}" class="inline">
+          ? html`<div class="actions">
+              <form method="post" action="${vaultPath(id, `/proposals/${p.id}`)}">
                 ${csrfField(ctx.csrf)}<input type="hidden" name="decision" value="approve">
                 <button class="primary">Approve</button></form>
-              <form method="post" action="${vaultPath(id, `/proposals/${p.id}`)}" class="inline">
+              <form method="post" action="${vaultPath(id, `/proposals/${p.id}`)}">
                 ${csrfField(ctx.csrf)}<input type="hidden" name="decision" value="reject">
                 <button class="danger">Reject</button></form>
             </div>`
           : p.status === "open" && mine
-            ? html`<p class="small muted">You've decided on this one. Waiting for others.</p>`
+            ? html`<p class="muted small">You’ve decided on this one. It needs more approvals before it applies.</p>`
             : ""}
-      </div>`;
+      </article>`;
     })}`,
+    "vaults",
   );
 }
 
@@ -350,8 +394,8 @@ async function decide(ctx: Ctx, id: string, pid: string): Promise<Reply> {
       {
         applied: "Approved and applied.",
         open: "Approved. It needs more approvals before it applies.",
-        rejected: "Rejected.",
-        stale: "The file changed since this was proposed, so it was marked stale instead of applied.",
+        rejected: "Rejected. The file is unchanged.",
+        stale: "The file changed after this was proposed, so it was marked stale instead of applied.",
       }[result] ?? result,
     );
   } catch (err) {
@@ -373,13 +417,15 @@ async function log(ctx: Ctx, id: string): Promise<Reply> {
   return render(
     ctx,
     "Change log",
-    html`<p class="small"><a href="${vaultPath(id)}">${data.v.name}</a></p>
+    html`${crumb(id, data.v.name)}
     <h1>Change log</h1>
-    <table><tr><th>#</th><th>When</th><th>Event</th><th>Path</th><th>By</th></tr>
+    <p class="lede">Every change to this vault, newest first. The log can only be added to; nothing here is ever edited or deleted.</p>
+    <div class="table-wrap"><table><tr><th class="num">#</th><th>When</th><th>Event</th><th>Path</th><th>By</th></tr>
     ${data.rows.map(
-      (r) => html`<tr><td class="small muted">${r.seq}</td><td class="small">${when(r.at)}</td>
-        <td><code>${r.event}</code></td><td>${r.path ?? ""}</td><td class="small">${who(ctx, r.actor, r.agent)}</td></tr>`,
-    )}</table>`,
+      (r) => html`<tr><td class="num small muted">${r.seq}</td><td class="small">${when(r.at)}</td>
+        <td class="small">${r.event}</td><td>${r.path ?? ""}</td><td class="small">${who(ctx, r.actor, r.agent)}</td></tr>`,
+    )}</table></div>`,
+    "vaults",
   );
 }
 
@@ -408,26 +454,31 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
   return render(
     ctx,
     "Tokens",
-    html`<h1>Access tokens</h1>
-    <p class="small muted">A token lets one agent act as you, through MCP. Agents can read, write open files and propose; they can never approve, set policies or manage members.</p>
+    html`<h1>Tokens</h1>
+    <p class="lede">A token lets one agent act as you over MCP. Agents can read, write open files and propose changes. They can never approve, set policies or manage members.</p>
     ${fresh
-      ? html`<div class="card"><p><strong>${fresh.name}</strong>: copy this now. It won't be shown again, and it must never be pasted into a chat.</p>
-        <p class="secret">${fresh.token}</p></div>`
+      ? html`<div class="reveal facet" role="status"><strong>${fresh.name}</strong>
+          <p class="muted small">Copy it now. It won’t be shown again. Paste it into your agent’s settings, never into a chat.</p>
+          <p class="secret">${fresh.token}</p></div>`
       : ""}
-    <form method="post" action="/tokens/new" class="card">
+    <form method="post" action="/tokens/new" class="panel">
       ${csrfField(ctx.csrf)}
-      <label for="tn">New token for</label>
-      <div class="row"><input id="tn" type="text" name="name" placeholder="Hermes on Linux" required>
-      <button class="primary">Create</button></div>
+      <label for="tn">Name it after the agent and machine</label>
+      <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required>
+      <div class="actions"><button class="primary">Create token</button></div>
     </form>
-    <table><tr><th>Name</th><th>Created</th><th>Last used</th><th>Expires</th><th></th></tr>
+    <h2>Your tokens</h2>
+    ${rows.length === 0
+      ? html`<div class="empty">No tokens yet.</div>`
+      : html`<div class="table-wrap"><table><tr><th>Name</th><th class="hide-sm">Created</th><th>Last used</th><th class="hide-sm">Expires</th><th></th></tr>
     ${rows.map(
-      (t) => html`<tr><td>${t.name}</td><td class="small">${when(t.created_at)}</td>
-        <td class="small">${when(t.last_used_at) || "never"}</td><td class="small">${when(t.expires_at)}</td>
-        <td>${t.revoked_at
-          ? html`<span class="muted small">revoked</span>`
-          : html`<form method="post" action="/tokens/${t.id}/revoke" class="inline">${csrfField(ctx.csrf)}<button class="danger">Revoke</button></form>`}</td></tr>`,
-    )}</table>`,
+      (t) => html`<tr><td>${t.name}</td><td class="small hide-sm">${when(t.created_at)}</td>
+        <td class="small">${when(t.last_used_at) || "Never"}</td><td class="small hide-sm">${when(t.expires_at)}</td>
+        <td class="num">${t.revoked_at
+          ? html`<span class="muted small">Revoked</span>`
+          : html`<form method="post" action="/tokens/${t.id}/revoke">${csrfField(ctx.csrf)}<button class="danger">Revoke</button></form>`}</td></tr>`,
+    )}</table></div>`}`,
+    "tokens",
   );
 }
 
@@ -448,7 +499,7 @@ async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
   if (!UUID.test(tid)) return notFound(ctx);
   try {
     await asPerson(ctx.userId, (c) => c.query(`select public.revoke_access_token($1)`, [tid]));
-    ctx.setFlash("Token revoked.");
+    ctx.setFlash("Token revoked. Any agent using it is cut off on its next request.");
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -481,4 +532,3 @@ export async function routes(ctx: Ctx): Promise<Reply> {
   if (!get && d) return decide(ctx, id, d[1]);
   return notFound(ctx);
 }
-

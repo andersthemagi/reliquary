@@ -75,9 +75,9 @@ test("escaping: agent-written HTML is shown as text, never run", async () => {
 
 test("review: the proposal shows a diff, who proposed it, and a warning", async () => {
   const h = await text(await get(`/v/${TEAM_VAULT}/proposals`));
-  assert.match(h, /<div class="del">Day rate is 800 EUR\.<\/div>/);
-  assert.match(h, /<div class="add">Day rate is 900 EUR\.<\/div>/);
-  assert.match(h, /<div class="same">Net 30\.<\/div>/);
+  assert.match(h, /<div class="del"><span>Day rate is 800 EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="add"><span>Day rate is 900 EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="same"><span>Net 30\.<\/span><\/div>/);
   assert.match(h, /via Hermes on Linux/);
   assert.match(h, /Proposed by an agent/);
   assert.match(h, />Approve</);
@@ -135,7 +135,7 @@ test("policy: the owner sets a folder rule", async () => {
   const csrf = csrfOf(await text(await get(`/v/${TEAM_VAULT}`)));
   await post(`/v/${TEAM_VAULT}/policy`, { csrf, path: "clients/", policy: "canon", quorum: "2" });
   const h = await text(await get(`/v/${TEAM_VAULT}`));
-  assert.match(h, /<code>clients\/<\/code><\/td><td><span class="badge canon">canon<\/span><\/td><td>2<\/td>/);
+  assert.match(h, /<code>clients\/<\/code><\/td><td><span class="tag canon">canon<\/span><\/td><td class="num">2<\/td>/);
 });
 
 test("tokens: minted in the browser, shown once, then revocable", async () => {
@@ -147,4 +147,48 @@ test("tokens: minted in the browser, shown once, then revocable", async () => {
   const id = /action="\/tokens\/([0-9a-f-]{36})\/revoke"/.exec(again)[1];
   await post(`/tokens/${id}/revoke`, { csrf });
   assert.match(await text(await get("/tokens")), /revoked/);
+});
+
+test("theme: the switcher sets a cookie and the page follows it", async () => {
+  const csrf = csrfOf(await text(await get("/tokens")));
+  const r = await post("/theme", { csrf, theme: "dark", back: "/tokens" });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), "/tokens");
+  const set = r.headers.get("set-cookie");
+  assert.match(set, /^rlq_theme=dark;/);
+  const h = await text(await get("/tokens", { cookie: `${cookie}; rlq_theme=dark` }));
+  assert.match(h, /<html lang="en" data-theme="dark">/);
+  assert.match(h, /value="dark" aria-pressed="true"/);
+  const auto = await text(await get("/tokens"));
+  assert.match(auto, /<html lang="en">/);
+});
+
+test("theme: an off-site return path is ignored", async () => {
+  const csrf = csrfOf(await text(await get("/")));
+  const r = await post("/theme", { csrf, theme: "light", back: "//evil.example/x" });
+  assert.equal(r.headers.get("location"), "/");
+});
+
+test("assets: self-hosted fonts and icons are served, and the CSP allows only them", async () => {
+  const font = await fetch(BASE + "/fonts/bebas-neue-latin-400-normal.woff2");
+  assert.equal(font.status, 200);
+  assert.equal(font.headers.get("content-type"), "font/woff2");
+  assert.equal((await fetch(BASE + "/arrow.svg")).headers.get("content-type"), "image/svg+xml");
+  assert.equal((await fetch(BASE + "/fonts/../server.js")).status, 401);
+  const csp = (await get("/")).headers.get("content-security-policy");
+  assert.match(csp, /font-src 'self'/);
+});
+
+test("copy: no em dashes or straight apostrophes in the interface text", async () => {
+  for (const path of ["/", "/tokens", `/v/${TEAM_VAULT}`, `/v/${TEAM_VAULT}/proposals?status=stale`, `/v/${TEAM_VAULT}/new`]) {
+    const h = await text(await get(path));
+    const visible = h.replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'");
+    assert.doesNotMatch(visible, /\u2014/, `em dash on ${path}`);
+    assert.doesNotMatch(visible.replace(/Andrés's workspace/g, ""), /[a-z]'[a-z]/i, `straight apostrophe on ${path}`);
+  }
+});
+
+test("assets: the stylesheet URL carries a content version so updates are never stale", async () => {
+  const h = await text(await get("/"));
+  assert.match(h, /<link rel="stylesheet" href="\/style\.css\?v=[0-9a-f]{10}">/);
 });

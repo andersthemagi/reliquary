@@ -8,11 +8,12 @@
 // Every POST needs the session's CSRF token and, when the browser sends one, a
 // same-origin Origin header. Responses carry a CSP that forbids all scripts.
 
-import { randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { html, notice, setStyleVersion, type Theme } from "./html.js";
 import { routes, type Ctx, type Reply } from "./pages.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -27,7 +28,21 @@ if (!/^[0-9a-f-]{36}$/.test(USER)) {
   process.exit(1);
 }
 
-const CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "public", "style.css"));
+// Static files: a fixed map built at start, so no request path ever touches
+// the filesystem.
+const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
+const TYPES: Record<string, string> = {
+  css: "text/css; charset=utf-8",
+  svg: "image/svg+xml",
+  woff2: "font/woff2",
+  txt: "text/plain; charset=utf-8",
+};
+const STATIC = new Map<string, { type: string; body: Buffer }>();
+for (const rel of ["style.css", "arrow.svg", ...readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`)]) {
+  const type = TYPES[rel.split(".").pop() ?? ""];
+  if (type) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
+}
+setStyleVersion(createHash("sha256").update(STATIC.get("/style.css")!.body).digest("hex").slice(0, 10));
 
 type Session = { userId: string; csrf: string; expires: number; flash?: string };
 const sessions = new Map<string, Session>();
@@ -70,7 +85,7 @@ function readForm(req: http.IncomingMessage): Promise<URLSearchParams> {
 
 const SECURITY_HEADERS = {
   "content-security-policy":
-    "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   "x-content-type-options": "nosniff",
   // Not "no-referrer": under that policy browsers send `Origin: null` on
   // form posts, which the same-origin check below (rightly) refuses.
@@ -93,10 +108,13 @@ function send(res: http.ServerResponse, reply: Reply, extra: Record<string, stri
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   try {
-    if (url.pathname === "/style.css") {
-      res.writeHead(200, { "content-type": "text/css", "cache-control": "max-age=300" }).end(CSS);
+    const file = req.method === "GET" ? STATIC.get(url.pathname) : undefined;
+    if (file) {
+      res.writeHead(200, { "content-type": file.type, "cache-control": "max-age=300", "x-content-type-options": "nosniff" }).end(file.body);
       return;
     }
+    const themeCookie = cookie(req, "rlq_theme");
+    const theme: Theme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : "auto";
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
       return;
@@ -104,7 +122,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/login" && req.method === "GET") {
       const code = url.searchParams.get("code") ?? "";
       if (!loginCode || !sameSecret(code, loginCode)) {
-        send(res, { status: 401, html: "<p>That sign-in link has expired. Run <code>./mcp/dev.sh ui</code> again.</p>" });
+        send(res, { status: 401, html: notice("Link expired", html`That sign-in link has already been used or has expired. Run <code>./mcp/dev.sh ui</code> for a fresh one.`, theme) });
         return;
       }
       rotateLoginCode();
@@ -124,7 +142,7 @@ const server = http.createServer(async (req, res) => {
     const session = sid ? sessions.get(sid) : undefined;
     if (!session || session.expires < Date.now()) {
       if (sid) sessions.delete(sid);
-      send(res, { status: 401, html: "<p>Not signed in. Run <code>./mcp/dev.sh ui</code> to open a sign-in link.</p>" });
+      send(res, { status: 401, html: notice("Signed out", html`Run <code>./mcp/dev.sh ui</code> to open a sign-in link.`, theme) });
       return;
     }
 
@@ -132,17 +150,27 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST") {
       const origin = req.headers.origin;
       if (origin && origin !== `http://${req.headers.host}`) {
-        send(res, { status: 403, html: "<p>Cross-site request refused. If you submitted this form yourself, reload the page and try again.</p>" });
+        send(res, { status: 403, html: notice("Request refused", "This form didn’t come from Reliquary’s own page. If you sent it yourself, reload the page and try again.", theme) });
         console.info(`POST ${url.pathname} 403 origin=${origin === "null" ? "null" : "other"}`);
         return;
       }
       form = await readForm(req);
       if (!sameSecret(form.get("csrf") ?? "", session.csrf)) {
-        send(res, { status: 403, html: "<p>Form expired. Go back, reload, and try again.</p>" });
+        send(res, { status: 403, html: notice("Form expired", "Go back, reload the page, and try again.", theme) });
         return;
       }
     } else if (req.method !== "GET") {
       send(res, { status: 405, html: "" });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/theme") {
+      const choice = form.get("theme");
+      const back = form.get("back") ?? "/";
+      const next: Theme = choice === "light" || choice === "dark" ? choice : "auto";
+      send(res, { redirect: back.startsWith("/") && !back.startsWith("//") ? back : "/" }, {
+        "set-cookie": `rlq_theme=${next}; SameSite=Strict; Path=/; Max-Age=31536000`,
+      });
       return;
     }
 
@@ -155,6 +183,7 @@ const server = http.createServer(async (req, res) => {
       form,
       method: req.method,
       flash,
+      theme,
       setFlash: (m) => {
         session.flash = m;
       },
@@ -164,7 +193,7 @@ const server = http.createServer(async (req, res) => {
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
   } catch (err) {
     console.error("web error", (err as { code?: string }).code ?? (err as Error).name);
-    if (!res.headersSent) send(res, { status: 500, html: "<p>Something went wrong.</p>" });
+    if (!res.headersSent) send(res, { status: 500, html: notice("Something went wrong", "Reliquary hit an error. Try again; if it keeps happening, check the server log.") });
   }
 });
 
