@@ -443,3 +443,28 @@ section { scroll-margin-top: 16px; }
 .token-form select.token-expiry { width: auto; min-width: 12rem; }
 .token-list .token-client { display: block; }
 .token-list tr.inactive td:not(.num) { color: var(--muted); }
+
+/* threads and snooze ------------------------------------------------------------------ */
+
+/* The discussion: comments, review notes and approvals in one ruled timeline.
+   Entries an agent wrote carry a rule on the left, so a reader always knows
+   which words came from a model. */
+.discussion { max-width: 78ch; }
+.thread li.by-agent { box-shadow: inset 2px 0 0 var(--rule-strong); padding-left: 14px; }
+form.comment { margin-top: 20px; }
+form.comment .actions { margin-top: 12px; }
+
+/* Snooze: a quiet row of choices under the decision, and a one-line state. */
+.snooze, .snoozed-note {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  margin: 24px 0 0; padding: 12px 0; max-width: 78ch;
+  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+  color: var(--muted); font-size: 0.875rem;
+}
+.snooze span, .snoozed-note span { margin-right: 4px; }
+.snooze button { padding: 7px 12px; font-size: 0.8125rem; }
+.snooze .hint { flex-basis: 100%; margin: 0; }
+.snoozed-note .quiet { padding-top: 0; padding-bottom: 0; }
+.snooze-toggle { margin: 24px 0 0; }
+.rows li form { margin: 0; flex: none; }
+.rows li form .quiet { padding-top: 0; padding-bottom: 0; }

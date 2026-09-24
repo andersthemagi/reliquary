@@ -7,6 +7,7 @@ import { asPerson } from "./db.js";
 import { diffLines } from "./diff.js";
 import { csrfField, html, page, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
+import { NOT_SNOOZED_SQL, postComment, snooze, snoozedList, snoozedSection, threadSection, unsnooze } from "./thread.js";
 
 export type Ctx = {
   userId: string;
@@ -106,7 +107,7 @@ const WAITING_SQL = `
     left join public.file_versions cur on cur.id = f.current_version_id
    where p.status = 'open'
      and not exists (select 1 from public.approvals a
-                      where a.proposal_id = p.id and a.user_id = $1 and a.revision = p.revision)`;
+                      where a.proposal_id = p.id and a.user_id = $1 and a.revision = p.revision)${NOT_SNOOZED_SQL}`;
 
 export async function reviewCount(userId: string): Promise<number> {
   return asPerson(userId, async (c) => (await c.query(`select count(*)::int as n from (${WAITING_SQL}) w`, [userId])).rows[0].n);
@@ -303,8 +304,9 @@ async function home(ctx: Ctx): Promise<Reply> {
 }
 
 async function review(ctx: Ctx): Promise<Reply> {
-  const { waiting, revising } = await asPerson(ctx.userId, async (c) => ({
+  const { waiting, revising, snoozed } = await asPerson(ctx.userId, async (c) => ({
     waiting: (await c.query(`${WAITING_SQL} order by v.name, p.created_at`, [ctx.userId])).rows,
+    snoozed: await snoozedList(c, ctx.userId),
     revising: (
       await c.query(
         `select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
@@ -335,7 +337,8 @@ async function review(ctx: Ctx): Promise<Reply> {
       ? html`<h2>Waiting on the proposer</h2>
         <p class="muted small">You asked for changes. These come back here when they’re revised.</p>
         <ul class="rows">${revising.map((p) => reviewRow(ctx, p, true))}</ul>`
-      : ""}`,
+      : ""}
+    ${snoozedSection(ctx, snoozed)}`,
     "review",
   );
 }
@@ -625,13 +628,6 @@ async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
   return render(ctx, "Proposals", data.shell, "vaults");
 }
 
-const NOTE_LABEL: Record<string, string> = {
-  request_changes: "Requested changes",
-  reject: "Rejected",
-  revise: "Revised",
-  edit: "Edited before approving",
-};
-
 const STATE_TEXT: Record<string, string> = {
   open: "Open",
   changes_requested: "Changes requested",
@@ -663,7 +659,6 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
         p.revision,
       ])
     ).rows;
-    const notes = (await c.query(`select * from public.proposal_notes where proposal_id = $1 order by at`, [pid])).rows;
     const firstFromAgent = p.agent
       ? (
           await c.query(`select count(*)::int as n from public.proposals where vault_id = $1 and agent = $2 and created_at < $3`, [
@@ -685,6 +680,7 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
     const decidable = canWrite(v) && p.status === "open" && !mine;
     const rejectable = canWrite(v) && (decidable || p.status === "changes_requested");
     const editable = canWrite(v) && (p.status === "open" || p.status === "changes_requested") && p.kind === "write" && p.body !== null;
+    const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: canWrite(v), waitingOnMe: decidable });
 
     const body = html`
       <p class="crumb"><a href="${vaultPath(id, "/proposals")}">Proposals</a></p>
@@ -713,13 +709,6 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
       <h2>${p.agent ? "Agent’s stated reason (unverified)" : "Reason"}</h2>
       <blockquote class="claim">${p.reason || "No reason given."}</blockquote>
 
-      ${notes.length
-        ? html`<h2>Review notes</h2><ol class="notes">${notes.map(
-            (n) => html`<li><p class="small muted">${NOTE_LABEL[n.kind]} · ${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${ago(n.at)}</p>
-              ${n.body ? html`<p>${n.body}</p>` : n.erased_at ? html`<p class="muted small">Erased.</p>` : ""}</li>`,
-          )}</ol>`
-        : ""}
-
       <h2>Approvals</h2>
       <p>${approvers.length} of ${p.quorum} for revision ${p.revision}${
         approvers.length ? `: ${approvers.map((a) => who(ctx, a.user_id, null)).join(", ")}` : "."
@@ -747,7 +736,8 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
           </form>`
         : p.status === "open" && mine
           ? html`<p class="muted">You’ve decided on this revision. It needs more approvals before it applies.</p>`
-          : ""}`;
+          : ""}
+      ${thread}`;
     return { v, p, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -1209,6 +1199,9 @@ export async function routes(ctx: Ctx): Promise<Reply> {
     if (!get && action === "/edit") return editAndApprove(ctx, id, pid);
     if (!get && action === "/decide") return decide(ctx, id, pid);
     if (!get && action === "/repropose") return repropose(ctx, id, pid);
+    if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx));
+    if (!get && action === "/snooze") return snooze(ctx, id, pid, () => notFound(ctx));
+    if (!get && action === "/unsnooze") return unsnooze(ctx, id, pid, () => notFound(ctx));
   }
   return notFound(ctx);
 }

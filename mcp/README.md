@@ -40,8 +40,10 @@ Any MCP client that can send a header works the same way (Hermes, Cursor):
 ## Tools
 
 `list_vaults`, `list_files`, `read_file`, `search`, `write_file` (open files
-only), `propose`, `list_proposals`, `changes_since`. There is no approve tool:
-approving needs a person in the web UI.
+only), `propose`, `list_proposals`, `revise_proposal`, `read_proposal` (one
+proposal with its whole thread), `comment_on_proposal`, `changes_since`.
+There is no approve tool: approving needs a person in the web UI. There is no
+snooze tool either, so an agent can't hide its proposals from its person.
 
 ## How a call is authorised
 
@@ -61,7 +63,9 @@ never logged. Tokens made with `./dev.sh token` reach all your vaults,
 read-write; make scoped ones in the web UI.
 
 File text is returned between `BEGIN-<nonce>` and `END-<nonce>` markers, with
-a fresh random value each response, so a file can't fake its own end.
+a fresh random value each response, so a file can't fake its own end. Review
+notes and thread comments are fenced the same way (`NOTE-<nonce>`), with a
+nonce none of the response's texts contains.
 
 ## Test
 

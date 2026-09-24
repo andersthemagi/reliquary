@@ -1,0 +1,216 @@
+// A proposal's discussion (comments, review notes and approvals in one
+// timeline), and per-person snooze of proposals in the Review inbox.
+// Everything is decided by the database (see
+// supabase/migrations/20260924170000_threads_snooze.sql); these handlers only
+// render and forward. Comment text is people's and agents' words: it goes
+// through html``, so it is always escaped text.
+
+import type pg from "pg";
+import { asPerson } from "./db.js";
+import { csrfField, html, when, type Raw } from "./html.js";
+import type { Ctx, Reply } from "./pages.js";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const proposalPath = (id: string, pid: string, rest = "") => `/v/${id}/proposals/${pid}${rest}`;
+
+// Proposals this person snoozed, still in force. Appended to the Review
+// inbox's query, where $1 is the person.
+export const NOT_SNOOZED_SQL = `
+     and not exists (select 1 from public.active_snoozes s where s.proposal_id = p.id and s.user_id = $1)`;
+
+// Errors from our own migrations are safe to show; others aren't.
+function message(err: unknown): string {
+  const e = err as { code?: string; message?: string };
+  if (["42501", "P0002", "22023", "23505", "55000"].includes(e.code ?? "")) {
+    const m = e.message ?? "Not allowed";
+    return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
+  }
+  throw err;
+}
+
+const who = (ctx: Ctx, id: string | null, agent: string | null) =>
+  `${id === ctx.userId ? "you" : id ? id.slice(0, 8) : "system"}${agent ? ` via ${agent}` : ""}`;
+
+function ago(d: Date): string {
+  const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (s < 90) return "just now";
+  if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} days ago`;
+}
+
+const LABEL: Record<string, string> = {
+  comment: "Comment",
+  request_changes: "Requested changes",
+  reject: "Rejected",
+  revise: "Revised",
+  edit: "Edited before approving",
+  approve: "Approved",
+};
+
+const live = (status: string) => status === "open" || status === "changes_requested";
+
+// ---------------------------------------------------------------------------
+// The proposal page's discussion, below the decision section.
+
+export async function threadSection(
+  c: pg.PoolClient,
+  ctx: Ctx,
+  o: { vaultId: string; p: { id: string; status: string }; canWrite: boolean; waitingOnMe: boolean },
+): Promise<Raw> {
+  const { vaultId: id, p } = o;
+  const entries = (
+    await c.query(
+      `select kind, body, author, agent, revision, at, erased_at from public.proposal_notes
+        where proposal_id = $1
+       union all
+       select 'approve', null, user_id, null, revision, at, null from public.approvals
+        where proposal_id = $1 and decision = 'approve'
+       order by at`,
+      [p.id],
+    )
+  ).rows;
+  const snoozed = (await c.query(`select until from public.active_snoozes where proposal_id = $1 and user_id = $2`, [p.id, ctx.userId]))
+    .rows[0];
+
+  const snooze = snoozed
+    ? html`<form method="post" action="${proposalPath(id, p.id, "/unsnooze")}" class="snoozed-note">
+        ${csrfField(ctx.csrf)}<input type="hidden" name="back" value="proposal">
+        <span>Snoozed in your Review ${snoozed.until ? html`until ${when(snoozed.until)}, or ` : ""}until it changes.</span>
+        <button class="quiet">Unsnooze</button>
+      </form>`
+    : o.waitingOnMe && live(p.status)
+      ? html`<form method="post" action="${proposalPath(id, p.id, "/snooze")}" class="snooze">
+          ${csrfField(ctx.csrf)}
+          <span>Not now? Hide it from your Review</span>
+          <button name="for" value="day">For a day</button>
+          <button name="for" value="week">For a week</button>
+          <button name="for" value="change">Until it changes</button>
+          <p class="hint">Only you see this. A new revision or someone else’s comment brings it back.</p>
+        </form>`
+      : "";
+
+  const timeline = entries.length
+    ? html`<ol class="notes thread">${entries.map(
+        (n) => html`<li${n.agent ? html` class="by-agent"` : ""}><p class="small muted">${LABEL[n.kind] ?? n.kind} · ${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${ago(n.at)}</p>
+          ${n.body ? html`<p>${n.body}</p>` : n.erased_at ? html`<p class="muted small">Erased.</p>` : ""}</li>`,
+      )}</ol>`
+    : html`<p class="muted">No comments yet.</p>`;
+
+  const form = !live(p.status)
+    ? entries.length
+      ? html`<p class="muted small">This proposal is decided, so its discussion is closed.</p>`
+      : ""
+    : o.canWrite
+      ? html`<form method="post" action="${proposalPath(id, p.id, "/comment")}" class="panel comment">
+          ${csrfField(ctx.csrf)}
+          <label for="comment">Add to the discussion</label>
+          <textarea id="comment" name="body" class="short" maxlength="4000" required></textarea>
+          <p class="hint">Everyone in this vault can read it, and so can their agents, as quoted text. A comment doesn’t approve or change the proposal.</p>
+          <div class="actions"><button>Comment</button></div>
+        </form>`
+      : html`<p class="muted small">Viewers can read the discussion but not add to it.</p>`;
+
+  return html`${snooze}<section class="discussion" aria-labelledby="discussion"><h2 id="discussion">Discussion</h2>${timeline}${form}</section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+
+// The proposal must be in the vault named by the URL, so a form can't write
+// to one vault's proposal from another vault's page.
+async function inVault(c: pg.PoolClient, id: string, pid: string): Promise<boolean> {
+  if (!UUID.test(pid)) return false;
+  return (await c.query(`select 1 from public.proposals where id = $1 and vault_id = $2`, [pid, id])).rowCount === 1;
+}
+
+export async function postComment(ctx: Ctx, id: string, pid: string, notFound: () => Reply): Promise<Reply> {
+  try {
+    const found = await asPerson(ctx.userId, async (c) => {
+      if (!(await inVault(c, id, pid))) return false;
+      await c.query(`select public.comment_on_proposal($1, $2)`, [pid, (ctx.form.get("body") ?? "").replaceAll("\r\n", "\n")]);
+      return true;
+    });
+    if (!found) return notFound();
+    ctx.setFlash("Comment added.");
+  } catch (err) {
+    ctx.setFlash(message(err));
+  }
+  return { redirect: `${proposalPath(id, pid)}#discussion` };
+}
+
+const SNOOZE: Record<string, { sql: string; flash: string }> = {
+  day: { sql: "now() + interval '1 day'", flash: "Snoozed for a day, or until it changes." },
+  week: { sql: "now() + interval '7 days'", flash: "Snoozed for a week, or until it changes." },
+  change: { sql: "null", flash: "Snoozed until it changes." },
+};
+
+export async function snooze(ctx: Ctx, id: string, pid: string, notFound: () => Reply): Promise<Reply> {
+  const choice = SNOOZE[ctx.form.get("for") ?? ""] ?? SNOOZE.change;
+  try {
+    const found = await asPerson(ctx.userId, async (c) => {
+      if (!(await inVault(c, id, pid))) return false;
+      await c.query(`select public.snooze_proposal($1, ${choice.sql})`, [pid]);
+      return true;
+    });
+    if (!found) return notFound();
+    ctx.setFlash(choice.flash);
+    return { redirect: "/review" };
+  } catch (err) {
+    ctx.setFlash(message(err));
+    return { redirect: proposalPath(id, pid) };
+  }
+}
+
+export async function unsnooze(ctx: Ctx, id: string, pid: string, notFound: () => Reply): Promise<Reply> {
+  const found = await asPerson(ctx.userId, async (c) => {
+    if (!(await inVault(c, id, pid))) return false;
+    await c.query(`select public.unsnooze_proposal($1)`, [pid]);
+    return true;
+  });
+  if (!found) return notFound();
+  ctx.setFlash("Back in your Review.");
+  return { redirect: ctx.form.get("back") === "review" ? "/review?snoozed=1" : proposalPath(id, pid) };
+}
+
+// ---------------------------------------------------------------------------
+// The Review page's snoozed items: what would be waiting on this person if
+// they hadn't snoozed it.
+
+export async function snoozedList(c: pg.PoolClient, userId: string) {
+  return (
+    await c.query(
+      `select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, s.until,
+              (f.id is null) as creates
+         from public.active_snoozes s
+         join public.proposals p on p.id = s.proposal_id
+         join public.vaults v on v.id = p.vault_id
+         left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
+        where s.user_id = $1 and p.status = 'open' and private.can_write(p.vault_id)
+          and not exists (select 1 from public.approvals a
+                           where a.proposal_id = p.id and a.user_id = $1 and a.revision = p.revision)
+        order by s.until nulls last, p.created_at`,
+      [userId],
+    )
+  ).rows;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function snoozedSection(ctx: Ctx, rows: any[]): Raw {
+  if (rows.length === 0) return html``;
+  if (!ctx.url.searchParams.has("snoozed")) {
+    return html`<p class="snooze-toggle small"><a href="/review?snoozed=1">Show snoozed (${rows.length})</a></p>`;
+  }
+  return html`<h2 id="snoozed">Snoozed</h2>
+    <p class="muted small">Hidden from your Review until their time, or until they change. <a href="/review">Hide snoozed</a></p>
+    <ul class="rows">${rows.map(
+      (p) => html`<li>
+        <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${p.kind === "delete" ? "Delete" : p.creates ? "Create" : "Change"} ${p.path}</a>
+          <span class="muted small"> · ${p.vault} · by ${who(ctx, p.proposed_by, p.agent)} · ${p.until ? `until ${when(p.until)}` : "until it changes"}</span></span>
+        <form method="post" action="${proposalPath(p.vault_id, p.id, "/unsnooze")}">
+          ${csrfField(ctx.csrf)}<input type="hidden" name="back" value="review">
+          <button class="quiet">Unsnooze</button>
+        </form>
+      </li>`,
+    )}</ul>`;
+}

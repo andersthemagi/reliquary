@@ -24,7 +24,10 @@ Done so far:
 - scoped, expiring agent tokens (chosen vaults or all, read-only or
   read-write, 1 to 366 days, last used with client name), enforced in
   `private.role_in` via the `act.tok` claim, with hostile tests
-  (`supabase/tests/token_scope_test.sql`).
+  (`supabase/tests/token_scope_test.sql`);
+- proposal threads (comments from people and, over MCP, their agents, in one
+  timeline with review notes) and private per-person snooze in the Review
+  inbox (`20260924170000_threads_snooze.sql`, `web/src/thread.ts`).
 Both need podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
