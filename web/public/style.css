@@ -727,6 +727,16 @@ form.comment .actions { margin-top: var(--space-4); }
 }
 .danger-zone p { margin: 0; }
 
+/* A page header's "More" menu: rare or destructive actions, as links. */
+.more-menu .menu { min-width: 200px; padding: var(--space-2); gap: var(--space-1); }
+.more-menu .menu a {
+  display: flex; align-items: center; min-height: var(--control-sm); padding: 0 12px;
+  border-radius: var(--radius-md); text-decoration: none;
+}
+.more-menu .menu a:hover { background: var(--bg-muted); }
+.more-menu .menu a.danger { color: var(--danger); }
+.more-menu .menu a.danger:hover { background: var(--danger-bg); }
+
 /* Activity ------------------------------------------------------------------- */
 
 form.filters { max-width: none; background: var(--bg-subtle); padding: var(--space-4) var(--space-5); }

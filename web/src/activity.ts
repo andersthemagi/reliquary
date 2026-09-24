@@ -27,6 +27,9 @@ const EVENTS: [string, string][] = [
   ["policy.set", "Changed a rule"],
   ["member.set", "Changed members"],
   ["vault.create", "Created the vault"],
+  ["vault.rename", "Renamed the vault"],
+  ["vault.default_policy", "Changed the default policy"],
+  ["vault.export", "Exported the vault"],
 ];
 const GROUPS: [string, string][] = [
   ["file.", "Any file change"],

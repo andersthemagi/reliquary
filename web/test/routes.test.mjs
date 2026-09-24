@@ -49,6 +49,10 @@ const pages = [
   [`${V}/proposals/${PROPOSAL}/edit`, "edit, then approve"],
   [`${V}/variables`, "variables"],
   [`${V}/variables/log`, "variables access log"],
+  [`${V}/config`, "vault settings"],
+  [`${V}/config/export`, "export a vault"],
+  [`${V}/config/delete`, "delete a vault (confirm)"],
+  [`${V}/erase?path=notes/md.md`, "erase a file (confirm)"],
 ];
 
 for (const [path, what] of pages) {

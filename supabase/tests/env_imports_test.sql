@@ -429,6 +429,20 @@ select t.expect('reject: the author discards their own draft, and nothing is log
   'ok,0,0');
 
 -- ---------------------------------------------------------------------------
+-- Deleting a vault (public.delete_vault, 20260925120000_vault_admin)
+
+insert into t.ids select 'gone', t.run('ana', $q$select public.create_vault('Gone')$q$)::uuid;
+insert into t.ids select 'gone_push', t.imp(t.via('ana', t.g('ana-push'), t.create_sql('gone', array['development'], array['GONE_KEY'], 'gone')));
+insert into t.ids select 'gone_draft', t.imp(t.run('ana', t.create_sql('gone', array['preview'], array['DRAFT_GONE'], 'gone')));
+
+select t.expect('delete: deleting a vault removes its pending imports and their ciphertexts',
+  t.secrets(t.id('gone_push')) || ',' || t.secrets(t.id('gone_draft'))
+  || ',' || t.run('ana', format($q$select public.delete_vault(%L, 'Gone') is not null$q$, t.id('gone')))
+  || ',' || t.q(format($s$select count(*) from public.env_imports where id in (%L, %L)$s$, t.id('gone_push'), t.id('gone_draft')))
+  || ',' || t.q(format($s$select count(*) from private.env_import_secrets where import_id in (%L, %L)$s$, t.id('gone_push'), t.id('gone_draft'))),
+  '1,1,true,0,0');
+
+-- ---------------------------------------------------------------------------
 -- Rate limits
 
 insert into t.ids select 'rl_vault', t.run('ana', $q$select public.create_vault('Rate')$q$)::uuid;

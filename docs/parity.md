@@ -42,7 +42,7 @@ and, for the agent, its token's vaults and access.
 | Comment on a proposal | POST `/v/:v/proposals/:p/comment` | `comment_on_proposal` | both | |
 | Approve, request changes, reject | POST `/v/:v/proposals/:p/decide` | none | person | **Ceiling**: approving needs the person present |
 | Edit, then approve | `/v/:v/proposals/:p/edit` (POST) | none | person | **Ceiling**: it approves. An agent revises its own proposal instead |
-| Set or remove a rule (canon/open, quorum) | `/v/:v/rules` (POST) | none | person (owner) | **Ceiling**: rules are policy. An agent picks a new vault's default policy when it creates one, and nothing after |
+| Set or remove a rule (canon/open, quorum) | `/v/:v/rules` (POST; linked from Settings) | none | person (owner) | **Ceiling**: rules are policy. An agent picks a new vault's default policy when it creates one, and nothing after |
 | Snooze a proposal in Review | POST `/v/:v/proposals/:p/snooze` | none | person | **Ceiling**: an agent that could snooze could hide its own proposals from its person's inbox |
 | Unsnooze | POST `/v/:v/proposals/:p/unsnooze` | none | person (the database allows the agent) | **Gap**, and not worth closing: an agent has no inbox to bring things back into |
 | Changes feed / activity | `/activity`, `/v/:v/activity`, a file's History tab | `changes_since` | both | The web pages are for reading; `changes_since` is a cursor feed for agents. Same log |
@@ -51,9 +51,10 @@ and, for the agent, its token's vaults and access.
 | Approve an OAuth client (consent) | `/oauth/authorize` | none | person | **Ceiling**: consent is a grant, and must be a person |
 | Connect an agent (setup help) | `/connect` | none | person | Not an action; there is nothing to do over MCP |
 | Manage members | none | none | person (owner) | Web: **gap** (`set_member` exists in the database; only seeds and `./mcp/dev.sh` use it). MCP: **ceiling** |
-| Erase a file (blank every version) | none | none | person (owner) | Web: **gap** (`erase_file` exists in the database). MCP: **ceiling** (irreversible) |
-| Rename a vault, change its default policy | none | none | | **Gap** on both sides: no database function yet. The default can be worked around with a rule per folder |
-| Delete or export a vault | none | none | person (owner) | Not built (milestone 1 has no vault deletion or export). MCP: **ceiling** when it lands |
+| Erase a file (blank every version) | the file page's More menu, `/v/:v/erase?path=` (GET confirms: type the path; POST erases) | none | person (owner) | **Ceiling** (irreversible): `erase_file` is `require_human` |
+| Rename a vault, change its default policy | `/v/:v/config` (POST, then a confirm page) | none | person (owner) | **Ceiling**: the default is policy, like rules, and a name is what every member navigates by. `rename_vault` and `set_default_policy` are `require_human` (`20260925120000_vault_admin.sql`) |
+| Export a vault | `/v/:v/config/export` (GET explains; POST downloads a `.tar.gz`) | none | person (owner) | **Ceiling** (design: exporting needs the person present). `export_vault` and `export_files` are `require_human` and owners-only; logged as `vault.export`. Variable values are never exported, only names |
+| Delete a vault | `/v/:v/config/delete` (GET confirms: type the name; POST deletes) | none | person (owner) | **Ceiling** (irreversible). `delete_vault` is `require_human`, owners-only, and checks the typed name itself |
 | List environment variables (names, environments, who set them) | `/v/:v/variables` | `list_variables` | both | Names only, on both sides of MCP: no tool returns a value, a ciphertext or a nonce ([docs/variables.md](variables.md)) |
 | Set, rotate or delete a variable's value | `/v/:v/variables/set` (GET, POST; Rotate is the same form with the name and environment fixed), `/v/:v/variables/delete` (GET confirms, POST deletes) | none | person (owners everywhere; editors outside production) | **Ceiling**: a value typed to an agent has already reached a model. `set_variable` and `delete_variable` are `require_human` |
 | Reveal one value | POST `/v/:v/variables/reveal` (the value is in that response only, never a GET or a redirect) | none | person | **Ceiling** (design: revealing a value needs the person present). `reveal_variable` refuses any `act` claim and logs the refusal |
@@ -75,12 +76,24 @@ and, for the agent, its token's vaults and access.
   person could only "edit, then approve", which also approves. Now a Revise
   action for the proposer.
 
+## Closed since (vault administration)
+
+- **Erase a file** in the web UI: the file page's More menu, then a confirm
+  page that says what erasure blanks and what the log keeps, with the path
+  typed to confirm.
+- **Rename a vault and change its default policy**: new database functions,
+  owners in person, and a Settings page (`/v/:v/config`, "Settings" in the
+  vault sidebar) that also holds Rules, Export and the Danger zone. Both stay
+  off MCP: the default is policy, which the ceiling keeps with people.
+- **Export and delete a vault**: owners in person, from Settings, each
+  through a confirm step (docs/design.md, "Git mirror and export" and
+  "Deleting a vault"). Both are in the delegation ceiling, so neither is an
+  MCP tool.
+
 ## Gaps left
 
 | Gap | Side | Why it's not in this change |
 |---|---|---|
 | Manage members (invite, change role, remove) | web | Needs a way to name a person who isn't in the vault (email lookup through Supabase Auth, or invitations), which is a design decision, not a form |
-| Erase a file | web | Irreversible; wants a confirm page (design system step 5's "More" menu and confirm), so it's its own change |
-| Rename a vault, change its default policy | both | No database function; add one (owner, person only for the default policy, since it is policy) |
 | Revoke a token | MCP | The database allows an agent to revoke its person's tokens (`revoke_access_token` is `require_person`). An agent cutting off other agents is grant management; decide whether to tighten the database to `require_human` rather than add a tool |
 | Unsnooze | MCP | Allowed by the database, pointless for an agent; left out |
