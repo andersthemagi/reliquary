@@ -62,6 +62,8 @@ authorization server ([Claude connector auth](https://claude.com/docs/connectors
 
 ### The minimal code change
 
+> **As built (2026-09-24):** zero-config detection did not pick up our plain `node:http` servers (the first deploys failed). Each app now ships `api/index.js` (one function) plus a catch-all rewrite in `vercel.json`, verified with `vercel build` locally.
+
 Both `web/src/server.ts` and `mcp/src/server.ts` already call `listen()` at
 module load from `src/server.ts`, which is the shape Vercel detects. What must
 change:

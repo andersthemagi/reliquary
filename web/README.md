@@ -115,15 +115,18 @@ no `public/`) for `test/hosting.test.mjs`.
 ## Deploy (Vercel)
 
 Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
-project, `reliquary-web`, Root Directory `web`. Vercel's zero-config Node
-server runs `src/server.ts`; `vercel.json` sets region `fra1`, Fluid
+project, `reliquary-web`, Root Directory `web`. Vercel runs the app as one function, `api/index.js`, which hands every
+request to the handler `src/server.ts` exports (built by `tsc` into `dist/`);
+every path is rewritten to it after `public/` gets its turn on the CDN. The
+zero-config Node server detection only recognises Express-style apps, so it
+failed on this plain `node:http` server. `vercel.json` sets region `fra1`, Fluid
 compute, `maxDuration` 30 s, bundles `supabase-ca.crt` into the function, and
 turns off automatic deploys from `main` (the deploy workflow applies
 migrations first). `public/` is served by Vercel's CDN.
 
 What the server does differently when hosted:
 
-- **`VERCEL` set**: listens on the platform's `PORT` without binding a host,
+- **`VERCEL` set**: opens no port (the function calls the exported handler),
   and refuses to start unless `DATABASE_CA_FILE` is set.
 - **`PUBLIC_URL`** (e.g. `https://app.example.com`): every POST must carry
   exactly that `Origin`; any other, `null` or none gets 403. With `https`,

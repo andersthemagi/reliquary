@@ -1,9 +1,27 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["fra1"],
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "regions": [
+    "fra1"
+  ],
   "fluid": true,
   "functions": {
-    "src/server.ts": { "maxDuration": 60, "includeFiles": "supabase-ca.crt" }
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "{dist/**,supabase-ca.crt}"
+    }
   },
-  "git": { "deploymentEnabled": { "main": false } }
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  }
 }

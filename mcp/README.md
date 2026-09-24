@@ -111,13 +111,16 @@ endpoint.
 ## Deploy (Vercel)
 
 Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
-project, `reliquary-mcp`, Root Directory `mcp`. Vercel's zero-config Node
-server runs `src/server.ts`; `vercel.json` sets region `fra1`, Fluid
+project, `reliquary-mcp`, Root Directory `mcp`. Vercel runs the app as one function, `api/index.js`, which hands every
+request to the handler `src/server.ts` exports (built by `tsc` into `dist/`);
+every path is rewritten to it after `public/` gets its turn on the CDN. The
+zero-config Node server detection only recognises Express-style apps, so it
+failed on this plain `node:http` server. `vercel.json` sets region `fra1`, Fluid
 compute, `maxDuration` 60 s, bundles `supabase-ca.crt` into the function, and
 turns off automatic deploys from `main` (the deploy workflow applies
 migrations first). Answers are plain JSON, so nothing streams.
 
-- **`VERCEL` set**: listens on the platform's `PORT` without binding a host,
+- **`VERCEL` set**: opens no port (the function calls the exported handler),
   and refuses to start unless `DATABASE_CA_FILE` is set.
 - **Database**: `DATABASE_URL` is the Supavisor transaction pooler (port
   6543, user `reliquary_mcp.<project-ref>`) with no `sslmode` in it;

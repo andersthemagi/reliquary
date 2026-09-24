@@ -17,3 +17,4 @@ web/.login
 mcp/.login-oauth-*
 supabase/.db-password
 supabase/.*-db-password
+supabase/.*-secret

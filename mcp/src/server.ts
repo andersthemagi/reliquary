@@ -196,9 +196,12 @@ const httpServer = http.createServer(async (req, res) => {
   }
 });
 
-// On Vercel (zero-config Node server) the platform supplies PORT and owns the
-// socket, so bind no host; locally stay on loopback.
-const onVercel = !!process.env.VERCEL;
-httpServer.listen(PORT, onVercel ? undefined : HOST, () => {
-  console.info(onVercel ? `reliquary mcp listening on port ${PORT}` : `reliquary mcp listening on http://${HOST}:${PORT}/mcp`);
-});
+// On Vercel the app runs as one function (api/index.js) that hands every
+// request to this handler; the platform owns the socket. Locally, listen on
+// loopback as before.
+export const handle: http.RequestListener = (req, res) => {
+  httpServer.emit("request", req, res);
+};
+if (!process.env.VERCEL) {
+  httpServer.listen(PORT, HOST, () => console.info(`reliquary mcp on http://${HOST}:${PORT}/mcp`));
+}
