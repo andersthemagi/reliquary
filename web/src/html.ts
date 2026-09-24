@@ -37,6 +37,13 @@ export const setStyleVersion = (v: string) => {
   styleVersion = v;
 };
 
+// How people sign in (AUTH_MODE), set by the server at start: the account
+// menu says "(local)" for the dev.sh stand-in, and offers Sign out otherwise.
+let accountMode: "local" | "supabase" = "local";
+export const setAccountMode = (m: "local" | "supabase") => {
+  accountMode = m;
+};
+
 export type Nav = "home" | "review" | "vaults" | "activity" | "connect" | "tokens";
 
 export type PageOpts = {
@@ -83,12 +90,15 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
     ? html`<details class="account menu-wrap">
     <summary class="button quiet">Account</summary>
     <div class="menu">
-      <p class="menu-meta">Signed in as <strong>${opts.user.slice(0, 8)}</strong> (local)</p>
+      <p class="menu-meta">Signed in as <strong>${opts.user.slice(0, 8)}</strong>${accountMode === "local" ? " (local)" : ""}</p>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
         ${csrfField(opts.csrf)}<input type="hidden" name="back" value="${opts.path ?? "/"}">
         <span class="menu-label">Theme</span>
         <span class="segmented">${themeButton("auto", "Auto")}${themeButton("light", "Light")}${themeButton("dark", "Dark")}</span>
       </form>
+      ${accountMode === "supabase"
+        ? html`<form method="post" action="/signout" class="signout">${csrfField(opts.csrf)}<button class="quiet">Sign out</button></form>`
+        : ""}
     </div>
   </details>`
     : ""}`

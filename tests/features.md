@@ -60,7 +60,7 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 | F25 | Search | Finds by content and path within the caller's vaults and reports the policy; outsiders find nothing; wildcards match nothing extra; erased text is never found | `supabase/tests/access_tokens_test.sql#search:`, `mcp/test/e2e.test.mjs#search:`, `mcp/test/e2e.test.mjs#outsider: Team`, `web/test/web.test.mjs#search:` |
 | F26 | Entry text is data | File text, reasons, notes and comments reach agents inside markers with author and date, and can't close their fence; the UI escapes them | `mcp/test/e2e.test.mjs#read:`, `mcp/test/e2e.test.mjs#data, not instructions`, `mcp/test/threads.test.mjs#data, not instructions`, `mcp/test/changes_comments.test.mjs#data, not instructions`, `web/test/web.test.mjs#file:` |
 | F27 | MCP tool contract | Tool names, titles, descriptions, input schemas and annotations match the approved snapshot; every token sees the same tools | `mcp/test/contract.test.mjs#contract:`, `mcp/test/contract.snapshot.json` |
-| F28 | No secrets in server logs | MCP and web server logs contain no tokens, login codes or file text | `mcp/test.sh`, `web/test.sh` |
+| F28 | No secrets in server logs | MCP and web server logs contain no tokens, login codes or file text; the supabase-mode web logs contain no JWTs, refresh tokens, sign-in codes, token hashes, emails or the session secret | `mcp/test.sh`, `web/test.sh` |
 
 ## Web shell and design system
 
@@ -79,10 +79,13 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 | F34 | Database TLS and pool for serverless | On Vercel, `DATABASE_URL` without `DATABASE_CA_FILE` is refused at start; with it, TLS is verified against the bundled Supabase CA; TLS parameters in the URL are refused next to a CA; refusals never contain the URL; pools default small (web 3, mcp 5); local runs unchanged | `web/test/db_tls.test.mjs#db tls:`, `web/test/db_tls.test.mjs#db pool:`, `mcp/test/db_tls.test.mjs#db tls:`, `mcp/test/db_tls.test.mjs#db pool:` |
 | F35 | Health and keepalive | `/healthz` answers `ok` without the database; `/healthz?db=1` runs `select 1` and answers only `ok` or 503 `unavailable`, uncached; with `KEEPALIVE_TOKEN` set it needs a matching `x-keepalive` header (constant-time compare), and the token never reaches the log | `mcp/test/healthz.test.mjs#healthz:` |
 | F36 | Role statement timeouts | `reliquary_web` and `reliquary_mcp` log in with a 10s `statement_timeout`, kept across `set local role authenticated` | `supabase/tests/role_timeouts_test.sql#timeout:`, `mcp/test/healthz.test.mjs#timeout:` |
+| F37 | Web sign-in with Supabase Auth | `AUTH_MODE=supabase`: sign-in by emailed 6-digit code or by link through a button POST (the link's GET spends nothing); unknown emails get the same page; users are never created; forms need a double-submit token and the site's Origin; `next` stays on the site; session cookies `__Host-`, HttpOnly, Secure, SameSite=Lax, private; stateless (two instances accept each other's cookies and CSRF); CSRF per session; an expired JWT is refreshed once with new cookies, a failed refresh signs out; sign-out revokes at Supabase | `web/test/auth.test.mjs#sign-in:`, `web/test/auth.test.mjs#session:` |
+| F38 | Web session JWTs refused | Only JWTs signed by a key in the project's JWKS with the pinned `JWT_ALG` pass: another key, `alg: none`, HS256, a relabelled algorithm, wrong `iss`, `aud` or `role`, a `client_id`, anonymous, tampered, unknown key id, no `session_id` are refused and the cookies cleared; the database gets exactly `{ sub, role }`, never `act` | `web/test/auth.test.mjs#jwt:`, `web/test/auth.test.mjs#claims:` |
+| F39 | Sign-in configuration refusals | `AUTH_MODE=local` (explicit or default) refuses to start when `VERCEL` is set; `AUTH_MODE=supabase` refuses to start without `SUPABASE_URL` (https, bare), `SUPABASE_PUBLISHABLE_KEY`, `JWT_ALG` (ES256 or RS256) or a 32-character `SESSION_SECRET`, or on Vercel without an https `PUBLIC_URL`; messages name the variable, never a value | `web/test/auth.test.mjs#config:` |
 
 ## Not built yet (no rows until they ship)
 
-OAuth for MCP, Supabase Auth in the web UI, plain export, environment
+OAuth for MCP, plain export, environment
 variables, connections, routines. Each lands with its row and tests.
 
 ## Known gaps
