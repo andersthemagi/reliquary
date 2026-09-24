@@ -111,7 +111,7 @@ select t.expect('stale: the file keeps the version that won',
   'Day rate 900');
 insert into t.ids select 'p4', t.run('ben', format($q$select public.propose(%L, 'canon/pricing.md', 'Free!')$q$, t.id('v1')))::uuid;
 select t.expect('reject: one rejection closes it',
-  t.run('ana', format($q$select public.decide(%L, 'reject')$q$, t.id('p4'))), 'rejected');
+  t.run('ana', format($q$select public.decide(%L, 'reject', 'not free')$q$, t.id('p4'))), 'rejected');
 select t.expect('reject: nothing changed',
   (select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/pricing.md'),
   'Day rate 900');

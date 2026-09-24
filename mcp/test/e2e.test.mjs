@@ -46,7 +46,7 @@ test("tools: the expected set, and no way to approve", async () => {
   const names = (await c.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(names, [
     "changes_since", "list_files", "list_proposals", "list_vaults",
-    "propose", "read_file", "search", "write_file",
+    "propose", "read_file", "revise_proposal", "search", "write_file",
   ]);
   await c.close();
 });
@@ -99,7 +99,7 @@ test("propose: an agent proposes; it waits for people", async () => {
   });
   assert.equal(p.isError, false, p.text);
   const list = await call(ben, "list_proposals", { vault: "Team" });
-  assert.match(list.text, /write canon\/pricing\.md\s+0\/1 approvals\s+via Hermes on Linux/);
+  assert.match(list.text, /write canon\/pricing\.md\s+revision 1\s+0\/1 approvals\s+via Hermes on Linux/);
   const still = await call(ben, "read_file", { vault: "Team", path: "canon/pricing.md" });
   assert.match(still.text, /800 EUR/);
   await ben.close();
@@ -153,4 +153,26 @@ test("data, not instructions: injected text stays inside the markers", async () 
   const endLines = r.text.split("\n").filter((l) => l === `END-${nonce}`);
   assert.equal(endLines.length, 1, "exactly one line is the real end marker");
   await ben.close();
+});
+
+test("revise: an agent reads the reviewer's note and revises its proposal", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  const waiting = await call(ben, "list_proposals", { vault: "Team", status: "changes_requested" });
+  assert.match(waiting.text, /canon\/terms\.md/);
+  assert.match(waiting.text, /request changes \(revision 1\), between NOTE-([0-9a-f]{12}) and END-\1:\nNOTE-\1\nWe agreed Net 30\.\nEND-\1/);
+  const r = await call(ben, "revise_proposal", {
+    proposal_id: env.CHANGES_PROPOSAL, content: "Net 30.", reason: "as agreed",
+  });
+  assert.equal(r.isError, false, r.text);
+  assert.match(r.text, /revision 2/);
+  const open = await call(ben, "list_proposals", { vault: "Team" });
+  assert.match(open.text, /write canon\/terms\.md\s+revision 2\s+0\/1 approvals/);
+  await ben.close();
+});
+
+test("revise: an agent can't revise someone else's proposal", async () => {
+  const ana = await connect(env.ANA_TOKEN);
+  const r = await call(ana, "revise_proposal", { proposal_id: env.CHANGES_PROPOSAL, content: "hijack" });
+  assert.equal(r.isError, true);
+  await ana.close();
 });

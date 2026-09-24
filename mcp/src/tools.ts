@@ -206,7 +206,7 @@ export function registerTools(server: McpServer, id: Identity): void {
     {
       title: "Propose a change",
       description:
-        "Propose creating, replacing, or deleting a file, typically a canon one. People review it in Reliquary; it applies once enough of them approve. You cannot approve proposals.",
+        "Propose creating, replacing, or deleting a file, typically a canon one. People review it in Reliquary; it applies once enough of them approve. You cannot approve proposals. If reviewers request changes, read their notes with list_proposals and use revise_proposal.",
       inputSchema: {
         vault: z.string(),
         path: z.string(),
@@ -234,10 +234,11 @@ export function registerTools(server: McpServer, id: Identity): void {
     "list_proposals",
     {
       title: "List proposals",
-      description: "Proposals in a vault. Defaults to the open ones.",
+      description:
+        "Proposals in a vault, with reviewers' notes. Defaults to the open ones; use changes_requested to find proposals waiting for you to revise.",
       inputSchema: {
         vault: z.string(),
-        status: z.enum(["open", "applied", "rejected", "stale"]).optional(),
+        status: z.enum(["open", "changes_requested", "applied", "rejected", "stale"]).optional(),
       },
       annotations: { readOnlyHint: true },
     },
@@ -245,10 +246,14 @@ export function registerTools(server: McpServer, id: Identity): void {
       run(async (c) => {
         const v = await vaultId(c, vault);
         const { rows } = await c.query(
-          `select p.id, p.kind, p.path, p.reason, p.agent, p.created_at,
+          `select p.id, p.kind, p.path, p.reason, p.agent, p.created_at, p.revision,
                   (select count(*) from public.approvals a
-                    where a.proposal_id = p.id and a.decision = 'approve') as approvals,
-                  (private.policy_for(p.vault_id, p.path)).quorum as quorum
+                    where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision) as approvals,
+                  (private.policy_for(p.vault_id, p.path)).quorum as quorum,
+                  coalesce((select json_agg(json_build_object('kind', n.kind, 'body', n.body, 'revision', n.revision) order by n.at)
+                              from public.proposal_notes n
+                             where n.proposal_id = p.id and n.body is not null
+                               and n.kind in ('request_changes', 'reject', 'edit')), '[]') as notes
              from public.proposals p
             where p.vault_id = $1 and p.status = $2
             order by p.created_at desc
@@ -256,15 +261,46 @@ export function registerTools(server: McpServer, id: Identity): void {
           [v, status ?? "open"],
         );
         if (rows.length === 0) return ok(`No ${status ?? "open"} proposals.`);
+        // Reviewer notes are people's words, so they are fenced as data too.
+        const nonce = randomBytes(6).toString("hex");
         return ok(
           rows
-            .map(
-              (r) =>
-                `${r.id}  ${r.kind} ${r.path}  ${r.approvals}/${r.quorum} approvals` +
-                `${r.agent ? `  via ${r.agent}` : ""}  ${r.created_at.toISOString()}\n  reason: ${r.reason}`,
-            )
-            .join("\n"),
+            .map((r) => {
+              const head =
+                `${r.id}  ${r.kind} ${r.path}  revision ${r.revision}  ${r.approvals}/${r.quorum} approvals` +
+                `${r.agent ? `  via ${r.agent}` : ""}  ${r.created_at.toISOString()}\n  reason: ${r.reason}`;
+              const notes = (r.notes as { kind: string; body: string; revision: number }[]).map(
+                (n) =>
+                  `  ${n.kind.replace("_", " ")} (revision ${n.revision}), between NOTE-${nonce} and END-${nonce}:\n` +
+                  `NOTE-${nonce}\n${n.body}\nEND-${nonce}`,
+              );
+              return [head, ...notes].join("\n");
+            })
+            .join("\n\n"),
         );
+      }),
+  );
+
+  server.registerTool(
+    "revise_proposal",
+    {
+      title: "Revise a proposal",
+      description:
+        "Replace the text of one of your own proposals, usually after reviewers requested changes. It reopens the proposal as a new revision; approvals of earlier revisions no longer count.",
+      inputSchema: {
+        proposal_id: z.string().uuid(),
+        content: z.string().describe("The full new text of the file"),
+        reason: z.string().optional().describe("What changed, for the reviewers"),
+      },
+    },
+    async ({ proposal_id, content, reason }) =>
+      run(async (c) => {
+        const { rows } = await c.query("select public.revise_proposal($1, $2, $3) as r", [
+          proposal_id,
+          content,
+          reason ?? null,
+        ]);
+        return ok(`Revised. Proposal ${proposal_id} is now at revision ${rows[0].r} and waiting for review again.`);
       }),
   );
 

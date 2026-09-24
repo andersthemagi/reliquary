@@ -22,6 +22,7 @@ const USER = process.env.LOCAL_USER_ID ?? "";
 const LOGIN_FILE = process.env.LOGIN_FILE ?? ".login";
 const MAX_BODY = 2 * 1024 * 1024;
 const SESSION_HOURS = 12;
+const MCP_URL = process.env.MCP_PUBLIC_URL ?? "http://127.0.0.1:8787/mcp";
 
 if (!/^[0-9a-f-]{36}$/.test(USER)) {
   console.error("LOCAL_USER_ID must be a UUID");
@@ -184,6 +185,7 @@ const server = http.createServer(async (req, res) => {
       method: req.method,
       flash,
       theme,
+      mcpUrl: MCP_URL,
       setFlash: (m) => {
         session.flash = m;
       },

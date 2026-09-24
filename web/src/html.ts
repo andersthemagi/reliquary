@@ -37,18 +37,22 @@ export const setStyleVersion = (v: string) => {
   styleVersion = v;
 };
 
+export type Nav = "home" | "review" | "vaults" | "connect" | "tokens";
+
 export type PageOpts = {
   user?: string;
   flash?: string;
   theme?: Theme;
   csrf?: string;
   path?: string; // current path, so the theme form can come back here
-  nav?: "vaults" | "tokens";
+  nav?: Nav;
+  reviewCount?: number;
 };
 
 export function page(title: string, body: Raw, opts: PageOpts = {}): string {
   const theme = opts.theme ?? "auto";
-  const current = (n: PageOpts["nav"]) => (opts.nav === n ? raw(' aria-current="page"') : "");
+  const current = (...n: Nav[]) => (opts.nav && n.includes(opts.nav) ? raw(' aria-current="page"') : "");
+  const count = opts.reviewCount ?? 0;
   const themeButton = (t: Theme, label: string) =>
     html`<button name="theme" value="${t}" aria-pressed="${theme === t ? "true" : "false"}">${label}</button>`;
   return html`<!doctype html>
@@ -64,7 +68,14 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
 <body>
 <header class="top">
   <a class="wordmark" href="/">Reliquary</a>
-  ${opts.user ? html`<nav aria-label="Main"><a href="/"${current("vaults")}>Vaults</a><a href="/tokens"${current("tokens")}>Tokens</a></nav>` : ""}
+  ${opts.user
+    ? html`<nav aria-label="Main">
+    <a href="/review"${current("review")}>Review${count ? html`<span class="count" aria-label="${count} waiting">${count}</span>` : ""}</a>
+    <a href="/"${current("home", "vaults")}>Vaults</a>
+    <a href="/connect"${current("connect")}>Connect</a>
+    <a href="/tokens"${current("tokens")}>Tokens</a>
+  </nav>`
+    : ""}
 </header>
 <main>
 ${opts.flash ? html`<p class="flash" role="status">${opts.flash}</p>` : ""}

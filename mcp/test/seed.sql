@@ -32,6 +32,15 @@ select public.decide(:'p1', 'approve');
 select public.create_access_token('Claude Code on MacBook') as ana_token \gset
 select pg_temp.reset();
 
+-- Ben's agent proposes; Ana asks for changes.
+select set_config('request.jwt.claims', json_build_object('sub', :'ben', 'act', json_build_object('sub', 'x', 'name', 'Hermes on Linux'))::text, false),
+       set_config('role', 'authenticated', false);
+select public.propose(:'v1', 'canon/terms.md', 'Net 60.', 'payment terms') as p2 \gset
+select pg_temp.reset();
+select pg_temp.as_person(:'ana');
+select public.decide(:'p2', 'request_changes', 'We agreed Net 30.');
+select pg_temp.reset();
+
 select pg_temp.as_person(:'ben');
 select public.create_access_token('Hermes on Linux') as ben_token \gset
 select pg_temp.reset();
@@ -52,4 +61,5 @@ select pg_temp.reset();
 \echo CAL_TOKEN=:cal_token
 \echo DEE_TOKEN=:dee_token
 \echo TEAM_VAULT=:v1
+\echo CHANGES_PROPOSAL=:p2
 \echo DEE_VAULT=:v2
