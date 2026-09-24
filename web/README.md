@@ -18,6 +18,13 @@ sessions are HttpOnly, SameSite=Strict cookies.
 person `dev.sh` created. Hosted, it will verify a Supabase Auth session
 instead; nothing else changes.
 
+Tokens (`/tokens`) are scoped to chosen vaults or all of yours, read-only or
+read-write, with an expiry of 7 days to a year. The form defaults to all
+vaults, read-only; ticking any vault narrows the token to those vaults. Scope
+can't be edited: revoke and create another. The list shows last use and the
+client name the agent reported. The database enforces the scope, not this
+page.
+
 ```bash
 ./test.sh    # real Postgres + this server; sign-in, escaping, CSRF, approve, tokens; log leak check
 ```

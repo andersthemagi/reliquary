@@ -50,7 +50,15 @@ approving needs a person in the web UI.
 2. The call runs in one transaction as `authenticated`, with the person as
    `sub` and the token as `act`. The act claim means every token call gets the
    delegation ceiling.
-3. RLS and the security-definer API do the rest.
+3. RLS and the security-definer API do the rest. `act.tok` names the token,
+   and `private.role_in` limits the call to the token's vaults and access: a
+   vault outside its scope doesn't exist for it, and a read-only token is a
+   viewer. A revoked or expired token stops working on its next call.
+
+At `initialize` the server records the client's `clientInfo.name` for the
+Tokens page (by token hash, through `private.record_token_client`). It is
+never logged. Tokens made with `./dev.sh token` reach all your vaults,
+read-write; make scoped ones in the web UI.
 
 File text is returned between `BEGIN-<nonce>` and `END-<nonce>` markers, with
 a fresh random value each response, so a file can't fake its own end.
