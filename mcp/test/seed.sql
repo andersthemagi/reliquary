@@ -63,3 +63,32 @@ select pg_temp.reset();
 \echo TEAM_VAULT=:v1
 \echo CHANGES_PROPOSAL=:p2
 \echo DEE_VAULT=:v2
+
+-- ---------------------------------------------------------------------------
+-- Threads (test/threads.test.mjs). Its own vault, so the other tests' lists
+-- don't change: Ana owner, Ben editor, Cal viewer. Ben's agent proposes a
+-- brief and Ana asks for changes; a second proposal is already applied.
+\o /dev/null
+select pg_temp.as_person(:'ana');
+select public.create_vault('Threads', 'open') as tv \gset
+select public.set_member(:'tv', :'ben', 'editor');
+select public.set_member(:'tv', :'cal', 'viewer');
+select public.set_policy(:'tv', 'canon/', 'canon', 1);
+select public.propose(:'tv', 'canon/done.md', 'Done.', 'closed one') as tp_closed \gset
+select public.decide(:'tp_closed', 'approve');
+select pg_temp.reset();
+select set_config('request.jwt.claims', json_build_object('sub', :'ben', 'act', json_build_object('sub', 'x', 'name', 'Hermes on Linux'))::text, false),
+       set_config('role', 'authenticated', false);
+select public.propose(:'tv', 'canon/brief.md', 'A long brief about the booking flow.', 'first brief') as tp \gset
+select pg_temp.reset();
+select pg_temp.as_person(:'ana');
+select public.decide(:'tp', 'request_changes', 'Shorter, please.');
+select pg_temp.reset();
+select pg_temp.as_person(:'dee');
+select public.propose(:'v2', 'plans.md', 'Plan.', 'dee plan') as tp_dee \gset
+select pg_temp.reset();
+\o
+\echo THREAD_VAULT=:tv
+\echo THREAD_PROPOSAL=:tp
+\echo THREAD_CLOSED=:tp_closed
+\echo DEE_PROPOSAL=:tp_dee
