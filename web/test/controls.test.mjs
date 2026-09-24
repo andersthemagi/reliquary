@@ -128,15 +128,25 @@ test("pages: file and folder actions are in the header; the rule form comes befo
 
 // Review list: per-row snooze ----------------------------------------------------
 
-test("review: every waiting row carries a compact snooze with three choices", async () => {
+test("review: every waiting row carries one Snooze menu with three choices", async () => {
   const h = await page("/review");
   const row = new RegExp(
-    `<form method="post" action="${C}/proposals/${C_ROW}/snooze" class="snooze row-snooze" aria-label="Snooze Create canon/row\\.md">\\s*` +
-      `<input type="hidden" name="csrf" value="[0-9a-f]+"><span>Snooze</span><button name="for" value="day">For a day</button>\\s*` +
+    `<details class="menu-wrap row-snooze-menu">\\s*<summary class="button small quiet" aria-label="Snooze Create canon/row\\.md">Snooze</summary>\\s*` +
+      `<form method="post" action="${C}/proposals/${C_ROW}/snooze" class="menu row-snooze" aria-label="Snooze Create canon/row\\.md">\\s*` +
+      `<input type="hidden" name="csrf" value="[0-9a-f]+"><span class="menu-label">Hide from your Review</span><button name="for" value="day">For a day</button>\\s*` +
       `<button name="for" value="week">For a week</button>\\s*<button name="for" value="change">Until it changes</button>`,
   );
   assert.match(h, row);
-  assert.match(h, new RegExp(`action="${C}/proposals/${C_REVISED}/snooze" class="snooze row-snooze"`));
+  assert.match(h, new RegExp(`action="${C}/proposals/${C_REVISED}/snooze" class="menu row-snooze"`));
+});
+
+test("review: a row's risk badge names the first reason, not a bare count", async () => {
+  const h = await page("/review");
+  assert.doesNotMatch(h, /\d+ to check/);
+  assert.match(h, /<span class="badge attention risk-count" title="[^"]+">(Deletes the file|Removes \d+ of \d+ lines|Revised [^<]+|First proposal [^<]+)( \+\d+ more)?<\/span>/);
+  // Creating a file is not a risk: a neutral label, never the amber badge.
+  assert.match(h, /<span class="badge">New file<\/span>/);
+  assert.doesNotMatch(h, /risk-count"[^>]*>Creates a new file/);
 });
 
 test("review: snoozing a row needs the form token and a same-origin post", async () => {

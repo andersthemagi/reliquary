@@ -150,12 +150,13 @@ function risks(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
-  const r = risks(p);
+  // A new file is shown as a neutral label; only real risks get the amber badge.
+  const r = risks(p).filter((x) => x !== "Creates a new file");
   const verb = p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
   return html`<li>
     <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${verb} ${p.path}</a>
       <span class="muted small"> · ${showVault ? `${p.vault} · ` : ""}by ${who(ctx, p.proposed_by, p.agent)} · ${ago(p.created_at)}</span></span>
-    <span class="row-end small">${r.length ? html`<span class="badge attention risk-count">${r.length} to check</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
+    <span class="row-end small">${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${r.length ? html`<span class="badge attention risk-count" title="${r.join("; ")}">${r[0]}${r.length > 1 ? ` +${r.length - 1} more` : ""}</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
       snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : ""
     }</span>
   </li>`;

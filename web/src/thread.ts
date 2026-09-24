@@ -103,10 +103,14 @@ export async function snoozeControl(
 }
 
 // Snooze from a row of the Review list; the handler redirects to /review.
+// One "Snooze" menu per row (a <details>, no script), so the list stays quiet.
 export const rowSnooze = (ctx: Ctx, vaultId: string, pid: string, label: string) =>
-  html`<form method="post" action="${proposalPath(vaultId, pid, "/snooze")}" class="snooze row-snooze" aria-label="Snooze ${label}">
-    ${csrfField(ctx.csrf)}<span>Snooze</span>${snoozeButtons}
-  </form>`;
+  html`<details class="menu-wrap row-snooze-menu">
+    <summary class="button small quiet" aria-label="Snooze ${label}">Snooze</summary>
+    <form method="post" action="${proposalPath(vaultId, pid, "/snooze")}" class="menu row-snooze" aria-label="Snooze ${label}">
+      ${csrfField(ctx.csrf)}<span class="menu-label">Hide from your Review</span>${snoozeButtons}
+    </form>
+  </details>`;
 
 // ---------------------------------------------------------------------------
 // The proposal page's discussion, at the end of the page.
