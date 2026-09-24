@@ -30,7 +30,12 @@ Done so far:
   inbox (`20260924170000_threads_snooze.sql`, `web/src/thread.ts`);
 - unified / split / rendered diffs with word highlights, and Activity
   (account-wide and per vault, filterable, paged; a file's History is the
-  same log), in `web/src/diff.ts`, `diffview.ts`, `activity.ts`.
+  same log), in `web/src/diff.ts`, `diffview.ts`, `activity.ts`;
+- parity between people and agents ([docs/parity.md](docs/parity.md), kept
+  true by `mcp/test/parity.test.mjs`): New vault in the web UI, and
+  `create_vault` over MCP for all-vaults read-write tokens
+  (`20260924230000_agent_create_vault.sql`), `delete_file` over MCP, Revise
+  for your own proposal in the web UI.
 Both need podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session

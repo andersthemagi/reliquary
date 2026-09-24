@@ -39,11 +39,15 @@ Any MCP client that can send a header works the same way (Hermes, Cursor):
 
 ## Tools
 
-`list_vaults`, `list_files`, `read_file`, `search`, `write_file` (open files
-only), `propose`, `list_proposals`, `revise_proposal`, `read_proposal` (one
-proposal with its whole thread), `comment_on_proposal`, `changes_since`.
-There is no approve tool: approving needs a person in the web UI. There is no
-snooze tool either, so an agent can't hide its proposals from its person.
+`list_vaults`, `create_vault`, `list_files`, `read_file`, `search`,
+`write_file` and `delete_file` (open files only), `propose`, `list_proposals`,
+`revise_proposal`, `read_proposal` (one proposal with its whole thread),
+`comment_on_proposal`, `changes_since`. There is no approve tool: approving
+needs a person in the web UI. There is no snooze tool either, so an agent
+can't hide its proposals from its person, and no rules or members tool.
+`create_vault` only works through a token (or OAuth grant) that reaches all
+of the person's vaults with read-write access; the person owns the vault.
+What each side can do, and why not: [docs/parity.md](../docs/parity.md).
 
 `changes_since` brings the discussion with it: each comment, request for
 changes, rejection, revision or edit event is followed by that note's text
