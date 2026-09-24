@@ -23,6 +23,9 @@ import { registerTools } from "./tools.js";
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8787);
 const MAX_BODY = 1024 * 1024;
+// A JSON-RPC batch runs one transaction per message: without a ceiling, one
+// 1 MB POST could queue thousands of database calls.
+const MAX_BATCH = 10;
 
 // OAuth (docs/research/hosting.md, section 4). MCP_RESOURCE is this server's
 // canonical URL, byte for byte what the authorization server binds tokens to
@@ -177,6 +180,11 @@ const httpServer = http.createServer(async (req, res) => {
     send(res, 400, { error: (err as Error).message });
     return;
   }
+  if (Array.isArray(body) && body.length > MAX_BATCH) {
+    send(res, 400, { error: `batch too large: at most ${MAX_BATCH} messages per request` });
+    console.info("mcp 400 batch");
+    return;
+  }
 
   // The client's self-reported name, for the Tokens page. Never logged.
   const init = body as { method?: unknown; params?: { clientInfo?: { name?: unknown } } } | null;
@@ -210,6 +218,11 @@ const httpServer = http.createServer(async (req, res) => {
 export const handle: http.RequestListener = (req, res) => {
   httpServer.emit("request", req, res);
 };
+// Locally, a client that trickles its headers or body can't hold a socket
+// for Node's default five minutes. (On Vercel the platform owns the socket,
+// and maxDuration in vercel.json bounds a request.)
+httpServer.headersTimeout = 10_000;
+httpServer.requestTimeout = 30_000;
 if (!process.env.VERCEL) {
   httpServer.listen(PORT, HOST, () => console.info(`reliquary mcp on http://${HOST}:${PORT}/mcp`));
 }

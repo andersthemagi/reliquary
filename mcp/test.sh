@@ -3,6 +3,9 @@
 # official MCP client, all in containers on the host network (127.0.0.1).
 # For OAuth (test/oauth.test.mjs) the web app runs too, as the authorization
 # server.
+#
+#   MCP_TESTS="test/token_load.test.mjs" ./mcp/test.sh   only these test files
+#   TOKEN_LOAD_MEASURE_ONLY=1                            print token load, don't fail on budgets
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -64,7 +67,8 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 "$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" \
   -e MCP_URL="http://127.0.0.1:$port/mcp" -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
-  "$node" node --test --test-concurrency=1 test/*.test.mjs
+  -e TOKEN_LOAD_MEASURE_ONLY="${TOKEN_LOAD_MEASURE_ONLY:-}" \
+  "$node" node --test --test-concurrency=1 ${MCP_TESTS:-test/*.test.mjs}
 
 echo "== server log (must contain no tokens or file text)"
 # Not `tee /dev/stderr`: when stderr is a file (./test.sh logs) that reopens

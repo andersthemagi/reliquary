@@ -2,23 +2,29 @@
   {
     "name": "changes_since",
     "title": "Changes since a cursor",
-    "description": "Everything that happened in a vault after a cursor, oldest first. Store the last seq you saw and pass it next time. Comments and review notes on proposals (requested changes, rejections, revisions, edits) come with their text, so you can act on them without calling read_proposal.",
+    "description": "A vault's events after a cursor, oldest first, with the text of proposal comments and review notes. Pass back the next cursor it returns.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "cursor": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 9007199254740991
+          "maximum": 1000000000000000
+        },
+        "limit": {
+          "description": "Events, default 100",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
         }
       },
       "required": [
         "vault"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": {
       "readOnlyHint": true
@@ -27,34 +33,31 @@
   {
     "name": "comment_on_proposal",
     "title": "Comment on a proposal",
-    "description": "Add a comment to a proposal's thread, as your person: answer a reviewer's question, explain a change, or ask one. Comments are words only; they can't approve, reject or change a proposal. To change your own proposal's text, use revise_proposal.",
+    "description": "Comment on a proposal's thread as your person. Words only: a comment can't approve, reject or change it (revise_proposal changes your own).",
     "inputSchema": {
       "type": "object",
       "properties": {
         "proposal_id": {
           "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^[0-9a-fA-F-]{36}$"
         },
         "comment": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 4000,
-          "description": "Plain text, up to 4000 characters"
+          "maxLength": 4000
         }
       },
       "required": [
         "proposal_id",
         "comment"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": null
   },
   {
     "name": "create_vault",
     "title": "Create a vault",
-    "description": "Create a new vault owned by your person; the log records that you made it. Only works through a connection that reaches all of your person's vaults with read-write access: a token limited to chosen vaults, or read-only, is refused. default_policy is what every file is unless a rule says otherwise: open (members and agents write directly) or canon (every change is a proposal people approve). Rules for folders and files are policy, so only people set them, in Reliquary's Rules page; you can't add members either.",
+    "description": "Create a vault owned by your person (the log records you made it). Needs a token that reaches all your person's vaults read-write. default_policy: open (write directly) or canon (changes are proposals people approve). Only people set folder rules and members.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -65,7 +68,6 @@
           "description": "The vault's name"
         },
         "default_policy": {
-          "description": "open (the default) or canon",
           "type": "string",
           "enum": [
             "open",
@@ -75,53 +77,64 @@
       },
       "required": [
         "name"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": null
   },
   {
     "name": "delete_file",
     "title": "Delete an open file",
-    "description": "Delete a file whose policy is open. Its earlier versions are kept and the deletion is logged. Canon files can't be deleted directly: use propose with delete set to true.",
+    "description": "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1024
         }
       },
       "required": [
         "vault",
         "path"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": null
   },
   {
     "name": "list_files",
     "title": "List files",
-    "description": "Files in a vault, optionally under a folder prefix like 'clients/'.",
+    "description": "Files in a vault, one per line: path, [canon] if canon (the rest are open), last change.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
           "type": "string",
-          "description": "Vault name or id"
+          "maxLength": 200
         },
         "prefix": {
-          "description": "Folder prefix, e.g. 'clients/'",
-          "type": "string"
+          "description": "Folder, e.g. 'clients/'",
+          "type": "string",
+          "maxLength": 1024
+        },
+        "after": {
+          "description": "Path to continue after",
+          "type": "string",
+          "maxLength": 1024
+        },
+        "limit": {
+          "description": "Default 200",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       },
       "required": [
         "vault"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": {
       "readOnlyHint": true
@@ -130,12 +143,13 @@
   {
     "name": "list_proposals",
     "title": "List proposals",
-    "description": "Proposals in a vault, with reviewers' notes. Defaults to the open ones; use changes_requested to find proposals waiting for you to revise. read_proposal shows one with its whole thread.",
+    "description": "A vault's proposals (open by default), newest first, with reviewers' notes. changes_requested: those waiting for you to revise.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "status": {
           "type": "string",
@@ -150,8 +164,7 @@
       },
       "required": [
         "vault"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": {
       "readOnlyHint": true
@@ -160,23 +173,24 @@
   {
     "name": "list_variables",
     "title": "List environment variables",
-    "description": "Names of a vault's environment variables, the environments each has a value in (development, preview, production, ...), and when and by whom each was last set. Never values: you can't read, set or reveal one. To use them, your person runs `reliquary run -- <command>` or `reliquary env pull` on their own machine; values are set in Reliquary's web UI.",
+    "description": "Names of a vault's environment variables per environment, and who last set each. Never values: you can't read, set or reveal one. Your person uses them with `reliquary run` or `reliquary env pull`.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
           "type": "string",
-          "description": "Vault name or id"
+          "maxLength": 200
         },
         "environment": {
-          "description": "Only this environment, e.g. 'development'",
-          "type": "string"
+          "description": "e.g. development",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
         }
       },
       "required": [
         "vault"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": {
       "readOnlyHint": true
@@ -185,7 +199,7 @@
   {
     "name": "list_vaults",
     "title": "List vaults",
-    "description": "Vaults this token can reach, with your role in each (viewer when the token is read-only).",
+    "description": "Vaults this token reaches, with your role in each (viewer if the token is read-only). Other tools take a vault by name or id.",
     "inputSchema": {
       "type": "object",
       "properties": {}
@@ -197,23 +211,27 @@
   {
     "name": "propose",
     "title": "Propose a change",
-    "description": "Propose creating, replacing, or deleting a file, typically a canon one. People review it in Reliquary; it applies once enough of them approve. You cannot approve proposals. If reviewers comment or request changes, their notes arrive in changes_since (or list_proposals); use revise_proposal.",
+    "description": "Propose writing or deleting a file, typically a canon one. People review it; it applies once enough approve. You cannot approve. Reviewers' notes arrive in changes_since; answer with revise_proposal.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1024
         },
         "content": {
-          "description": "The full new text. Omit when deleting.",
-          "type": "string"
+          "description": "Full new text; omit to delete",
+          "type": "string",
+          "maxLength": 1000000
         },
         "reason": {
           "type": "string",
-          "description": "Why this change, for the reviewers"
+          "maxLength": 4000,
+          "description": "For the reviewers"
         },
         "delete": {
           "type": "boolean"
@@ -223,30 +241,45 @@
         "vault",
         "path",
         "reason"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": null
   },
   {
     "name": "read_file",
     "title": "Read a file",
-    "description": "Read one file's current text, with its policy and who last wrote it.",
+    "description": "A file's text, policy and last writer. At most max_bytes (default 100000); from_line and to_line pick lines.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1024
+        },
+        "from_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "to_line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 1048576
         }
       },
       "required": [
         "vault",
         "path"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": {
       "readOnlyHint": true
@@ -255,20 +288,18 @@
   {
     "name": "read_proposal",
     "title": "Read a proposal and its thread",
-    "description": "One proposal with its reason, proposed text, and its whole thread: comments, review notes and approvals, oldest first. Read it before replying with comment_on_proposal.",
+    "description": "One proposal: reason, proposed text, and its thread (comments, review notes, approvals), oldest first.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "proposal_id": {
           "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^[0-9a-fA-F-]{36}$"
         }
       },
       "required": [
         "proposal_id"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": {
       "readOnlyHint": true
@@ -277,47 +308,49 @@
   {
     "name": "revise_proposal",
     "title": "Revise a proposal",
-    "description": "Replace the text of one of your own proposals, usually after reviewers requested changes. It reopens the proposal as a new revision; approvals of earlier revisions no longer count.",
+    "description": "Replace your own proposal's text as a new revision; approvals of earlier revisions stop counting.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "proposal_id": {
           "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "pattern": "^[0-9a-fA-F-]{36}$"
         },
         "content": {
           "type": "string",
-          "description": "The full new text of the file"
+          "maxLength": 1000000
         },
         "reason": {
-          "description": "What changed, for the reviewers",
-          "type": "string"
+          "description": "What changed",
+          "type": "string",
+          "maxLength": 4000
         }
       },
       "required": [
         "proposal_id",
         "content"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": null
   },
   {
     "name": "search",
     "title": "Search a vault",
-    "description": "Full-text search over the current text of every file in a vault. Supports quoted phrases, 'or', and '-exclusions'.",
+    "description": "Full-text search of a vault: \"phrases\", or, -exclusions. Up to 3 matching lines per file, best first.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "query": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 500
         },
         "limit": {
+          "description": "Files, default 10",
           "type": "integer",
           "minimum": 1,
           "maximum": 50
@@ -326,8 +359,7 @@
       "required": [
         "vault",
         "query"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": {
       "readOnlyHint": true
@@ -341,21 +373,23 @@
       "type": "object",
       "properties": {
         "vault": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1024
         },
         "content": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
       "required": [
         "vault",
         "path",
         "content"
-      ],
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      ]
     },
     "annotations": null
   }

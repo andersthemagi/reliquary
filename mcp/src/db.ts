@@ -111,9 +111,10 @@ export async function recordClient(token: string, clientName: string): Promise<v
 export async function asIdentity<T>(id: Identity, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
+    // Two round trips before the work: begin, then the role and the claims
+    // in one statement (set_config('role', ..., true) is SET LOCAL ROLE).
     await client.query("begin");
-    await client.query("set local role authenticated");
-    await client.query("select set_config('request.jwt.claims', $1, true)", [
+    await client.query("select set_config('role', 'authenticated', true), set_config('request.jwt.claims', $1, true)", [
       JSON.stringify({
         sub: id.userId,
         role: "authenticated",

@@ -36,7 +36,9 @@ test("create_vault: an all-vaults read-write token creates a vault its person ow
 test("create_vault: the log records the agent, acting as its person", async () => {
   const log = await call(EVE_ALL_RW, "changes_since", { vault: "Eve agent notes" });
   assert.equal(log.isError, false, log.text);
-  assert.match(log.text, new RegExp(`vault\\.create {2}by ${EVE} via Eve all rw`));
+  // The feed names each person once (p1=<id>), then by label.
+  assert.match(log.text, new RegExp(`^people: p1=${EVE} \\(your person\\)$`, "m"));
+  assert.match(log.text, /vault\.create {2}by p1 via Eve all rw/);
 });
 
 test("create_vault: the agent works in the new vault; canon as the default means proposals", async () => {

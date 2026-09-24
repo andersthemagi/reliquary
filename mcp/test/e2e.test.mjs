@@ -159,7 +159,7 @@ test("revise: an agent reads the reviewer's note and revises its proposal", asyn
   const ben = await connect(env.BEN_TOKEN);
   const waiting = await call(ben, "list_proposals", { vault: "Team", status: "changes_requested" });
   assert.match(waiting.text, /canon\/terms\.md/);
-  assert.match(waiting.text, /request changes \(revision 1\), between NOTE-([0-9a-f]{12}) and END-\1:\nNOTE-\1\nWe agreed Net 30\.\nEND-\1/);
+  assert.match(waiting.text, /request changes \(revision 1\):\nNOTE-([0-9a-f]{12})\nWe agreed Net 30\.\nEND-\1/);
   const r = await call(ben, "revise_proposal", {
     proposal_id: env.CHANGES_PROPOSAL, content: "Net 30.", reason: "as agreed",
   });
