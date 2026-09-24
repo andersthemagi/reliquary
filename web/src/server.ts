@@ -37,7 +37,8 @@ import { landing } from "./landing.js";
 import { publicRoute } from "./legal.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
-import { configureVariables } from "./secrets.js";
+import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
+import { pool } from "./db.js";
 import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -73,6 +74,27 @@ try {
   process.exit(1);
 }
 setAccountMode(MODE);
+
+// Every stored value must name a key this server holds: otherwise a key was
+// dropped before its values were re-encrypted (docs/ops/runbook.md), and
+// they would fail one by one. Refuse to start instead, naming the ids (never
+// a key). If the database can't be asked (down, or the migration not yet
+// applied), say so and start: the value routes fail on their own then.
+if (variablesConfigured()) {
+  let stored: string[] | null = null;
+  try {
+    stored = (await pool.query("select key_id from private.variable_key_ids()")).rows.map((r) => r.key_id as string);
+  } catch (err) {
+    console.error("could not check the stored variable key ids", (err as { code?: string }).code ?? (err as Error).name);
+  }
+  const missing = stored ? missingKeyIds(stored) : [];
+  if (missing.length) {
+    console.error(
+      `Refusing to start: stored values are sealed with key id${missing.length === 1 ? "" : "s"} ${missing.join(", ")}, which VARIABLES_KEYS doesn't hold. Add the old key back, re-encrypt (scripts/rotate-variables-key.sh), then drop it.`,
+    );
+    process.exit(1);
+  }
+}
 
 // Static files: a fixed map built at start, so no request path ever touches
 // the filesystem. On Vercel, public/ is served by the CDN and may be missing

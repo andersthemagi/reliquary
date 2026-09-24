@@ -244,8 +244,15 @@ select t.expect('ciphertext: no function an API role can call returns it except 
       and p.prosrc ~ 'variable_secrets'
       and (has_function_privilege('authenticated', p.oid, 'execute')
            or has_function_privilege('reliquary_mcp', p.oid, 'execute')
-           or has_function_privilege('reliquary_web', p.oid, 'execute'))
+           or has_function_privilege('anon', p.oid, 'execute'))
       and p.proname not in ('reveal_variable', 'read_variables', 'set_variable')), 'none');
+select t.expect('ciphertext: the web app''s own role reaches it only through the re-encryption functions',
+  (select coalesce(string_agg(p.proname, ',' order by p.proname), 'none')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname in ('public', 'private')
+      and p.prosrc ~ 'variable_secrets'
+      and has_function_privilege('reliquary_web', p.oid, 'execute')
+      and not has_function_privilege('authenticated', p.oid, 'execute')), 'rekey_vaults,reseal,sealed_rows,variable_key_ids');
 
 -- ---------------------------------------------------------------------------
 -- Reveal: one value, a person in person

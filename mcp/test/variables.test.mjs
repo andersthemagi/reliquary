@@ -174,3 +174,15 @@ test("mcp app: refuses to start with VARIABLES_KEY set, without printing it", ()
   assert.match(r.stderr, /Refusing to start: VARIABLES_KEY is set, and only the web app may hold it/);
   assert.equal((r.stdout + r.stderr).includes(key), false);
 });
+
+test("mcp app: refuses to start with VARIABLES_KEYS set, without printing it", () => {
+  const key = `k2:${randomBytes(24).toString("base64url")}KEYMARK`;
+  const r = spawnSync(process.execPath, ["dist/server.js"], {
+    env: { ...process.env, DATABASE_URL: "postgres://reliquary_mcp:test@127.0.0.1:1/postgres", PORT: "1", VARIABLES_KEYS: key },
+    encoding: "utf8",
+    timeout: 15_000,
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /Refusing to start: VARIABLES_KEYS is set, and only the web app may hold it/);
+  assert.equal((r.stdout + r.stderr).includes("KEYMARK"), false);
+});

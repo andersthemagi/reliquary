@@ -11,9 +11,36 @@
 #
 # The web app also needs SUPABASE_PUBLISHABLE_KEY, from the Supabase dashboard
 # (Project Settings -> API Keys); it is printed as a placeholder.
+#
+# The variables encryption keys (VARIABLES_KEYS, docs/variables.md "Key
+# rotation") come from supabase/.variables-keys-secret, one id:key per line,
+# the current key first (scripts/variables-keys.sh). To rotate
+# (docs/ops/runbook.md, "Rotating VARIABLES_KEY"):
+#
+#   scripts/vercel-env.sh new-variables-key       a new current key; then `web`
+#   scripts/vercel-env.sh drop-variables-key <id> after re-encrypting; then `web`
+#   scripts/vercel-env.sh variables-keys          the key ids, current first
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
+
+next="Next: scripts/vercel-env.sh web <web-origin> <mcp-origin>, then put VARIABLES_KEYS in the web Vercel project and redeploy (docs/ops/runbook.md)."
+case ${1:-} in
+  new-variables-key)
+    scripts/variables-keys.sh new
+    echo "$next Then run scripts/rotate-variables-key.sh."
+    exit 0
+    ;;
+  drop-variables-key)
+    scripts/variables-keys.sh drop "${2:?which key id to drop}"
+    echo "$next"
+    exit 0
+    ;;
+  variables-keys)
+    scripts/variables-keys.sh list
+    exit 0
+    ;;
+esac
 
 app=${1:?web or mcp}
 web=${2:?the web app origin, e.g. https://reliquary-web.vercel.app}
@@ -32,15 +59,14 @@ case $app in
     if [[ ! -s $secret ]]; then
       (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$secret")
     fi
-    # The variables encryption key (docs/variables.md). Generated once into a
-    # gitignored file; keep a copy in a password manager too: Vercel can't
-    # show a Sensitive value again, and losing the key loses every value.
-    vkey=supabase/.variables-secret
-    if [[ ! -s $vkey ]]; then
-      (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$vkey")
-    fi
+    # The variables encryption keys (docs/variables.md, "Key rotation"), the
+    # current one first. Made once (an older supabase/.variables-secret is
+    # taken over as k1) into a gitignored file; keep a copy of each in a
+    # password manager too: Vercel can't show a Sensitive value again, and
+    # losing a key loses every value sealed with it.
+    scripts/variables-keys.sh ensure
     cat > "$out" <<EOF
-VARIABLES_KEY=$(cat "$vkey")
+VARIABLES_KEYS=$(paste -sd, supabase/.variables-keys-secret)
 DATABASE_URL=postgres://reliquary_web.$ref:$(pw web | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 PUBLIC_URL=$web
