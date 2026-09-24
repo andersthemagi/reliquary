@@ -17,7 +17,9 @@ cleanup
 
 "$engine" run -d --network none --name "$name" -e POSTGRES_PASSWORD=test \
   docker.io/library/postgres:17 >/dev/null
-until "$engine" exec "$name" pg_isready -U postgres -q; do sleep 0.5; done
+# Ask over TCP: the image's init-time server listens on the socket only, so a
+# socket check can pass before the real server is up (a flaky race).
+until "$engine" exec "$name" pg_isready -h 127.0.0.1 -U postgres -q 2>/dev/null; do sleep 0.5; done
 sleep 1
 
 psql() { "$engine" exec -i "$name" psql -U postgres -v ON_ERROR_STOP=1 -q "$@"; }
