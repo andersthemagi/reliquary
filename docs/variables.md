@@ -141,7 +141,7 @@ deleteVariable(userId, vaultId, name, environment): Promise<void>
 revealVariable(userId, vaultId, name, environment): Promise<
   | { ok: true; value: string; updatedAt: string; updatedBy: string }
   | { ok: false; error: "unauthorized" | "forbidden" | "not_found" | "decrypt_failed" }>
-accessLog(userId, vaultId, { before?: seq, limit?: 1..500 = 100 }): Promise<{
+accessLog(userId, vaultId, { before?: seq, limit?: 1..500 = 100, action?, name? }): Promise<{
   seq, at, actor, agent, tokenId, clientId, action, environment, names, detail }[]>   // newest first
 ```
 

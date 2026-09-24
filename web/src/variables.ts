@@ -96,8 +96,13 @@ export async function revealVariable(userId: string, vaultId: string, name: stri
 }
 
 // The vault's env_access_log, newest first, for owners and editors (RLS
-// gives others nothing). Page with `before` (a seq).
-export async function accessLog(userId: string, vaultId: string, opts: { before?: string; limit?: number } = {}): Promise<AccessLogRow[]> {
+// gives others nothing). Page with `before` (a seq); narrow to one `action`,
+// or to the rows naming one variable (`name`).
+export async function accessLog(
+  userId: string,
+  vaultId: string,
+  opts: { before?: string; limit?: number; action?: string; name?: string } = {},
+): Promise<AccessLogRow[]> {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
   return asPerson(userId, async (c) =>
     (
@@ -105,8 +110,9 @@ export async function accessLog(userId: string, vaultId: string, opts: { before?
         `select seq, at, actor, agent, token_id, client_id, action, environment, names, detail
            from public.env_access_log
           where vault_id = $1 and ($2::bigint is null or seq < $2::bigint)
+            and ($4::text is null or action = $4) and ($5::text is null or $5 = any(names))
           order by seq desc limit $3`,
-        [vaultId, opts.before ?? null, limit],
+        [vaultId, opts.before ?? null, limit, opts.action || null, opts.name || null],
       )
     ).rows.map((r) => ({
       seq: String(r.seq),

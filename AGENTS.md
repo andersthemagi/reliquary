@@ -54,7 +54,10 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
 - the CLI in `cli/` (`reliquary login | logout | vaults | run | env pull`,
   to be published as `@reliquary-ai/cli`), with end-to-end tests
   (`./cli/test.sh`).
-Next (phase 2): the web Variables page.
+- phase 2's web Variables page (`web/src/variablespage.ts`): names by
+  environment, set / rotate / delete, reveal by POST, the access log, and the
+  CLI on Connect, with tests (`web/test/variables_page.test.mjs`).
+Milestone 2 is built; next is its week of real use.
 
 All of it needs podman or docker; nothing needs Node installed on the host.
 
