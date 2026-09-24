@@ -54,8 +54,9 @@ test("headers: scripts forbidden, same-origin referrer, no caching", async () =>
 });
 
 test("assets: fonts, icon and a versioned stylesheet are served from here only", async () => {
-  const font = await fetch(BASE + "/fonts/bebas-neue-latin-400-normal.woff2");
+  const font = await fetch(BASE + "/fonts/inter-latin-opsz-normal.woff2");
   assert.equal(font.headers.get("content-type"), "font/woff2");
+  assert.equal((await fetch(BASE + "/favicon.svg")).headers.get("content-type"), "image/svg+xml");
   assert.equal((await fetch(BASE + "/fonts/../server.js")).status, 401);
   assert.match(await page("/"), /<link rel="stylesheet" href="\/style\.css\?v=[0-9a-f]{10}">/);
 });
