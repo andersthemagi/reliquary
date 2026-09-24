@@ -90,7 +90,7 @@ const mcpPost = (token) =>
 before(async () => {
   [{ id: vault }] = await as({ user: UMA }, "select public.create_vault('Var Vault') as id");
   [{ id: ivyVault }] = await as({ user: IVY }, "select public.create_vault('Ivy Vault') as id");
-  await as({ user: UMA }, "select public.set_member($1, $2, 'editor')", [vault, IVY]);
+  await as({ role: "postgres" }, "select test_support.add_member($1, $2, 'editor', $3)", [vault, IVY, UMA]);
   await setv(UMA, vault, "STRIPE_KEY", "production");
   await setv(IVY, vault, "STRIPE_KEY", "development");
   await setv(IVY, vault, "DATABASE_URL", "development");

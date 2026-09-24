@@ -137,9 +137,9 @@ before(async () => {
   [{ id: V.erase }] = await as(VERA, "select public.create_vault('Admin Erase') as id");
   [{ id: V.doomed }] = await as(VERA, "select public.create_vault('Admin Doomed') as id");
   [{ id: V.walt }] = await as(WALT, "select public.create_vault('Admin Walt') as id");
-  await as(WALT, "select public.set_member($1, $2, 'editor')", [V.walt, VERA]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.walt, VERA, WALT]);
   await as(WALT, "select public.write_file($1, 'walt.md', 'Walt text')", [V.walt]);
-  await as(VERA, "select public.set_member($1, $2, 'editor')", [V.doomed, WALT]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.doomed, WALT, VERA]);
 
   await as(VERA, "select public.set_policy($1, 'canon/', 'canon', 1)", [V.own]);
   await as(VERA, "select public.write_file($1, 'notes/a.md', 'Alpha one')", [V.own]);

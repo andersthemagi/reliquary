@@ -29,7 +29,7 @@ for t in tests/*_test.sql; do
   db=$(basename "$t" .sql)
   echo "== $t"
   psql -c "create database $db"
-  cat tests/stub.sql migrations/*.sql | psql -d "$db"
+  cat tests/stub.sql migrations/*.sql tests/support.sql | psql -d "$db"
   cat tests/harness.sql "$t" tests/report.sql | psql -d "$db" | grep -E '^ (PASS|FAIL)' || status=1
 done
 exit $status

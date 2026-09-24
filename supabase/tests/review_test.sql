@@ -2,8 +2,8 @@
 -- approve, revision-bound approvals, and notes.
 
 insert into t.ids select 'v1', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('v1'), t.id('ben')));
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('v1'), t.id('cal')));
+select test_support.add_member(t.id('v1'), t.id('ben'), 'editor', t.id('ana'));
+select test_support.add_member(t.id('v1'), t.id('cal'), 'editor', t.id('ana'));
 select t.run('ana', format($q$select public.set_policy(%L, 'canon/', 'canon', 1)$q$, t.id('v1')));
 select t.run('ana', format($q$select public.set_policy(%L, 'board/', 'canon', 2)$q$, t.id('v1')));
 insert into t.ids select 'v2', t.run('dee', $q$select public.create_vault('Other')$q$)::uuid;

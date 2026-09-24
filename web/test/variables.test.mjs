@@ -163,7 +163,7 @@ before(async () => {
 
   [{ id: team }] = await as({ user: OLIVE }, "select public.create_vault('Env Team') as id");
   [{ id: side }] = await as({ user: OLIVE }, "select public.create_vault('Env Side') as id");
-  await as({ user: OLIVE }, "select public.set_member($1, $2, 'editor')", [team, ED]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [team, ED, OLIVE]);
   values.devKey = value("dev-api");
   values.prodKey = value("prod-api");
   values.dbUrl = value("db-url");

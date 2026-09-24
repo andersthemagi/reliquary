@@ -9,7 +9,7 @@
 insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
 insert into t.ids select 'side', t.run('ana', $q$select public.create_vault('Side')$q$)::uuid;
 insert into t.ids select 'priv', t.run('dee', $q$select public.create_vault('Private')$q$)::uuid;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('team'), t.id('ben')));
+select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
 select t.run('ana', format($q$select public.write_file(%L, 'notes/alpha.md', 'Alpha plan')$q$, t.id('team')));
 select t.run('ana', format($q$select public.write_file(%L, 'notes/bravo.md', 'Bravo plan')$q$, t.id('side')));
 select t.run('ana', format($q$select public.set_policy(%L, 'canon/', 'canon', 1)$q$, t.id('team')));

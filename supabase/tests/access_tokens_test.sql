@@ -1,7 +1,7 @@
 -- Hostile tests for access tokens, search, and the MCP server role.
 
 insert into t.ids select 'v1', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('v1'), t.id('ben')));
+select test_support.add_member(t.id('v1'), t.id('ben'), 'editor', t.id('ana'));
 select t.run('ana', format($q$select public.write_file(%L, 'clients/acme.md', 'Acme pays net 30. Contact is Rosa.')$q$, t.id('v1')));
 select t.run('ana', format($q$select public.write_file(%L, 'notes/offsite.md', 'Offsite in Lisbon in May.')$q$, t.id('v1')));
 insert into t.ids select 'v2', t.run('dee', $q$select public.create_vault('Private')$q$)::uuid;

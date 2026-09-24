@@ -43,7 +43,7 @@ mkdir -p "$work/state"
 until "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q 2>/dev/null; do sleep 0.5; done
 sleep 1
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql | psql >/dev/null
+cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
 echo "alter role reliquary_mcp login password 'test';" | psql
 

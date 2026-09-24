@@ -162,8 +162,8 @@ before(async () => {
   [{ id: V.ed }] = await as({ user: OREN }, "select public.create_vault('Page Ed') as id");
   [{ id: V.view }] = await as({ user: OREN }, "select public.create_vault('Page View') as id");
   [{ id: V.priv }] = await as({ user: OREN }, "select public.create_vault('Page Private') as id");
-  await as({ user: OREN }, "select public.set_member($1, $2, 'editor')", [V.ed, PIA]);
-  await as({ user: OREN }, "select public.set_member($1, $2, 'viewer')", [V.view, PIA]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.ed, PIA, OREN]);
+  await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.view, PIA, OREN]);
 
   vals.ownDev = value("own-dev");
   vals.ownProd = value("own-prod");
