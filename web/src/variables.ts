@@ -9,7 +9,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { fromDb, open, seal, SecretsError } from "./secrets.js";
+import { fromDb, open, reseal, seal, SecretsError } from "./secrets.js";
 
 export type Environment = { name: string; ownersOnly: boolean };
 export type VariableValue = { environment: string; version: number; updatedBy: string; updatedAt: Date };
@@ -21,7 +21,9 @@ export type AccessLogRow = {
   agent: string | null;
   tokenId: string | null;
   clientId: string | null;
-  action: "set" | "rotate" | "delete" | "read" | "reveal" | "refused" | "push" | "reject";
+  action:
+    | "set" | "rotate" | "delete" | "read" | "reveal" | "refused" | "push" | "reject"
+    | "rotate_key" | "create_environment" | "rename_environment" | "delete_environment";
   environment: string | null;
   names: string[];
   detail: Record<string, unknown>;
@@ -75,6 +77,55 @@ export async function setVariable(userId: string, vaultId: string, name: string,
       ])
     ).rows[0].action,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Environments (owners, in person; the database decides). Each rejects with
+// the database's error (42501, P0002, 22023, 23505, 55000; message safe to
+// show).
+
+export async function createEnvironment(userId: string, vaultId: string, name: string, ownersOnly: boolean): Promise<void> {
+  await asPerson(userId, (c) => c.query("select public.create_environment($1, $2, $3)", [vaultId, name, ownersOnly]));
+}
+
+// Renames an environment with its values. Each value's additional data
+// names its environment, so every moved value is opened and sealed again
+// for the new name here, in the rename's transaction (as the web app's own
+// role: people can't read ciphertext), and swapped in by private.reseal,
+// which allows it only after this rename. A value that doesn't open (an
+// unknown key, or tampered) rolls the whole rename back: SecretsError.
+export async function renameEnvironment(userId: string, vaultId: string, from: string, to: string): Promise<{ moved: number; rejectedImports: number }> {
+  return asPerson(userId, async (c) => {
+    const r = (await c.query("select public.rename_environment($1, $2, $3) as r", [vaultId, from, to])).rows[0].r;
+    if (r.moved > 0) {
+      await c.query("select set_config('role', 'none', true)");
+      const rows = (
+        await c.query("select ref, name, key_id, nonce, ciphertext from private.sealed_rows($1, $2) where kind = 'value'", [vaultId, to])
+      ).rows;
+      const items = rows.map((x) => {
+        const s = reseal({ keyId: x.key_id, nonce: x.nonce, ciphertext: x.ciphertext }, { vaultId, environment: from, name: x.name }, { vaultId, environment: to, name: x.name });
+        return {
+          kind: "value",
+          ref: x.ref,
+          name: x.name,
+          environment: to,
+          old_nonce: (x.nonce as Buffer).toString("base64"),
+          key_id: s.keyId,
+          nonce: s.nonce.toString("base64"),
+          ciphertext: s.ciphertext.toString("base64"),
+        };
+      });
+      const n = Number((await c.query("select private.reseal($1, 'rename_environment', $2) as n", [vaultId, JSON.stringify(items)])).rows[0].n);
+      if (n !== items.length) throw new SecretsError(`${to}: a value changed while it was being renamed`);
+      await c.query("select set_config('role', 'authenticated', true)");
+    }
+    return { moved: r.moved, rejectedImports: r.rejected_imports };
+  });
+}
+
+// Deletes an environment and its values; `confirm` is the name as typed.
+export async function deleteEnvironment(userId: string, vaultId: string, name: string, confirm: string): Promise<{ deleted: number; names: string[] }> {
+  return asPerson(userId, async (c) => (await c.query("select public.delete_environment($1, $2, $3) as r", [vaultId, name, confirm])).rows[0].r);
 }
 
 export async function deleteVariable(userId: string, vaultId: string, name: string, environment: string): Promise<void> {

@@ -12,8 +12,11 @@ module), `web/src/envapi.ts` (the CLI's API), `web/src/oauth.ts` (the CLI's
 sign-in), `mcp/src/tools.ts` (`list_variables`). Imports (paste a `.env`,
 `reliquary env push`): `supabase/migrations/20260925100000_env_imports.sql`,
 `web/src/dotenv.ts` (= `cli/src/dotenv.ts`), below under
-[Imports](#imports). Tests: rows F50 to F71 in
-[tests/features.md](../tests/features.md).
+[Imports](#imports). Key rotation, custom environments and limits:
+`supabase/migrations/20260925170000_variables_keys.sql`, `web/src/rekey.ts`,
+`scripts/rotate-variables-key.sh`, `scripts/variables-keys.sh`, below under
+[Key rotation](#key-rotation) and [Environments](#environments). Tests: rows
+F50 to F71 and F130 to F133 in [tests/features.md](../tests/features.md).
 
 ## What holds
 
@@ -28,10 +31,13 @@ sign-in), `mcp/src/tools.ts` (`list_variables`). Imports (paste a `.env`,
 
 - The web app encrypts; the database stores a key id, a nonce and the
   ciphertext and never sees the key or a value. The MCP app refuses to start
-  with `VARIABLES_KEY` set.
+  with `VARIABLES_KEY` or `VARIABLES_KEYS` set.
 - Ciphertext lives in `private.variable_secrets`: no grants to any role, RLS
-  on with no policies. Only `reveal_variable` and `read_variables` return it,
-  and both write `env_access_log` in the same transaction.
+  on with no policies. To people and their clients only `reveal_variable`
+  and `read_variables` return it, and both write `env_access_log` in the
+  same transaction. The web app's own role also reads it to seal values
+  again, for a key rotation or an environment's rename
+  ([Key rotation](#key-rotation)).
 - A value leaves Reliquary only in two ways: a person reveals one in the web
   UI, or the CLI reads an environment for `reliquary run` or `reliquary env
   pull`. No MCP tool, log line, feed event, error or redirect carries one.
@@ -45,15 +51,20 @@ All in `20260925090000_variables.sql`.
 
 | Table | Columns | Who reads | Who writes |
 |---|---|---|---|
-| `public.environments` | `vault_id`, `name` (`^[a-z][a-z0-9_-]{0,31}$`), `owners_only`, `created_at` | members and their agents (RLS `is_member`) | a trigger: every vault gets `development`, `preview`, `production` (owners-only). No custom environments yet |
+| `public.environments` | `vault_id`, `name` (`^[a-z][a-z0-9_-]{0,31}$`), `owners_only`, `created_at` | members and their agents (RLS `is_member`) | a trigger: every vault gets `development`, `preview`, `production` (owners-only); owners add, rename and delete others ([Environments](#environments)) |
 | `public.variables` | `id`, `vault_id`, `name` (`^[A-Za-z_][A-Za-z0-9_]{0,127}$`), `created_by`, `created_at`; unique `(vault_id, name)` | members and their agents | `set_variable`, `delete_variable` only |
 | `public.variable_values` | `variable_id`, `vault_id`, `environment`, `version` (1, then +1 per rotation), `updated_by`, `updated_at`; one row per environment with a value | members and their agents | same |
 | `private.variable_secrets` | `variable_id`, `environment`, `key_id` (`^[A-Za-z0-9_-]{1,32}$`), `nonce` (12 bytes), `ciphertext` (16 to 65 552 bytes: encrypted bytes, then the 16-byte GCM tag) | nobody directly | same |
 | `public.env_access_log` | `seq`, `vault_id`, `at`, `actor` (the person), `agent` (null in person; `Reliquary CLI` for the CLI; the token's name for an agent), `token_id`, `client_id` (the grant's OAuth client), `action`, `environment`, `names text[]`, `detail jsonb` | owners and editors of the vault, and their agents within scope (RLS on `role_in`); not viewers, not read-only agents, not the CLI | the functions below only. Append-only: update, delete and truncate raise, even for the table owner |
 
 `action` is one of `set`, `rotate`, `delete`, `read` (the CLI), `reveal` (the
-web UI), `refused`, and for imports `push` (a CLI push was made) and `reject`
-(a person rejected one). A `refused` row's `detail` is `{"attempt": "read" |
+web UI), `refused`, for imports `push` (a CLI push was made) and `reject`
+(a person rejected one, or its environment was renamed or deleted:
+`detail.reason`), `rotate_key` (the operator re-encrypted values under a new
+key: `actor` null, `agent` `Reliquary operator`, `names`, `detail` `{"key_ids",
+"values", "imports"}`), and `create_environment`, `rename_environment`
+(`detail` `{"from", "to"}`, `names` the values moved), `delete_environment`
+(`names` the values destroyed). A `refused` row's `detail` is `{"attempt": "read" |
 "reveal" | "push" | "apply" | "reject", "reason": "..."}`. No column holds a value.
 
 A variable exists while it has a value in at least one environment. Set,
@@ -116,16 +127,98 @@ caller's own token), `private.valid_variable_name(name)`.
   `JSON.stringify(["reliquary.variable.v1", vaultId, environment, name])`.
   A ciphertext moved to another vault, environment or name fails to decrypt
   (tested by swapping two rows in the database).
-- `VARIABLES_KEY`: 32 random bytes, base64url, no padding (43 characters).
-  Anything else refuses to start, without printing the value.
-  `VARIABLES_KEY_ID` (optional, default `k1`) is stored with every
-  ciphertext. On Vercel the web app refuses to start without the key;
-  locally it starts, and value routes answer 503 `not_configured`.
-- Values are UTF-8 text up to 64 KiB.
-- Rotation of the key itself is not built: `open()` accepts only the current
-  key id. When it's needed: add old keys for decryption
-  (`VARIABLES_PREVIOUS_KEYS`), re-seal every row under the new id in one
-  pass, then drop the old key.
+- `VARIABLES_KEYS`: `id:key` pairs, comma-separated, the current (sealing)
+  key first, e.g. `k2:<key>,k1:<key>`. An id is `[A-Za-z0-9_-]{1,32}`; a key
+  is 32 random bytes, base64url, no padding (43 characters). A value is
+  sealed with the current key and its id stored beside it, and opened with
+  the key its stored id names. A malformed list, an id given twice or one
+  key under two ids refuses to start, naming at most an id, never a key.
+- `VARIABLES_KEY` (the single key from before rotation, id
+  `VARIABLES_KEY_ID`, default `k1`) still works. Alone it is the current
+  key; beside `VARIABLES_KEYS` it is one more key for opening, and giving its
+  id a different key there refuses to start.
+- On Vercel the web app refuses to start without a key; locally it starts,
+  and value routes answer 503 `not_configured`. With keys, it also refuses to
+  start while a stored value (or a pending import's) names a key id it
+  doesn't hold (`private.variable_key_ids()`), naming the id.
+- Values are UTF-8 text up to 64 KiB, without NUL characters (an environment
+  variable can't hold one).
+
+## Key rotation
+
+Rotating the key never takes values offline: the web app holds the old and
+the new key while every ciphertext moves to the new one. The owner's steps
+are in the [runbook](ops/runbook.md#rotating-variables_key); what each
+piece does:
+
+- **Keys file.** `scripts/variables-keys.sh` keeps the keys in
+  `supabase/.variables-keys-secret` (gitignored, mode 600, one `id:key` per
+  line, current first): `new` adds `k<n+1>` as the current key, `drop <id>`
+  forgets an old one, `list` prints ids. `scripts/vercel-env.sh web` turns
+  the file into `VARIABLES_KEYS`; an older `supabase/.variables-secret` is
+  taken over as `k1`, the id its values carry. Neither prints a key.
+- **Re-encryption.** `scripts/rotate-variables-key.sh [--check]` runs
+  `web/src/rekey.ts` in a container against the database, as the web app's
+  role (`reliquary_web`), with the `DATABASE_URL` and `VARIABLES_KEYS` of
+  `supabase/.vercel-web.env`. Vault by vault, in one transaction each, it
+  reads the sealed values and pending imports' values under any other key
+  (`private.sealed_rows`), opens each with its key and its slot's additional
+  data, seals it again under the current key for the same slot, and swaps it
+  in (`private.reseal`). It prints counts and key ids only, and exits 0 only
+  when nothing is left on another key.
+- **What a reseal changes.** Only the ciphertext, nonce and key id. Version,
+  `updated_by`, `updated_at` and the feed stay as they were; the access log
+  gets one `rotate_key` row per vault. A row is replaced only if it still
+  has the nonce that was read, so a value a person sets meanwhile (already
+  under the new key) is left alone. A value that doesn't open with its key
+  (moved between rows, or a key given the wrong id) stays as it is and the
+  run exits 1: keep the old key.
+- **Who can.** `private.variable_key_ids`, `rekey_vaults`, `sealed_rows` and
+  `reseal` are granted to `reliquary_web` alone: people, agents, CLI grants
+  and `reliquary_mcp` get 42501. So the web app's own role (the operator)
+  reads ciphertext without a reveal row; it can decrypt anyway (as the
+  design says, the operator holds both). `reseal` for a rename is allowed
+  only inside that rename's transaction, for that vault and new name.
+- **The MCP app** refuses to start with `VARIABLES_KEY` or `VARIABLES_KEYS`
+  set.
+
+| Function | Returns | Who may call |
+|---|---|---|
+| `private.variable_key_ids()` | table `(key_id, values, imports)`: key ids in use by values and by pending, unexpired imports | `reliquary_web` |
+| `private.rekey_vaults(p_key_id text)` | setof uuid: vaults with anything under another key | `reliquary_web` |
+| `private.sealed_rows(p_vault uuid, p_environment text default null, p_not_key text default null)` | table `(kind 'value' or 'import', ref, name, environment, key_id, nonce, ciphertext)` | `reliquary_web` |
+| `private.reseal(p_vault uuid, p_reason text, p_items jsonb)` | int, the rows replaced. `p_reason` `rotate_key` or `rename_environment`; items `[{"kind", "ref", "name", "environment", "old_nonce", "key_id", "nonce", "ciphertext"}]` (base64); malformed 22023 | `reliquary_web` |
+
+## Environments
+
+Every vault starts with `development`, `preview` and `production`
+(owners-only). Owners add others, in person (agents, CLI grants, editors
+and viewers are refused by the database), on the Variables page's
+**Environments** page (`/v/:v/variables/environments`, with rename and a
+typed-name delete).
+
+| Function | Returns | Notes |
+|---|---|---|
+| `public.create_environment(p_vault uuid, p_name text, p_owners_only boolean default false)` | void | Name `^[a-z][a-z0-9_-]{0,31}$` (22023), unique (23505), at most 20 a vault (55000). Owners-only: only owners set and read its values, as production. Logs `create_environment`, and `environment.create` in the feed |
+| `public.rename_environment(p_vault uuid, p_name text, p_new_name text)` | jsonb `{"moved", "names", "rejected_imports"}` | Not a default (55000). Its values move with it, versions kept. The caller must then seal every moved value again for the new name (the additional data names the environment) in the same transaction: `renameEnvironment` in `web/src/variables.ts` does, through `private.reseal`, and a value that doesn't open rolls the whole rename back. Logs `rename_environment` and `environment.rename` |
+| `public.delete_environment(p_vault uuid, p_name text, p_confirm text)` | jsonb `{"deleted", "names"}` | `p_confirm` must be the name (22023). A default holding values is refused (55000), and a vault keeps one environment (55000). Destroys its values; a variable left with no value goes too. Logs `delete_environment` with the names, and `environment.delete` |
+
+Pending imports (drafts and pushes) for an environment that is renamed or
+deleted are rejected, their values deleted, each logged as `reject` with
+`detail.reason`: they were sealed for the old name. The CLI's `--env` takes
+any environment's name; `env_vaults()` lists custom environments after the
+defaults, by name.
+
+## Limits and retention
+
+- A value: 64 KiB of UTF-8, no NUL. An import: 200 names, 4 MiB, 20 pending
+  a person a vault, 60 an hour. A vault: 1000 variables (55000) and 20
+  environments.
+- `env_access_log` is kept for the vault's life: append-only, it goes only
+  with the vault (`delete_vault`). A CLI read logs one row naming every
+  variable read, so a busy vault grows by a row per `run` or `env pull`.
+  Nothing prunes it; a retention shorter than the vault's life would be a
+  design decision (it is the audit record), not a patch.
 
 ## Web module (for the Variables page)
 
@@ -147,6 +240,10 @@ revealVariable(userId, vaultId, name, environment): Promise<
   | { ok: false; error: "unauthorized" | "forbidden" | "not_found" | "decrypt_failed" }>
 accessLog(userId, vaultId, { before?: seq, limit?: 1..500 = 100, action?, name? }): Promise<{
   seq, at, actor, agent, tokenId, clientId, action, environment, names, detail }[]>   // newest first
+createEnvironment(userId, vaultId, name, ownersOnly): Promise<void>
+renameEnvironment(userId, vaultId, from, to): Promise<{ moved: number; rejectedImports: number }>
+  // seals the moved values again for the new name, in the same transaction
+deleteEnvironment(userId, vaultId, name, confirm): Promise<{ deleted: number; names: string[] }>
 ```
 
 `variablesConfigured()` (secrets.ts) says whether the server has a key.
@@ -234,7 +331,7 @@ or through step 6, refuses the next request.
 ```
 
 The vaults the grant reaches, by name, each with the environments the
-person's role may read (empty for a viewer). Works without `VARIABLES_KEY`.
+person's role may read (empty for a viewer). Works without a key.
 Not logged in `env_access_log` (no values).
 
 `GET /api/env/<vault uuid>/<environment>`
@@ -252,7 +349,7 @@ order. Logged as `read` with the names. Errors:
 | 403 | `{"error": "forbidden"}` | the role doesn't allow the environment (viewer; editor on production). Logged as `refused` |
 | 404 | `{"error": "not_found"}` | the vault isn't reachable with this grant (not a member, outside its vaults; logged as `refused`), the environment doesn't exist, or the path doesn't match `/<uuid>/<[a-z][a-z0-9_-]{0,31}>` |
 | 500 | `{"error": "decrypt_failed"}` | a ciphertext doesn't decrypt (wrong key, or moved between rows). Nothing is delivered, not even the other values |
-| 503 | `{"error": "not_configured"}` | the server has no `VARIABLES_KEY` |
+| 503 | `{"error": "not_configured"}` | the server has no key (`VARIABLES_KEYS` or `VARIABLES_KEY`) |
 | 500 | `{"error": "server_error"}` | anything else |
 
 No dotenv format: the CLI formats (below), so escaping lives in one place.
@@ -505,10 +602,10 @@ endpoints above.
 
 ## For the owner
 
-- Generate the key once, yourself, and never paste it into a chat:
-  `head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '='`. Set it as
-  `VARIABLES_KEY` in the **web** Vercel project only, marked Sensitive.
-  Never in the mcp project (it refuses to start with it).
+- Keys come from `scripts/variables-keys.sh` (through `scripts/vercel-env.sh
+  web`), never pasted into a chat. Set `VARIABLES_KEYS` in the **web** Vercel
+  project only, marked Sensitive. Never in the mcp project (it refuses to
+  start with it). To rotate: the [runbook](ops/runbook.md#rotating-variables_key).
 - Keep a copy somewhere safe outside Vercel (a password manager). Sensitive
   variables can't be read back from Vercel, and without the key every
   stored value is lost.

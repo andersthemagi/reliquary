@@ -19,8 +19,11 @@ import { dotenvTooBig, parseDotenv, DOTENV_MAX_ENTRIES } from "./dotenv.js";
 import {
   accessLog,
   applyImport,
+  createEnvironment,
   createImport,
+  deleteEnvironment,
   deleteVariable,
+  renameEnvironment,
   getImport,
   listVariables,
   pendingPushes,
@@ -38,7 +41,10 @@ import {
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const ENV = /^[a-z][a-z0-9_-]{0,31}$/;
-const ACTIONS = ["set", "rotate", "delete", "read", "reveal", "refused", "push", "reject"] as const;
+const ACTIONS = [
+  "set", "rotate", "delete", "read", "reveal", "refused", "push", "reject",
+  "rotate_key", "create_environment", "rename_environment", "delete_environment",
+] as const;
 const ACTION_LABEL: Record<string, string> = {
   set: "Set",
   rotate: "Rotated",
@@ -48,7 +54,12 @@ const ACTION_LABEL: Record<string, string> = {
   refused: "Refused",
   push: "Sent for approval",
   reject: "Rejected",
+  rotate_key: "Re-encrypted (key rotation)",
+  create_environment: "Environment added",
+  rename_environment: "Environment renamed",
+  delete_environment: "Environment deleted",
 };
+const DEFAULT_ENVIRONMENTS = ["development", "preview", "production"];
 const LOG_PAGE = 50;
 
 const q = encodeURIComponent;
@@ -157,7 +168,8 @@ async function list(ctx: Ctx, id: string): Promise<Reply> {
     ${pageHeader({
       crumb: crumb(v),
       title: "Variables",
-      actions: html`${canSet ? html`<a class="button" href="${base(id, "/import")}">Import .env</a>` : ""}${
+      actions: html`${v.role === "owner" ? html`<a class="button" href="${base(id, "/environments")}">Environments</a>` : ""}${
+        canSet ? html`<a class="button" href="${base(id, "/import")}">Import .env</a>` : ""}${
         readsLog(v.role) ? html`<a class="button" href="${base(id, "/log")}">Access log</a>` : ""}${
         canSet ? html`<a class="button primary" href="${base(id, "/set")}">Add a variable</a>` : ""
       }`,
@@ -261,7 +273,13 @@ async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
     return { redirect: base(v.id) };
   } catch (err) {
     if (err instanceof SecretsError) {
-      return again(variablesConfigured() ? "A value is at most 64 KiB." : "This server has no encryption key, so values can’t be set here.");
+      return again(
+        !variablesConfigured()
+          ? "This server has no encryption key, so values can’t be set here."
+          : value.includes("\u0000")
+            ? "A value can’t contain a NUL character."
+            : "A value is at most 64 KiB.",
+      );
     }
     const code = (err as { code?: string }).code;
     return again(message(err), code === "42501" ? 403 : code === "P0002" ? 404 : 400);
@@ -527,6 +545,139 @@ async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: boolean
 }
 
 // ---------------------------------------------------------------------------
+// Environments: owners add, rename and delete them. The database decides
+// (public.create_environment and friends); this page offers what an owner
+// may do and shows the database's refusal otherwise.
+
+const envBase = (vaultId: string, rest = "") => base(vaultId, `/environments${rest}`);
+
+async function ownersOnlyPage(ctx: Ctx, v: Vault, title: string): Promise<Reply> {
+  return shell(ctx, v, title, html`${pageHeader({ crumb: crumb(v, "environments"), title })}
+    <p class="callout attention">Only owners manage a vault’s environments.</p>`, 403);
+}
+
+async function environmentsPage(ctx: Ctx, v: Vault, f: { name?: string; ownersOnly?: boolean; error?: string } = {}, status = 200): Promise<Reply> {
+  const title = "Environments";
+  if (v.role !== "owner") return ownersOnlyPage(ctx, v, title);
+  const { environments, variables } = await listVariables(ctx.userId, v.id);
+  const count = (e: string) => variables.filter((x) => x.values.some((y) => y.environment === e)).length;
+  const body = html`
+    ${pageHeader({ crumb: crumb(v, "environments"), title, actions: html`<a class="button" href="${base(v.id)}">Variables</a>` })}
+    ${f.error ? html`<p class="callout danger" role="alert">${f.error}</p>` : ""}
+    <p class="lede">Each environment holds its own value of every variable. Programs get one environment’s values: <code>reliquary run --env &lt;name&gt;</code>. Owners-only environments are set and read by owners alone.</p>
+    <ul class="rows env-list">${environments.map((e) => {
+      const n = count(e.name);
+      const isDefault = DEFAULT_ENVIRONMENTS.includes(e.name);
+      return html`<li><span><strong>${e.name}</strong>${e.ownersOnly ? html` <span class="badge">Owners only</span>` : ""}
+        <span class="muted small"> · ${plural(n, "value")}${isDefault ? " · default" : ""}</span></span>
+        <span class="row-end small">${isDefault ? "" : html`<a class="button" href="${envBase(v.id, "/rename")}?name=${q(e.name)}">Rename</a>`}${
+          !isDefault || n === 0 ? html`<a class="button danger" href="${envBase(v.id, "/delete")}?name=${q(e.name)}">Delete</a>` : ""}</span></li>`;
+    })}</ul>
+    <p class="small muted">The defaults keep their names, and are deleted only when they hold no value. A vault has at most 20 environments.</p>
+    <h2>Add an environment</h2>
+    <form method="post" action="${envBase(v.id)}" class="panel choice-form" autocomplete="off">
+      ${csrfField(ctx.csrf)}
+      <label for="en">Name</label>
+      <input id="en" type="text" name="name" value="${f.name ?? ""}" placeholder="staging" required maxlength="32"
+        autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="hint">Lowercase letters, digits, <code>-</code> and <code>_</code>, starting with a letter.</p>
+      <label class="choice"><input type="checkbox" name="owners_only" value="1"${f.ownersOnly ? raw(" checked") : ""}> Owners only (like production)</label>
+      <div class="actions"><button class="primary">Add environment</button></div>
+    </form>`;
+  return shell(ctx, v, title, body, status, envBase(v.id));
+}
+
+async function createEnvironmentPost(ctx: Ctx, v: Vault): Promise<Reply> {
+  const name = (ctx.form.get("name") ?? "").trim();
+  const ownersOnly = ctx.form.get("owners_only") === "1";
+  try {
+    await createEnvironment(ctx.userId, v.id, name, ownersOnly);
+    ctx.setFlash(`Added ${name}${ownersOnly ? " (owners only)" : ""}.`);
+    return { redirect: envBase(v.id) };
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    return environmentsPage(ctx, v, { name: ENV.test(name) ? name : "", ownersOnly, error: message(err) }, code === "42501" ? 403 : code === "P0002" ? 404 : 400);
+  }
+}
+
+async function renamePage(ctx: Ctx, v: Vault, from: string, f: { to?: string; error?: string } = {}, status = 200): Promise<Reply> {
+  const title = `Rename ${from}`;
+  if (v.role !== "owner") return ownersOnlyPage(ctx, v, title);
+  const { environments, variables } = await listVariables(ctx.userId, v.id);
+  if (!environments.some((e) => e.name === from)) return notFound(ctx);
+  const n = variables.filter((x) => x.values.some((y) => y.environment === from)).length;
+  const body = html`
+    ${pageHeader({ crumb: crumb(v, "environments"), title, path: true })}
+    ${f.error ? html`<p class="callout danger" role="alert">${f.error}</p>` : ""}
+    <p class="lede">${n ? `Its ${plural(n, "value")} ${n === 1 ? "moves" : "move"} with it.` : "It holds no values."} Scripts and <code>.reliquary.json</code> files that name <strong>${from}</strong> need the new name, and pushes waiting for approval for ${from} are rejected: send them again.</p>
+    <form method="post" action="${envBase(v.id, "/rename")}" class="panel" autocomplete="off">
+      ${csrfField(ctx.csrf)}
+      <input type="hidden" name="from" value="${from}">
+      <label for="et">New name</label>
+      <input id="et" type="text" name="to" value="${f.to ?? ""}" required maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="actions"><button class="primary">Rename</button><a class="button quiet" href="${envBase(v.id)}">Cancel</a></div>
+    </form>`;
+  return shell(ctx, v, title, body, status, envBase(v.id));
+}
+
+async function renamePost(ctx: Ctx, v: Vault): Promise<Reply> {
+  const from = ctx.form.get("from") ?? "";
+  const to = (ctx.form.get("to") ?? "").trim();
+  if (!ENV.test(from)) return notFound(ctx);
+  try {
+    const r = await renameEnvironment(ctx.userId, v.id, from, to);
+    ctx.setFlash(`Renamed ${from} to ${to}${r.moved ? ` with its ${plural(r.moved, "value")}` : ""}.${r.rejectedImports ? ` ${plural(r.rejectedImports, "pending import was", "pending imports were")} rejected.` : ""}`);
+    return { redirect: envBase(v.id) };
+  } catch (err) {
+    if (err instanceof SecretsError) {
+      return renamePage(ctx, v, from, { to, error: variablesConfigured()
+        ? "A value in it can’t be decrypted, so nothing was renamed. Set that value again, then rename."
+        : "This server has no encryption key, and renaming seals each value again for the new name. Nothing was renamed." }, 409);
+    }
+    const code = (err as { code?: string }).code;
+    return renamePage(ctx, v, from, { to: ENV.test(to) ? to : "", error: message(err) }, code === "42501" ? 403 : code === "P0002" ? 404 : 400);
+  }
+}
+
+async function deleteEnvPage(ctx: Ctx, v: Vault, name: string, error?: string, status = 200): Promise<Reply> {
+  const title = `Delete ${name}`;
+  if (v.role !== "owner") return ownersOnlyPage(ctx, v, title);
+  const { environments, variables } = await listVariables(ctx.userId, v.id);
+  if (!environments.some((e) => e.name === name)) return notFound(ctx);
+  const names = variables.filter((x) => x.values.some((y) => y.environment === name)).map((x) => x.name);
+  const body = html`
+    ${pageHeader({ crumb: crumb(v, "environments"), title, path: true })}
+    ${error ? html`<p class="callout danger" role="alert">${error}</p>` : ""}
+    <p class="lede">${names.length
+      ? html`This destroys the ${plural(names.length, "value")} in <strong>${name}</strong> (${names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`)}). They can’t be recovered; other environments keep theirs. Programs run with <code>--env ${name}</code> stop getting them.`
+      : html`<strong>${name}</strong> holds no values.`} Pushes waiting for approval for it are rejected. The access log keeps the record.</p>
+    <form method="post" action="${envBase(v.id, "/delete")}" class="panel" autocomplete="off">
+      ${csrfField(ctx.csrf)}
+      <input type="hidden" name="name" value="${name}">
+      <label for="ec">Type <strong>${name}</strong> to confirm</label>
+      <input id="ec" type="text" name="confirm_name" required autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="actions"><button class="danger">Delete ${name}${names.length ? " and its values" : ""}</button>
+        <a class="button quiet" href="${envBase(v.id)}">Cancel</a></div>
+    </form>`;
+  return shell(ctx, v, title, body, status, envBase(v.id));
+}
+
+async function deleteEnvPost(ctx: Ctx, v: Vault): Promise<Reply> {
+  const name = ctx.form.get("name") ?? "";
+  const typed = (ctx.form.get("confirm_name") ?? "").trim();
+  if (!ENV.test(name)) return notFound(ctx);
+  try {
+    const r = await deleteEnvironment(ctx.userId, v.id, name, typed);
+    ctx.setFlash(`Deleted ${name}${r.deleted ? ` and its ${plural(r.deleted, "value")}` : ""}.`);
+    return { redirect: envBase(v.id) };
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === "22023") return deleteEnvPage(ctx, v, name, "That isn’t the environment’s name. Nothing was deleted.", 400);
+    return deleteEnvPage(ctx, v, name, message(err), code === "42501" ? 403 : code === "P0002" ? 404 : 400);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Access log
 
 function logFilters(ctx: Ctx, id: string, action: string, name: string): Raw {
@@ -542,8 +693,12 @@ function logFilters(ctx: Ctx, id: string, action: string, name: string): Raw {
 }
 
 function detail(r: AccessLogRow): string {
+  const d = r.detail as { attempt?: string; reason?: string; from?: string; values?: number; imports?: number; key_ids?: string[] };
+  if (r.action === "rename_environment") return `from ${d.from ?? "?"}`;
+  if (r.action === "delete_environment") return `${d.values ?? 0} value${d.values === 1 ? "" : "s"} destroyed`;
+  if (r.action === "rotate_key") return `${(d.values ?? 0) + (d.imports ?? 0)} to key ${(d.key_ids ?? []).join(", ")}`;
+  if (r.action === "reject" && d.reason) return d.reason;
   if (r.action !== "refused") return "";
-  const d = r.detail as { attempt?: string; reason?: string };
   return `${d.attempt ? `${d.attempt}: ` : ""}${d.reason ?? ""}`;
 }
 
@@ -572,7 +727,9 @@ async function log(ctx: Ctx, id: string): Promise<Reply> {
           <tbody>${shown.map(
             (r) => html`<tr${r.action === "refused" ? raw(' class="refused"') : ""}><td class="small" data-label="When"><div>${when(r.at)}</div></td>
               <td class="small" data-label="Who"><div>${who(ctx, r.actor, null)}<span class="muted token-client">from ${client(r)}</span></div></td>
-              <td class="small" data-label="What"><div>${r.action === "refused" ? html`<span class="badge danger">Refused</span> <span class="muted">${detail(r)}</span>` : ACTION_LABEL[r.action] ?? r.action}</div></td>
+              <td class="small" data-label="What"><div>${r.action === "refused"
+                ? html`<span class="badge danger">Refused</span> <span class="muted">${detail(r)}</span>`
+                : html`${ACTION_LABEL[r.action] ?? r.action}${detail(r) ? html` <span class="muted">${detail(r)}</span>` : ""}`}</div></td>
               <td class="small path-cell" data-label="Variables"><div>${r.names.length ? r.names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`) : html`<span class="muted">none</span>`}${
                 r.environment ? html` <span class="muted">in ${r.environment}</span>` : ""}</div></td></tr>`,
           )}</tbody></table></div>`
@@ -608,6 +765,17 @@ export async function variablesRoutes(ctx: Ctx, id: string, rest: string): Promi
   if (get && rest === "/variables/delete") return confirmDelete(ctx, v);
   if (!get && rest === "/variables/delete") return remove(ctx, v);
   if (!get && rest === "/variables/reveal") return reveal(ctx, v);
+  if (rest === "/variables/environments") return get ? environmentsPage(ctx, v) : createEnvironmentPost(ctx, v);
+  if (rest === "/variables/environments/rename") {
+    if (!get) return renamePost(ctx, v);
+    const name = ctx.url.searchParams.get("name") ?? "";
+    return ENV.test(name) ? renamePage(ctx, v, name) : notFound(ctx);
+  }
+  if (rest === "/variables/environments/delete") {
+    if (!get) return deleteEnvPost(ctx, v);
+    const name = ctx.url.searchParams.get("name") ?? "";
+    return ENV.test(name) ? deleteEnvPage(ctx, v, name) : notFound(ctx);
+  }
   if (get && rest === "/variables/import") return importForm(ctx, v, {});
   if (!get && rest === "/variables/import") return importPost(ctx, v);
   const m = /^\/variables\/imports\/([0-9a-f-]{36})(\/apply|\/reject)?$/.exec(rest);

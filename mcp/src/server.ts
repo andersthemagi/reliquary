@@ -57,9 +57,11 @@ const OAUTH = oauthConfig();
 // The key that decrypts variable values belongs to the web app alone
 // (docs/variables.md). This app never decrypts anything, so holding it could
 // only leak it.
-if (process.env.VARIABLES_KEY !== undefined) {
-  console.error("Refusing to start: VARIABLES_KEY is set, and only the web app may hold it");
-  process.exit(1);
+for (const name of ["VARIABLES_KEY", "VARIABLES_KEYS"]) {
+  if (process.env[name] !== undefined) {
+    console.error(`Refusing to start: ${name} is set, and only the web app may hold it`);
+    process.exit(1);
+  }
 }
 
 const prm = () => ({
