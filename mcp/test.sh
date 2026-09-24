@@ -65,7 +65,8 @@ env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 # docs/ read-only, for test/parity.test.mjs (every tool is in docs/parity.md).
 "$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" \
-  -e MCP_URL="http://127.0.0.1:$port/mcp" -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
+  -e MCP_URL="http://127.0.0.1:$port/mcp" -e TEST_DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
+  -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
   -e TOKEN_LOAD_MEASURE_ONLY="${TOKEN_LOAD_MEASURE_ONLY:-}" \
   "$node" node --test --test-concurrency=1 ${MCP_TESTS:-test/*.test.mjs}

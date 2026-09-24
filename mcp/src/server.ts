@@ -17,7 +17,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { pool, recordClient, resolveOAuthToken, resolveToken } from "./db.js";
+import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
 import { registerTools } from "./tools.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -158,18 +158,28 @@ const httpServer = http.createServer(async (req, res) => {
   }
 
   const bearer = /^Bearer (\S+)$/.exec(req.headers.authorization ?? "");
-  const identity = bearer ? await identify(bearer[1]).catch(() => null) : null;
-  if (!identity) {
+  const ref = bearer ? tokenRef(bearer[1], OAUTH.resource) : null;
+  const unauthorized = () => {
     // RFC 6750: no error code when no credentials were sent.
     const challenge = `Bearer realm="reliquary", resource_metadata="${OAUTH.prmUrl}"${bearer ? ', error="invalid_token"' : ""}`;
     send(res, 401, { error: "invalid_token" }, { "WWW-Authenticate": challenge });
     console.info("mcp 401");
+  };
+  // A request that fails before any tool could run answers 401 for a bad
+  // token first, as before, then its own error.
+  const knownOr401 = async () => {
+    const id = ref ? await identify(bearer![1]).catch(() => null) : null;
+    if (!id) unauthorized();
+    return id;
+  };
+  if (!ref) {
+    unauthorized();
     return;
   }
 
   // Stateless: no server-initiated streams or sessions to resume.
   if (req.method !== "POST") {
-    send(res, 405, { error: "method_not_allowed" }, { Allow: "POST" });
+    if (await knownOr401()) send(res, 405, { error: "method_not_allowed" }, { Allow: "POST" });
     return;
   }
 
@@ -177,12 +187,33 @@ const httpServer = http.createServer(async (req, res) => {
   try {
     body = await readJson(req);
   } catch (err) {
-    send(res, 400, { error: (err as Error).message });
+    if (await knownOr401()) send(res, 400, { error: (err as Error).message });
     return;
   }
   if (Array.isArray(body) && body.length > MAX_BATCH) {
-    send(res, 400, { error: `batch too large: at most ${MAX_BATCH} messages per request` });
-    console.info("mcp 400 batch");
+    if (await knownOr401()) {
+      send(res, 400, { error: `batch too large: at most ${MAX_BATCH} messages per request` });
+      console.info("mcp 400 batch");
+    }
+    return;
+  }
+
+  // A request that calls a tool resolves its token inside the first call's
+  // transaction, on the one connection the whole request uses (Session).
+  // Anything else (initialize, tools/list, notifications) needs no
+  // transaction: one autocommit resolve, as before.
+  const messages = Array.isArray(body) ? body : [body];
+  const callsTools = messages.some((m) => (m as { method?: unknown } | null)?.method === "tools/call");
+  let session: Session | null = null;
+  let identity: Identity | null;
+  if (callsTools) {
+    session = new Session(ref);
+    identity = await session.open().catch(() => null);
+  } else {
+    identity = await identify(bearer![1]).catch(() => null);
+  }
+  if (!identity) {
+    unauthorized();
     return;
   }
 
@@ -193,7 +224,8 @@ const httpServer = http.createServer(async (req, res) => {
   }
 
   const mcp = new McpServer({ name: "reliquary", version: "0.1.0" });
-  registerTools(mcp, identity);
+  const runner = session;
+  registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -201,6 +233,7 @@ const httpServer = http.createServer(async (req, res) => {
   res.on("close", () => {
     void transport.close();
     void mcp.close();
+    void session?.close();
   });
   try {
     await mcp.connect(transport);
@@ -209,6 +242,8 @@ const httpServer = http.createServer(async (req, res) => {
   } catch (err) {
     console.error("mcp error", (err as Error).name);
     if (!res.headersSent) send(res, 500, { error: "server_error" });
+  } finally {
+    await session?.close();
   }
 });
 

@@ -65,9 +65,9 @@ const TOKEN_SHAPE = /^rlq_[0-9a-f]{64}$/;
 
 const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
 
-export async function resolveToken(token: string): Promise<Identity | null> {
+export async function resolveToken(token: string, db: pg.Pool = pool): Promise<Identity | null> {
   if (!TOKEN_SHAPE.test(token)) return null;
-  const { rows } = await pool.query(
+  const { rows } = await db.query(
     "select token_id, user_id, name from private.resolve_access_token($1)",
     [hashOf(token)],
   );
@@ -83,9 +83,9 @@ export async function resolveToken(token: string): Promise<Identity | null> {
 // resource is refused (RFC 8707 audience binding).
 const OAUTH_SHAPE = /^rlo_[0-9a-f]{64}$/;
 
-export async function resolveOAuthToken(token: string, resource: string): Promise<Identity | null> {
+export async function resolveOAuthToken(token: string, resource: string, db: pg.Pool = pool): Promise<Identity | null> {
   if (!OAUTH_SHAPE.test(token)) return null;
-  const { rows } = await pool.query(
+  const { rows } = await db.query(
     "select token_id, user_id, name from private.resolve_oauth_token($1, $2)",
     [hashOf(token), resource],
   );
@@ -103,16 +103,140 @@ export async function recordClient(token: string, clientName: string): Promise<v
     .catch(() => console.error("record client failed"));
 }
 
+// A token as the database resolves it: its hash, and for an OAuth access
+// token the resource it must have been issued for (null for a personal
+// token). Null when the token has neither shape.
+export type TokenRef = { hash: string; resource: string | null };
+
+export function tokenRef(token: string, resource: string): TokenRef | null {
+  if (TOKEN_SHAPE.test(token)) return { hash: hashOf(token), resource: null };
+  if (OAUTH_SHAPE.test(token)) return { hash: hashOf(token), resource };
+  return null;
+}
+
+// One MCP request's database work on one pooled connection
+// (docs/research/server-load.md, "Second pass"). open() checks the
+// connection out and, in one round trip, begins a transaction, resolves the
+// token and becomes its person (private.mcp_begin: the same claims
+// asIdentity sets, so scope and the agent ceiling apply unchanged). The
+// first tool call works in that transaction; a later call in the same
+// request (a batch) begins another, resolving the token again. Calls run
+// one at a time. close() commits a transaction no call used (resolving may
+// have written last_used_at) and releases the connection.
+//
+// Before, a tool call resolved the token on one checkout (1 round trip),
+// then took a second for begin, the claims, the work and commit (3 + work).
+// Now: 1 checkout, begin-and-resolve in 1 round trip, the work, commit.
+export class Session {
+  private client: pg.PoolClient | null = null;
+  private inTx = false;
+  private broken = false;
+  private closed = false;
+  private queue: Promise<unknown> = Promise.resolve();
+
+  constructor(
+    private readonly ref: TokenRef,
+    private readonly db: pg.Pool = pool,
+  ) {}
+
+  // The token's identity, or null (no such live token; nothing is held).
+  async open(): Promise<Identity | null> {
+    this.client = await this.db.connect();
+    let id: Identity | null = null;
+    try {
+      id = await this.begin();
+    } finally {
+      if (!id) await this.close();
+    }
+    return id;
+  }
+
+  // Both values are checked shapes (hex, and our own configured URL), and
+  // escaped anyway: inlined so begin and the resolve go in one simple-query
+  // round trip (a parameterised query can't carry two statements).
+  private async begin(): Promise<Identity | null> {
+    const c = this.client!;
+    const resource = this.ref.resource === null ? "null" : c.escapeLiteral(this.ref.resource);
+    this.inTx = true;
+    let results: pg.QueryResult[];
+    try {
+      results = (await c.query(
+        `begin; select token_id, user_id, name from private.mcp_begin(${c.escapeLiteral(this.ref.hash)}, ${resource})`,
+      )) as unknown as pg.QueryResult[];
+    } catch (err) {
+      await this.end("rollback");
+      throw err;
+    }
+    const rows = results[1]?.rows ?? [];
+    if (rows.length !== 1) {
+      await this.end("rollback");
+      return null;
+    }
+    return { tokenId: rows[0].token_id, userId: rows[0].user_id, agent: rows[0].name };
+  }
+
+  private async end(how: "commit" | "rollback"): Promise<void> {
+    this.inTx = false;
+    try {
+      await this.client!.query(how);
+    } catch (err) {
+      if (how === "rollback") this.broken = true;
+      else throw err;
+    }
+  }
+
+  run<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+    const next = this.queue.then(async () => {
+      if (this.closed || !this.client) throw new Error("session closed");
+      // A later call re-resolves: a token revoked mid-batch stops working.
+      if (!this.inTx && !(await this.begin())) throw new TokenGone();
+      try {
+        const result = await fn(this.client);
+        await this.end("commit");
+        return result;
+      } catch (err) {
+        if (this.inTx) await this.end("rollback");
+        throw err;
+      }
+    });
+    this.queue = next.catch(() => {});
+    return next;
+  }
+
+  close(): Promise<void> {
+    const done = this.queue.then(async () => {
+      if (this.closed) return;
+      this.closed = true;
+      if (!this.client) return;
+      if (this.inTx) await this.end("commit").catch(() => (this.broken = true));
+      this.client.release(this.broken || undefined);
+      this.client = null;
+    });
+    this.queue = done.catch(() => {});
+    return done;
+  }
+}
+
+export class TokenGone extends Error {
+  constructor() {
+    super("token no longer valid");
+  }
+}
+
 // Runs fn in one transaction as the identity's person, acting through their
 // agent. The `act` claim is always set for token calls, so the database's
 // delegation ceiling (no approving, no policy or member changes, no erasure)
 // always applies. `act.tok` names the token; the database limits every call
 // to that token's vaults and access (read-only or read-write).
-export async function asIdentity<T>(id: Identity, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+// Tool calls normally go through a Session; this stays for callers that
+// already hold an identity.
+export async function asIdentity<T>(id: Identity, fn: (c: pg.PoolClient) => Promise<T>, db: pg.Pool = pool): Promise<T> {
+  const client = await db.connect();
   try {
     // Two round trips before the work: begin, then the role and the claims
     // in one statement (set_config('role', ..., true) is SET LOCAL ROLE).
+    // The claims carry the token's name, which its person chose, so they go
+    // as a parameter, never inlined.
     await client.query("begin");
     await client.query("select set_config('role', 'authenticated', true), set_config('request.jwt.claims', $1, true)", [
       JSON.stringify({
