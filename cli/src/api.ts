@@ -3,6 +3,7 @@
 
 import { accessToken, forget } from "./auth.js";
 import { type Server, getJson } from "./config.js";
+import { isVariableName, startsPrograms, type DotenvRefusal } from "./dotenv.js";
 import { CliError, NotSignedIn, UsageError } from "./errors.js";
 
 export type Vault = { id: string; name: string; role: string; environments: string[] };
@@ -11,21 +12,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ENVIRONMENT = /^[a-z][a-z0-9_-]{0,31}$/;
 // docs/variables.md: the database refuses these names; so does the CLI, in
 // case a server ever sends one, since `run` puts every variable into a process.
-const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
-const STARTUP_PREFIXES = ["LD_", "DYLD_", "BASH_FUNC_", "GIT_CONFIG_"];
-const STARTUP_NAMES = new Set(
-  (
-    "PATH HOME SHELL USER IFS ENV BASH_ENV PS4 PROMPT_COMMAND SHELLOPTS BASHOPTS CDPATH NODE_OPTIONS NODE_PATH " +
-    "PYTHONPATH PYTHONSTARTUP PYTHONHOME PERL5OPT PERL5LIB PERLLIB RUBYOPT RUBYLIB JAVA_TOOL_OPTIONS _JAVA_OPTIONS " +
-    "JDK_JAVA_OPTIONS CLASSPATH GIT_SSH GIT_SSH_COMMAND GIT_EXEC_PATH GIT_ASKPASS SSH_ASKPASS EDITOR VISUAL PAGER TMPDIR"
-  ).split(" "),
-);
-export const safeName = (n: string) =>
-  NAME.test(n) && !STARTUP_NAMES.has(n.toUpperCase()) && !STARTUP_PREFIXES.some((p) => n.toUpperCase().startsWith(p));
+export const safeName = (n: string) => isVariableName(n) && !startsPrograms(n);
 
-async function get(server: Server, path: string): Promise<{ status: number; body: unknown }> {
+// One call to the env API, refreshing the access token once if it's refused.
+async function request(server: Server, path: string, init: { method?: string; body?: string } = {}): Promise<{ status: number; body: unknown }> {
   const url = `${server.issuer}/api/env${path}`;
-  const once = (token: string) => getJson(url, { headers: { authorization: `Bearer ${token}`, accept: "application/json" } });
+  const once = (token: string) =>
+    getJson(url, {
+      method: init.method ?? "GET",
+      body: init.body,
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: "application/json",
+        ...(init.body !== undefined ? { "content-type": "application/json" } : {}),
+      },
+    });
   let token = await accessToken(server);
   let r = await once(token);
   if (r.status === 401) {
@@ -39,6 +40,7 @@ async function get(server: Server, path: string): Promise<{ status: number; body
   }
   return r;
 }
+const get = (server: Server, path: string) => request(server, path);
 
 function fail(status: number, body: unknown, what: string): never {
   const code = (body as { error?: unknown } | null)?.error;
@@ -98,4 +100,61 @@ export async function readEnvironment(server: Server, vault: Vault, environment:
     out.set(name, value);
   }
   return new Map([...out].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
+// ---------------------------------------------------------------------------
+// Pushes (docs/variables.md, "Imports"): values sent for a person to apply in
+// the web UI. The server seals them on receipt; nothing is set until then.
+
+export type Pushed = { id: string; names: string[]; overwrites: string[]; expiresAt: string; url: string };
+export type PushStatus = "pending" | "applied" | "rejected" | "expired";
+
+function pushFail(status: number, body: unknown, what: string): never {
+  const code = (body as { error?: unknown } | null)?.error;
+  if (status === 403 && code === "push_not_allowed") {
+    throw new CliError("This sign-in wasn't allowed to send values. Run `reliquary login` again and leave \"Also let it send .env files\" ticked.");
+  }
+  if (status === 403) throw new CliError(`Your role can't set values in ${what}.`);
+  if (status === 413) throw new CliError("That's too much to send at once (the limit is 1 MiB). Split the file.");
+  if (status === 429) throw new CliError("Too many pushes are waiting. Apply or reject some on the Variables page, or try again in an hour.");
+  if (status === 400) throw new CliError("The server refused the file's contents (a name or a value it doesn't take). Nothing was sent for approval.");
+  fail(status, body, what);
+}
+
+// Sends values for approval. Returns the pending import.
+export async function pushEnvironment(
+  server: Server,
+  vault: Vault,
+  environment: string,
+  entries: { name: string; value: string }[],
+  refused: DotenvRefusal[],
+): Promise<Pushed> {
+  if (!ENVIRONMENT.test(environment)) throw new UsageError(`"${environment}" isn't an environment name (like development, preview, production).`);
+  const what = `${environment} in ${vault.name}`;
+  const variables = Object.fromEntries(entries.map((e) => [e.name, e.value]));
+  const { status, body } = await request(server, `/${vault.id}/${environment}/imports`, {
+    method: "POST",
+    body: JSON.stringify({ variables, refused }),
+  });
+  if (status !== 201) pushFail(status, body, what);
+  const b = body as { import?: unknown; names?: unknown; overwrites?: unknown; expires_at?: unknown; url?: unknown };
+  if (typeof b?.import !== "string" || !UUID.test(b.import) || !Array.isArray(b.names) || typeof b.url !== "string" || !b.url.startsWith(`${server.issuer}/`)) {
+    throw new CliError(`The server sent an unexpected answer for ${what}.`);
+  }
+  return {
+    id: b.import,
+    names: b.names.filter((n): n is string => typeof n === "string"),
+    overwrites: Array.isArray(b.overwrites) ? b.overwrites.filter((n): n is string => typeof n === "string") : [],
+    expiresAt: typeof b.expires_at === "string" ? b.expires_at : "",
+    url: b.url,
+  };
+}
+
+// A push's status, for --wait.
+export async function pushStatus(server: Server, id: string): Promise<PushStatus> {
+  const { status, body } = await get(server, `/imports/${id}`);
+  if (status !== 200) fail(status, body, "that push");
+  const s = (body as { status?: unknown } | null)?.status;
+  if (s !== "pending" && s !== "applied" && s !== "rejected" && s !== "expired") throw new CliError("The server sent an unexpected answer for that push.");
+  return s;
 }

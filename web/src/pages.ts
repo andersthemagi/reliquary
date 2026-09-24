@@ -9,7 +9,8 @@ import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
 import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
-import { variablesRoutes } from "./variablespage.js";
+import { pendingList, variablesRoutes } from "./variablespage.js";
+import { pendingPushes } from "./variables.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -406,6 +407,9 @@ async function review(ctx: Ctx): Promise<Reply> {
       )
     ).rows,
   }));
+  // Environment variables sent with `reliquary env push` that this person
+  // may apply (docs/variables.md, "Imports").
+  const pushes = (await pendingPushes(ctx.userId)).filter((p) => p.mayApply);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const byVault = new Map<string, any[]>();
   for (const p of waiting) byVault.set(p.vault, [...(byVault.get(p.vault) ?? []), p]);
@@ -414,7 +418,8 @@ async function review(ctx: Ctx): Promise<Reply> {
     "Review",
     html`${pageHeader({ title: "Review" })}
     <p class="lede">Every change waiting on your approval, across your vaults. Read the change itself before the reason. Not now? Snooze one: it comes back when its time is up or it changes.</p>
-    ${waiting.length === 0
+    ${pushes.length ? pendingList(ctx, pushes, true) : ""}
+    ${waiting.length === 0 && pushes.length === 0
       ? html`<div class="empty"><strong>Nothing is waiting on you.</strong> When an agent proposes a change to a canon file, it shows up here.</div>`
       : [...byVault.entries()].map(
           ([name, items]) => html`<h2>${name}</h2><ul class="rows review-rows">${items.map((p) => reviewRow(ctx, p, false, true))}</ul>`,
@@ -1206,6 +1211,8 @@ function connect(ctx: Ctx): Reply {
       <pre class="code">npx @reliquary-ai/cli run --env development -- &lt;command&gt;</pre>
       <p>Or write them to a <code>.env</code> file, which the CLI only does where git ignores it:</p>
       <pre class="code">npx @reliquary-ai/cli env pull --env development</pre>
+      <p>To add a project’s <code>.env</code> to the vault, send it; you apply it on the Variables page, where only names are shown. An agent can run this for you without ever seeing a value:</p>
+      <pre class="code">npx @reliquary-ai/cli env push --env development --file .env</pre>
       <p class="small muted">Add <code>--vault &lt;name&gt;</code> if you belong to more than one vault. The sign-in is on the <a href="/tokens">Tokens</a> page as Reliquary CLI; revoke it there. Set values on a vault’s Variables page.</p></section>`,
     "connect",
   );
@@ -1222,7 +1229,7 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
     rows: (
       await c.query(
         `select t.id, t.name, t.created_at, t.expires_at, t.last_used_at, t.revoked_at,
-                t.all_vaults, t.access, t.kind, t.client_name, t.expires_at <= now() as expired,
+                t.all_vaults, t.access, t.kind, t.env_push, t.client_name, t.expires_at <= now() as expired,
                 cardinality(t.vault_ids) as n_vaults,
                 (select array_agg(v.name order by v.name) from public.vaults v
                   where v.id = any(t.vault_ids)) as vault_names
@@ -1297,7 +1304,7 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
     ${rows.map(
       (t) => html`<tr${t.revoked_at || t.expired ? raw(' class="inactive"') : ""}><td>${t.name}</td>
         <td class="small">${scope(t)}</td>
-        <td class="small">${t.kind === "cli" ? "Environment variables" : t.access === "write" ? "Read and write" : "Read only"}</td>
+        <td class="small">${t.kind === "cli" ? (t.env_push ? "Environment variables (reads; sends for approval)" : "Environment variables") : t.access === "write" ? "Read and write" : "Read only"}</td>
         <td class="small">${t.last_used_at ? ago(t.last_used_at) : "Never"}${t.client_name
           ? html`<span class="muted token-client">from ${t.client_name}</span>`
           : ""}</td>

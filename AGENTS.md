@@ -57,6 +57,11 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
 - phase 2's web Variables page (`web/src/variablespage.ts`): names by
   environment, set / rotate / delete, reveal by POST, the access log, and the
   CLI on Connect, with tests (`web/test/variables_page.test.mjs`).
+- imports (`20260925100000_env_imports.sql`): paste a `.env` on the
+  Variables page (a draft, previewed without values), or `reliquary env
+  push` from the CLI (a pending import, for an agent to run): either way a
+  person applies it in the web UI; one parser in `web/src/dotenv.ts` and
+  `cli/src/dotenv.ts`. The CLI is ready to publish (`publish-cli.yml`).
 Milestone 2 is built; next is its week of real use.
 
 All of it needs podman or docker; nothing needs Node installed on the host.

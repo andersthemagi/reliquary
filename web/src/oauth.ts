@@ -365,8 +365,8 @@ export async function authorize(ctx: Ctx): Promise<Reply> {
     code = await asPerson(ctx.userId, async (c) =>
       (
         cli
-          ? await c.query("select public.create_cli_grant($1, $2, $3, $4, $5::uuid[]) as code", [
-              r.client.clientId, r.redirectUri, r.resource, r.challenge, some ? ticked : null,
+          ? await c.query("select public.create_cli_grant($1, $2, $3, $4, $5::uuid[], $6) as code", [
+              r.client.clientId, r.redirectUri, r.resource, r.challenge, some ? ticked : null, ctx.form.get("push") === "yes",
             ])
           : await c.query("select public.create_oauth_grant($1, $2, $3, $4, $5, $6::uuid[], $7) as code", [
               name, r.client.clientId, r.redirectUri, r.resource, r.challenge, some ? ticked : null, access,
@@ -420,12 +420,16 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
       ctx,
       "Sign in the Reliquary CLI",
       html`<div class="page-head"><div class="page-title-row"><div class="page-title"><h1>Sign in the Reliquary CLI?</h1></div></div></div>
-      <p class="lede">The Reliquary CLI on a computer wants to read environment variables as you, for <code>reliquary run</code> and <code>reliquary env pull</code>. It gets the values you may use (as an editor, development and preview; as an owner, production too), in the vaults you choose. It can’t read files, write, propose or change anything. Every read is in the vault’s access log, and you can revoke it any time on the <a href="/tokens">Tokens</a> page.</p>
+      <p class="lede">The Reliquary CLI on a computer wants to read environment variables as you, for <code>reliquary run</code> and <code>reliquary env pull</code>. It gets the values you may use (as an editor, development and preview; as an owner, production too), in the vaults you choose. It can’t read files, write, propose or change anything, and it never sets a value. Every read is in the vault’s access log, and you can revoke it any time on the <a href="/tokens">Tokens</a> page.</p>
       ${problem ? html`<p class="callout attention" role="alert">${problem}</p>` : ""}
       <p class="callout attention loopback-warning"><strong>Only allow this if you just ran <code>reliquary login</code> on this computer yourself.</strong> It sends you back to ${back.host}, a program on this device, and any program here could have started this request.</p>
       <form method="post" action="/oauth/authorize" class="panel token-form">
         ${fields}
         ${vaultChoice("the CLI")}
+        <fieldset>
+          <legend>Sending values</legend>
+          <label class="choice"><input type="checkbox" name="push" value="yes" checked> Also let it send <code>.env</code> files here (<code>reliquary env push</code>). They wait for you, or another owner or editor, to apply them on the Variables page; it can’t apply them itself.</label>
+        </fieldset>
         <div class="actions"><button name="decision" value="deny">Deny</button> <button class="primary" name="decision" value="approve">Allow</button></div>
         <p class="hint">To change its vaults later, revoke it and sign in again.</p>
       </form>`,

@@ -9,7 +9,10 @@ enforces access", "Append-only means append-only").
 Code: `supabase/migrations/20260925090000_variables.sql`,
 `web/src/secrets.ts` (encryption), `web/src/variables.ts` (the web UI's
 module), `web/src/envapi.ts` (the CLI's API), `web/src/oauth.ts` (the CLI's
-sign-in), `mcp/src/tools.ts` (`list_variables`). Tests: rows F50 to F59 in
+sign-in), `mcp/src/tools.ts` (`list_variables`). Imports (paste a `.env`,
+`reliquary env push`): `supabase/migrations/20260925100000_env_imports.sql`,
+`web/src/dotenv.ts` (= `cli/src/dotenv.ts`), below under
+[Imports](#imports). Tests: rows F50 to F71 in
 [tests/features.md](../tests/features.md).
 
 ## What holds
@@ -20,7 +23,7 @@ sign-in), `mcp/src/tools.ts` (`list_variables`). Tests: rows F50 to F59 in
 | Editor, in the web UI | yes | not in owners-only environments (production) | reveal, not production |
 | Viewer | yes | no | no |
 | Any agent: MCP token, OAuth grant, `act` without a token | yes, within its token's vaults | no | **never**, and the attempt is logged |
-| The CLI (a `cli` grant) | only through `/api/env/vaults` | no | a whole environment within its person's role and chosen vaults, logged as `read` |
+| The CLI (a `cli` grant) | only through `/api/env/vaults` | no; with the push permission, sends values as a pending import for a person to apply | a whole environment within its person's role and chosen vaults, logged as `read` |
 | A session logged in as `reliquary_mcp` | as its claims allow | no (always an agent) | never, whatever its claims |
 
 - The web app encrypts; the database stores a key id, a nonce and the
@@ -49,8 +52,9 @@ All in `20260925090000_variables.sql`.
 | `public.env_access_log` | `seq`, `vault_id`, `at`, `actor` (the person), `agent` (null in person; `Reliquary CLI` for the CLI; the token's name for an agent), `token_id`, `client_id` (the grant's OAuth client), `action`, `environment`, `names text[]`, `detail jsonb` | owners and editors of the vault, and their agents within scope (RLS on `role_in`); not viewers, not read-only agents, not the CLI | the functions below only. Append-only: update, delete and truncate raise, even for the table owner |
 
 `action` is one of `set`, `rotate`, `delete`, `read` (the CLI), `reveal` (the
-web UI), `refused`. A `refused` row's `detail` is `{"attempt": "read" |
-"reveal", "reason": "..."}`. No column holds a value.
+web UI), `refused`, and for imports `push` (a CLI push was made) and `reject`
+(a person rejected one). A `refused` row's `detail` is `{"attempt": "read" |
+"reveal" | "push" | "apply" | "reject", "reason": "..."}`. No column holds a value.
 
 A variable exists while it has a value in at least one environment. Set,
 rotate and delete also go into the vault's feed (`public.log`, so
@@ -261,6 +265,145 @@ in and who set it when. Read-only, within the token's vaults. An unknown
 environment is an error naming those there are. No tool sets, reveals or
 reads a value, and the database refuses agents anyway.
 
+## Imports
+
+Bringing a whole `.env` in at once, two ways. Both end in a **pending
+import** that a person applies in the web UI; nothing else sets a value.
+
+- **Paste** (the Variables page, like Vercel's): Import .env, paste the file,
+  tick environments. The web app parses it (`web/src/dotenv.ts`), seals every
+  value for every ticked environment and stores a **draft** (30 minutes, its
+  author's alone), then redirects to a preview. The preview names each
+  variable as new or replacing a version, lists the lines not taken and why,
+  and never shows a value. Apply sets them; Discard drops them.
+- **Push** (`reliquary env push`): an agent may run the CLI, so a push never
+  sets a value. The CLI parses the file with the same code, sends names and
+  values over TLS to the env API, which seals them on receipt and makes a
+  **pending import** (24 hours). An owner or editor applies or rejects it on
+  the vault's Variables page (a notice lists pending pushes) or from Review.
+  The agent only runs a command; the values go from disk to the server, never
+  through a model.
+
+**Why the preview's values stay on the server.** The alternative was to carry
+the parsed values back in hidden fields of a no-store confirm form. Stashing
+them sealed in the database is safer: the values are sent by the browser
+once and never come back to it (no form restore, bfcache, extension or
+view-source copy, no second copy in a page), the confirm request carries only
+an import id and the CSRF token, and an abandoned preview expires and is
+swept instead of living in a tab. The draft is bound to its author (RLS and
+the functions), and to the vault, environment and name by the encryption's
+additional data.
+
+### Parsing
+
+`web/src/dotenv.ts` and `cli/src/dotenv.ts` are the same file (a CLI test
+compares them byte for byte), and both suites run
+`web/test/dotenv-vectors.json`.
+
+- A UTF-8 byte order mark at the start is dropped; lines end in LF, CRLF or CR.
+- Blank lines and lines starting with `#` are skipped; `export ` before a name is ignored.
+- `NAME=value`, spaces around the `=` ignored; an `=` inside a value is kept.
+- Unquoted values end at the line's end or at a `#` after a space or tab, trailing spaces dropped.
+- `"double quotes"` take `\n`, `\r`, `\t`, `\"`, `\\` and `\$` (any other backslash is kept) and may span lines.
+- `'single quotes'` and `` `backticks` `` are literal and may span lines.
+- After a closing quote only spaces and a `# comment` may follow.
+- No `${VAR}` expansion: values are taken as written.
+
+Refused, each with its line number and a reason (and the name only when it
+is a well-formed name, never any of the value): no `=`, a bad name, a name
+that changes how programs start, an empty value, a NUL character, a value
+over 64 KiB, text after a closing quote, over 200 variables. A name given
+twice: the later line is used and the earlier one refused, saying so. A
+quote never closed stops the parse there, so the rest of a value can't be
+read as more variables. A file over 512 KiB or 5000 lines is refused whole.
+
+### Data
+
+In `20260925100000_env_imports.sql`.
+
+| Table | Columns | Who reads | Who writes |
+|---|---|---|---|
+| `public.env_imports` | `id`, `vault_id`, `environments text[]`, `names text[]` (1 to 200), `refused jsonb` (`[{"line", "name" or null, "reason"}]`), `source` (`web` draft or `cli` push), `created_by`, `agent`, `token_id`, `client_id`, `created_at`, `expires_at`, `status` (`pending`, `applied`, `rejected`, `expired`), `decided_by`, `decided_at` | owners and editors (and their agents within scope) see pushes; a draft only its author, in person; not a CLI grant (it asks `env_import_status`) | the functions below only |
+| `private.env_import_secrets` | `import_id`, `name`, `environment`, `key_id`, `nonce`, `ciphertext` (as `variable_secrets`) | nobody; no function returns them | the functions below; deleted when the import is applied, rejected or found expired |
+| `public.access_tokens.env_push` | whether a `cli` grant may push (only a `cli` grant can carry it) | the person, on the Tokens page | consent |
+
+Values are sealed with the stored-value key and the same additional data
+(vault, environment, name), so applying copies the ciphertext into
+`variable_secrets` without opening it.
+
+| Function | Returns | Who may call | Notes |
+|---|---|---|---|
+| `public.create_env_import(p_vault uuid, p_environments text[], p_items jsonb, p_refused jsonb default '[]')` | jsonb `{"ok": true, "id", "source", "environments", "names", "overwrites", "expires_at"}` or `{"ok": false, "error": "unauthorized" \| "forbidden" \| "push_not_allowed" \| "not_found" \| "rate_limited"}` | a person in person (a draft), or a live CLI grant with `env_push` that reaches the vault (a push) | `p_items`: `[{"name", "environment", "key_id", "nonce", "ciphertext"}]` (base64), one per name per environment. Owners in every environment, editors outside owners-only (an editor's push to production is refused when made), viewers never. Any other agent, a `reliquary_mcp` session: `forbidden`. Refusals are logged. Malformed input raises 22023. Limits: 200 names, 4 MiB; 20 pending per person per vault, 60 a person an hour. A push is logged as `push` with its names |
+| `public.apply_env_import(p_import uuid)` | jsonb `{"ok": true, "applied", "names", "environments"}` or `{"ok": false, "error": "unauthorized" \| "forbidden" \| "not_found" \| "expired" \| "applied" \| "rejected"}` | a person in person, within their role in every environment of the import; a draft only its author | Any `act` (the CLI included) or `reliquary_mcp` session: `forbidden`, logged. Each value goes through `private.put_variable` (the path `set_variable` uses): `set` or `rotate`, one access-log row per variable and environment with `detail.import`, and a feed event; the import becomes `applied` and its values are deleted, all in one transaction |
+| `public.reject_env_import(p_import uuid)` | as apply, `{"ok": true}` | the same people, or the import's author | Deletes the values; a push's rejection is logged as `reject` |
+| `public.env_import_status(p_import uuid)` | jsonb `{"ok": true, "id", "status", "source", "environments", "names", "expires_at", "decided_at"}` or not found | the import's author in person, or through a live CLI grant of theirs that reaches the vault | For `--wait`. Not logged (no values) |
+| `public.create_cli_grant(..., p_push boolean default false)` | as before | a person | Records `env_push` |
+
+A pending import past `expires_at` reads as `expired` everywhere
+(`private.env_import_state`), and the next create, apply or reject marks it
+and deletes its values (`private.sweep_env_imports`).
+
+### The env API, for pushes
+
+`POST /api/env/<vault uuid>/<environment>/imports`, `content-type:
+application/json`, at most 1 MiB:
+
+```json
+{ "variables": { "API_KEY": "...", "DATABASE_URL": "..." },
+  "refused": [ { "line": 4, "name": "PATH", "reason": "changes how programs start, so it can't be a shared variable" } ] }
+```
+
+```json
+201 { "import": "<uuid>", "status": "pending", "vault": "<uuid>", "environment": "development",
+      "names": ["API_KEY", "DATABASE_URL"], "overwrites": ["API_KEY"], "expires_at": "...",
+      "url": "<issuer>/v/<vault>/variables/imports/<import>" }
+```
+
+Errors: 400 `invalid_request` (not JSON, a bad or refused name, an empty,
+non-string or oversized value, a bad `refused` list; never echoed), 403
+`forbidden` (role) or `push_not_allowed` (the sign-in wasn't allowed to push:
+sign in again and leave the box ticked), 404 `not_found`, 405 (only POST),
+413 `too_large`, 415 `unsupported_media_type`, 429 `rate_limited`, 503
+`not_configured`.
+
+`GET /api/env/imports/<uuid>`: `200 {"import", "status", "environments",
+"names", "expires_at", "decided_at"}` for its author, else 404.
+
+The log line is the route's shape (`POST /api/env/:vault/:environment/imports
+201 pending`), never an id, name or value.
+
+### Web routes
+
+| Route | Does |
+|---|---|
+| `GET /v/:v/variables/import` | The paste form: a `<textarea>` (autocomplete and spellcheck off) and the environments the role may set |
+| `POST /v/:v/variables/import` | Parses, seals, stores a draft, redirects (303) to its preview. Nothing importable, no environment or too big: the form again with the reasons, never the text |
+| `GET /v/:v/variables/imports/:id` | The preview of a draft or a push: names by environment, new or `Replaces vN`, lines not taken, Apply and Discard (Reject for a push) when the role allows; a push warns that an agent may have sent it |
+| `POST /v/:v/variables/imports/:id/apply`, `.../reject` | CSRF and same-origin as every POST; redirect with a flash |
+
+The Variables page lists pending pushes (owners and editors), and Review
+lists the ones the person may apply. The consent page for the CLI has a box
+(ticked) "Also let it send .env files here"; the Tokens page shows a grant
+that may push as "Environment variables (reads; sends for approval)".
+
+### The CLI
+
+`reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]`:
+reads the file (a regular file, at most 512 KiB), prints each line it can't
+take with its reason, refuses before sending if the role can't set values in
+that environment, sends the rest, prints the names (new and replacing) on
+stderr and the approval link on stdout. `--wait` polls the status (2 s, then
+backing off to 15 s) and exits 0 when applied, 1 when rejected or expired, 3
+when the timeout runs out first (the push stays pending). It never prints a
+value.
+
+### MCP
+
+No tool sends, applies or rejects a push. `list_variables` also lists the
+pushes waiting for a person (environments, names, who, when, expiry), and its
+description tells an agent to run `env push` rather than read a `.env`'s
+values into the conversation.
+
 ## What phase 2 builds
 
 ### Web: the Variables page
@@ -309,7 +452,7 @@ A small Node package, no native dependencies. It talks to exactly the
 endpoints above.
 
 - **Server**: `--server <url>` or `RELIQUARY_URL`, default the hosted web
-  app. Discover the authorization server metadata; `client_id` and
+  app (`https://reliquary.redmage.cc`). Discover the authorization server metadata; `client_id` and
   `resource` derive from its `issuer` as above.
 - **Credentials**: the refresh token (and the current access token and its
   expiry) per server, in the OS keychain when available, else

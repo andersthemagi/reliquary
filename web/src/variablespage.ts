@@ -15,13 +15,20 @@ import { asPerson } from "./db.js";
 import { csrfField, html, page, pageHeader, raw, when, type Raw } from "./html.js";
 import { ago, message, notFound, UUID, vault, vaultPath, vaultShell, who, type Ctx, type Reply, type Vault } from "./pages.js";
 import { SecretsError, variablesConfigured } from "./secrets.js";
+import { dotenvTooBig, parseDotenv, DOTENV_MAX_ENTRIES } from "./dotenv.js";
 import {
   accessLog,
+  applyImport,
+  createImport,
   deleteVariable,
+  getImport,
   listVariables,
+  pendingPushes,
+  rejectImport,
   revealVariable,
   setVariable,
   type AccessLogRow,
+  type EnvImport,
   type Environment,
   type Variable,
   type VariableValue,
@@ -29,7 +36,7 @@ import {
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const ENV = /^[a-z][a-z0-9_-]{0,31}$/;
-const ACTIONS = ["set", "rotate", "delete", "read", "reveal", "refused"] as const;
+const ACTIONS = ["set", "rotate", "delete", "read", "reveal", "refused", "push", "reject"] as const;
 const ACTION_LABEL: Record<string, string> = {
   set: "Set",
   rotate: "Rotated",
@@ -37,6 +44,8 @@ const ACTION_LABEL: Record<string, string> = {
   read: "Read",
   reveal: "Revealed",
   refused: "Refused",
+  push: "Sent for approval",
+  reject: "Rejected",
 };
 const LOG_PAGE = 50;
 // How far back the "read since it was set" note looks.
@@ -136,17 +145,20 @@ async function list(ctx: Ctx, id: string): Promise<Reply> {
   const recent = readsLog(v.role) && variables.length ? await accessLog(ctx.userId, id, { limit: RECENT }) : null;
   const canSet = keyed && environments.some((e) => writes(v.role, e));
   const ownersOnly = environments.filter((e) => e.ownersOnly).map((e) => e.name);
+  const pushes = readsLog(v.role) ? await pendingPushes(ctx.userId, id) : [];
 
   const body = html`
     ${pageHeader({
       crumb: crumb(v),
       title: "Variables",
-      actions: html`${readsLog(v.role) ? html`<a class="button" href="${base(id, "/log")}">Access log</a>` : ""}${
+      actions: html`${canSet ? html`<a class="button" href="${base(id, "/import")}">Import .env</a>` : ""}${
+        readsLog(v.role) ? html`<a class="button" href="${base(id, "/log")}">Access log</a>` : ""}${
         canSet ? html`<a class="button primary" href="${base(id, "/set")}">Add a variable</a>` : ""
       }`,
     })}
     <p class="lede">Shared environment variables for this vault’s projects: API keys, database URLs, other secrets. This page shows names and who set them, never values.</p>
     ${keyed ? "" : html`<p class="callout attention">This server has no encryption key, so values can’t be set or revealed here. Names are listed as usual.</p>`}
+    ${pushes.length ? pendingList(ctx, pushes, false) : ""}
     ${v.role === "viewer"
       ? html`<p class="muted small">As a viewer you see names only. Owners and editors set and use values.</p>`
       : v.role === "editor" && ownersOnly.length
@@ -330,6 +342,185 @@ async function reveal(ctx: Ctx, v: Vault): Promise<Reply> {
 }
 
 // ---------------------------------------------------------------------------
+// Imports: paste a .env (a draft), or review a push from the CLI. Values are
+// in plaintext here only in the paste form's POST body, handed straight to
+// createImport() (sealed, stored as a draft). No page shows one: the
+// preview names what will be set or replaced, and the confirm step sends
+// only the import's id, so a value never goes back to the browser.
+
+const importPath = (vaultId: string, importId: string, rest = "") => base(vaultId, `/imports/${importId}${rest}`);
+
+// Minutes or hours from now, for "expires in".
+function inTime(d: Date): string {
+  const s = Math.max(0, (d.getTime() - Date.now()) / 1000);
+  if (s < 90) return "a minute";
+  if (s < 5400) return `${Math.round(s / 60)} minutes`;
+  return `${Math.round(s / 3600)} hours`;
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// Pending pushes, on the Variables page (one vault) and in Review (all).
+export function pendingList(ctx: Ctx, pushes: (EnvImport & { vaultName: string; mayApply: boolean })[], showVault: boolean): Raw {
+  return html`<section class="callout attention pending-imports" aria-label="Pushes waiting for approval">
+    <strong>${pushes.length === 1 ? "A push is" : `${pushes.length} pushes are`} waiting for approval</strong>
+    <p class="small">Sent with <code>reliquary env push</code>. Nothing is set until a person applies it here.</p>
+    <ul class="rows">${pushes.map(
+      (p) => html`<li><span><a class="name" href="${importPath(p.vaultId, p.id)}">${plural(p.names.length, "variable")} for ${p.environments.join(", ")}</a>
+        <span class="muted small"> · ${showVault ? `${p.vaultName} · ` : ""}from ${who(ctx, p.createdBy, null)} via the CLI · ${ago(p.createdAt)} · expires in ${inTime(p.expiresAt)}</span></span>
+        <span class="row-end small">${p.mayApply ? html`<a class="button" href="${importPath(p.vaultId, p.id)}">Review</a>` : html`<span class="muted">Owners apply it</span>`}</span></li>`,
+    )}</ul>
+  </section>`;
+}
+
+type ImportForm = { environments?: string[]; error?: Raw | string; refused?: { line: number; name: string | null; reason: string }[] };
+
+function refusedList(refused: { line: number; name: string | null; reason: string }[]): Raw {
+  return html`<ul class="plain small import-refused">${refused.map(
+    (r) => html`<li>Line ${r.line}${r.name ? html`, <code>${r.name}</code>` : ""}: ${r.reason}</li>`,
+  )}</ul>`;
+}
+
+async function importForm(ctx: Ctx, v: Vault, f: ImportForm, status = 200): Promise<Reply> {
+  const { environments } = await listVariables(ctx.userId, v.id);
+  const allowed = environments.filter((e) => writes(v.role, e));
+  const title = "Import a .env";
+  if (!allowed.length || !variablesConfigured()) {
+    const why = variablesConfigured() ? "Your role in this vault can’t set variables. Ask an owner." : "This server has no encryption key, so values can’t be set here.";
+    return shell(ctx, v, title, html`${pageHeader({ crumb: crumb(v, "import"), title })}<p class="callout attention">${why}</p>`, 403);
+  }
+  const chosen = f.environments?.length ? f.environments : ["development"];
+  const body = html`
+    ${pageHeader({
+      crumb: crumb(v, "import"),
+      title,
+      actions: html`<a class="button quiet" href="${base(v.id)}">Cancel</a>`,
+    })}
+    ${f.error ? html`<p class="callout danger" role="alert">${f.error}</p>` : ""}
+    ${f.refused?.length ? html`<div class="callout attention"><p><strong>Not taken:</strong></p>${refusedList(f.refused)}</div>` : ""}
+    <p class="lede">Paste a <code>.env</code> file. Each <code>NAME=value</code> line becomes a variable in the environments you tick. Next you see which names are new and which replace a value, without the values, and nothing is saved until you apply it.</p>
+    <form method="post" action="${base(v.id, "/import")}" class="panel choice-form" id="import-env" autocomplete="off">
+      ${csrfField(ctx.csrf)}
+      <label for="ie">Contents of the .env</label>
+      <textarea id="ie" name="dotenv" class="secret-input" rows="12" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="STRIPE_SECRET_KEY=sk_test_...&#10;DATABASE_URL=&quot;postgres://...&quot;"></textarea>
+      <p class="hint">Comments, blank lines, <code>export</code>, single and double quotes (with <code>\\n</code> escapes in double quotes) and multi-line quoted values are understood; <code>\${VAR}</code> isn’t expanded. Up to ${DOTENV_MAX_ENTRIES} variables. Names like <code>PATH</code> or <code>NODE_OPTIONS</code> are refused.</p>
+      <fieldset>
+        <legend>Environments</legend>
+        ${allowed.map(
+          (e) => html`<label class="choice"><input type="checkbox" name="environment" value="${e.name}"${chosen.includes(e.name) ? raw(" checked") : ""}> ${e.name}</label>`,
+        )}
+        ${allowed.length < environments.length ? html`<p class="hint">Only owners set values in ${environments.filter((e) => !writes(v.role, e)).map((e) => e.name).join(", ")}.</p>` : ""}
+      </fieldset>
+      <div class="actions"><button class="primary">Review the import</button>
+        <a class="button quiet" href="${base(v.id)}">Cancel</a></div>
+    </form>
+    <p class="small muted">From a terminal, or an agent: <code>npx @reliquary-ai/cli env push --env development</code> sends a <code>.env</code> file for you to approve here. It never sets a value by itself.</p>`;
+  return shell(ctx, v, title, body, status, base(v.id));
+}
+
+async function importPost(ctx: Ctx, v: Vault): Promise<Reply> {
+  const environments = [...new Set(ctx.form.getAll("environment"))].filter((e) => ENV.test(e));
+  const text = ctx.form.get("dotenv") ?? "";
+  // The form again: the environments kept, the pasted text never sent back.
+  const again = (error: Raw | string, status = 400, refused?: ImportForm["refused"]) => importForm(ctx, v, { environments, error, refused }, status);
+  if (!environments.length) return again("Tick at least one environment.");
+  if (!text.trim()) return again("Paste the contents of a .env file.");
+  const big = dotenvTooBig(text);
+  if (big) return again(`That can’t be imported: ${big}.`, 413);
+  const { entries, refused } = parseDotenv(text);
+  if (!entries.length) return again("Nothing in it could be imported.", 400, refused);
+  try {
+    const r = await createImport(ctx.userId, v.id, environments, entries, refused);
+    if (r.ok) return { redirect: importPath(v.id, r.id) };
+    const why: Record<string, string> = {
+      forbidden: "Your role can’t set values in every environment you ticked.",
+      not_found: "There’s no such environment in this vault.",
+      rate_limited: "You’ve started too many imports. Apply or discard some, or try again in an hour.",
+    };
+    return again(why[r.error] ?? "That import was refused.", r.error === "rate_limited" ? 429 : r.error === "not_found" ? 404 : 403);
+  } catch (err) {
+    if (err instanceof SecretsError) {
+      return again(variablesConfigured() ? "A value is at most 64 KiB." : "This server has no encryption key, so values can’t be set here.");
+    }
+    return again(message(err));
+  }
+}
+
+const STATUS_TEXT: Record<string, string> = {
+  applied: "This import was applied.",
+  rejected: "This import was rejected or discarded; its values are gone.",
+  expired: "This import expired before anyone applied it; its values are gone.",
+};
+
+async function reviewImport(ctx: Ctx, v: Vault, importId: string): Promise<Reply> {
+  const found = await getImport(ctx.userId, v.id, importId);
+  if (!found) return notFound(ctx);
+  const { imp, existing } = found;
+  const { environments } = await listVariables(ctx.userId, v.id);
+  const envs = environments.filter((e) => imp.environments.includes(e.name));
+  const mayApply = envs.length === imp.environments.length && envs.every((e) => writes(v.role, e));
+  const pending = imp.status === "pending";
+  const push = imp.source === "cli";
+  const title = push ? "Review a push" : "Review your import";
+  const replaced = imp.names.filter((n) => existing.has(n)).length;
+  const body = html`
+    ${pageHeader({
+      crumb: crumb(v, "import"),
+      title,
+      meta: html`<p class="meta"><span>${push ? html`Sent by ${who(ctx, imp.createdBy, null)} with the Reliquary CLI` : "Pasted by you"}, ${ago(imp.createdAt)}</span>${
+        pending ? html`<span>Expires in ${inTime(imp.expiresAt)}</span>` : ""}</p>`,
+    })}
+    ${pending
+      ? ""
+      : html`<p class="callout ${imp.status === "applied" ? "success" : "neutral"}" role="status">${STATUS_TEXT[imp.status]}${
+          imp.decidedBy && imp.status !== "expired" ? ` (${who(ctx, imp.decidedBy, null)}, ${ago(imp.decidedAt!)})` : ""}</p>`}
+    ${pending && push
+      ? html`<p class="callout attention">Sent from a computer signed in as ${who(ctx, imp.createdBy, null)}; an agent may have run it. Check the names before you apply. Values are set as you, and the access log records that they came from this push.</p>`
+      : ""}
+    <p class="lede">${plural(imp.names.length, "variable")} for ${imp.environments.join(", ")}: ${
+      plural(imp.names.length - replaced, "new name")}, ${plural(replaced, "replacing a value", "replacing values")}. Values aren’t shown here.</p>
+    <div class="vars-wrap"><table class="vars import-preview">
+      <thead><tr><th>Name</th>${envs.map((e) => html`<th>${e.name}</th>`)}</tr></thead>
+      <tbody>${imp.names.map(
+        (n) => html`<tr><th scope="row"><code>${n}</code></th>${envs.map((e) => {
+          const version = existing.get(n)?.get(e.name);
+          return html`<td data-label="${e.name}"><div>${version
+            ? html`<span class="badge attention">Replaces v${version}</span>`
+            : html`<span class="badge">New</span>`} <span class="muted small">value set, hidden</span></div></td>`;
+        })}</tr>`,
+      )}</tbody></table></div>
+    ${imp.refused.length ? html`<h2>Not taken</h2><p class="small muted">Lines of the file that won’t be imported, and why.</p>${refusedList(imp.refused)}` : ""}
+    ${pending && mayApply
+      ? html`<div class="actions import-actions">
+          <form method="post" action="${importPath(v.id, imp.id, "/apply")}">${csrfField(ctx.csrf)}<button class="primary">Apply: set ${plural(imp.names.length, "variable")}</button></form>
+          <form method="post" action="${importPath(v.id, imp.id, "/reject")}">${csrfField(ctx.csrf)}<button class="danger">${push ? "Reject" : "Discard"}</button></form>
+        </div>`
+      : pending
+        ? html`<p class="muted small">Only owners set values in ${envs.filter((e) => !writes(v.role, e)).map((e) => e.name).join(", ")}, so an owner applies this.</p>`
+        : html`<p><a href="${base(v.id)}">Back to variables</a></p>`}`;
+  return shell(ctx, v, title, body);
+}
+
+async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: boolean): Promise<Reply> {
+  const r = apply ? await applyImport(ctx.userId, importId) : await rejectImport(ctx.userId, importId);
+  if (r.ok) {
+    if (apply) ctx.setFlash(`Set ${plural(r.names?.length ?? 0, "variable")} in ${(r.environments ?? []).join(", ")}.`);
+    else ctx.setFlash("The import is discarded; its values are gone.");
+    return { redirect: base(v.id) };
+  }
+  if (r.error === "not_found") return notFound(ctx);
+  const why: Record<string, string> = {
+    forbidden: "Your role can’t set values in every environment of this import.",
+    expired: "This import expired; its values are gone. Import the file again.",
+    applied: "This import was already applied.",
+    rejected: "This import was already rejected or discarded.",
+    unauthorized: "Your session ended. Sign in and try again.",
+  };
+  ctx.setFlash(why[r.error] ?? "That was refused.");
+  return { redirect: importPath(v.id, importId) };
+}
+
+// ---------------------------------------------------------------------------
 // Access log
 
 function logFilters(ctx: Ctx, id: string, action: string, name: string): Raw {
@@ -411,5 +602,12 @@ export async function variablesRoutes(ctx: Ctx, id: string, rest: string): Promi
   if (get && rest === "/variables/delete") return confirmDelete(ctx, v);
   if (!get && rest === "/variables/delete") return remove(ctx, v);
   if (!get && rest === "/variables/reveal") return reveal(ctx, v);
+  if (get && rest === "/variables/import") return importForm(ctx, v, {});
+  if (!get && rest === "/variables/import") return importPost(ctx, v);
+  const m = /^\/variables\/imports\/([0-9a-f-]{36})(\/apply|\/reject)?$/.exec(rest);
+  if (m && UUID.test(m[1])) {
+    if (get && !m[2]) return reviewImport(ctx, v, m[1]);
+    if (!get && m[2]) return decideImport(ctx, v, m[1], m[2] === "/apply");
+  }
   return notFound(ctx);
 }

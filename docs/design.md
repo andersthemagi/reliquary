@@ -367,6 +367,10 @@ accounts.
     process and writes nothing to disk. This is the preferred path.
   - `reliquary env pull --env development` writes `.env`, refuses unless
     `.env` is gitignored, and never prints values.
+- **Getting values in:** set one on the Variables page, paste a whole
+  `.env` there (previewed by name, never by value), or `reliquary env push`
+  from a project, which an agent may run: a push is only a pending import
+  until a person applies it in the web UI (docs/variables.md, Imports).
 - **Every** read, grant, revoke, rotation and reveal lands in
   `env_access_log`, which is append-only. Change events carry the name and
   action, never the value.
