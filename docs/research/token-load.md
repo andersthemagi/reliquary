@@ -113,4 +113,23 @@ Still to do, from the token side:
   (`list_variables`'s description, 447 characters, is the longest).
 - **`search` could send less from the database, not to the agent**: see
   server-load.md, "Still to do", item 4. The agent already gets three lines
-  a file.
+  a file. (Done in the third pass, below.)
+
+## Third pass (server load)
+
+2026-09-25, with docs/research/server-load.md's third pass. Again no
+response changed, byte for byte: `mcp/test/token_load.test.mjs` passes with
+every budget as it was, and the whole pass is still 26,044 bytes. What
+changed is behind the responses: every tool that names a vault finds it in
+its own query, `changes_since` and `read_proposal` take one query each, and
+`search` picks its three lines per file in the database, so a search over
+large files moves about a kilobyte from the database instead of megabytes
+(the second pass's last item here). The lines are the same as before
+(`mcp/test/search_lines.test.mjs`).
+
+Still to do, from the token side:
+
+- **`tools/list` is 88 bytes under its budget.** Unchanged since the second
+  pass: the next tool or longer description will need the budget raised on
+  purpose, or a trim first (`list_variables`'s description, 447
+  characters, is the longest).

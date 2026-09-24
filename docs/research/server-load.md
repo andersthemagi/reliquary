@@ -125,10 +125,10 @@ blocklists. Nothing to change.
 
 ## Recommendations from the first pass
 
-Numbers 2 to 6 were done in the second pass (below); 1 is still open, in
-"Still to do".
+Numbers 2 to 6 were done in the second pass (below); 1 was evaluated in
+the third and not adopted (see "`attachDatabasePool`: not adopted").
 
-1. **`attachDatabasePool(pool)`**: still to do.
+1. **`attachDatabasePool(pool)`**: evaluated, not adopted.
 2. **Resolve the token inside the tool's transaction**: done.
 3. **Move the variables tables' policies to the set-based check**: done.
 4. **Fold the Review badge count into each page's transaction, and cut the
@@ -271,48 +271,203 @@ never the input. The database still enforces the same ceilings. A form over
   Without the job, the old request-time sweep runs as before. docs/variables.md
   has the query to check the job on a project.
 
+## Third pass
+
+2026-09-25, `20260925150000_efficiency_3.sql` and the app changes with it:
+seven of the ten items the second pass left (the vault lookup, the env
+API's resolve, search lines, the form limit, the Review lists, search
+storage, and `attachDatabasePool`, evaluated). Database numbers
+are on Postgres 17 over the local socket, median of 25 runs or second of two
+`explain analyze` runs, on synthetic data: 2,000 other people with a vault
+of 4 notes each; Ana's vault Big with 3,000 notes of about 1.5 KB, each
+written 5 times (history), and 10 files of 8,000 lines (about 510 KB); ten
+vaults R1 to R10 with a canon folder (quorum 2) and a canon file (quorum 3),
+10 open proposals each, all waiting on Ana. 23,010 versions in all.
+
+### The vault in the tool's query (MCP)
+
+Every tool that names a vault looked it up first (`vaultId()`, one round
+trip), then did its work. The lookup is now `private.vault_ref(ref)`, called
+inside the tool's own query: by id when the reference is shaped like one,
+else by name among the caller's memberships, only when exactly one matches,
+under RLS (security invoker), as before. "No vault" is an error it raises
+(`RLV01`), so a tool can't mistake a missing vault for an empty one: the
+tools join their work laterally to a one-row `(select private.vault_ref($1)
+offset 0) v`, which the planner can't flatten or skip, and the MCP server
+answers `RLV01` with the same message as before. Two more tools needed a
+query each for things that fit in one: `changes_since` read the events and
+then their notes, and `read_proposal` the proposal and then its thread;
+each is one query now (JSON aggregates for the second part).
+
+| One tool call (measured by `mcp/test/round_trips.test.mjs`) | Before | After |
+|---|---:|---:|
+| `list_files`, `read_file`, `search`, `write_file`, `delete_file`, `propose`, `list_proposals`, `list_variables`: the tool's queries | 2 | 1 |
+| `changes_since` | 3 | 1 |
+| `read_proposal` | 2 | 1 |
+| Typical call in round trips (begin with resolve, work, commit) | 4 to 5 | 3 |
+
+The lookup itself costs what it did (about 1 ms by name among 2,000 other
+vaults' memberships); `list_files` for 200 of Big's files with it inline
+takes 2.4 ms, against 1.4 ms plus the separate lookup and its round trip.
+`tools/list` and every response are byte for byte as before
+(`mcp/test/token_load.test.mjs` unchanged, 26,044 bytes for the pass).
+`create_vault` keeps two queries: the vault it creates isn't visible to the
+statement that creates it.
+
+### The env API's token in its transaction
+
+`reliquary run` resolved its token on one checkout, then read the values on
+a second. GET routes (`/api/env/vaults`, `/api/env/<vault>/<environment>`,
+`/api/env/imports/<id>`) now begin, resolve and become the grant's person in
+one round trip (`private.env_begin`, callable only by the web app's role,
+as `private.mcp_begin` is by the MCP server's), then do their work and
+commit (`asCliToken` in `web/src/db.ts`). Values are decrypted after the
+commit. A push still resolves first: it reads its body after
+authenticating, and a transaction must not stay open across that.
+
+| One GET (measured by `web/test/efficiency_3.test.mjs`) | Before | After |
+|---|---:|---:|
+| Pool checkouts | 2 | 1 |
+| Round trips besides the route's own query | 4 (resolve, begin, claims, commit) | 2 (begin with resolve, commit) |
+
+### Search lines in the database (MCP)
+
+MCP `search` fetched every result's whole text (up to 50 files of up to
+1 MiB) to pick three lines each in Node. The lines are now picked in the
+query (`SEARCH_SQL` in `mcp/src/tools.ts`: `string_to_table` with
+ordinality, matched with `lower()` and `strpos`, the first non-blank line
+when only the path matched, each cut to 201 characters for Node to finish
+exactly as before). `mcp/test/search_lines.test.mjs` compares it with the
+old way on words, phrases, exclusions, `or`, case, accents, Greek and
+Cyrillic, long lines, emoji, CRLF and path-only matches: same files, order
+and lines. `lower()` follows the database's locale; for the scripts tested
+it agrees with JavaScript's `toLowerCase()`, but a few special cases (a
+dotted capital I) can differ, which could only change which line is shown.
+
+| `search`, 10 results | Before | After |
+|---|---:|---:|
+| Transfer, 10 files of 510 KB ("workshop line") | 5,106,128 bytes | about 1 KB |
+| Transfer in the test (one 510 KB file) | 510,532 bytes | 84 bytes |
+| Database time, the 510 KB files (median of 25) | 13.0 ms | 14.2 ms |
+| Database time, 10 notes of 1.5 KB ("agenda") | 7.8 ms | 8.9 ms |
+
+The database now does about 0.1 ms more work per result. For large files
+that buys megabytes less through Supavisor and TLS and no 5 MB string to
+split in the function; for notes of a few KB it's about even (1 ms of
+database time for 14 KB less transfer). Measured over a local socket,
+where transfer is nearly free, so the table understates the win on Vercel.
+
+### Review and Home: one rule lookup per list
+
+The Review inbox, Home's waiting list and Review's "changes requested" list
+called `rule_for()` per proposal (a membership check each), across vaults,
+so `rules_for()` (one vault) didn't fit. `private.rules_for_pairs(vaults[],
+paths[])` answers many (vault, path) pairs with one set-based check
+(`readable_vaults()`, token scope included); a test checks it agrees with
+`rule_for()` pair by pair for owners, editors, viewers, outsiders and a
+scoped token. The Review badge's count never read the quorum and is
+unchanged.
+
+| Ana's waiting list, 100 proposals across 10 vaults | Before | After |
+|---|---:|---:|
+| Query | 21.1 ms | 2.7 ms |
+
+### File forms and non-ASCII text
+
+Browsers percent-encode each non-ASCII UTF-8 byte as three characters, so
+the 2 MB form cap stopped non-Latin text at about 680 KB though the
+database takes 1 MiB. The forms that carry a file's text (write or propose a
+file, revise, edit and approve) now take 3 MiB + 64 KiB, enough for 1 MiB
+of any text plus the other fields; every other form keeps 2 MB. The field
+ceilings are unchanged (1 MiB of text in bytes), so a file form between
+1 MiB of text and the body cap is still refused with the ceiling, not a
+413. Vercel's own limit on a function's request body is 4.5 MB.
+`multipart/form-data` would have saved the 3x, but needs a parser; not
+worth it for three forms.
+
+### Search words for current versions only
+
+The second pass stored each version's words (`file_versions.body_tsv`, a
+generated column), history included, though search only reads each file's
+current version. `body_tsv` is now a plain column kept by triggers: a new
+version gets its words when written (every new version becomes its file's
+current one), the version it replaces loses them, erasing a version erases
+them. `versions_erase_only` allows exactly one more change: clearing a
+version's words with every other column as it was. The migration backfills
+(`private.clear_history_words()`, 0.23 s here).
+
+| `file_versions` on this data | Before | After |
+|---|---:|---:|
+| Versions with stored words | 23,010 | 11,010 |
+| Stored words | 15 MB | 8.0 MB |
+| Table total (after `vacuum full`) | 24 MB | 16 MB |
+
+Each write now also updates the previous version's row (clearing its
+words), one small extra write per file write; search answers exactly as
+before (`supabase/tests/efficiency_2_test.sql`'s comparison still passes).
+Space freed by the backfill is reused by Postgres, not returned to the
+disk, until a `vacuum full`, which isn't needed.
+
+### `attachDatabasePool`: not adopted
+
+Evaluated and left out, deliberately:
+
+- **There is no version "without the Supavisor leak" to pin.** The leak
+  (pooler client connections climbing until "Max client connections
+  reached") was in Supavisor: fatal TLS alerts left zombie client handlers.
+  Supabase fixed it server-side (supavisor#783), rolled out in July 2026;
+  the thread is explicit that `attachDatabasePool`, Fluid and the idle
+  timeout only changed how often the bug was hit
+  ([discussion #40671](https://github.com/orgs/supabase/discussions/40671)).
+- **Versions before 3.9.5 stop working after an instance's first 15
+  minutes.** The helper waits (`waitUntil`) for the pool's idle timeout
+  after each release, capped at `15 min - (now - module load)`; on a Fluid
+  instance older than 15 minutes that cap is 100 ms, so idle clients stay
+  open when the instance suspends, which is the thing it exists to prevent.
+  3.9.5 (2026-08-20) caps by the invocation's deadline instead.
+- **3.9.5 and later pull in 17 more packages.** `@vercel/functions` 3.9.x
+  depends on `@vercel/oidc` 3.8.x, which depends on `@vercel/cli-exec`,
+  `@vercel/cli-config`, `execa`, `jose` and their dependencies (a process
+  spawner among them), for a helper we'd use one function of. The web
+  function holds `VARIABLES_KEY`; adding a process-spawning dependency tree
+  to it for connection hygiene is the wrong trade.
+- **Without it, the cost is bounded.** A suspended instance keeps at most
+  its idle clients (3 for web, 5 for MCP) open to Supavisor until it
+  resumes and the 10 s idle timer closes them, or it is torn down. With the
+  leak fixed that is a handful of the 200 pooler clients per instance, not a
+  climb.
+
+What would change the answer: the pooler client count (Supabase dashboard,
+Database, Connection pooling) approaching 200 in real use. Then the
+cheapest fix is our own twenty lines doing what the helper does (on the
+pool's `release`, `waitUntil` a timer of the idle timeout plus 100 ms,
+capped by the request deadline, through Vercel's request context), with the
+idle timeout at 5 s on Vercel, and no new dependency; or 3.9.5+ pinned
+exactly, accepting the tree above.
+
 ## Still to do
 
-1. **`attachDatabasePool(pool)`** from `@vercel/functions`, with an idle
-   timeout near 5 s, as Vercel advises for Fluid (hosting.md, section 2).
-   It adds a dependency and there was a Supavisor client leak with it until
-   July 2026, so turn it on deliberately and watch the pooler client count.
-2. **Fold the vault lookup into each MCP tool's query.** Every tool call
-   still spends a round trip on `vaultId()` before its work (4 to 5 round
-   trips a call; this would make it 3 to 4). Each tool's SQL would take the
-   vault reference and resolve it in a CTE, keeping the "no vault with that
-   name" answer.
-3. **The env API's token resolve in its transaction**, as MCP now does: `reliquary run`
-   costs two checkouts (resolve, then the read). A push reads its body
-   after authenticating, and the transaction must not stay open across
-   that, so resolve in the transaction only for the GET routes.
-4. **MCP `search` fetches whole texts** (up to 10 files of up to 1 MiB)
-   from the database to pick three matching lines each. Picking the lines
-   in SQL (`regexp_split_to_table` with ordinality, filtered by the terms)
-   would move kilobytes instead of megabytes for large files.
-5. **The web form limit and non-ASCII text.** A form body is capped at
-   2 MB, and browsers percent-encode each non-ASCII UTF-8 byte as three
-   characters, so a file of about 680 KB of non-Latin text can't be saved
-   from the web UI though the database takes 1 MiB. Raise the cap to about
-   3.2 MB for the file forms, or accept `multipart/form-data` there.
-6. **The Review and home lists** still call `rule_for()` per waiting
-   proposal (across vaults, so one `rules_for()` call doesn't fit); fine
-   while a person has tens waiting. A lateral `rules_for()` per vault would
-   fix it if lists grow.
-7. **Readers "since it was set" look back 500 log rows.** A value read only
+1. **Readers "since it was set" look back 500 log rows.** A value read only
    long ago, in a busy vault, shows no readers. An index on
    `env_access_log (vault_id, environment, at) where action in ('read',
    'reveal')` would let the page answer exactly; that's a behaviour change,
    so not done here.
-8. **Planner choice on the access log.** With RLS now cheap, `order by seq
+2. **Planner choice on the access log.** With RLS now cheap, `order by seq
    desc limit n` for one vault can pick a backward scan of the primary key
    instead of `(vault_id, seq)`; on data where one vault's rows were all the
    oldest it took 26 ms instead of 1 ms. Realistic, interleaved data picks
    the index. Watch the Access log page's timing; a partial or covering
    index would pin it if needed.
-9. **Search storage.** The stored words are kept for every version; if
-   history grows large, keep them for current versions only (a table keyed
-   by file, maintained where `current_version_id` changes).
-10. **Confirm the pg_cron job after the next `db push`** (`select jobname,
-    active from cron.job`), and that `cron.job_run_details` shows it
-    succeeding.
+3. **Confirm the pg_cron job after the next `db push`** (`select jobname,
+   active from cron.job`), and that `cron.job_run_details` shows it
+   succeeding.
+4. **Watch the pooler client count** in the week of real use (see
+   `attachDatabasePool` above); act only if it climbs.
+5. **Web form posts still look the vault up first.** A file save runs
+   `vault()`, then the rule for a new path, then the write: three queries
+   in its transaction where the vault check could fold into the write's
+   (as the MCP tools now do). Small (POSTs are rare next to reads), so left.
+6. **`vault_ref` by name costs about 1 ms** among thousands of other
+   vaults, mostly RLS on `vault_members` and `vaults`; a security-definer
+   lookup keyed on `(user_id)` then name would be faster but would move
+   an access decision out of RLS. Not worth it at this size.

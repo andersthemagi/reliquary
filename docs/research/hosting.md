@@ -172,7 +172,9 @@ Caveats and settings:
   ([Vercel KB](https://vercel.com/kb/guide/connection-pooling-with-functions)).
   A Supavisor leak of client connections with Fluid + `attachDatabasePool` was
   fixed in July 2026 ([discussion #40671](https://github.com/orgs/supabase/discussions/40671));
-  watch the pooler client count in the first week.
+  watch the pooler client count in the first week. We don't call
+  `attachDatabasePool` (why, and what would change that:
+  [server-load.md](server-load.md), third pass).
 - **TLS with node-postgres**: `pg-connection-string` treats `sslmode=require`
   as full verification against Node's default CAs unless `uselibpqcompat=true`
   ([README](https://github.com/brianc/node-postgres/blob/master/packages/pg-connection-string/README.md)),
