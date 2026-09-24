@@ -27,8 +27,9 @@ cross join lateral (
 insert into app.identities (channel, external_id, member_id)
 select 'telegram', 'tg:' || id, id from app.members;
 
-insert into app.agent_tokens (id, name)
-values ('00000000-0000-0000-0000-0000000000f1', 'bench-bot');
+insert into app.agent_tokens (id, name, token_hash)
+values ('00000000-0000-0000-0000-0000000000f1', 'bench-bot',
+        encode(digest('bench-secret', 'sha256'), 'hex'));
 insert into app.agent_token_spaces (token_id, space_id)
 select '00000000-0000-0000-0000-0000000000f1', id from app.spaces;
 
@@ -87,6 +88,9 @@ with ins as (
 insert into app.chat_participants (chat_id, external_id)
 select id, 'tg:' || substr(external_chat_id, 4) from ins;
 
+insert into app.chat_bots (chat_id, token_id)
+select id, '00000000-0000-0000-0000-0000000000f1' from app.chats;
+
 analyze;
 
 -- ---------------------------------------------------------------------------
@@ -97,6 +101,8 @@ language plpgsql as $$
 declare
   c record;
   t0 timestamptz;
+  v_ticket uuid;
+  v_sid uuid;
   times numeric[] := '{}';
   rows_seen int[] := '{}';
   k int;
@@ -106,9 +112,12 @@ begin
                            where p.chat_id = ch.id order by random() limit 1) as asker
     from app.chats ch where ch.kind = p_kind order by random() limit p_n
   loop
-    perform set_config('request.jwt.claims', jsonb_build_object(
-      'token', '00000000-0000-0000-0000-0000000000f1',
-      'chat', c.chat, 'asker', c.asker)::text, true);
+    insert into app.message_tickets (token_id, chat_id, asker, message_ref)
+    values ('00000000-0000-0000-0000-0000000000f1', c.chat, c.asker, 'bench')
+    returning id into v_ticket;
+    select session_id into v_sid from app.mint_session('bench-secret', v_ticket);
+    perform set_config('request.jwt.claims',
+      jsonb_build_object('sid', v_sid)::text, true);
     perform set_config('role', 'reliquary_agent', true);
     t0 := clock_timestamp();
     execute p_sql into k;
@@ -144,14 +153,17 @@ select * from pg_temp.bench('count all visible, group', 'group', 300,
 \echo
 \echo 'Plan for one group search (helpers should appear once, as InitPlans):'
 do $$
-declare c record; line text;
+declare c record; line text; v_ticket uuid; v_sid uuid;
 begin
   select ch.id as chat, p.external_id as asker into c
   from app.chats ch join app.chat_participants p on p.chat_id = ch.id
   where ch.kind = 'group' limit 1;
-  perform set_config('request.jwt.claims', jsonb_build_object(
-    'token', '00000000-0000-0000-0000-0000000000f1',
-    'chat', c.chat, 'asker', c.asker)::text, true);
+  insert into app.message_tickets (token_id, chat_id, asker, message_ref)
+  values ('00000000-0000-0000-0000-0000000000f1', c.chat, c.asker, 'plan')
+  returning id into v_ticket;
+  select session_id into v_sid from app.mint_session('bench-secret', v_ticket);
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sid', v_sid)::text, true);
   perform set_config('role', 'reliquary_agent', true);
   for line in execute $q$explain (analyze, costs off, timing on, summary on)
     select id from app.entries where tsv @@ to_tsquery('simple', 'budget & launch')

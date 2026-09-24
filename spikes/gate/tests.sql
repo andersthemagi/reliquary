@@ -31,9 +31,11 @@ insert into app.identities (channel, external_id, member_id) values
   ('telegram', 'tg:dee', '00000000-0000-0000-0000-0000000000a4');
 
 -- Agent tokens: t1 reads everything, t2 is not granted exec
-insert into app.agent_tokens (id, name) values
-  ('00000000-0000-0000-0000-0000000000f1', 'bot'),
-  ('00000000-0000-0000-0000-0000000000f2', 'bot-limited');
+insert into app.agent_tokens (id, name, token_hash) values
+  ('00000000-0000-0000-0000-0000000000f1', 'bot',
+   encode(digest('secret-f1', 'sha256'), 'hex')),
+  ('00000000-0000-0000-0000-0000000000f2', 'bot-limited',
+   encode(digest('secret-f2', 'sha256'), 'hex'));
 insert into app.agent_token_spaces (token_id, space_id) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1'),
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b2'),
@@ -70,6 +72,12 @@ insert into app.chat_participants (chat_id, external_id) values
   ('00000000-0000-0000-0000-0000000000d4', 'tg:dee'),
   ('00000000-0000-0000-0000-0000000000d5', 'tg:eve');
 
+-- Bot installs: f1 is everywhere, f2 only in Ana's DM
+insert into app.chat_bots (chat_id, token_id)
+select id, '00000000-0000-0000-0000-0000000000f1' from app.chats;
+insert into app.chat_bots (chat_id, token_id) values
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f2');
+
 -- Entries
 insert into app.entries (space_id, title, body, audience) values
   ('00000000-0000-0000-0000-0000000000b1', 'eng-roadmap',       'Q4 roadmap: ship the feed',        null),
@@ -103,13 +111,53 @@ exception when others then
   raise;
 end $$;
 
+-- Gate tests create sessions directly (bypassing mint) so they can also
+-- test sessions mint would refuse, e.g. an asker who isn't in the chat.
 create function t.claims(p_token text, p_chat text, p_asker text) returns jsonb
-language sql as $$
-  select jsonb_build_object(
-    'token', '00000000-0000-0000-0000-0000000000' || p_token,
-    'chat',  '00000000-0000-0000-0000-0000000000' || p_chat,
-    'asker', p_asker)
+language plpgsql as $$
+declare
+  v_token uuid := ('00000000-0000-0000-0000-0000000000' || p_token)::uuid;
+  v_chat  uuid := ('00000000-0000-0000-0000-0000000000' || p_chat)::uuid;
+  v_ticket uuid;
+  v_sid uuid;
+begin
+  insert into app.message_tickets (token_id, chat_id, asker, message_ref, used_at)
+  values (v_token, v_chat, p_asker, 'test', now()) returning id into v_ticket;
+  insert into app.sessions (token_id, chat_id, asker, ticket_id)
+  values (v_token, v_chat, p_asker, v_ticket) returning id into v_sid;
+  return jsonb_build_object('sid', v_sid);
+end $$;
+
+create function t.sid(p_sid uuid) returns jsonb
+language sql as $$ select jsonb_build_object('sid', p_sid) $$;
+
+create function t.expect_true(p_name text, p_ok boolean, p_detail text default '')
+returns void language sql as $$
+  insert into t.results values (p_name, coalesce(p_ok, false), p_detail)
 $$;
+
+-- Calls mint_session as the minter role. NULL when minting is refused.
+create function t.mint(p_token text, p_ticket uuid) returns uuid
+language plpgsql as $$
+declare v uuid;
+begin
+  perform set_config('role', 'reliquary_minter', true);
+  select session_id into v from app.mint_session(p_token, p_ticket);
+  perform set_config('role', 'none', true);
+  return v;
+end $$;
+
+-- Calls issue_ticket as the adapter role.
+create function t.issue(p_chat text, p_token text, p_sender text) returns uuid
+language plpgsql as $$
+declare v uuid;
+begin
+  perform set_config('role', 'reliquary_adapter', true);
+  v := app.issue_ticket('telegram', p_chat,
+         ('00000000-0000-0000-0000-0000000000' || p_token)::uuid, p_sender, 'msg');
+  perform set_config('role', 'none', true);
+  return v;
+end $$;
 
 create function t.expect(p_name text, p_got text[], p_want text[]) returns void
 language sql as $$
@@ -120,11 +168,12 @@ language sql as $$
     format('got %s want %s', p_got, p_want))
 $$;
 
--- Runs p_sql as the agent role and records ok if it raises.
-create function t.expect_error(p_name text, p_sql text) returns void
+-- Runs p_sql as p_role (the agent by default) and records ok if it raises.
+create function t.expect_error(p_name text, p_sql text,
+  p_role text default 'reliquary_agent') returns void
 language plpgsql as $$
 begin
-  perform set_config('role', 'reliquary_agent', true);
+  perform set_config('role', p_role, true);
   begin
     execute p_sql;
     perform set_config('role', 'none', true);
@@ -204,8 +253,11 @@ select t.expect('no claims: nothing',
 select t.expect('empty claims object: nothing',
   t.visible('{}'::jsonb), '{}');
 
-select t.expect('unknown token: nothing',
-  t.visible(jsonb_build_object('token', gen_random_uuid(),
+select t.expect('forged: a random session id sees nothing',
+  t.visible(t.sid(gen_random_uuid())), '{}');
+
+select t.expect('forged: the old {token, chat, asker} claim shape is ignored',
+  t.visible(jsonb_build_object('token', '00000000-0000-0000-0000-0000000000f1',
     'chat', '00000000-0000-0000-0000-0000000000d1', 'asker', 'tg:ana')),
   '{}');
 
@@ -246,11 +298,187 @@ select t.expect_error('privilege: agent cannot call audience_mode directly',
   'select app.audience_mode()');
 select t.expect_error('privilege: agent cannot disable RLS',
   'alter table app.entries disable row level security');
-select set_config('request.jwt.claims',
-  '{"token":"x","chat":"not-a-uuid","asker":"tg:ana"}', false);
-select t.expect_error('malformed claims: non-UUID chat raises instead of returning rows',
+select set_config('request.jwt.claims', '{"sid":"not-a-uuid"}', false);
+select t.expect_error('malformed claims: non-UUID sid raises instead of returning rows',
   'select count(*) from app.entries');
 select set_config('request.jwt.claims', '', false);
+
+-- ---------------------------------------------------------------------------
+-- Minting: adapter ticket + bot token -> session
+
+-- A third bot for revocation and expiry cases, installed in Ana's DM and g-eng
+insert into app.agent_tokens (id, name, token_hash) values
+  ('00000000-0000-0000-0000-0000000000f3', 'bot-to-revoke',
+   encode(digest('secret-f3', 'sha256'), 'hex')),
+  ('00000000-0000-0000-0000-0000000000f4', 'bot-to-expire',
+   encode(digest('secret-f4', 'sha256'), 'hex'));
+insert into app.agent_token_spaces (token_id, space_id)
+select t, s from unnest(array['00000000-0000-0000-0000-0000000000f3',
+                              '00000000-0000-0000-0000-0000000000f4']::uuid[]) t,
+              unnest(array['00000000-0000-0000-0000-0000000000b1',
+                           '00000000-0000-0000-0000-0000000000b3']::uuid[]) s;
+insert into app.chat_bots (chat_id, token_id)
+select c, t from unnest(array['00000000-0000-0000-0000-0000000000d1',
+                              '00000000-0000-0000-0000-0000000000c1']::uuid[]) c,
+              unnest(array['00000000-0000-0000-0000-0000000000f3',
+                           '00000000-0000-0000-0000-0000000000f4']::uuid[]) t;
+
+do $$
+declare
+  tk uuid;
+  sid uuid;
+  sid2 uuid;
+begin
+  -- Happy path
+  tk := t.issue('g-eng', 'f1', 'tg:ana');
+  sid := t.mint('secret-f1', tk);
+  perform t.expect('mint: token + ticket gives a session that sees g-eng''s view',
+    t.visible(t.sid(sid)), '{eng-roadmap,eng-chat-remark,pub-wifi-hours}');
+
+  -- Replay
+  perform t.expect_true('mint: a used ticket cannot be replayed',
+    t.mint('secret-f1', tk) is null);
+
+  -- Wrong token, then the right one still works (failed attempts don't burn it)
+  tk := t.issue('dm-ana', 'f1', 'tg:ana');
+  perform t.expect_true('mint: wrong token is refused',
+    t.mint('secret-wrong', tk) is null);
+  perform t.expect_true('mint: null token is refused',
+    t.mint(null, tk) is null);
+  perform t.expect_true('mint: after a bad attempt the real bot can still use its ticket',
+    t.mint('secret-f1', tk) is not null);
+
+  -- A ticket issued to one bot, presented with another bot's token
+  tk := t.issue('dm-ana', 'f1', 'tg:ana');
+  perform t.expect_true('mint: ticket issued to bot f1 refused for bot f2',
+    t.mint('secret-f2', tk) is null);
+
+  -- Expired ticket
+  tk := t.issue('dm-ana', 'f1', 'tg:ana');
+  update app.message_tickets set expires_at = now() - interval '1 second' where id = tk;
+  perform t.expect_true('mint: expired ticket is refused',
+    t.mint('secret-f1', tk) is null);
+
+  -- Unknown ticket
+  perform t.expect_true('mint: unknown ticket is refused',
+    t.mint('secret-f1', gen_random_uuid()) is null);
+
+  -- Sender not in the chat (adapter bug or spoofed webhook)
+  tk := t.issue('g-eng', 'f1', 'tg:dee');
+  perform t.expect_true('mint: ticket for a sender outside the chat is refused',
+    t.mint('secret-f1', tk) is null);
+
+  -- Revoked token: refused at mint, and kills a live session
+  tk := t.issue('dm-ana', 'f3', 'tg:ana');
+  sid := t.mint('secret-f3', tk);
+  perform t.expect_true('mint: bot f3 gets a session before revocation', sid is not null);
+  update app.agent_tokens set revoked_at = now()
+  where id = '00000000-0000-0000-0000-0000000000f3';
+  perform t.expect('mint: revoking the token empties its live session',
+    t.visible(t.sid(sid)), '{}');
+  tk := t.issue('dm-ana', 'f3', 'tg:ana');
+  perform t.expect_true('mint: revoked token is refused',
+    t.mint('secret-f3', tk) is null);
+
+  -- Expired token
+  tk := t.issue('dm-ana', 'f4', 'tg:ana');
+  sid2 := t.mint('secret-f4', tk);
+  update app.agent_tokens set expires_at = now() - interval '1 second'
+  where id = '00000000-0000-0000-0000-0000000000f4';
+  perform t.expect('mint: an expired token empties its live session',
+    t.visible(t.sid(sid2)), '{}');
+  update app.agent_tokens set expires_at = null
+  where id = '00000000-0000-0000-0000-0000000000f4';
+
+  -- Removing the bot from a chat kills its session there
+  tk := t.issue('g-eng', 'f4', 'tg:ana');
+  sid := t.mint('secret-f4', tk);
+  perform t.expect_true('mint: bot f4 gets a g-eng session', sid is not null);
+  delete from app.chat_bots
+  where chat_id = '00000000-0000-0000-0000-0000000000c1'
+    and token_id = '00000000-0000-0000-0000-0000000000f4';
+  perform t.expect('mint: removing the bot from the chat empties its session',
+    t.visible(t.sid(sid)), '{}');
+
+  -- Session expiry
+  tk := t.issue('dm-ana', 'f1', 'tg:ana');
+  sid := t.mint('secret-f1', tk);
+  update app.sessions set expires_at = now() - interval '1 second' where id = sid;
+  perform t.expect('mint: an expired session sees nothing',
+    t.visible(t.sid(sid)), '{}');
+
+  -- Membership sync is live: adapter adds an unlinked user to g-eng
+  tk := t.issue('g-eng', 'f1', 'tg:ana');
+  sid := t.mint('secret-f1', tk);
+  perform set_config('role', 'reliquary_adapter', true);
+  perform app.sync_participants('telegram', 'g-eng', array['tg:ana', 'tg:ben', 'tg:eve']);
+  perform set_config('role', 'none', true);
+  perform t.expect('mint: an unlinked joiner narrows a live session to public',
+    t.visible(t.sid(sid)), '{pub-wifi-hours}');
+  perform set_config('role', 'reliquary_adapter', true);
+  perform app.sync_participants('telegram', 'g-eng', array['tg:ana', 'tg:ben']);
+  perform set_config('role', 'none', true);
+  perform t.expect('mint: and restoring membership restores it',
+    t.visible(t.sid(sid)), '{eng-roadmap,eng-chat-remark,pub-wifi-hours}');
+end $$;
+
+-- The adapter can't issue tickets for chats the bot isn't in
+select t.expect_error('adapter: cannot issue a ticket for a chat the bot is not in',
+  $q$select app.issue_ticket('telegram', 'g-exec',
+       '00000000-0000-0000-0000-0000000000f2', 'tg:ana', 'msg')$q$,
+  'reliquary_adapter');
+
+-- The mint log explains refusals to the operator, never holds a token
+select t.expect_true('mint_log: every refusal cause is recorded',
+  (select array_agg(distinct reason order by reason) from app.mint_log where not ok)
+    @> array['expired ticket', 'revoked token', 'sender not in chat',
+             'ticket issued to another bot', 'ticket replay', 'unknown ticket',
+             'unknown token'],
+  (select string_agg(distinct reason, ', ') from app.mint_log where not ok));
+select t.expect_true('mint_log: no row contains a token value',
+  not exists (select 1 from app.mint_log l where l::text like '%secret-%'));
+
+do $$
+begin
+  begin
+    update app.mint_log set reason = 'x';
+    perform t.expect_true('mint_log: update is rejected, even for the owner', false);
+  exception when others then
+    perform t.expect_true('mint_log: update is rejected, even for the owner', true, sqlerrm);
+  end;
+  begin
+    delete from app.mint_log;
+    perform t.expect_true('mint_log: delete is rejected, even for the owner', false);
+  exception when others then
+    perform t.expect_true('mint_log: delete is rejected, even for the owner', true, sqlerrm);
+  end;
+end $$;
+
+-- Each role can do exactly its job
+select t.expect_error('roles: minter cannot read entries',
+  'select * from app.entries', 'reliquary_minter');
+select t.expect_error('roles: minter cannot read sessions',
+  'select * from app.sessions', 'reliquary_minter');
+select t.expect_error('roles: minter cannot issue tickets',
+  $q$select app.issue_ticket('telegram', 'dm-ana',
+       '00000000-0000-0000-0000-0000000000f1', 'tg:ana', 'msg')$q$,
+  'reliquary_minter');
+select t.expect_error('roles: adapter cannot read entries',
+  'select * from app.entries', 'reliquary_adapter');
+select t.expect_error('roles: adapter cannot mint sessions',
+  $q$select * from app.mint_session('secret-f1', gen_random_uuid())$q$,
+  'reliquary_adapter');
+select t.expect_error('roles: agent cannot mint sessions',
+  $q$select * from app.mint_session('secret-f1', gen_random_uuid())$q$);
+select t.expect_error('roles: agent cannot insert a session',
+  $q$insert into app.sessions (token_id, chat_id, asker, ticket_id)
+     select token_id, chat_id, asker, id from app.message_tickets limit 1$q$);
+select t.expect_error('roles: agent cannot read tickets',
+  'select * from app.message_tickets');
+select t.expect_error('roles: agent cannot read mint_log',
+  'select * from app.mint_log');
+select t.expect_error('roles: agent cannot read token hashes',
+  'select token_hash from app.agent_tokens');
 
 -- Revocation takes effect on the next query, no cache
 
