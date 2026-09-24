@@ -27,7 +27,7 @@ import { pool } from "./db.js";
 import { DOTENV_MAX_ENTRIES, DOTENV_MAX_VALUE_BYTES, isVariableName, startsPrograms } from "./dotenv.js";
 import { envResource, issuer } from "./oauth.js";
 import { fromDb, open, SecretsError, variablesConfigured } from "./secrets.js";
-import { sealItems, type ImportRefusal } from "./variables.js";
+import { precheckImport, sealItems, type ImportRefusal } from "./variables.js";
 
 const PRM_PATH = "/.well-known/oauth-protected-resource/api/env";
 const TOKEN = /^Bearer (rle_[0-9a-f]{64})$/;
@@ -65,9 +65,10 @@ async function resolve(token: string): Promise<Grant | null> {
 async function asGrant<T>(g: Grant, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
+    // Begin, then the role and the claims in one statement (as the web
+    // app's asPerson and the MCP server do): two round trips, not three.
     await client.query("begin");
-    await client.query("set local role authenticated");
-    await client.query("select set_config('request.jwt.claims', $1, true)", [
+    await client.query("select set_config('role', 'authenticated', true), set_config('request.jwt.claims', $1, true)", [
       JSON.stringify({ sub: g.userId, role: "authenticated", act: { sub: g.grantId, name: g.name, tok: g.grantId } }),
     ]);
     const result = await fn(client);
@@ -275,16 +276,20 @@ async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: 
     return "not_configured";
   }
   const { entries, refused } = pushBody(await readJson(req, MAX_PUSH_BYTES));
-  const items = sealItems(vaultId, [environment], entries);
   let r;
   try {
-    r = await asGrant(grant, async (c) =>
-      (
+    // The rate limit before sealing (up to 200 values), in the same
+    // transaction as the import itself (create_env_import checks it again).
+    r = await asGrant(grant, async (c) => {
+      const pre = await precheckImport(c, vaultId, entries);
+      if (!pre.ok) return pre;
+      const items = sealItems(vaultId, [environment], entries);
+      return (
         await c.query("select public.create_env_import($1, $2, $3, $4) as r", [
           vaultId, [environment], JSON.stringify(items), JSON.stringify(refused),
         ])
-      ).rows[0].r,
-    );
+      ).rows[0].r;
+    });
   } catch (err) {
     // 22023: the database refused the input (a name, the shape).
     if ((err as { code?: string }).code === "22023") throw new BadRequest(400, "invalid_request");

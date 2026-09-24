@@ -333,15 +333,25 @@ Values are sealed with the stored-value key and the same additional data
 
 | Function | Returns | Who may call | Notes |
 |---|---|---|---|
-| `public.create_env_import(p_vault uuid, p_environments text[], p_items jsonb, p_refused jsonb default '[]')` | jsonb `{"ok": true, "id", "source", "environments", "names", "overwrites", "expires_at"}` or `{"ok": false, "error": "unauthorized" \| "forbidden" \| "push_not_allowed" \| "not_found" \| "rate_limited"}` | a person in person (a draft), or a live CLI grant with `env_push` that reaches the vault (a push) | `p_items`: `[{"name", "environment", "key_id", "nonce", "ciphertext"}]` (base64), one per name per environment. Owners in every environment, editors outside owners-only (an editor's push to production is refused when made), viewers never. Any other agent, a `reliquary_mcp` session: `forbidden`. Refusals are logged. Malformed input raises 22023. Limits: 200 names, 4 MiB; 20 pending per person per vault, 60 a person an hour. A push is logged as `push` with its names |
+| `public.create_env_import(p_vault uuid, p_environments text[], p_items jsonb, p_refused jsonb default '[]')` | jsonb `{"ok": true, "id", "source", "environments", "names", "overwrites", "expires_at"}` or `{"ok": false, "error": "unauthorized" \| "forbidden" \| "push_not_allowed" \| "not_found" \| "rate_limited"}` | a person in person (a draft), or a live CLI grant with `env_push` that reaches the vault (a push) | `p_items`: `[{"name", "environment", "key_id", "nonce", "ciphertext"}]` (base64), one per name per environment. Owners in every environment, editors outside owners-only (an editor's push to production is refused when made), viewers never. Any other agent, a `reliquary_mcp` session: `forbidden`. Refusals are logged. Malformed input raises 22023. Limits: 200 names, 4 MiB; 20 pending (not yet expired) per person per vault, 60 a person an hour. A push is logged as `push` with its names |
 | `public.apply_env_import(p_import uuid)` | jsonb `{"ok": true, "applied", "names", "environments"}` or `{"ok": false, "error": "unauthorized" \| "forbidden" \| "not_found" \| "expired" \| "applied" \| "rejected"}` | a person in person, within their role in every environment of the import; a draft only its author | Any `act` (the CLI included) or `reliquary_mcp` session: `forbidden`, logged. Each value goes through `private.put_variable` (the path `set_variable` uses): `set` or `rotate`, one access-log row per variable and environment with `detail.import`, and a feed event; the import becomes `applied` and its values are deleted, all in one transaction |
 | `public.reject_env_import(p_import uuid)` | as apply, `{"ok": true}` | the same people, or the import's author | Deletes the values; a push's rejection is logged as `reject` |
+| `public.env_import_precheck(p_vault uuid, p_names text[] default '{}')` | jsonb `{"ok": true}` or `{"ok": false, "error": "unauthorized" \| "rate_limited"}` | a person, or a CLI grant | Called before the web app seals anything (sealing every value for every environment is the costly part), in the same transaction as the create that follows. Refuses only a person over a rate limit, logged exactly as `create_env_import` logs it (with `p_names`, which must be names); a caller `create_env_import` would refuse for who they are or for the vault gets `{"ok": true}`, and create refuses and logs them. Create checks the limit again, under its lock |
 | `public.env_import_status(p_import uuid)` | jsonb `{"ok": true, "id", "status", "source", "environments", "names", "expires_at", "decided_at"}` or not found | the import's author in person, or through a live CLI grant of theirs that reaches the vault | For `--wait`. Not logged (no values) |
 | `public.create_cli_grant(..., p_push boolean default false)` | as before | a person | Records `env_push` |
 
 A pending import past `expires_at` reads as `expired` everywhere
-(`private.env_import_state`), and the next create, apply or reject marks it
-and deletes its values (`private.sweep_env_imports`).
+(`private.env_import_state`), can't be applied, and doesn't count against
+the rate limit. `private.cleanup_expired_imports()` marks such imports
+`expired` and deletes the values of every import that isn't pending; pg_cron
+runs it every five minutes (job `reliquary-expired-imports`, created by
+`20260925130000_efficiency_2.sql` where the platform has pg_cron, as
+Supabase does). Where pg_cron isn't there (plain Postgres, as in the
+tests), the next create, apply or reject runs it instead
+(`private.sweep_env_imports`, a no-op when the job is active). No app role
+can call it. To check the job on a project: `select jobname, schedule,
+active from cron.job;` and `select status, start_time from
+cron.job_run_details order by start_time desc limit 5;`.
 
 ### The env API, for pushes
 

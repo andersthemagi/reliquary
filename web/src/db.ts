@@ -2,6 +2,7 @@
 // the signed-in person, with no `act` claim: this is the human-present
 // surface, so approvals and policy changes are allowed here and nowhere else.
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,15 +54,87 @@ export function poolConfig(env: NodeJS.ProcessEnv = process.env, appDir = APP_DI
 
 export const pool = new pg.Pool(poolConfig());
 
-export async function asPerson<T>(userId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+// The pool asPerson() checks out from; tests swap in one that counts.
+let db: pg.Pool = pool;
+export function usePool(p: pg.Pool): void {
+  db = p;
+}
+
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Begins a transaction as the person, in one round trip: begin and the
+// role and claims (set_config('role', ..., true) is SET LOCAL ROLE) as one
+// simple query, the claims inlined as an escaped literal, since a
+// parameterised query can't carry two statements. A user id that isn't a
+// UUID (sessions always carry one) takes two round trips with a parameter.
+async function begin(client: pg.PoolClient, userId: string): Promise<void> {
+  const claims = JSON.stringify({ sub: userId, role: "authenticated" });
+  if (UUID_SHAPE.test(userId)) {
+    await client.query(
+      `begin; select set_config('role', 'authenticated', true), set_config('request.jwt.claims', ${client.escapeLiteral(claims)}, true)`,
+    );
+    return;
+  }
+  await client.query("begin");
+  await client.query("select set_config('role', 'authenticated', true), set_config('request.jwt.claims', $1, true)", [claims]);
+}
+
+// One page, one transaction (docs/research/server-load.md, "Second pass").
+// Inside readOnlyRequest(), every asPerson() for the same person shares one
+// connection and one transaction, opened by the first call and committed
+// when the page is built: the Review badge's count and all of the page's
+// queries, however many asPerson() calls it makes. Only GET pages run this
+// way; they only read, so one snapshot for the page is also more
+// consistent. A call that fails rolls the transaction back and the next
+// call opens a fresh one, so a caught error can't poison the rest of the
+// page. POSTs keep a transaction per call. Calls must not overlap (none do:
+// no page runs asPerson() calls concurrently).
+type Shared = { userId: string; client: pg.PoolClient | null; open: boolean; done: boolean; broken: boolean };
+const shared = new AsyncLocalStorage<Shared>();
+
+export async function readOnlyRequest<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  const s: Shared = { userId, client: null, open: false, done: false, broken: false };
   try {
-    // Two round trips before the work: begin, then the role and the claims
-    // in one statement (set_config('role', ..., true) is SET LOCAL ROLE).
-    await client.query("begin");
-    await client.query("select set_config('role', 'authenticated', true), set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify({ sub: userId, role: "authenticated" }),
-    ]);
+    return await shared.run(s, fn);
+  } finally {
+    s.done = true;
+    const client = s.client;
+    s.client = null;
+    if (client) {
+      if (s.open) await client.query("commit").catch(() => (s.broken = true));
+      s.open = false;
+      client.release(s.broken || undefined);
+    }
+  }
+}
+
+async function inShared<T>(s: Shared, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+  if (!s.client) s.client = await db.connect();
+  const client = s.client;
+  if (!s.open) {
+    try {
+      await begin(client, s.userId);
+    } catch (err) {
+      await client.query("rollback").catch(() => (s.broken = true));
+      throw err;
+    }
+    s.open = true;
+  }
+  try {
+    return await fn(client);
+  } catch (err) {
+    s.open = false;
+    await client.query("rollback").catch(() => (s.broken = true));
+    throw err;
+  }
+}
+
+export async function asPerson<T>(userId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+  const s = shared.getStore();
+  if (s && !s.done && s.userId === userId) return inShared(s, fn);
+  const client = await db.connect();
+  try {
+    await begin(client, userId);
     const result = await fn(client);
     await client.query("commit");
     return result;

@@ -24,10 +24,12 @@ import {
   getImport,
   listVariables,
   pendingPushes,
+  readersSinceSet,
   rejectImport,
   revealVariable,
   setVariable,
   type AccessLogRow,
+  type ReaderRow,
   type EnvImport,
   type Environment,
   type Variable,
@@ -48,8 +50,6 @@ const ACTION_LABEL: Record<string, string> = {
   reject: "Rejected",
 };
 const LOG_PAGE = 50;
-// How far back the "read since it was set" note looks.
-const RECENT = 500;
 
 const q = encodeURIComponent;
 const base = (id: string, rest = "") => vaultPath(id, `/variables${rest}`);
@@ -62,7 +62,7 @@ const readsLog = (role: string) => role === "owner" || role === "editor";
 
 // The client a log row came from: the web UI (a person in person), the CLI,
 // or an agent's token.
-function client(r: AccessLogRow): string {
+function client(r: { agent: string | null }): string {
   if (!r.agent) return "web UI";
   if (r.agent === "Reliquary CLI") return "CLI";
   return r.agent;
@@ -97,22 +97,28 @@ const crumb = (v: Vault, here?: string) =>
 // ---------------------------------------------------------------------------
 // The list
 
-function readersSince(ctx: Ctx, recent: AccessLogRow[], name: string, value: VariableValue): { who: string[]; read: boolean } {
-  const seen = new Set<string>();
-  let read = false;
-  for (const r of recent) {
-    if (r.at <= value.updatedAt) break; // newest first: the rest are older
-    if ((r.action !== "read" && r.action !== "reveal") || r.environment !== value.environment || !r.names.includes(name)) continue;
-    read ||= r.action === "read";
-    seen.add(`${r.action === "reveal" ? "revealed by" : "read by"} ${who(ctx, r.actor, null)}${r.action === "read" ? ` (${client(r)})` : ""}`);
+// Who read or revealed each value since it was set, as the cells show it
+// ("read by you (CLI)", "revealed by 1a2b3c4d"), newest first, once each,
+// keyed by name and environment.
+type Readers = Map<string, { who: string[]; read: boolean }>;
+const slot = (name: string, environment: string) => `${name}\u0000${environment}`;
+function readersOf(ctx: Ctx, rows: ReaderRow[]): Readers {
+  const out: Readers = new Map();
+  for (const r of rows) {
+    const key = slot(r.name, r.environment);
+    const seen = out.get(key) ?? { who: [], read: false };
+    out.set(key, seen);
+    seen.read ||= r.action === "read";
+    const text = `${r.action === "reveal" ? "revealed by" : "read by"} ${who(ctx, r.actor, null)}${r.action === "read" ? ` (${client(r)})` : ""}`;
+    if (!seen.who.includes(text)) seen.who.push(text);
   }
-  return { who: [...seen], read };
+  return out;
 }
 
 // The environment's name as each cell carries it, for the stacked layout.
 const label = (e: Environment) => (e.ownersOnly ? `${e.name} (owners)` : e.name);
 
-function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, recent: AccessLogRow[] | null, keyed: boolean): Raw {
+function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByCell: Readers | null, keyed: boolean): Raw {
   const value = variable.values.find((x) => x.environment === e.name);
   const may = writes(v.role, e);
   if (!value) {
@@ -120,7 +126,7 @@ function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, recent: Ac
       may && keyed ? html`<span class="var-actions"><a class="button" href="${base(v.id, "/set")}${slotQuery(variable.name, e.name)}">Set a value</a></span>` : ""
     }</div></td>`;
   }
-  const readers = recent ? readersSince(ctx, recent, variable.name, value) : { who: [], read: false };
+  const readers = readersByCell?.get(slot(variable.name, e.name)) ?? { who: [], read: false };
   return html`<td data-label="${label(e)}"><div>
     <span class="var-set">Set</span> <span class="muted small">v${value.version} · ${who(ctx, value.updatedBy, null)}, <span title="${when(value.updatedAt)}">${ago(value.updatedAt)}</span></span>
     ${readers.who.length
@@ -142,7 +148,7 @@ async function list(ctx: Ctx, id: string): Promise<Reply> {
   if (!v) return notFound(ctx);
   const { environments, variables } = await listVariables(ctx.userId, id);
   const keyed = variablesConfigured();
-  const recent = readsLog(v.role) && variables.length ? await accessLog(ctx.userId, id, { limit: RECENT }) : null;
+  const readers = readsLog(v.role) && variables.length ? readersOf(ctx, await readersSinceSet(ctx.userId, id)) : null;
   const canSet = keyed && environments.some((e) => writes(v.role, e));
   const ownersOnly = environments.filter((e) => e.ownersOnly).map((e) => e.name);
   const pushes = readsLog(v.role) ? await pendingPushes(ctx.userId, id) : [];
@@ -168,7 +174,7 @@ async function list(ctx: Ctx, id: string): Promise<Reply> {
       ? html`<div class="vars-wrap"><table class="vars">
         <thead><tr><th>Name</th>${environments.map((e) => html`<th>${e.name}${e.ownersOnly ? html` <span class="muted">(owners)</span>` : ""}</th>`)}</tr></thead>
         <tbody>${variables.map(
-          (x) => html`<tr><th scope="row"><code>${x.name}</code></th>${environments.map((e) => cell(ctx, v, x, e, recent, keyed))}</tr>`,
+          (x) => html`<tr><th scope="row"><code>${x.name}</code></th>${environments.map((e) => cell(ctx, v, x, e, readers, keyed))}</tr>`,
         )}</tbody></table></div>`
       : html`<div class="empty"><strong>No variables yet.</strong>
         <p>Keep your projects’ secrets here instead of in <code>.env</code> files passed around by hand. Each value is encrypted, and every set, read and reveal is logged.</p>

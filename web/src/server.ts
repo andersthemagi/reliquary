@@ -119,13 +119,66 @@ function readForm(req: http.IncomingMessage): Promise<URLSearchParams> {
     req.on("data", (c: Buffer) => {
       size += c.length;
       if (size > MAX_BODY) {
+        // Stop reading; the 413 goes out with `connection: close`, which
+        // ends the upload.
+        req.removeAllListeners("data");
+        req.pause();
+        chunks.length = 0;
         reject(new Error("too large"));
-        req.destroy();
       } else chunks.push(c);
     });
     req.on("end", () => resolve(new URLSearchParams(Buffer.concat(chunks).toString("utf8"))));
     req.on("error", reject);
   });
+}
+
+// Ceilings for form fields, checked before any handler runs, so an
+// over-long field never costs a database round trip. The database refuses
+// the same (20260925110000_hardening.sql, sections 2 and 3), so these only
+// answer sooner; they are never looser. Characters, as Postgres's length()
+// counts them, except file text, which is bytes. Each answer names the
+// ceiling, never the input. Other fields are bounded by the body limit and
+// checked by their handlers (a variable's value by sealing, a pasted .env by
+// its parser).
+const TOO_LONG = "That’s too long (text up to 1 MB, reasons and notes up to 4000 characters, paths up to 1024, names up to 200). Nothing was saved.";
+const FIELD_LIMITS: Record<string, { max: number; bytes?: boolean; message?: string }> = {
+  content: { max: 1_048_576, bytes: true },
+  reason: { max: 4000 },
+  note: { max: 4000 },
+  body: { max: 4000, message: "Comments are at most 4000 characters." },
+  path: { max: 1024 },
+  confirm_path: { max: 1024 },
+  name: { max: 200 },
+  confirm_name: { max: 200 },
+};
+function codePoints(s: string): number {
+  let n = 0;
+  for (const _ of s) n++;
+  return n;
+}
+function tooLong(form: URLSearchParams): string | null {
+  for (const [field, value] of form) {
+    const limit = FIELD_LIMITS[field];
+    // Cheap first: a character is at least one UTF-16 unit, and a unit at
+    // most three UTF-8 bytes.
+    if (!limit || value.length * (limit.bytes ? 3 : 1) <= limit.max) continue;
+    const size = limit.bytes ? Buffer.byteLength(value, "utf8") : codePoints(value);
+    if (size > limit.max) return limit.message ?? TOO_LONG;
+  }
+  return null;
+}
+
+// The page a form was posted from, when the browser says (Referer, this
+// site only), else home.
+function formPage(req: http.IncomingMessage): string {
+  try {
+    const from = new URL(req.headers.referer ?? "");
+    const here = PUBLIC_ORIGIN || `http://${req.headers.host}`;
+    if (from.origin === here) return safeNext(from.pathname + from.search);
+  } catch {
+    // no or unparseable Referer
+  }
+  return "/";
 }
 
 const SECURITY_HEADERS = {
@@ -279,9 +332,24 @@ const server = http.createServer(async (req, res) => {
         logRefused(url.pathname, o.origin);
         return;
       }
-      form = await readForm(req);
+      try {
+        form = await readForm(req);
+      } catch {
+        send(res, { status: 413, html: notice("Too large", "That form is over 2 MB, so nothing was saved. Go back and send less.", theme) }, { connection: "close" }, auth.cookies);
+        console.info(`POST ${url.pathname} 413`);
+        return;
+      }
       if (!sameSecret(form.get("csrf") ?? "", session.csrf)) {
         send(res, { status: 403, html: notice("Form expired", "Go back, reload the page, and try again.", theme) }, {}, auth.cookies);
+        return;
+      }
+      // An over-long field: back to the form's page with the reason, as a
+      // refusal from the database would be shown, without asking it.
+      const long = tooLong(form);
+      if (long) {
+        session.setFlash(long);
+        send(res, { redirect: formPage(req) }, {}, auth.cookies);
+        console.info(`POST ${url.pathname} 303 too long`);
         return;
       }
     } else if (req.method !== "GET") {

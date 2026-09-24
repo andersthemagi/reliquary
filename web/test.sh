@@ -92,6 +92,7 @@ env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "${env_args[@]}" \
   -e WEB_URL="http://127.0.0.1:$port" -e LOGIN_FILE=/app/.login-test-$slot \
+  -e TEST_DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e WEB_HOSTED_URL="http://127.0.0.1:$hosted_port" -e WEB_HOSTED_PUBLIC_URL="$hosted_url" \
   -e HOSTED_LOGIN_FILE=/app/.login-test-hosted-$slot \
   -e WEB_AUTH_A_URL="http://127.0.0.1:$auth_a_port" -e WEB_AUTH_B_URL="http://127.0.0.1:$auth_b_port" \

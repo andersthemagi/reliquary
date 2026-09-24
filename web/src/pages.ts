@@ -4,7 +4,7 @@
 
 import type { Writable } from "node:stream";
 import type pg from "pg";
-import { asPerson } from "./db.js";
+import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
@@ -184,27 +184,26 @@ type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: stri
 export type Section = "files" | "proposals" | "activity" | "rules" | "search" | "variables" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
-  const paths = (
-    await c.query(`select path from public.files where vault_id = $1 and deleted_at is null order by path`, [v.id])
-  ).rows.map((r) => r.path as string);
-  const dirs = new Set<string>();
-  for (const p of paths) {
-    const parts = p.split("/");
-    for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join("/") + "/");
-  }
-  // Every file's and folder's rule in one set-based call (one membership
-  // check), not one rule_for() per row.
-  const policy = new Map<string, string>(
-    paths.length
-      ? (await c.query(`select path, policy from private.rules_for($1, $2::text[])`, [v.id, [...paths, ...dirs]])).rows.map(
-          (r) => [r.path, r.policy],
-        )
-      : [],
-  );
-  const files = paths.map((path) => ({ path, policy: policy.get(path) ?? "open" }));
-  const dirPolicy = new Map<string, string>([...dirs].map((d) => [d, policy.get(d) ?? "open"]));
-  const open = (await c.query(`select count(*)::int as n from public.proposals where vault_id = $1 and status = 'open'`, [v.id]))
-    .rows[0].n as number;
+  // One round trip: the live files, every folder above them, each one's
+  // rule in one set-based call (one membership check, not rule_for() per
+  // row), and the open proposals' count.
+  const shell = (
+    await c.query(
+      `with p as (select path from public.files where vault_id = $1 and deleted_at is null),
+            d as (select distinct array_to_string(s[1:i], '/') || '/' as path
+                    from (select string_to_array(path, '/') as s from p) x, generate_series(1, cardinality(s) - 1) i),
+            r as (select * from private.rules_for($1, array(select path from p union all select path from d)))
+       select (select coalesce(json_agg(json_build_array(p.path, coalesce(r.policy, 'open')) order by p.path), '[]')
+                 from p left join r on r.path = p.path) as files,
+              (select coalesce(json_object_agg(d.path, coalesce(r.policy, 'open')), '{}')
+                 from d left join r on r.path = d.path) as dirs,
+              (select count(*)::int from public.proposals where vault_id = $1 and status = 'open') as open`,
+      [v.id],
+    )
+  ).rows[0] as { files: [string, string][]; dirs: Record<string, string>; open: number };
+  const files = shell.files.map(([path, policy]) => ({ path, policy }));
+  const dirPolicy = new Map<string, string>(Object.entries(shell.dirs));
+  const open = shell.open;
 
   const root: TreeNode = { dirs: new Map(), files: [] };
   for (const f of files) {
@@ -1132,7 +1131,8 @@ async function search(ctx: Ctx, id: string): Promise<Reply> {
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
-    const rows = query ? (await c.query(`select path, policy, body from public.search($1, $2, 30)`, [id, query])).rows : [];
+    // Only the start of each text, for its snippet: 30 whole files could be 30 MB.
+    const rows = query ? (await c.query(`select path, policy, left(body, 4000) as body from public.search($1, $2, 30)`, [id, query])).rows : [];
     const body = html`
       ${pageHeader({ title: "Search" })}
       ${query
@@ -1387,11 +1387,20 @@ async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
 
 // ---------------------------------------------------------------------------
 
+// A GET page runs in one transaction (db.ts, readOnlyRequest): the Review
+// badge's count below and every query the page makes. Not the OAuth
+// consent page: it fetches the client's metadata over the network, and a
+// transaction mustn't stay open across that.
 export async function routes(ctx: Ctx): Promise<Reply> {
+  const shared = ctx.method === "GET" && ctx.url.pathname !== "/oauth/authorize";
+  return shared ? readOnlyRequest(ctx.userId, () => route(ctx)) : route(ctx);
+}
+
+async function route(ctx: Ctx): Promise<Reply> {
   const p = ctx.url.pathname;
   const get = ctx.method === "GET";
   // The Review badge is only drawn on pages: a POST almost always redirects,
-  // so it doesn't pay for the count (one transaction saved per form post).
+  // so it doesn't pay for the count.
   if (get) ctx.reviewCount = await reviewCount(ctx.userId);
   if (get && p === "/") return home(ctx);
   if (get && p === "/review") return review(ctx);

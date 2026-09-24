@@ -7,6 +7,7 @@
 // revealVariable (after opening). Never log them, put them in a URL, a
 // flash message, an error or a redirect.
 
+import type pg from "pg";
 import { asPerson } from "./db.js";
 import { fromDb, open, seal, SecretsError } from "./secrets.js";
 
@@ -129,6 +130,34 @@ export async function accessLog(
   );
 }
 
+// Who read or revealed each value since it was last set, for the Variables
+// page: one row per variable, environment, action, person and client, newest
+// first, looking back over the vault's last 500 access-log entries as the
+// page always has. The database does the matching, so the page gets a few
+// rows instead of 500 log entries (each CLI read names every variable).
+export type ReaderRow = { name: string; environment: string; action: "read" | "reveal"; actor: string | null; agent: string | null };
+export async function readersSinceSet(userId: string, vaultId: string): Promise<ReaderRow[]> {
+  return asPerson(userId, async (c) =>
+    (
+      await c.query(
+        `with recent as (
+           select seq, at, action, actor, agent, environment, names from public.env_access_log
+            where vault_id = $1 order by seq desc limit 500),
+         g as (
+           select environment, action, actor, agent, names, max(seq) as last, max(at) as at
+             from recent where action in ('read', 'reveal') group by 1, 2, 3, 4, 5)
+         select n.name, g.environment, g.action, g.actor, g.agent, max(g.last) as last
+           from g cross join unnest(g.names) n(name)
+           join public.variables v on v.vault_id = $1 and v.name = n.name
+           join public.variable_values vv on vv.variable_id = v.id and vv.environment = g.environment and g.at > vv.updated_at
+          group by 1, 2, 3, 4, 5
+          order by last desc`,
+        [vaultId],
+      )
+    ).rows.map((r) => ({ name: r.name, environment: r.environment, action: r.action, actor: r.actor, agent: r.agent })),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Imports (docs/variables.md, "Imports"): a pasted .env becomes a draft here;
 // a CLI push (envapi.ts) becomes a pending import. Either way the values are
@@ -181,14 +210,28 @@ export async function createImport(
   entries: { name: string; value: string }[],
   refused: ImportRefusal[],
 ): Promise<CreateImportResult> {
-  const items = sealItems(vaultId, environments, entries);
-  return asPerson(userId, async (c) =>
-    (
+  return asPerson(userId, async (c) => {
+    const pre = await precheckImport(c, vaultId, entries);
+    if (!pre.ok) return pre;
+    const items = sealItems(vaultId, environments, entries);
+    return (
       await c.query("select public.create_env_import($1, $2, $3, $4) as r", [
         vaultId, environments, JSON.stringify(items), JSON.stringify(refused),
       ])
-    ).rows[0].r,
-  );
+    ).rows[0].r;
+  });
+}
+
+// Before sealing anything (the costly part: every value for every
+// environment): is the person over an import rate limit? The database logs
+// the refusal; every other refusal waits for create_env_import, which
+// checks everything again. Used by the paste form and the CLI's pushes.
+export async function precheckImport(
+  c: pg.PoolClient,
+  vaultId: string,
+  entries: { name: string }[],
+): Promise<{ ok: true } | { ok: false; error: "unauthorized" | "rate_limited" }> {
+  return (await c.query("select public.env_import_precheck($1, $2) as r", [vaultId, entries.map((e) => e.name)])).rows[0].r;
 }
 
 const IMPORT_COLUMNS = `i.id, i.vault_id, i.environments, i.names, i.refused, i.source, i.created_by, i.agent,
