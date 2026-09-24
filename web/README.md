@@ -42,9 +42,10 @@ log as you, so RLS limits it to your vaults. It filters by person, agent
 (or people / agents only), action, path prefix and date, 50 events a page,
 and never shows file text.
 
-**Local sign-in is a stand-in.** The server acts only as the one local
-person `dev.sh` created. Hosted, it will verify a Supabase Auth session
-instead; nothing else changes.
+**Sign-in** has two modes (`AUTH_MODE`). `local`, the default under `dev.sh`,
+is a stand-in: the server acts only as the one local person `dev.sh`
+created, and refuses to start on Vercel. `supabase` is the hosted one: see
+"Sign-in with Supabase Auth" below.
 
 Tokens (`/tokens`) are scoped to chosen vaults or all of yours, read-only or
 read-write, with an expiry of 7 days to a year. The form defaults to all
@@ -88,9 +89,100 @@ What the server does differently when hosted:
 Env vars: see `/.env.example`. Mark `DATABASE_URL` (and later
 `SESSION_SECRET`) Sensitive.
 
-**Not deployable yet:** the local sign-in stand-in (`LOCAL_USER_ID`, a login
-file) stays until chunk B (Supabase Auth) replaces it; its login file can't
-be written on Vercel's read-only filesystem.
+Hosted, set `AUTH_MODE=supabase` (below); the local stand-in refuses to
+start when `VERCEL` is set.
+
+## Sign-in with Supabase Auth
+
+Plan: `docs/research/hosting.md`, section 3. `AUTH_MODE=supabase` signs
+people in by email with Supabase Auth, entirely server-side: the server calls
+the Auth REST API with `fetch` and the publishable key (`src/auth.ts`); the
+pages are plain forms (`src/signin.ts`), since the CSP forbids scripts.
+
+1. `/signin`: the person enters their email; the server asks Supabase to
+   email a 6-digit code and a link (`create_user: false`: members are
+   invited, nobody signs up). Every address gets the same "check your
+   email" page, whether it has an account or not.
+2. The code goes into the form on that page (works when the email is read on
+   another device), or the link opens `/auth/confirm`, a page with one
+   **Sign in** button (so a mail scanner fetching the link doesn't spend
+   it); either way the server calls `/auth/v1/verify`.
+3. The session is two cookies, `__Host-rlq_at` (the Supabase access JWT,
+   Max-Age its lifetime) and `__Host-rlq_rt` (the refresh token, 30 days):
+   HttpOnly, Secure, SameSite=Lax (so the OAuth consent page, reached by a
+   redirect from claude.ai or chatgpt.com, sees you signed in), Path=/.
+   Responses that set them are `Cache-Control: private, no-store`.
+4. Every request verifies the JWT against the project's JWKS (cached 10
+   minutes, refetched on an unknown key id at most every 30 s): signature
+   with the pinned `JWT_ALG` only (`none`, HS256 and the other asymmetric
+   algorithm are refused), `iss` = `SUPABASE_URL/auth/v1`, `aud` =
+   `authenticated`, `role` = `authenticated`, a `sub` and a `session_id`,
+   not anonymous, and no `client_id` (tokens from Supabase's OAuth server
+   belong to third-party apps). An expired JWT is refreshed once with the
+   refresh token and both cookies are rewritten; a refused refresh signs
+   you out. Supabase unreachable: 503, cookies kept.
+5. Nothing is stored on the server: any instance serves any session. The
+   CSRF token is `HMAC(SESSION_SECRET, session_id)`; before sign-in the
+   forms use a double-submit cookie (`rlq_pre`). Flash notices are an
+   HMAC'd cookie.
+6. The database sees only `{ sub, role: "authenticated" }`, as with the
+   stand-in: never `act` or any other claim from the JWT.
+7. **Sign out** (Account menu) calls `/auth/v1/logout` for this session and
+   clears the cookies. A signed-out JWT stays valid until it expires (at
+   most an hour) if someone copied it; the refresh token is dead at once.
+
+Logs carry method, path and status, and fixed reasons for refused tokens;
+never a JWT, refresh token, code, token hash or email (`test.sh` checks).
+
+| Var | Sensitive | Value |
+|---|---|---|
+| `AUTH_MODE` | no | `supabase` |
+| `SUPABASE_URL` | no | `https://bigonndpibguxuwtysnx.supabase.co` (https, no path) |
+| `SUPABASE_PUBLISHABLE_KEY` | no, but server-only | `sb_publishable_...` (Project Settings, API Keys) |
+| `JWT_ALG` | no | `ES256` or `RS256`: the `alg` of the current key in `/auth/v1/.well-known/jwks.json` |
+| `SESSION_SECRET` | **yes** | 32 random bytes, base64url; rotating it signs nobody out but voids open forms and flash notices |
+| `PUBLIC_URL` | no | the site's https URL (required on Vercel) |
+
+The server refuses to start without these, naming the variable, never its
+value. It never uses a Supabase key that bypasses RLS.
+
+### Supabase dashboard (the owner, once)
+
+- **Authentication, Sign In / Providers**: Email enabled; **Allow new users
+  to sign up** off. Email OTP expiration: 600 seconds. Email OTP length: 6.
+- **Authentication, URL Configuration**: Site URL = `PUBLIC_URL` (e.g.
+  `https://app.<domain>`); Redirect URLs: that origin only.
+- **Authentication, Emails, Templates, Magic link** (the template Supabase
+  uses for sign-in by email): include both the code and our link, e.g.
+
+  ```html
+  <h2>Sign in to Reliquary</h2>
+  <p>Your code: <strong>{{ .Token }}</strong></p>
+  <p>Or <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">sign in on this device</a>.</p>
+  <p>If you didn't ask for this, ignore this email.</p>
+  ```
+
+  Not `{{ .ConfirmationURL }}`: that goes through Supabase's own verify
+  endpoint and returns tokens in a URL fragment, which a server can't read.
+- **Authentication, Emails, SMTP Settings**: custom SMTP (the built-in
+  sender reaches only the project team, 2 emails an hour); turn off link
+  tracking at the provider, which would rewrite the link.
+- **Project Settings, JWT Keys**: the current signing key must be
+  asymmetric (ES256 or RS256); set `JWT_ALG` to match. Rotating keys is
+  safe: new key ids are fetched on first sight.
+- **Authentication, Users**: invite or add each person; their user id is
+  the `sub` their vault memberships use.
+
+### Tests
+
+`test.sh` runs two `AUTH_MODE=supabase` instances sharing a
+`SESSION_SECRET` against `test/fake-auth.mjs`, a fake Supabase Auth (OTP,
+verify, refresh with rotation and reuse revocation, logout, JWKS with a key
+generated at start, and test-only `/_last_email`, `/_mint`, `/_stats`).
+`test/auth.test.mjs` covers sign-in by code and by link, no enumeration,
+cookies, both instances, refresh, sign-out, refused JWTs (another key, `alg:
+none`, HS256, wrong `iss`/`aud`/`role`, `client_id`, tampered), claims, and
+the start-up refusals.
 
 ### The Supabase CA
 

@@ -1,9 +1,15 @@
-// Reliquary web UI (local). Server-rendered HTML, no client-side script.
+// Reliquary web UI. Server-rendered HTML, no client-side script.
 //
-// Sign-in stand-in until Supabase Auth: the server acts only as LOCAL_USER_ID.
-// At start (and after each use) it writes a one-time login code to LOGIN_FILE
-// (mode 600). `dev.sh ui` opens /login?code=... in the browser without
-// printing it. The session is an HttpOnly, SameSite=Strict cookie.
+// Sign-in (src/auth.ts), by AUTH_MODE:
+//  - local (default: dev.sh and most tests): the server acts only as
+//    LOCAL_USER_ID. At start (and after each use) it writes a one-time login
+//    code to LOGIN_FILE (mode 600). `dev.sh ui` opens /login?code=... in the
+//    browser without printing it. The session is an HttpOnly,
+//    SameSite=Strict cookie. Refuses to start on Vercel.
+//  - supabase (hosted): an emailed code or link through Supabase Auth
+//    (src/signin.ts). The session is the Supabase JWT and refresh token in
+//    HttpOnly, SameSite=Lax cookies, verified on every request; no server
+//    state, so any instance serves any session.
 //
 // Every POST needs the session's CSRF token and, when the browser sends one, a
 // same-origin Origin header. Responses carry a CSP that forbids all scripts.
@@ -13,21 +19,25 @@
 // (a missing one is refused too), and with https the cookies are Secure and
 // __Host- prefixed. Unset, as under dev.sh and the tests, the Origin is
 // compared with http://<Host header>, and absent is allowed.
+//
+// Routes that must work without a session (chunk C's OAuth metadata and token
+// endpoints) go before the getSession() call below; pages that need the
+// signed-in person use ctx.userId, and a signed-out GET is sent to
+// signinUrl(next) and back.
 
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import http from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { html, notice, setStyleVersion, type Theme } from "./html.js";
+import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
+import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
 import { routes, type Ctx, type Reply } from "./pages.js";
+import { signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8790);
-const USER = process.env.LOCAL_USER_ID ?? "";
-const LOGIN_FILE = process.env.LOGIN_FILE ?? ".login";
 const MAX_BODY = 2 * 1024 * 1024;
-const SESSION_HOURS = 12;
 const MCP_URL = process.env.MCP_PUBLIC_URL ?? "http://127.0.0.1:8787/mcp";
 
 let PUBLIC_ORIGIN = "";
@@ -45,14 +55,17 @@ const SECURE = PUBLIC_ORIGIN.startsWith("https://");
 // __Host- cookies must be Secure, Path=/ and carry no Domain: bound to this
 // exact host, over https only.
 const COOKIE_PREFIX = SECURE ? "__Host-" : "";
-const SESSION_COOKIE = `${COOKIE_PREFIX}rlq_session`;
 const THEME_COOKIE = `${COOKIE_PREFIX}rlq_theme`;
 const COOKIE_SECURE = SECURE ? "; Secure" : "";
 
-if (!/^[0-9a-f-]{36}$/.test(USER)) {
-  console.error("LOCAL_USER_ID must be a UUID");
+let MODE: AuthMode;
+try {
+  MODE = configureAuth(process.env, { secure: SECURE, host: HOST, port: PORT });
+} catch (err) {
+  console.error((err as Error).message);
   process.exit(1);
 }
+setAccountMode(MODE);
 
 // Static files: a fixed map built at start, so no request path ever touches
 // the filesystem. On Vercel, public/ is served by the CDN and may be missing
@@ -81,28 +94,7 @@ setStyleVersion(
       : randomBytes(5).toString("hex"),
 );
 
-type Session = { userId: string; csrf: string; expires: number; flash?: string };
-const sessions = new Map<string, Session>();
-let loginCode = "";
-
-function rotateLoginCode(): void {
-  loginCode = randomBytes(24).toString("hex");
-  writeFileSync(LOGIN_FILE, `http://${HOST}:${PORT}/login?code=${loginCode}\n`, { mode: 0o600 });
-}
-
-function sameSecret(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}
-
-function cookie(req: http.IncomingMessage, name: string): string | undefined {
-  for (const part of (req.headers.cookie ?? "").split(";")) {
-    const [k, ...v] = part.trim().split("=");
-    if (k === name) return v.join("=");
-  }
-  return undefined;
-}
+const cookie = readCookie;
 
 function readForm(req: http.IncomingMessage): Promise<URLSearchParams> {
   return new Promise((resolve, reject) => {
@@ -132,15 +124,32 @@ const SECURITY_HEADERS = {
   "cache-control": "no-store",
 };
 
-function send(res: http.ServerResponse, reply: Reply, extra: Record<string, string> = {}): void {
+// `cookies`: auth Set-Cookie values (a sign-in, a refreshed or cleared
+// session, a flash). A response that carries them is also marked private.
+function send(res: http.ServerResponse, reply: Reply, extra: Record<string, string> = {}, cookies: string[] = []): void {
+  const headers: Record<string, string | string[]> = { ...SECURITY_HEADERS, ...extra };
+  if (cookies.length) {
+    headers["set-cookie"] = extra["set-cookie"] ? [...cookies, extra["set-cookie"]] : cookies;
+    headers["cache-control"] = "private, no-store";
+  }
   if (reply.redirect) {
-    res.writeHead(303, { location: reply.redirect, ...SECURITY_HEADERS, ...extra }).end();
+    res.writeHead(303, { location: reply.redirect, ...headers }).end();
     return;
   }
-  res
-    .writeHead(reply.status ?? 200, { "content-type": "text/html; charset=utf-8", ...SECURITY_HEADERS, ...extra })
-    .end(reply.html ?? "");
+  res.writeHead(reply.status ?? 200, { "content-type": "text/html; charset=utf-8", ...headers }).end(reply.html ?? "");
 }
+
+// The same-origin rule for every POST (see the top of this file).
+function originAllowed(req: http.IncomingMessage): { ok: boolean; origin: string | undefined } {
+  const origin = req.headers.origin;
+  return { ok: PUBLIC_ORIGIN ? origin === PUBLIC_ORIGIN : !origin || origin === `http://${req.headers.host}`, origin };
+}
+const refused = (theme: Theme): Reply => ({
+  status: 403,
+  html: notice("Request refused", "This form didn’t come from Reliquary’s own page. If you sent it yourself, reload the page and try again.", theme),
+});
+const logRefused = (path: string, origin: string | undefined) =>
+  console.info(`POST ${path} 403 origin=${origin === undefined ? "none" : origin === "null" ? "null" : "other"}`);
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -156,49 +165,72 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
       return;
     }
-    if (url.pathname === "/login" && req.method === "GET") {
-      const code = url.searchParams.get("code") ?? "";
-      if (!loginCode || !sameSecret(code, loginCode)) {
+    if (MODE === "local" && url.pathname === "/login" && req.method === "GET") {
+      const setCookie = localLogin(url.searchParams.get("code") ?? "");
+      if (!setCookie) {
         send(res, { status: 401, html: notice("Link expired", html`That sign-in link has already been used or has expired. Run <code>./mcp/dev.sh ui</code> for a fresh one.`, theme) });
         return;
       }
-      rotateLoginCode();
-      const sid = randomBytes(32).toString("hex");
-      sessions.set(sid, {
-        userId: USER,
-        csrf: randomBytes(24).toString("hex"),
-        expires: Date.now() + SESSION_HOURS * 3600_000,
-      });
-      send(res, { redirect: "/" }, {
-        "set-cookie": `${SESSION_COOKIE}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_HOURS * 3600}${COOKIE_SECURE}`,
-      });
+      send(res, { redirect: "/" }, { "set-cookie": setCookie });
       return;
     }
 
-    const sid = cookie(req, SESSION_COOKIE);
-    const session = sid ? sessions.get(sid) : undefined;
-    if (!session || session.expires < Date.now()) {
-      if (sid) sessions.delete(sid);
-      send(res, { status: 401, html: notice("Signed out", html`Run <code>./mcp/dev.sh ui</code> to open a sign-in link.`, theme) });
+    const auth = await getSession(req);
+    if (auth.unavailable) {
+      send(res, { status: 503, html: notice("Sign-in is unavailable", "Reliquary can’t reach its sign-in service right now. Try again in a minute.", theme) });
+      console.info(`${req.method} ${url.pathname} 503`);
+      return;
+    }
+
+    // Sign-in pages (AUTH_MODE=supabase): reachable without a session.
+    if (MODE === "supabase" && SIGNIN_PATHS.has(url.pathname)) {
+      let signinForm = new URLSearchParams();
+      if (req.method === "POST") {
+        const o = originAllowed(req);
+        if (!o.ok) {
+          send(res, refused(theme), {}, auth.cookies);
+          logRefused(url.pathname, o.origin);
+          return;
+        }
+        signinForm = await readForm(req);
+      }
+      const out = await signinRoutes({ req, method: req.method ?? "", url, form: signinForm, theme, session: auth.session });
+      if (out) {
+        send(res, out.reply, {}, [...auth.cookies, ...out.cookies]);
+        console.info(`${req.method} ${url.pathname} ${out.reply.redirect ? 303 : out.reply.status ?? 200}`);
+        return;
+      }
+    }
+
+    const session = auth.session;
+    if (!session) {
+      if (MODE === "supabase") {
+        // Signed out: a page sends you to sign in and back; a form post
+        // can't be replayed after sign-in, so it just says so.
+        if (req.method === "GET") send(res, { redirect: signinUrl(url.pathname + url.search) }, {}, auth.cookies);
+        else send(res, { status: 401, html: notice("Signed out", html`Your session ended. <a href="/signin">Sign in</a> and try again.`, theme) }, {}, auth.cookies);
+        console.info(`${req.method} ${url.pathname} ${req.method === "GET" ? 303 : 401}`);
+      } else {
+        send(res, { status: 401, html: notice("Signed out", html`Run <code>./mcp/dev.sh ui</code> to open a sign-in link.`, theme) });
+      }
       return;
     }
 
     let form = new URLSearchParams();
     if (req.method === "POST") {
-      const origin = req.headers.origin;
-      const allowed = PUBLIC_ORIGIN ? origin === PUBLIC_ORIGIN : !origin || origin === `http://${req.headers.host}`;
-      if (!allowed) {
-        send(res, { status: 403, html: notice("Request refused", "This form didn’t come from Reliquary’s own page. If you sent it yourself, reload the page and try again.", theme) });
-        console.info(`POST ${url.pathname} 403 origin=${origin === undefined ? "none" : origin === "null" ? "null" : "other"}`);
+      const o = originAllowed(req);
+      if (!o.ok) {
+        send(res, refused(theme), {}, auth.cookies);
+        logRefused(url.pathname, o.origin);
         return;
       }
       form = await readForm(req);
       if (!sameSecret(form.get("csrf") ?? "", session.csrf)) {
-        send(res, { status: 403, html: notice("Form expired", "Go back, reload the page, and try again.", theme) });
+        send(res, { status: 403, html: notice("Form expired", "Go back, reload the page, and try again.", theme) }, {}, auth.cookies);
         return;
       }
     } else if (req.method !== "GET") {
-      send(res, { status: 405, html: "" });
+      send(res, { status: 405, html: "" }, {}, auth.cookies);
       return;
     }
 
@@ -206,29 +238,35 @@ const server = http.createServer(async (req, res) => {
       const choice = form.get("theme");
       const back = form.get("back") ?? "/";
       const next: Theme = choice === "light" || choice === "dark" ? choice : "auto";
-      send(res, { redirect: back.startsWith("/") && !back.startsWith("//") ? back : "/" }, {
-        "set-cookie": `${THEME_COOKIE}=${next}; SameSite=Strict; Path=/; Max-Age=31536000${COOKIE_SECURE}`,
-      });
+      send(
+        res,
+        { redirect: back.startsWith("/") && !back.startsWith("//") ? back : "/" },
+        { "set-cookie": `${THEME_COOKIE}=${next}; SameSite=Strict; Path=/; Max-Age=31536000${COOKIE_SECURE}` },
+        auth.cookies,
+      );
       return;
     }
 
-    const flash = session.flash;
-    session.flash = undefined;
+    if (MODE === "supabase" && req.method === "POST" && url.pathname === "/signout") {
+      await session.signOut();
+      send(res, { redirect: "/signin" }, {}, auth.cookies);
+      console.info("POST /signout 303");
+      return;
+    }
+
     const ctx: Ctx = {
       userId: session.userId,
       csrf: session.csrf,
       url,
       form,
       method: req.method,
-      flash,
+      flash: session.takeFlash(),
       theme,
       mcpUrl: MCP_URL,
-      setFlash: (m) => {
-        session.flash = m;
-      },
+      setFlash: (m) => session.setFlash(m),
     };
     const reply = await routes(ctx);
-    send(res, reply);
+    send(res, reply, {}, auth.cookies);
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
   } catch (err) {
     console.error("web error", (err as { code?: string }).code ?? (err as Error).name);
@@ -236,7 +274,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-rotateLoginCode();
+if (MODE === "local") rotateLoginCode();
 // On Vercel (zero-config Node server) the platform supplies PORT and owns the
 // socket, so bind no host; locally stay on loopback.
 const onVercel = !!process.env.VERCEL;
