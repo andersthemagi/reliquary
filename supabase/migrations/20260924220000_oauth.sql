@@ -92,7 +92,7 @@ revoke all on private.oauth_codes, private.oauth_tokens from public, anon, authe
 -- A grant slides: each refresh extends it by 30 days, never beyond a year
 -- from consent, like the longest personal token.
 create or replace function private.oauth_grant_expiry(p_created timestamptz)
-returns timestamptz language sql stable as $$
+returns timestamptz language sql stable set search_path = '' as $$
   select least(now() + interval '30 days', p_created + interval '366 days')
 $$;
 

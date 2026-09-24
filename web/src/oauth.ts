@@ -48,7 +48,14 @@ function config() {
   return { issuer, resource, allowLoopback };
 }
 
-const { issuer: ISSUER, resource: RESOURCE, allowLoopback: ALLOW_LOOPBACK } = config();
+// Set by configureOAuth() at server start, after sign-in's own checks, so a
+// misconfigured deploy reports the first missing setting in a fixed order.
+let ISSUER = "";
+let RESOURCE = "";
+let ALLOW_LOOPBACK = false;
+export function configureOAuth(): void {
+  ({ issuer: ISSUER, resource: RESOURCE, allowLoopback: ALLOW_LOOPBACK } = config());
+}
 
 const ACCESS_SECONDS = 3600;
 const MAX_FORM = 16 * 1024;

@@ -32,7 +32,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
-import { oauthPublic } from "./oauth.js";
+import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Reply } from "./pages.js";
 import { signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
@@ -62,6 +62,7 @@ const COOKIE_SECURE = SECURE ? "; Secure" : "";
 let MODE: AuthMode;
 try {
   MODE = configureAuth(process.env, { secure: SECURE, host: HOST, port: PORT });
+  configureOAuth();
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);
