@@ -125,9 +125,17 @@ git). All four: `./test.sh`.
 | F64 | Reveal in the web UI | Only a POST with the session's CSRF token from this origin reveals (a GET, a missing or wrong token, another origin: nothing shown, nothing logged); the response shows the one value, is no-store and no redirect, says the reveal is logged, and is logged as reveal; the value is on no later page and in no server log line; a missing value and one that won't decrypt say so | `web/test/variables_page.test.mjs#variables reveal:` |
 | F65 | Variables access log in the web UI | `/v/:v/variables/log` for owners and editors (viewers are told it's theirs only): who set, rotated, deleted, read or revealed what, when and from which client (web UI, CLI, agent), refusals with their reason, newest first, filtered by action and variable, 50 a page; next to each value, who read or revealed it since it was set, with a link to revoke | `web/test/variables_page.test.mjs#variables log:` |
 
+## Vault administration (docs/parity.md, docs/design.md "Deleting a vault")
+
+| ID | Feature | Acceptance criteria | Tests |
+|---|---|---|---|
+| F70 | Rename a vault and set its default policy | Only an owner in person renames a vault or sets its default (an editor, viewer, outsider, anonymous, the owner's agent and the owner's all-vaults token are refused and change and log nothing); the name is trimmed and 1 to 100 characters, the default canon or open; each change is logged with the previous value, and an unchanged one logs nothing | `supabase/tests/vault_admin_test.sql#rename:`, `supabase/tests/vault_admin_test.sql#default policy:` |
+| F72 | Export a vault | Only an owner in person exports (agents, tokens, editors, viewers, outsiders and anonymous get neither the header nor file pages, and nothing is logged); a vault over the size cap is refused before anything is logged; an export is logged as vault.export with its file and byte counts; the header has the vault, its default and rules, and variable names with their environments, never a ciphertext, nonce or value; files are the current text of live files in path order, paged, never another vault's, never deleted or erased ones | `supabase/tests/vault_admin_test.sql#export:` |
+| F73 | Delete a vault | Only an owner in person deletes a vault, and only with its name typed exactly (the database checks it); everyone else, the owner's agent and any token are refused and leave the vault, its tokens and the deletion record alone; deletion is immediate: files, versions, proposals, approvals, notes, rules, members, the log, the variables access log, variables and their ciphertexts are gone, and only who, when and counts are kept (no name); tokens whose only vault it was are revoked (anyone's), a token that also reaches another vault keeps that one and sees and writes nothing of the deleted one; nobody signed in can write the deletion record or call its check, a record from another transaction unlocks no append-only table, truncate stays refused, and the log stays append-only afterwards | `supabase/tests/vault_admin_test.sql#delete:` |
+
 ## Not built yet (no rows until they ship)
 
-Plain export, connections, routines. Each lands with its row and tests.
+Connections, routines, the git mirror. Each lands with its row and tests.
 
 ## Known gaps
 
