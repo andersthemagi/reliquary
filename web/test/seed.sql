@@ -52,3 +52,24 @@ select pg_temp.reset();
 \echo P_APPROVE=:p2
 \echo P_EDIT=:p3
 \echo P_SOLO=:p4
+
+-- ---------------------------------------------------------------------------
+-- Tokens (test/tokens.test.mjs): Ana's existing tokens, one used by a client
+-- with a hostile name, one expired, and one scoped to a vault she has since
+-- left (Dee adds her to Dee private, she mints a token for it, Dee removes her).
+\o /dev/null
+select pg_temp.as_person(:'dee');
+select public.set_member(:'v2', :'ana', 'viewer');
+select pg_temp.reset();
+select pg_temp.as_person(:'ana');
+select public.create_access_token('Seeded reader', 30, array[:'v1']::uuid[], 'read');
+select public.create_access_token('Seeded expired', 30);
+select public.create_access_token('Seeded left', 30, array[:'v1', :'v2']::uuid[], 'read');
+select pg_temp.reset();
+select pg_temp.as_person(:'dee');
+select public.set_member(:'v2', :'ana', null);
+select pg_temp.reset();
+update public.access_tokens set client_name = 'Cursor <img src=x onerror=alert(3)>', last_used_at = now() - interval '2 hours'
+ where name = 'Seeded reader';
+update public.access_tokens set expires_at = now() - interval '1 day' where name = 'Seeded expired';
+\o

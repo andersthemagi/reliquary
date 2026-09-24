@@ -1034,44 +1034,95 @@ function connect(ctx: Ctx): Reply {
 // ---------------------------------------------------------------------------
 // Tokens
 
+// Scope (which vaults, read or read-write) is enforced by the database for
+// every call the token makes, and can't be edited: revoke and recreate. The
+// token itself is shown once, in this response only, and never logged.
 async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promise<Reply> {
-  const rows = await asPerson(
-    ctx.userId,
-    async (c) =>
-      (
-        await c.query(
-          `select id, name, created_at, expires_at, last_used_at, revoked_at from public.access_tokens
-            order by revoked_at nulls first, created_at desc`,
-        )
-      ).rows,
-  );
+  const { rows, vaults } = await asPerson(ctx.userId, async (c) => ({
+    rows: (
+      await c.query(
+        `select t.id, t.name, t.created_at, t.expires_at, t.last_used_at, t.revoked_at,
+                t.all_vaults, t.access, t.client_name, t.expires_at <= now() as expired,
+                cardinality(t.vault_ids) as n_vaults,
+                (select array_agg(v.name order by v.name) from public.vaults v
+                  where v.id = any(t.vault_ids)) as vault_names
+           from public.access_tokens t
+          order by t.revoked_at nulls first, (t.expires_at <= now()), t.created_at desc`,
+      )
+    ).rows,
+    vaults: (
+      await c.query(
+        `select v.id, v.name from public.vaults v
+           join public.vault_members m on m.vault_id = v.id and m.user_id = $1
+          order by v.name`,
+        [ctx.userId],
+      )
+    ).rows as { id: string; name: string }[],
+  }));
+
+  const scope = (t: { all_vaults: boolean; n_vaults: number; vault_names: string[] | null }) => {
+    if (t.all_vaults) return "All your vaults";
+    const names = t.vault_names ?? [];
+    const gone = t.n_vaults - names.length;
+    return names.join(", ") + (gone > 0 ? `${names.length ? ", and " : ""}${gone} you no longer belong to` : "");
+  };
+  const status = (t: { id: string; revoked_at: Date | null; expired: boolean }) =>
+    t.revoked_at
+      ? html`<span class="muted small">Revoked</span>`
+      : t.expired
+        ? html`<span class="muted small">Expired</span>`
+        : html`<form method="post" action="/tokens/${t.id}/revoke">${csrfField(ctx.csrf)}<button class="danger">Revoke</button></form>`;
+
   return render(
     ctx,
     "Tokens",
     html`<h1>Tokens</h1>
-    <p class="lede">A token lets one agent act as you over MCP. Agents can read, write open files and propose changes. They can never approve, change rules or manage members. <a href="/connect">How to connect an agent</a></p>
+    <p class="lede">A token lets one agent act as you over MCP, in the vaults you choose. A read-only agent can read, search and follow changes. A read-write agent can also write open files and propose changes. No agent can approve, change rules or manage members. <a href="/connect">How to connect an agent</a></p>
     ${fresh
       ? html`<div class="reveal facet" role="status"><strong>${fresh.name}</strong>
           <p class="muted small">Copy it now. It won’t be shown again. Put it in your agent’s settings, never in a chat.</p>
           <p class="secret">${fresh.token}</p></div>`
       : ""}
-    <form method="post" action="/tokens/new" class="panel">
+    <form method="post" action="/tokens/new" class="panel token-form">
       ${csrfField(ctx.csrf)}
       <label for="tn">Name it after the agent and machine</label>
-      <div class="inline-field"><input id="tn" type="text" name="name" placeholder="Hermes on Linux" required>
-        <button class="primary">Create token</button></div>
-      <p class="hint">Tokens expire after 90 days.</p>
+      <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100">
+      <fieldset>
+        <legend>Vaults</legend>
+        <label class="choice"><input type="radio" name="scope" value="all" checked> All my vaults, including ones I join later</label>
+        <label class="choice"><input type="radio" name="scope" value="some"> Only the vaults I tick</label>
+        ${vaults.length
+          ? html`<div class="choice-list">${vaults.map(
+              (v) => html`<label class="choice"><input type="checkbox" name="vault" value="${v.id}"> ${v.name}</label>`,
+            )}</div>`
+          : html`<p class="hint">You don’t belong to any vaults yet.</p>`}
+        <p class="hint">Ticking a vault limits the token to the ticked vaults.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Access</legend>
+        <label class="choice"><input type="radio" name="access" value="read" checked> Read only: read, search and follow changes</label>
+        <label class="choice"><input type="radio" name="access" value="write"> Read and write: also write open files and propose changes</label>
+      </fieldset>
+      <label for="te">Expires after</label>
+      <select id="te" name="days" class="token-expiry">
+        ${[7, 30, 90, 180, 366].map((d) => html`<option value="${d}"${d === 90 ? raw(" selected") : ""}>${d === 366 ? "1 year" : `${d} days`}</option>`)}
+      </select>
+      <div class="actions"><button class="primary">Create token</button></div>
+      <p class="hint">A token’s vaults and access can’t be changed later. To change them, revoke it and create another.</p>
     </form>
     <h2>Your tokens</h2>
     ${rows.length === 0
       ? html`<div class="empty">No tokens yet. <a href="/connect">Connect an agent</a> to get started.</div>`
-      : html`<div class="table-wrap"><table><tr><th>Name</th><th class="hide-sm">Created</th><th>Last used</th><th class="hide-sm">Expires</th><th></th></tr>
+      : html`<div class="table-wrap"><table class="token-list"><tr><th>Name</th><th>Vaults</th><th>Access</th><th>Last used</th><th class="hide-sm">Expires</th><th></th></tr>
     ${rows.map(
-      (t) => html`<tr><td>${t.name}</td><td class="small hide-sm">${when(t.created_at)}</td>
-        <td class="small">${t.last_used_at ? ago(t.last_used_at) : "Never"}</td><td class="small hide-sm">${when(t.expires_at)}</td>
-        <td class="num">${t.revoked_at
-          ? html`<span class="muted small">Revoked</span>`
-          : html`<form method="post" action="/tokens/${t.id}/revoke">${csrfField(ctx.csrf)}<button class="danger">Revoke</button></form>`}</td></tr>`,
+      (t) => html`<tr${t.revoked_at || t.expired ? raw(' class="inactive"') : ""}><td>${t.name}</td>
+        <td class="small">${scope(t)}</td>
+        <td class="small">${t.access === "write" ? "Read and write" : "Read only"}</td>
+        <td class="small">${t.last_used_at ? ago(t.last_used_at) : "Never"}${t.client_name
+          ? html`<span class="muted token-client">from ${t.client_name}</span>`
+          : ""}</td>
+        <td class="small hide-sm">${when(t.expires_at)}</td>
+        <td class="num">${status(t)}</td></tr>`,
     )}</table></div>`}`,
     "tokens",
   );
@@ -1079,10 +1130,29 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
 
 async function createToken(ctx: Ctx): Promise<Reply> {
   const name = (ctx.form.get("name") ?? "").trim();
+  // Ticked vaults always narrow the scope, whatever the radio says: a
+  // mismatch between the two must never produce the broader token.
+  const ticked = ctx.form.getAll("vault");
+  const some = ticked.length > 0 || ctx.form.get("scope") === "some";
+  const access = ctx.form.get("access") === "write" ? "write" : "read";
+  const days = Number.parseInt(ctx.form.get("days") ?? "90", 10);
+  if (some && ticked.length === 0) {
+    ctx.setFlash("Tick at least one vault, or choose all your vaults.");
+    return { redirect: "/tokens" };
+  }
+  if (!ticked.every((v) => UUID.test(v))) return notFound(ctx);
   try {
     const token = await asPerson(
       ctx.userId,
-      async (c) => (await c.query(`select public.create_access_token($1, 90) as t`, [name])).rows[0].t as string,
+      async (c) =>
+        (
+          await c.query(`select public.create_access_token($1, $2, $3::uuid[], $4) as t`, [
+            name,
+            Number.isFinite(days) ? days : null,
+            some ? ticked : null,
+            access,
+          ])
+        ).rows[0].t as string,
     );
     return tokens(ctx, { name, token });
   } catch (err) {

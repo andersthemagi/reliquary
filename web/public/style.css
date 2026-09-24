@@ -426,3 +426,20 @@ section { scroll-margin-top: 16px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
+
+/* tokens ------------------------------------------------------------------ */
+
+.token-form fieldset { border: 0; border-top: 1px solid var(--rule); padding: 12px 0 0; margin: 20px 0 0; min-width: 0; }
+.token-form legend {
+  font-weight: 600; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); padding: 0 8px 0 0;
+}
+.token-form label.choice {
+  display: flex; align-items: baseline; gap: 10px; margin: 8px 0 0;
+  font-weight: 400; font-size: 1rem; cursor: pointer;
+}
+.token-form .choice input { accent-color: var(--accent-ink); margin: 0; flex: none; }
+.token-form .choice-list { margin: 4px 0 0 26px; padding-left: 12px; border-left: 1px solid var(--rule); }
+.token-form select.token-expiry { width: auto; min-width: 12rem; }
+.token-list .token-client { display: block; }
+.token-list tr.inactive td:not(.num) { color: var(--muted); }
