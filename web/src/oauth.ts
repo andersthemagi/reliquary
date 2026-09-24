@@ -8,6 +8,7 @@
 //   POST /oauth/authorize    allow or deny (CSRF + same-origin, like every form)
 //   POST /oauth/token        authorization_code, refresh_token
 //   POST /oauth/revoke       RFC 7009
+//   GET  /cli/oauth-client.json   our own CLI's client metadata document
 //
 // A grant is an access_tokens row, made by the person in
 // public.create_oauth_grant (never by an agent: the web session has no `act`
@@ -15,10 +16,16 @@
 // out once and stored as SHA-256 by the database. None of them, and no
 // request value, is ever logged or echoed in an error.
 //
-// Config: the issuer is PUBLIC_URL (else this server's local address); the
-// one resource accepted is MCP_RESOURCE (else MCP_PUBLIC_URL), byte for byte
-// the value the MCP server has. CIMD_ALLOW_LOOPBACK=1 lets tests serve client
-// metadata from loopback; it is refused when VERCEL is set.
+// Config: the issuer is PUBLIC_URL (else this server's local address). Two
+// resources are accepted: MCP_RESOURCE (else MCP_PUBLIC_URL), byte for byte
+// the value the MCP server has, and this app's env API, `<issuer>/api/env`
+// (envapi.ts). The env API is for one client only, the Reliquary CLI, whose
+// client id is `<issuer>/cli/oauth-client.json`, served here rather than
+// fetched; the CLI is for the env API only. Its grants are kind 'cli' in the
+// database (public.create_cli_grant), and its access tokens are `rle_`, so
+// neither side's tokens work at the other (docs/variables.md).
+// CIMD_ALLOW_LOOPBACK=1 lets tests serve client metadata from loopback; it is
+// refused when VERCEL is set.
 
 import { createHash, randomBytes } from "node:crypto";
 import type http from "node:http";
@@ -53,9 +60,29 @@ function config() {
 let ISSUER = "";
 let RESOURCE = "";
 let ALLOW_LOOPBACK = false;
+let ENV_RESOURCE = "";
+let CLI_CLIENT_ID = "";
+const CLI_METADATA_PATH = "/cli/oauth-client.json";
 export function configureOAuth(): void {
   ({ issuer: ISSUER, resource: RESOURCE, allowLoopback: ALLOW_LOOPBACK } = config());
+  ENV_RESOURCE = `${ISSUER}/api/env`;
+  CLI_CLIENT_ID = `${ISSUER}${CLI_METADATA_PATH}`;
 }
+export const issuer = () => ISSUER;
+export const envResource = () => ENV_RESOURCE;
+
+// The CLI listens on a free port on this computer (RFC 8252, 7.3), so any
+// port matches (cimd.ts, redirectAllowed); the host and path must be these.
+export const cliClient = () => ({
+  client_id: CLI_CLIENT_ID,
+  client_name: "Reliquary CLI",
+  client_uri: ISSUER,
+  redirect_uris: ["http://127.0.0.1/callback", "http://[::1]/callback"],
+  grant_types: ["authorization_code", "refresh_token"],
+  response_types: ["code"],
+  token_endpoint_auth_method: "none",
+  application_type: "native",
+});
 
 const ACCESS_SECONDS = 3600;
 const MAX_FORM = 16 * 1024;
@@ -132,7 +159,7 @@ function single(params: URLSearchParams): boolean {
 
 const CODE = /^rlc_[0-9a-f]{64}$/;
 const REFRESH = /^rlr_[0-9a-f]{64}$/;
-const ACCESS = /^rlo_[0-9a-f]{64}$/;
+const ACCESS = /^rl[oe]_[0-9a-f]{64}$/;
 
 async function token(req: http.IncomingMessage, res: http.ServerResponse): Promise<string> {
   const fail = (status: number, error: string) => {
@@ -150,9 +177,11 @@ async function token(req: http.IncomingMessage, res: http.ServerResponse): Promi
   if (!clientId) return fail(400, "invalid_request");
   const resource = p.get("resource");
   if (!resource) return fail(400, "invalid_request");
-  if (resource !== RESOURCE) return fail(400, "invalid_target");
+  if (resource !== RESOURCE && resource !== ENV_RESOURCE) return fail(400, "invalid_target");
+  // The env API is the CLI's alone, and the CLI has no other resource.
+  if ((resource === ENV_RESOURCE) !== (clientId === CLI_CLIENT_ID)) return fail(400, "invalid_target");
 
-  const access = secret("rlo_");
+  const access = secret(resource === ENV_RESOURCE ? "rle_" : "rlo_");
   const refresh = secret("rlr_");
   let outcome: string;
   const grantType = p.get("grant_type");
@@ -206,7 +235,8 @@ async function revoke(req: http.IncomingMessage, res: http.ServerResponse): Prom
 export async function oauthPublic(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean> {
   const path = url.pathname;
   const known =
-    path === "/.well-known/oauth-authorization-server" || path === TOKEN_ENDPOINT || path === REVOKE_ENDPOINT;
+    path === "/.well-known/oauth-authorization-server" || path === TOKEN_ENDPOINT || path === REVOKE_ENDPOINT ||
+    path === CLI_METADATA_PATH;
   if (!known) return false;
   if (req.method === "OPTIONS") {
     res.writeHead(204, { ...CORS, "access-control-max-age": "600" }).end();
@@ -217,12 +247,15 @@ export async function oauthPublic(req: http.IncomingMessage, res: http.ServerRes
     if (path === "/.well-known/oauth-authorization-server" && req.method === "GET") {
       json(res, 200, metadata(), { "cache-control": "public, max-age=300" });
       outcome = "ok";
+    } else if (path === CLI_METADATA_PATH && req.method === "GET") {
+      json(res, 200, cliClient(), { "cache-control": "public, max-age=300" });
+      outcome = "ok";
     } else if (path === TOKEN_ENDPOINT && req.method === "POST") {
       outcome = await token(req, res);
     } else if (path === REVOKE_ENDPOINT && req.method === "POST") {
       outcome = await revoke(req, res);
     } else {
-      json(res, 405, { error: "invalid_request" }, { allow: path.startsWith("/.well-known") ? "GET" : "POST" });
+      json(res, 405, { error: "invalid_request" }, { allow: path === TOKEN_ENDPOINT || path === REVOKE_ENDPOINT ? "POST" : "GET" });
       outcome = "method";
     }
   } catch (err) {
@@ -280,11 +313,15 @@ async function check(ctx: Ctx, p: URLSearchParams): Promise<AuthRequest | Reply>
   const clientId = p.get("client_id");
   if (!clientId) return refuse(ctx, "The app didn’t say who it is.");
   let client: ClientMetadata;
-  try {
-    client = await clientMetadata(clientId, { allowLoopback: ALLOW_LOOPBACK });
-  } catch (err) {
-    if (err instanceof CimdError) return refuse(ctx, `Reliquary couldn’t check the app. ${err.message}`);
-    throw err;
+  if (clientId === CLI_CLIENT_ID) {
+    client = { clientId, clientName: "Reliquary CLI", redirectUris: cliClient().redirect_uris };
+  } else {
+    try {
+      client = await clientMetadata(clientId, { allowLoopback: ALLOW_LOOPBACK });
+    } catch (err) {
+      if (err instanceof CimdError) return refuse(ctx, `Reliquary couldn’t check the app. ${err.message}`);
+      throw err;
+    }
   }
   const redirectUri = p.get("redirect_uri") ?? "";
   if (!redirectAllowed(client, redirectUri)) {
@@ -298,7 +335,8 @@ async function check(ctx: Ctx, p: URLSearchParams): Promise<AuthRequest | Reply>
   if (p.get("code_challenge_method") !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(challenge)) return error("invalid_request");
   const resource = p.get("resource");
   if (!resource) return error("invalid_request");
-  if (resource !== RESOURCE) return error("invalid_target");
+  if (resource !== RESOURCE && resource !== ENV_RESOURCE) return error("invalid_target");
+  if ((resource === ENV_RESOURCE) !== (client.clientId === CLI_CLIENT_ID)) return error("invalid_target");
   return { client, redirectUri, challenge, state, resource, scope: p.get("scope") };
 }
 
@@ -321,13 +359,18 @@ export async function authorize(ctx: Ctx): Promise<Reply> {
   if (!ticked.every((v) => /^[0-9a-f-]{36}$/.test(v))) return consent(ctx, r, "Choose vaults from the list.");
   const host = new URL(r.client.clientId).hostname;
   const name = `${r.client.clientName}${r.client.clientName === host ? "" : ` (${host})`}`.slice(0, 100);
+  const cli = r.client.clientId === CLI_CLIENT_ID;
   let code: string;
   try {
     code = await asPerson(ctx.userId, async (c) =>
       (
-        await c.query("select public.create_oauth_grant($1, $2, $3, $4, $5, $6::uuid[], $7) as code", [
-          name, r.client.clientId, r.redirectUri, r.resource, r.challenge, some ? ticked : null, access,
-        ])
+        cli
+          ? await c.query("select public.create_cli_grant($1, $2, $3, $4, $5::uuid[]) as code", [
+              r.client.clientId, r.redirectUri, r.resource, r.challenge, some ? ticked : null,
+            ])
+          : await c.query("select public.create_oauth_grant($1, $2, $3, $4, $5, $6::uuid[], $7) as code", [
+              name, r.client.clientId, r.redirectUri, r.resource, r.challenge, some ? ticked : null, access,
+            ])
       ).rows[0].code as string,
     );
   } catch (err) {
@@ -356,6 +399,40 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
   const clientHost = new URL(r.client.clientId).hostname;
   const hidden = (name: string, value: string | null) =>
     value === null ? "" : html`<input type="hidden" name="${name}" value="${value}">`;
+  const fields = html`${csrfField(ctx.csrf)}
+      ${hidden("response_type", "code")}${hidden("client_id", r.client.clientId)}${hidden("redirect_uri", r.redirectUri)}
+      ${hidden("code_challenge", r.challenge)}${hidden("code_challenge_method", "S256")}${hidden("state", r.state)}
+      ${hidden("resource", r.resource)}${hidden("scope", r.scope)}`;
+  const vaultChoice = (what: string) => html`<fieldset>
+        <legend>Vaults</legend>
+        <label class="choice"><input type="radio" name="reach" value="all" checked> All my vaults, including ones I join later</label>
+        <label class="choice"><input type="radio" name="reach" value="some"> Only the vaults I tick</label>
+        ${vaults.length
+          ? html`<div class="choice-list">${vaults.map(
+              (v) => html`<label class="choice"><input type="checkbox" name="vault" value="${v.id}"> ${v.name}</label>`,
+            )}</div>`
+          : html`<p class="hint">You don’t belong to any vaults yet.</p>`}
+        <p class="hint">Ticking a vault limits ${what} to the ticked vaults.</p>
+      </fieldset>`;
+  if (r.client.clientId === CLI_CLIENT_ID) {
+    // Our own CLI: environment variables only, on this computer.
+    return shell(
+      ctx,
+      "Sign in the Reliquary CLI",
+      html`<div class="page-head"><div class="page-title-row"><div class="page-title"><h1>Sign in the Reliquary CLI?</h1></div></div></div>
+      <p class="lede">The Reliquary CLI on a computer wants to read environment variables as you, for <code>reliquary run</code> and <code>reliquary env pull</code>. It gets the values you may use (as an editor, development and preview; as an owner, production too), in the vaults you choose. It can’t read files, write, propose or change anything. Every read is in the vault’s access log, and you can revoke it any time on the <a href="/tokens">Tokens</a> page.</p>
+      ${problem ? html`<p class="callout attention" role="alert">${problem}</p>` : ""}
+      <p class="callout attention loopback-warning"><strong>Only allow this if you just ran <code>reliquary login</code> on this computer yourself.</strong> It sends you back to ${back.host}, a program on this device, and any program here could have started this request.</p>
+      <form method="post" action="/oauth/authorize" class="panel token-form">
+        ${fields}
+        ${vaultChoice("the CLI")}
+        <div class="actions"><button name="decision" value="deny">Deny</button> <button class="primary" name="decision" value="approve">Allow</button></div>
+        <p class="hint">To change its vaults later, revoke it and sign in again.</p>
+      </form>`,
+      200,
+      back.origin,
+    );
+  }
   return shell(
     ctx,
     "Connect an app",
@@ -371,21 +448,8 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
       ? html`<p class="callout attention loopback-warning"><strong>This app runs on a computer, not a website.</strong> It sends you back to ${back.host}, a program on this device, and any program here could have started this request. Only allow it if you just started connecting from an app on this computer yourself.</p>`
       : ""}
     <form method="post" action="/oauth/authorize" class="panel token-form">
-      ${csrfField(ctx.csrf)}
-      ${hidden("response_type", "code")}${hidden("client_id", r.client.clientId)}${hidden("redirect_uri", r.redirectUri)}
-      ${hidden("code_challenge", r.challenge)}${hidden("code_challenge_method", "S256")}${hidden("state", r.state)}
-      ${hidden("resource", r.resource)}${hidden("scope", r.scope)}
-      <fieldset>
-        <legend>Vaults</legend>
-        <label class="choice"><input type="radio" name="reach" value="all" checked> All my vaults, including ones I join later</label>
-        <label class="choice"><input type="radio" name="reach" value="some"> Only the vaults I tick</label>
-        ${vaults.length
-          ? html`<div class="choice-list">${vaults.map(
-              (v) => html`<label class="choice"><input type="checkbox" name="vault" value="${v.id}"> ${v.name}</label>`,
-            )}</div>`
-          : html`<p class="hint">You don’t belong to any vaults yet.</p>`}
-        <p class="hint">Ticking a vault limits the app to the ticked vaults.</p>
-      </fieldset>
+      ${fields}
+      ${vaultChoice("the app")}
       <fieldset>
         <legend>Access</legend>
         <label class="choice"><input type="radio" name="access" value="read" checked> Read only: read, search and follow changes</label>

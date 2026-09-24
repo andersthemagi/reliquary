@@ -99,7 +99,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   "$node" node --test --test-concurrency=1 test/*.test.mjs
 
 echo "== server log (must contain no tokens, codes or file text)"
-{ "$engine" logs "$srv"; "$engine" logs "$hosted"; } 2>&1 | grep -E 'rlq_|code=|EUR|script' && { echo "LEAK in server log"; exit 1; } || echo "clean"
+{ "$engine" logs "$srv"; "$engine" logs "$hosted"; } 2>&1 | grep -E 'rl[qe]_|code=|EUR|script|SEKRIT' && { echo "LEAK in server log"; exit 1; } || echo "clean"
 echo "== supabase-mode server logs (must contain no JWTs, refresh tokens, codes, token hashes or emails)"
 # test/auth.test.mjs wrote every code, token hash and refresh token it saw
 # to .auth-secrets-<slot>; none may appear in a log.

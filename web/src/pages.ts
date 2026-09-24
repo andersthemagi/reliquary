@@ -1211,7 +1211,7 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
     rows: (
       await c.query(
         `select t.id, t.name, t.created_at, t.expires_at, t.last_used_at, t.revoked_at,
-                t.all_vaults, t.access, t.client_name, t.expires_at <= now() as expired,
+                t.all_vaults, t.access, t.kind, t.client_name, t.expires_at <= now() as expired,
                 cardinality(t.vault_ids) as n_vaults,
                 (select array_agg(v.name order by v.name) from public.vaults v
                   where v.id = any(t.vault_ids)) as vault_names
@@ -1286,7 +1286,7 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
     ${rows.map(
       (t) => html`<tr${t.revoked_at || t.expired ? raw(' class="inactive"') : ""}><td>${t.name}</td>
         <td class="small">${scope(t)}</td>
-        <td class="small">${t.access === "write" ? "Read and write" : "Read only"}</td>
+        <td class="small">${t.kind === "cli" ? "Environment variables" : t.access === "write" ? "Read and write" : "Read only"}</td>
         <td class="small">${t.last_used_at ? ago(t.last_used_at) : "Never"}${t.client_name
           ? html`<span class="muted token-client">from ${t.client_name}</span>`
           : ""}</td>

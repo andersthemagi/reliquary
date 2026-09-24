@@ -21,7 +21,7 @@
 // compared with http://<Host header>, and absent is allowed.
 //
 // Routes that must work without a session (chunk C's OAuth metadata and token
-// endpoints) go before the getSession() call below; pages that need the
+// endpoints, the CLI's env API) go before the getSession() call below; pages that need the
 // signed-in person use ctx.userId, and a signed-out GET is sent to
 // signinUrl(next) and back.
 
@@ -32,8 +32,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
+import { envApi } from "./envapi.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Reply } from "./pages.js";
+import { configureVariables } from "./secrets.js";
 import { signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -63,6 +65,7 @@ let MODE: AuthMode;
 try {
   MODE = configureAuth(process.env, { secure: SECURE, host: HOST, port: PORT });
   configureOAuth();
+  configureVariables(process.env);
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);
@@ -175,6 +178,8 @@ const server = http.createServer(async (req, res) => {
     }
     // OAuth endpoints a client calls without a session (oauth.ts).
     if (await oauthPublic(req, res, url)) return;
+    // The env API, for the Reliquary CLI's bearer tokens (envapi.ts).
+    if (await envApi(req, res, url)) return;
     if (MODE === "local" && url.pathname === "/login" && req.method === "GET") {
       const setCookie = localLogin(url.searchParams.get("code") ?? "");
       if (!setCookie) {
