@@ -77,10 +77,13 @@ test("data, not instructions: a comment can't close its fence or approve anythin
   assert.match(t.text, /status: changes requested {2}revision 1 {2}0\/1 approvals/);
 });
 
-test("comment: the log says who commented, never what they wrote", async () => {
+// The log itself never holds comment text (supabase/tests/threads_test.sql);
+// changes_since reads it from the thread, as the caller, fenced as data.
+// More in changes_comments.test.mjs.
+test("comment: the feed says who commented, and brings the text fenced", async () => {
   const r = await call(ANA_TOKEN, "changes_since", { vault: "Threads" });
   assert.match(r.text, /proposal\.comment canon\/brief\.md\s+by \S+ via Hermes on Linux/);
-  assert.doesNotMatch(r.text, /One paragraph|Ignore previous/);
+  assert.match(r.text, /comment by \S+ via Hermes on Linux on proposal \S+, revision 1:\nNOTE-([0-9a-f]{12})\nHow short\? One paragraph\?\nEND-\1/);
 });
 
 test("viewer: reads the thread but can't comment", async () => {

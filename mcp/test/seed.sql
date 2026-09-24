@@ -87,7 +87,7 @@ update public.access_tokens set expires_at = now() - interval '1 second' where n
 \echo WORKSHOP_VAULT=:ana_ws
 
 -- Threads (test/threads.test.mjs). Its own vault, so the other tests' lists
--- don't change: Ana owner, Ben editor, Cal viewer. Ben's agent proposes a
+-- don't change (named to sort after Team): Ana owner, Ben editor, Cal viewer. Ben's agent proposes a
 -- brief and Ana asks for changes; a second proposal is already applied.
 \o /dev/null
 select pg_temp.as_person(:'ana');
@@ -113,3 +113,37 @@ select pg_temp.reset();
 \echo THREAD_PROPOSAL=:tp
 \echo THREAD_CLOSED=:tp_closed
 \echo DEE_PROPOSAL=:tp_dee
+
+-- Tidings (test/changes_comments.test.mjs): comments and review notes reach
+-- agents through changes_since. Its own vault, named to sort after Team, so
+-- the other tests' lists don't change: Ana owner, Ben editor, Cal viewer.
+-- Ben's agent proposes a plan that Ana comments on and sends back, a file Ana rejects, and one
+-- whose discussion Ana then erases. Dee comments on her own proposal.
+\o /dev/null
+select pg_temp.as_person(:'ana');
+select public.create_vault('Tidings', 'open') as fv \gset
+select public.set_member(:'fv', :'ben', 'editor');
+select public.set_member(:'fv', :'cal', 'viewer');
+select public.set_policy(:'fv', 'canon/', 'canon', 1);
+select pg_temp.reset();
+select set_config('request.jwt.claims', json_build_object('sub', :'ben', 'act', json_build_object('sub', 'x', 'name', 'Hermes on Linux'))::text, false),
+       set_config('role', 'authenticated', false);
+select public.propose(:'fv', 'canon/plan.md', 'Ship it next quarter.', 'roadmap') as fp \gset
+select public.propose(:'fv', 'canon/old.md', 'Old notes.', 'archive') as fp_old \gset
+select public.propose(:'fv', 'canon/gone.md', 'Gone.', 'to erase') as fp_gone \gset
+select pg_temp.reset();
+select pg_temp.as_person(:'ana');
+select public.comment_on_proposal(:'fp', 'Which quarter do you mean?');
+select public.decide(:'fp', 'request_changes', 'Name the quarter: Q3 or Q4.');
+select public.decide(:'fp_old', 'reject', 'We keep old notes elsewhere.');
+select public.comment_on_proposal(:'fp_gone', 'Gone remark, about to be erased.');
+select public.decide(:'fp_gone', 'request_changes', 'Gone note, about to be erased.');
+select public.erase_file(:'fv', 'canon/gone.md');
+select pg_temp.reset();
+select pg_temp.as_person(:'dee');
+select public.comment_on_proposal(:'tp_dee', 'Dee private remark.');
+select pg_temp.reset();
+\o
+\echo FEED_PROPOSAL=:fp
+\echo FEED_REJECTED=:fp_old
+\echo FEED_ERASED=:fp_gone
