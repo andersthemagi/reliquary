@@ -164,7 +164,7 @@ before(async () => {
 
   [{ id: team }] = await as(CARA, "select public.create_vault('Push Team') as id");
   [{ id: dans }] = await as(DAN, "select public.create_vault('Push Dan') as id");
-  await as(DAN, "select public.set_member($1, $2, 'editor')", [dans, CARA]);
+  await as(null, "select test_support.add_member($1, $2, 'editor', $3)", [dans, CARA, DAN]);
   await vars.setVariable(CARA, team, "OLD_KEY", "development", value("old"));
 
   pusher = tmp("pusher");

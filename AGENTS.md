@@ -48,7 +48,22 @@ Done so far:
   (`20260925120000_vault_admin.sql`, `web/src/vaultadmin.ts`,
   `web/src/export.ts`, with hostile tests in
   `supabase/tests/vault_admin_test.sql`). The model is in the design's
-  "Deleting a vault".
+  "Deleting a vault";
+- members and invites, people in person only (`20260925140000_invites.sql`,
+  `web/src/members.ts`, `web/src/invites.ts`, hostile tests in
+  `supabase/tests/invites_test.sql`): members listed by email to
+  co-members, invite links (single-use, 7 days, for one address, stored
+  hashed), role changes and removal with a vault always keeping an owner,
+  and members' agent connections an owner can cut off from the vault;
+- membership polish (`20260925160000_membership_polish.sql`, hostile tests
+  in `supabase/tests/membership_polish_test.sql`): invites are the only way
+  in (`set_member` never adds; seeds and tests use `test_support.add_member`
+  from `supabase/tests/support.sql`, which only the test runners load), 20
+  invites an hour per person, leaving a vault (Settings), people shown by
+  email where they share a vault with the reader (`web/src/people.ts`: one
+  lookup per page), a one-time Home notice to the other members when a
+  vault is deleted, and exports that are one snapshot, at most 10 an hour
+  per vault, and never look whole when cut off.
 
 Milestone 2: **environment variables**. Done so far (phase 1, the core;
 interface and phase 2's work in [docs/variables.md](docs/variables.md)):

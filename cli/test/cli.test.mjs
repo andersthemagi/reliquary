@@ -166,8 +166,8 @@ before(async () => {
   [{ id: twinA }] = await as(CARA, "select public.create_vault('Twin') as id");
   [{ id: shared }] = await as(DAN, "select public.create_vault('Dan Shared') as id");
   [{ id: twinB }] = await as(DAN, "select public.create_vault('Twin') as id");
-  await as(DAN, "select public.set_member($1, $2, 'editor')", [shared, CARA]);
-  await as(DAN, "select public.set_member($1, $2, 'viewer')", [twinB, CARA]);
+  await as(null, "select test_support.add_member($1, $2, 'editor', $3)", [shared, CARA, DAN]);
+  await as(null, "select test_support.add_member($1, $2, 'viewer', $3)", [twinB, CARA, DAN]);
 
   v.api = value("api");
   v.db = `postgres://u:${value("db")}@db/x?a="b"\\c`;

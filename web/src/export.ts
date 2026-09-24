@@ -3,11 +3,20 @@
 //
 // The database decides who may export (public.export_vault and
 // public.export_files: an owner, in person) and logs vault.export when an
-// export starts. Files come a page at a time, each page its own short
-// transaction, so a large vault or a slow download never holds a pooled
-// connection; the archive is a consistent listing only as far as each page
-// is. The manifest carries variable names and environments, never a value:
-// values leave Reliquary only through `reliquary run` and `env pull`.
+// export starts. export_vault also fixes what the export holds: each live
+// file's version at that moment, and the header, in one snapshot
+// (20260925160000_membership_polish.sql). Files then come a page at a time
+// from that list, each page its own short transaction, so a large vault or
+// a slow download never holds a pooled connection, and the archive is still
+// one consistent moment. The manifest carries variable names and
+// environments, never a value: values leave Reliquary only through
+// `reliquary run` and `env pull`.
+//
+// An archive that looks whole is whole: the manifest is written last, then
+// the end-of-archive blocks, then the gzip trailer. If anything fails
+// before that, the gzip stream is destroyed without its trailer and the
+// download is cut (server.ts), so a truncated file fails to gunzip and
+// holds no manifest.
 //
 // The tar writer is the minimum POSIX ustar needs: regular files, 0644,
 // owner 0, and a pax header for any path over 100 bytes. No dependency.
@@ -25,6 +34,7 @@ const STREAM_CAP = 110 * 1024 * 1024;
 const PAGE = 200;
 
 export type ExportHeader = {
+  export: string; // the snapshot's id: export_files serves this export's files
   vault: { id: string; name: string; default_policy: string; created_at: string };
   exported_at: string;
   exported_by: string;
@@ -107,9 +117,23 @@ export const tarEnd = () => Buffer.alloc(1024);
 // ---------------------------------------------------------------------------
 // The archive
 
-type FileRow = { path: string; body: string; updated_at: Date; version_id: string };
+export type FileRow = { path: string; body: string; updated_at: Date; version_id: string };
+// One page of the export's files after `after`, in path order.
+export type FilePages = (after: string, limit: number) => Promise<FileRow[]>;
 
-export async function writeExport(userId: string, h: ExportHeader, out: Writable): Promise<void> {
+const dbPages = (userId: string, h: ExportHeader): FilePages => (after, limit) =>
+  asPerson(userId, async (c) =>
+    (
+      await c.query(`select path, body, updated_at, version_id from public.export_files($1, $2, $3, $4)`, [
+        h.vault.id,
+        after,
+        limit,
+        h.export,
+      ])
+    ).rows,
+  );
+
+export async function writeExport(userId: string, h: ExportHeader, out: Writable, pages: FilePages = dbPages(userId, h)): Promise<void> {
   const root = `${slug(h.vault.name)}-${h.exported_at.slice(0, 10)}`;
   const gz = createGzip();
   const piped = pipeline(gz, out);
@@ -138,9 +162,7 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
   try {
     let after = "";
     for (;;) {
-      const rows: FileRow[] = await asPerson(userId, async (c) =>
-        (await c.query(`select path, body, updated_at, version_id from public.export_files($1, $2, $3)`, [h.vault.id, after, PAGE])).rows,
-      );
+      const rows = await pages(after, PAGE);
       for (const r of rows) {
         const body = Buffer.from(r.body, "utf8");
         total += body.length;

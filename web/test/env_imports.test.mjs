@@ -163,7 +163,7 @@ before(async () => {
   [{ id: V.own }] = await as({ user: RUTH }, "select public.create_vault('Imp Own') as id");
   [{ id: V.push }] = await as({ user: RUTH }, "select public.create_vault('Imp Push') as id");
   [{ id: V.sam }] = await as({ user: SAM }, "select public.create_vault('Imp Sam') as id");
-  await as({ user: RUTH }, "select public.set_member($1, $2, 'editor')", [V.own, SAM]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.own, SAM, RUTH]);
   await vars.setVariable(RUTH, V.own, "API_KEY", "development", value("existing"));
 });
 

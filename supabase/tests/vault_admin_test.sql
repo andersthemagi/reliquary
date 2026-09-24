@@ -7,8 +7,8 @@
 
 insert into t.ids select 'gone', t.run('ana', $q$select public.create_vault('Gone')$q$)::uuid;
 insert into t.ids select 'keep', t.run('ana', $q$select public.create_vault('Keep')$q$)::uuid;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('gone'), t.id('ben')));
-select t.run('ana', format($q$select public.set_member(%L, %L, 'viewer')$q$, t.id('gone'), t.id('cal')));
+select test_support.add_member(t.id('gone'), t.id('ben'), 'editor', t.id('ana'));
+select test_support.add_member(t.id('gone'), t.id('cal'), 'viewer', t.id('ana'));
 select t.run('ana', format($q$select public.set_policy(%L, 'canon/', 'canon', 2)$q$, t.id('gone')));
 select t.run('ana', format($q$select public.write_file(%L, 'notes/a.md', 'Alpha one')$q$, t.id('gone')));
 select t.run('ana', format($q$select public.write_file(%L, 'notes/a.md', 'Alpha two')$q$, t.id('gone')));

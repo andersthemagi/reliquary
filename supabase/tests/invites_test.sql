@@ -19,8 +19,8 @@ insert into auth.users (id, email) values
 insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
 insert into t.ids select 'deev', t.run('dee', $q$select public.create_vault('Dee own')$q$)::uuid;
 insert into t.ids select 'benv', t.run('ben', $q$select public.create_vault('Ben own')$q$)::uuid;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('team'), t.id('ben')));
-select t.run('ana', format($q$select public.set_member(%L, %L, 'viewer')$q$, t.id('team'), t.id('cal')));
+select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
+select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
 
 -- Tokens, used the way the MCP server does (act.tok = the token id), and a
 -- CLI grant and an OAuth grant as rows.
@@ -258,7 +258,7 @@ select t.expect('replace: the newer invite works',
 
 -- An invite never demotes
 insert into t.tokens select 'gil2', t.invite('dee', 'deev', 'gil@example.test', 'viewer');
-select t.run('dee', format($q$select public.set_member(%L, %L, 'owner')$q$, t.id('deev'), t.id('gil')));
+select test_support.add_member(t.id('deev'), t.id('gil'), 'owner', t.id('dee'));
 select t.expect('accept: someone who became a member meanwhile keeps their role',
   t.accept('gil', t.tk('gil2')) || ' ' || t.role_of('deev', 'gil') || ' ' || t.state(t.tk('gil2')),
   t.id('deev')::text || ' owner accepted');
@@ -275,6 +275,8 @@ select t.expect('isolation: an owner of another vault can''t list or revoke this
 do $$ begin
   for n in 1..50 loop
     perform t.invite('dee', 'deev', 'cap' || n || '@example.test', 'viewer');
+    -- Made before the hourly rate's window, so only the cap applies here.
+    update private.vault_invites set created_at = created_at - interval '2 hours' where created_by = t.id('dee');
   end loop;
 end $$;
 select t.expect('cap: a vault holds at most 50 waiting invites',

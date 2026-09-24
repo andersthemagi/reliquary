@@ -2,6 +2,8 @@
 // is no other way to put text on a page. File text is shown as plain text,
 // never rendered as markdown or HTML.
 
+import { personRef } from "./personref.js";
+
 export function esc(value: unknown): string {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -103,7 +105,7 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
     ? html`<details class="account menu-wrap">
     <summary class="button quiet">Account</summary>
     <div class="menu">
-      <p class="menu-meta">Signed in as <strong>${opts.user.slice(0, 8)}</strong>${accountMode === "local" ? " (local)" : ""}</p>
+      <p class="menu-meta">Signed in as <strong>${personRef(opts.user)}</strong>${accountMode === "local" ? " (local)" : ""}</p>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
         ${csrfField(opts.csrf)}<input type="hidden" name="back" value="${opts.path ?? "/"}">
         <span class="menu-label">Theme</span>

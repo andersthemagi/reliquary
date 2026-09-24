@@ -10,6 +10,7 @@
 //   POST /v/:id/config/members/invite                   make an invite; shows its link once
 //   POST /v/:id/config/members/invites/:iid/revoke
 //   POST /v/:id/config/members/connections/:tid/revoke  cut a connection off from this vault
+//   GET  /v/:id/config/leave                            confirm leaving; POST leaves
 //   GET  /invite?token=                                 what the invite is; Accept
 //   POST /invite                                        accept (token)
 //
@@ -279,6 +280,67 @@ async function revokeConnection(ctx: Ctx, id: string, tid: string): Promise<Repl
     ctx.setFlash(message(err));
   }
   return { redirect: membersPath(id) };
+}
+
+// ---------------------------------------------------------------------------
+// Leaving a vault (public.leave_vault: a member, in person; the last owner
+// can't). Settings links here; GET confirms, POST leaves.
+
+async function leavePage(ctx: Ctx, id: string): Promise<Reply> {
+  return shell(ctx, id, "Leave vault", async (c, v) => {
+    const owners = (await c.query(`select count(*)::int as n from public.vault_members where vault_id = $1 and role = 'owner'`, [id]))
+      .rows[0].n as number;
+    const head = pageHeader({ crumb: crumb(id, v), title: `Leave ${v.name}` });
+    if (v.role === "owner" && owners <= 1) {
+      return html`${head}<p class="callout info">You’re the only owner of ${v.name}. Make someone else an owner on <a href="${membersPath(id)}">Members</a> first, or delete the vault.</p>`;
+    }
+    return html`${head}
+      <p class="lede">You lose access to ${v.name} at once: its files, proposals and variables. So do your agents.</p>
+      <ul>
+        <li>What you wrote, proposed and approved stays, with your name on it.</li>
+        <li>To come back, an owner has to invite you again.</li>
+      </ul>
+      <form method="post" action="${vaultPath(id, "/config/leave")}" class="actions">
+        ${csrfField(ctx.csrf)}
+        <a class="button quiet" href="${vaultPath(id, "/config")}">Cancel</a><button class="danger">Leave ${v.name}</button>
+      </form>`;
+  });
+}
+
+async function leave(ctx: Ctx, id: string): Promise<Reply> {
+  try {
+    const name = await asPerson(ctx.userId, async (c) => {
+      const v = await vault(c, ctx, id);
+      if (!v) return null;
+      await c.query(`select public.leave_vault($1)`, [id]);
+      return v.name;
+    });
+    if (name === null) return notFound(ctx);
+    ctx.setFlash(`You left ${name}. You and your agents can no longer open it.`);
+    return { redirect: "/" };
+  } catch (err) {
+    ctx.setFlash(message(err));
+    return { redirect: vaultPath(id, "/config") };
+  }
+}
+
+export async function leaveRoutes(ctx: Ctx, id: string): Promise<Reply> {
+  return ctx.method === "GET" ? leavePage(ctx, id) : leave(ctx, id);
+}
+
+// ---------------------------------------------------------------------------
+// Deletion notices, for Home: each shown once (public.take_deletion_notices
+// deletes what it returns), within 30 days of the deletion.
+
+type Notice = { vault_name: string; deleted_by_email: string | null; deleted_at: Date };
+
+export async function deletionNotices(c: pg.PoolClient): Promise<Raw> {
+  const rows = (await c.query(`select vault_name, deleted_by_email, deleted_at from public.take_deletion_notices()`)).rows as Notice[];
+  return html`${rows.map(
+    (n) => html`<p class="callout attention" role="status"><strong>${n.vault_name}</strong> was deleted by ${
+      n.deleted_by_email ?? "an owner"
+    } on ${n.deleted_at.toISOString().slice(0, 10)}. Its files, history and variables are gone.</p>`,
+  )}`;
 }
 
 export async function membersRoutes(ctx: Ctx, id: string, rest: string): Promise<Reply> {
