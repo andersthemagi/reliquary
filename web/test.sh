@@ -37,7 +37,7 @@ until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "${env_args[@]}" \
-  -e WEB_URL="http://127.0.0.1:$port" -e LOGIN_FILE=/app/.login-test-$slot "$node" node --test test/web.test.mjs
+  -e WEB_URL="http://127.0.0.1:$port" -e LOGIN_FILE=/app/.login-test-$slot "$node" node --test --test-concurrency=1 test/*.test.mjs
 
 echo "== server log (must contain no tokens, codes or file text)"
 "$engine" logs "$srv" 2>&1 | grep -E 'rlq_|code=|EUR|script' && { echo "LEAK in server log"; exit 1; } || echo "clean"

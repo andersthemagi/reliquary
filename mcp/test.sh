@@ -36,7 +36,7 @@ until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "${env_args[@]}" \
-  -e MCP_URL="http://127.0.0.1:$port/mcp" "$node" node --test test/e2e.test.mjs
+  -e MCP_URL="http://127.0.0.1:$port/mcp" "$node" node --test --test-concurrency=1 test/*.test.mjs
 
 echo "== server log (must contain no tokens or file text)"
 "$engine" logs "$srv" 2>&1 | tee /dev/stderr | grep -E 'rlq_|800 EUR|Hermes|Falcon' && { echo "LEAK in server log"; exit 1; } || echo "clean"
