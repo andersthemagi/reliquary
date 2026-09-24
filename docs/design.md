@@ -20,18 +20,20 @@ The research behind this draft is in `docs/research/`
 5. [Identity and permissions](#identity-and-permissions)
 6. [Access surfaces](#access-surfaces)
 7. [Context](#context)
-8. [Routines](#routines)
-9. [Environment variables](#environment-variables)
-10. [Continuity](#continuity)
-11. [Client engagements](#client-engagements)
-12. [Git mirror and export](#git-mirror-and-export)
-13. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
-14. [Architecture](#architecture)
-15. [Data model](#data-model)
-16. [Hostile tests](#hostile-tests)
-17. [Build order](#build-order)
-18. [Open decisions](#open-decisions)
-19. [Out of scope](#out-of-scope)
+8. [Shared connections](#shared-connections)
+9. [Routines](#routines)
+10. [Environment variables](#environment-variables)
+11. [Continuity](#continuity)
+12. [Client engagements](#client-engagements)
+13. [Git mirror and export](#git-mirror-and-export)
+14. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
+15. [Architecture](#architecture)
+16. [Data model](#data-model)
+17. [Hostile tests](#hostile-tests)
+18. [Build order](#build-order)
+19. [Open decisions](#open-decisions)
+20. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
+21. [Out of scope](#out-of-scope)
 
 ## What changed from v2
 
@@ -58,15 +60,16 @@ into one repo. v3 separates the two.
  ChatGPT (connector) ─┐
  Claude Code ─────────┤
  Cursor ──────────────┼─ MCP ─┐        ┌──────────── a vault ─────────────┐
- Hermes (Nous) ───────┤       ├──────▶ │ context   entries, notes, log    │
+ Hermes (Nous) ───────┤       ├──────▶ │ context   files, canon/open, log │
  scripts, CI ─────────┘       │  gate  │ routines  automations on context │
  browser ──────── web UI ─────┤        │ env       shared variables        │
- terminal ─────── CLI ────────┘        │ members   people and agents      │
+ terminal ─────── CLI ────────┘        │ connections  shared upstream MCP  │──▶ Stripe, Linear,
+                                       │ members   people and agents      │    any remote MCP
                                        └──────────────┬───────────────────┘
                                                       └──▶ optional git mirror
 ```
 
-Four jobs:
+Five jobs:
 
 1. **Share context across people and whatever agent each one uses.** A
    ChatGPT user and a Claude Code user read and propose to the same
@@ -77,7 +80,10 @@ Four jobs:
 3. **Build with the same accounts, and survive losing a person.** Shared
    variables, access logs, and emergency access mean the team and their
    agents can carry on.
-4. **Run client engagements without email.** A client hands over context and
+4. **Share tools, not keys.** A vault holds connections to other MCP
+   servers with the team's credentials. Members' agents and routines use
+   those tools through Reliquary and never see the credential.
+5. **Run client engagements without email.** A client hands over context and
    credentials into a vault instead of an inbox, and gets it all back, or
    gone, when the work ends.
 
@@ -90,8 +96,10 @@ Four jobs:
 3. **Your agent is you, minus a few things.** An agent connected by a person
    acts with that person's permissions, except the actions that need the
    person present ([Identity and permissions](#identity-and-permissions)).
-4. **Nothing becomes canon without a person.** Agents and routines write
-   notes or proposals. People approve, or write canon themselves.
+4. **Canon needs people; open is open.** Files marked canon change only
+   through a proposal approved by the required number of people. Files
+   marked open can be written by any member or agent allowed to write.
+   Every change to either is logged.
 5. **Secret values never enter model context.** Not through MCP, logs,
    change events, errors, or routine prompts. Where a value must reach a
    process, say plainly what that process can do with it.
@@ -101,6 +109,9 @@ Four jobs:
    stays possible. A vault must outlive any one person, Reliquary included.
 8. **Nobody's machine has to stay on.** Nothing a vault needs runs on a
    member's laptop.
+9. **Good over perfect.** Build the smallest version that holds the
+   guarantees above. Note where it will need to scale, and don't build that
+   yet ([Where it falls flat](#where-it-falls-flat-and-what-scales-later)).
 
 ## Concepts
 
@@ -117,12 +128,20 @@ Four jobs:
 - **Service agent.** A headless agent with its own token and explicit
   grants, not tied to a person: CI, a Hermes instance on a server, a chat
   bot.
-- **Entry.** A unit of context. Two kinds:
-  - **canon:** approved, presented as fact;
-  - **note:** attributed and unconfirmed, can expire. This is where chat
-    remarks and routine observations land.
-- **Proposal.** A suggested new entry, edit, or retraction, waiting for a
-  person to approve it.
+- **File.** A unit of context: markdown at a path, in folders
+  (`clients/acme/brief.md`). Files are what agents read and write.
+- **Policy.** Every file is `canon` or `open`, set on the file or inherited
+  from its folder:
+  - **canon:** changes only through a proposal approved by the folder's
+    quorum of people (default 1). Presented to agents as approved fact.
+  - **open:** any member or agent with write access edits it directly.
+    Presented as attributed and unconfirmed. Chat remarks, routine output
+    and scratch work live here, and open folders can set an expiry.
+- **Proposal.** A suggested new file, edit, move, or retraction of a canon
+  file, waiting for approvals.
+- **Connection.** A remote MCP server plus the credential to reach it,
+  stored in the vault. Members and routines use its tools through
+  Reliquary.
 - **Routine.** A declarative automation inside a vault: a trigger, a
   prompt, an audience, and outputs.
 - **Environment.** A named set of variables in a vault (`development`,
@@ -137,10 +156,12 @@ Four jobs:
 | Action | owner | editor | viewer | service agent |
 |---|---|---|---|---|
 | Read context | yes | yes | yes | if granted |
-| Write notes | yes | yes | no | if granted |
-| Propose | yes | yes | no | if granted |
-| Write canon directly | yes | yes | no | never |
-| Approve or reject proposals | yes | yes | no | never |
+| Write open files | yes | yes | no | if granted |
+| Propose changes to canon files | yes | yes | no | if granted |
+| Approve or reject (counts toward quorum) | yes | yes | no | never |
+| Set a file or folder's policy and quorum | yes | no | no | never |
+| Use a connection's tools | if granted | if granted | if granted, read-only tools | if granted |
+| Add or edit connections | yes | no | no | never |
 | Create and edit routines | yes | yes | no | never |
 | Use environment variables (pull, run) | if granted | if granted | no | if granted, per environment |
 | Reveal a variable's value in the UI | if granted | if granted | no | never |
@@ -164,10 +185,15 @@ person present in the web UI:
 **Why the ceiling:** an agent reads text other people wrote. Prompt
 injection turns any permission the agent holds into a permission the
 injected text holds. The ceiling keeps the few irreversible or
-trust-granting actions behind a human click. Everything else, including
-writing canon where the person may, is open to their agent. Each vault
-chooses whether its agents write canon directly or as proposals; see
-[Open decisions](#open-decisions).
+trust-granting actions behind a human click. Everything else is open to
+their agent: reading, writing open files, proposing canon changes, and using
+granted connections.
+
+**Quorum.** A canon change lands when it has approvals from the folder's
+quorum of distinct people. The proposer's own approval counts, but only as
+a click in the UI; their agent's proposal is not their approval. Agents
+never count. In a one-person vault this means "my agent proposes, I tap
+approve".
 
 ### The gate: filter on who will see the output
 
@@ -182,7 +208,7 @@ may see:
 | A chat surface (group) | everyone present, intersected (`pilot/`) |
 
 This is the rule proven in `spikes/gate/`, with 63 hostile tests and p95
-under 6 ms at 200k entries.
+under 6 ms at 200k rows.
 
 ## Access surfaces
 
@@ -207,33 +233,68 @@ under 6 ms at 200k entries.
 
 | Tool | Notes |
 |---|---|
-| `search_context` | Full text first; embeddings when it proves too weak |
-| `read_entry` | Entry text returned as quoted data with author and approval date |
+| `search` | Full text first; embeddings when it proves too weak |
+| `read_file`, `list_files` | Text returned as quoted data with its policy, author and approvals |
 | `changes_since` | The feed: events after a cursor, oldest first |
-| `write_note` | Attributed, optionally expiring |
-| `propose` | New entry, edit or retraction, with a reason |
-| `write_entry` | Direct canon write, only where the person and vault allow it |
+| `write_file` | Open files only; refused on canon files with a pointer to `propose` |
+| `propose` | New file, edit, move or retraction of a canon file, with a reason |
 | `list_proposals` | Pending and recent |
 | `list_routines`, `routine_runs` | Status and artifacts |
 | `list_env` | Variable names and which environments they are in. **Never values** |
+| `<connection>.<tool>` | Each granted connection's tools, proxied (see [Shared connections](#shared-connections)) |
 
-No MCP tool returns a variable's value, on any scope.
+No MCP tool returns a variable's value or a connection's credential, on any
+scope.
 
 ## Context
 
-- **Entries** are markdown with a title, tags and an optional `path` (used
-  by the git mirror). They carry `valid_from` / `valid_to`, so facts can
-  expire or be superseded without deletion. Retractions are events with a
-  reason.
-- **Canon** is written by a person (or their agent where the vault allows
-  it) or promoted from a proposal. **Notes** are attributed, labelled
-  unconfirmed, and may expire. Promoting a note to canon is a proposal.
+- **Files** are markdown at a path, with optional tags. Folders exist as
+  path prefixes, with a policy record where one is set.
+- **Policy is inherited:** a file's own setting wins, then the nearest
+  folder's, then the vault default (`open` for a one-person vault, `canon`
+  for a shared one). Changing a policy is itself a logged event.
+- **Moving an open file into canon** (for example, promoting a chat remark)
+  is a proposal.
+- **Every change is logged with its content diff.** That is enough to
+  rebuild any past version. A version-history view and restore are a
+  stretch goal on top of the log, not new storage.
 - **The feed** has one call, `changes_since(vault, cursor)`, the same over
   MCP, REST and CLI. Deletions and retractions appear as events, never as
   gaps.
-- **Entry text is data.** Every surface wraps it as quoted content with
-  author and date. Proposals that address an AI system are flagged in
+- **File text is data.** Every surface wraps it as quoted content with its
+  policy, author and date. Proposals that address an AI system are flagged in
   review.
+
+## Shared connections
+
+A vault can hold connections to other remote MCP servers (Stripe, Linear,
+Supabase, a client's own server), each with the credential to reach it. A
+member's agent connects to Reliquary once, and sees each connection's tools
+as `<connection>.<tool>`. Reliquary calls the upstream server with the
+vault's credential. The agent never has the credential.
+
+This is how a team shares a platform account without sharing its key. It
+is also how routines reach third-party data, so there is no separate
+connector system.
+
+- **Grants per connection and role.** Each connection has a tool
+  allowlist. Tools that write or send are off until an owner enables them,
+  per role.
+- **Credentials** are stored like environment variables (secret store,
+  access log) and attached at egress. They never appear in tool results,
+  logs or errors. Reliquary is a separate MCP client to the upstream server
+  with its own credential, so there is no token passthrough.
+- **Every proxied call is logged:** who, which agent, which tool, the
+  outcome and size. Arguments and results are not stored by default, only
+  their hashes.
+- **Remote servers only.** Hosted Reliquary can't run a server that lives
+  on someone's laptop (stdio MCP). Upstream URLs must be public HTTPS: no
+  private or link-local addresses, and redirects are re-checked (SSRF).
+- **What the gate doesn't cover:** upstream data isn't vault context. A
+  member granted a connection sees whatever that upstream account returns.
+  The connection grant is the control, so grant accordingly.
+- **Shared credentials only in v1** (API keys, service accounts).
+  Per-member OAuth to upstream ("my Gmail") comes later.
 
 ## Routines
 
@@ -256,8 +317,9 @@ model:
   key: env:production/ANTHROPIC_API_KEY
 prompt: |
   Summarise what changed this week and what is blocked.
+tools: [linear.list_issues]        # declared connection tools only
 outputs:
-  - note: { tags: [digest], expires: 30d }
+  - write: { path: digests/{date}.md }    # an open folder
   - notify: { channel: discord, webhook: env:production/DISCORD_WEBHOOK }
 limits: { timeout: 120s, max_output_tokens: 4000 }
 ```
@@ -265,12 +327,12 @@ limits: { timeout: 120s, max_output_tokens: 4000 }
 - **Triggers:** a cron schedule, a change in the vault matching a filter
   (the feed drives this), or a manual run. Incoming webhooks come later.
 - **What a run may do:** read context through the gate as its audience,
-  call the model with the vault's key, and use Reliquary's own tools
-  (search, note, propose). It **may not** run code, touch git, or make
-  arbitrary HTTP calls. Outbound calls are only the declared notify targets.
-- **Outputs are artifacts:** notes, proposals, notifications. A run without
-  one is a failure. Canon never comes straight from a routine; that takes a
-  person.
+  call the model with the vault's key, use Reliquary's own tools (search,
+  write open files, propose), and call the connection tools it declares. It
+  **may not** run code, touch git, or reach anything it didn't declare.
+- **Outputs are artifacts:** open-file writes, proposals, notifications, or
+  a declared connection call. A run without one is a failure. Canon never
+  comes straight from a routine; that takes people.
 - **Secrets in routines** are resolved server-side at egress (the model key,
   a webhook URL) and never placed in the prompt.
 - **Runtime:** `pg_cron` enqueues due runs (`pgmq`). A serverless function
@@ -285,10 +347,10 @@ limits: { timeout: 120s, max_output_tokens: 4000 }
 - **Run log** (`routine_runs`) is append-only: `queued`, `running`, `ok`,
   `failed`, `skipped`, `missed`, `timed_out`, plus the artifact.
 
-Routines needing real code, repo access or third-party data (Gmail,
-calendars) are a later decision: connectors, or a sandboxed runner. Until
-then, those stay in each member's own tooling and talk to Reliquary over
-MCP.
+Third-party data comes through [shared connections](#shared-connections).
+Routines needing real code or repo access are a later decision (a
+sandboxed runner). Until then, those stay in each member's own tooling and
+talk to Reliquary over MCP.
 
 ## Environment variables
 
@@ -358,7 +420,7 @@ that with a vault per engagement:
   the client grants reveal. The client decides.
 - **Context intake.** A "tell us about the project" box and document
   uploads arrive as proposals the consultant reviews, so the client never
-  has to learn the difference between notes and canon.
+  has to learn the difference between open and canon.
 - **Offboarding.** Closing an engagement:
   - revokes every consultant grant and agent connection;
   - lists which credentials were used, so the client knows what to rotate;
@@ -388,10 +450,11 @@ that with a vault per engagement:
 paying clients ask for it. Until an auditor has signed a report, the product
 never says "SOC 2 compliant". It lists the controls it actually has.
 
-**Erasure without breaking append-only.** The log and entry history are
+**Erasure without breaking append-only.** The log and file history are
 never edited, but people have a right to be forgotten. So:
 
-- every entry's text (and every note's) is encrypted with its own key;
+- every file's text, and every diff in its history, is encrypted with the
+  file's own key;
 - erasure deletes the key and writes a tombstone event;
 - the history keeps its shape, but the content is unrecoverable, including
   in backups once they age out.
@@ -408,7 +471,7 @@ Closing a vault crypto-shreds everything in it after the export window.
   own agreement with them. The UI shows which provider each routine sends
   data to.
 - **Rights:** export (portability) and crypto-shred erasure; retention per
-  vault; notes expire by default.
+  vault; open folders can expire.
 - **Operations:** a breach runbook with 72-hour notification, a record of
   processing activities, and a plain privacy policy.
 
@@ -454,8 +517,12 @@ Carried from the spike and CommonThread, renamed where needed:
 - `service_agents`, `service_agent_grants`.
 - `sessions` (minted: vault, acting member or service agent, agent identity,
   audience, expiry).
-- `entries(kind, title, body, tags, path, audience, author, approved_by,
-  valid_from, valid_to)`, `proposals`.
+- `files(path, body_encrypted, key_id, tags, audience, author,
+  updated_at)`, `folder_policies(prefix, policy, quorum, expires_after)`,
+  `proposals`, `approvals`.
+- `connections(name, url, credential_secret_id, tool_allowlist)`,
+  `connection_grants(role or member, tools)`, `connection_calls` (append-only
+  log).
 - `log(seq bigint identity, vault_id, event, actor, agent, origin, at)`:
   append-only, the feed.
 - `routines(config jsonb, enabled, owner)`, `routine_runs` (append-only
@@ -482,15 +549,23 @@ New in v3:
 - **Delegation ceiling:** a member's agent attempting each human-present
   action.
 - **Routine audience:** a routine declaring `audience: editors` never reads
-  an entry a viewer-only note restricts; its output inherits no wider
+  a file whose audience excludes some editors; its output inherits no wider
   audience than its reads.
-- **Routine escape:** a routine attempting an undeclared notify target, a
+- **Routine escape:** a routine attempting an undeclared notify target or
+  connection tool, a
   code or git action, or putting an `env:` reference into its prompt text.
 - **Environment grants:** an editor granted `development` pulling
   `production`; a revoked member's next pull failing; a service agent
   revealing a value.
 - **Emergency access:** granted only after the wait, and cancelled by any
   owner's decline.
+- **Policies:** an agent writing a canon file directly; a canon change
+  landing one approval short of quorum; an agent's approval counting; a
+  proposer's agent approving for them.
+- **Connections:** a credential in any tool result, log or error; a tool
+  outside the allowlist; a write tool before an owner enabled it; an
+  upstream URL on a private address or redirecting to one; a revoked
+  member's agent calling a connection.
 - **Client engagements:** a requester revealing a variable the client
   didn't grant reveal on; a closed engagement's consultant or agent reading
   anything.
@@ -506,21 +581,20 @@ previous check has held for a week of real use.
 
 | # | Milestone | Done when |
 |---|---|---|
-| 1 | **Core, MCP and UI.** Vaults, entries, notes, proposals, log, gate, remote MCP with OAuth, web UI for review | Andrés uses one vault from ChatGPT, Claude Code and Hermes for a week. Each sees the same context; proposals are approved in the browser; hostile tests green |
-| 2 | **Routines.** Declarative runs on the vault's key, watchdog, run log | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
-| 3 | **Second person, environment variables, client engagements** | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; a real client fills a credential request instead of emailing it; the access log shows all of it; emergency access and engagement close tested end to end |
-| 4 | **Export and git mirror** | A vault round-trips through export, and a one-way mirror stays in sync for a week |
-| 5 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
+| 1 | **Core, MCP and UI.** Vaults, files and folders, canon/open policies with quorum, log, gate, remote MCP with OAuth, web UI for review, plain export | Andrés uses one vault from ChatGPT, Claude Code and Hermes for a week. Each sees the same files; canon changes are approved in the browser; hostile tests green |
+| 2 | **Shared connections** | One upstream MCP (e.g. Linear) is used from all three clients through Reliquary for a week, with the credential never leaving Reliquary |
+| 3 | **Routines** (can use connections) | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
+| 4 | **Team and clients.** Second person, quorum above 1, environment variables, credential requests, emergency access | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; a real client fills a credential request instead of emailing it; the access logs show all of it |
+| 5 | **Git mirror, version history view** | A one-way mirror stays in sync for a week; a file is restored from its history |
+| 6 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
 
 ## Open decisions
 
-1. **Agent writes: direct canon or proposals by default?**
-   *Recommendation:* direct in single-member vaults, proposals in shared
-   vaults, switchable per vault. Approving stays human-present either way.
-2. **"Vault" or "space".** "Vault" matches how Andrés talks about it, but
-   collides with Supabase Vault and 1Password vaults in docs.
-   *Recommendation:* use vault in the product, and say "secret store" for
-   the encryption layer.
+1. ~~Agent writes: direct or proposals?~~ Decided: per file or folder
+   policy (canon or open), with a quorum for canon.
+2. ~~"Vault" or "space"?~~ Decided: **vault** is the container. The
+   encryption layer is the **secret store**, and a **connection** is an
+   upstream MCP. Words in this doc aren't reused for anything else.
 3. **OAuth authorization server:** Supabase Auth, if it meets the MCP spec
    (resource indicators, client ID metadata documents); otherwise a small
    one in Next.js. Decide in milestone 1.
@@ -529,7 +603,36 @@ previous check has held for a week of real use.
    *Recommendation:* Supabase Vault for milestone 3, behind an interface.
 5. **Hosting model:** multi-tenant, or an instance per customer? v2 left
    this to later. v3 assumes multi-tenant with a self-host path.
-6. **Name:** check npm, domains and trademarks before any client material.
+6. **Name**, checked 2026-09-24, and to finish before any client material:
+   - npm: `reliquary` is taken, by a dormant secrets-management package
+     (last published 2022). A scoped `@reliquary/*` package name is
+     unverified.
+   - Domains: `reliquary.com`, `.dev`, `.app` and `getreliquary.com` are
+     registered with no live site; `reliquary.ai` is for sale; `reliquary.io`
+     looks unregistered.
+   - Trademarks: not yet searched (USPTO, EUIPO).
+
+## Where it falls flat, and what scales later
+
+Built lean on purpose. Where each part will strain, and the signal that
+says it's time:
+
+| Part | Lean v1 | Falls flat when | Then |
+|---|---|---|---|
+| Search | Postgres full text | Questions don't share words with the answer | Embeddings with pgvector, iterative scans under RLS |
+| Gate cost | Per-query helpers (p95 < 6 ms at 200k rows) | A vault passes millions of files | Combined indexes, partitioning by vault |
+| Quorum | Count of distinct approvers | Teams want "one from legal and one from eng" | Approver groups per folder |
+| Routines | One model call, Edge Function time limits | Multi-step agent work, long runs | A worker queue, or Managed Agents, per vault |
+| Connections | Shared credentials, remote MCP only | People want their own Gmail or calendar, or local tools | Per-member upstream OAuth; a small local relay for stdio servers |
+| Connection proxy | Synchronous pass-through | Long or streaming tool calls | Streaming proxy with its own timeouts |
+| Secret store | Supabase Vault, operator can decrypt | A client needs zero-knowledge | Client-side encryption with per-member keys |
+| Version history | Rebuilt from the log's diffs | History views get slow | Periodic snapshots |
+| Multi-tenant | One Supabase project | Noisy neighbours, data residency asks | Per-region or per-customer projects |
+| Compliance | Designed-in controls, no audit | A client requires a SOC 2 report | Compliance platform plus auditor |
+
+The big risk isn't technical. It's **approval fatigue**: canon folders with
+nobody approving. Watch the proposal queue's age from milestone 1, and
+default more folders to open if proposals sit unreviewed.
 
 ## Out of scope
 
