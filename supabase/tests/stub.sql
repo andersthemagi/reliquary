@@ -12,3 +12,14 @@ do $$ begin
   end if;
 end $$;
 grant usage on schema public to anon, authenticated, service_role;
+
+-- Supabase installs extensions in their own schema.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
+-- Supabase grants the API roles everything on new objects in public by
+-- default. Migrations must revoke what they don't intend to expose; these
+-- defaults make the tests prove it.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;

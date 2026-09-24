@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Apply every migration to a throwaway Postgres (with the Supabase roles
-# stubbed) and run the hostile tests. Exits non-zero on any failure.
+# Each *_test.sql gets a fresh database with the Supabase roles stubbed and
+# every migration applied, then runs between harness.sql and report.sql.
+# Exits non-zero on any failure.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -18,8 +19,12 @@ sleep 1
 
 psql() { "$engine" exec -i "$name" psql -U postgres -v ON_ERROR_STOP=1 -q "$@"; }
 
-cat tests/stub.sql migrations/*.sql | psql
+status=0
 for t in tests/*_test.sql; do
+  db=$(basename "$t" .sql)
   echo "== $t"
-  psql < "$t" | grep -E '^ (PASS|FAIL)'
+  psql -c "create database $db"
+  cat tests/stub.sql migrations/*.sql | psql -d "$db"
+  cat tests/harness.sql "$t" tests/report.sql | psql -d "$db" | grep -E '^ (PASS|FAIL)' || status=1
 done
+exit $status

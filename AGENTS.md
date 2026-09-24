@@ -12,8 +12,12 @@ for a week of real use, not when the code merges.
 
 Current milestone: **1, core, MCP and UI** (vaults, files with canon/open
 policies, proposals with quorum, log, gate, remote MCP with OAuth, web UI).
-Done so far: the core schema in `supabase/migrations/`, with hostile tests in
-`supabase/tests/` (`./supabase/tests/run.sh`, needs podman or docker).
+Done so far:
+- core schema, access tokens and search in `supabase/migrations/`, with hostile
+  tests (`./supabase/tests/run.sh`);
+- the remote MCP endpoint in `mcp/` (token auth; OAuth next), with end-to-end
+  tests (`./mcp/test.sh`) and a local runner (`./mcp/dev.sh`).
+Both need podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
 minting, a Telegram surface). They are not product code, and are not
