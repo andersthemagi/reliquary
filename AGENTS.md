@@ -16,7 +16,9 @@ Done so far:
 - core schema, access tokens and search in `supabase/migrations/`, with hostile
   tests (`./supabase/tests/run.sh`);
 - the remote MCP endpoint in `mcp/` (token auth; OAuth next), with end-to-end
-  tests (`./mcp/test.sh`) and a local runner (`./mcp/dev.sh`).
+  tests (`./mcp/test.sh`) and a local runner (`./mcp/dev.sh`);
+- the web UI in `web/` for browsing, editing and approving (local sign-in
+  stand-in until Supabase Auth), with end-to-end tests (`./web/test.sh`).
 Both need podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session

@@ -13,3 +13,4 @@ supabase/.temp/
 __pycache__/
 *.pyc
 mcp/.tokens/
+web/.login

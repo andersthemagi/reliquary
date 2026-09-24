@@ -2,7 +2,8 @@
 # Run Reliquary's MCP endpoint locally, with a persistent Postgres, so you can
 # connect your own agents before hosting and OAuth exist.
 #
-#   ./dev.sh up              start Postgres + server, apply new migrations
+#   ./dev.sh up              start Postgres, the MCP server and the web UI
+#   ./dev.sh ui              open the web UI, signed in (link never printed)
 #   ./dev.sh vault "<name>"   create a vault owned by you
 #   ./dev.sh token "<name>"   mint a token into mcp/.tokens/ (never printed)
 #   ./dev.sh claude "<name>"  mint a token and add it to Claude Code (CLI)
@@ -20,6 +21,8 @@ cd "$(dirname "$0")"
 engine=$(command -v podman || command -v docker)
 pg=reliquary-dev-pg
 srv=reliquary-dev-mcp
+web=reliquary-dev-web
+webport=8790
 pgport=54331
 port=8787
 node=docker.io/library/node:22-slim
@@ -36,6 +39,7 @@ if [[ ! -f $envfile ]]; then
     echo "ME=$(python3 -c 'import uuid; print(uuid.uuid4())')"
   } > $envfile
 fi
+grep -q '^WEB_DB_PASSWORD=' $envfile || echo "WEB_DB_PASSWORD=$(rand)" >> $envfile
 # shellcheck disable=SC1090
 source $envfile
 
@@ -80,7 +84,15 @@ case "${1:-}" in
       -e DATABASE_URL="postgres://reliquary_mcp:$MCP_DB_PASSWORD@127.0.0.1:$pgport/postgres" \
       -e PORT=$port $node node dist/server.js >/dev/null
     until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
+    echo "alter role reliquary_web login password :'pw';" | psql -v pw="$WEB_DB_PASSWORD"
+    "$engine" run --rm --network none -v "$PWD/../web":/app:Z -w /app $node npx tsc
+    "$engine" rm -f $web >/dev/null 2>&1 || true
+    "$engine" run -d --name $web --network host --restart unless-stopped -v "$PWD/../web":/app:Z -w /app \
+      -e DATABASE_URL="postgres://reliquary_web:$WEB_DB_PASSWORD@127.0.0.1:$pgport/postgres" \
+      -e LOCAL_USER_ID="$ME" -e LOGIN_FILE=/app/.login -e PORT=$webport $node node dist/server.js >/dev/null
+    until curl -sf "http://127.0.0.1:$webport/healthz" >/dev/null; do sleep 0.3; done
     echo "MCP endpoint: http://127.0.0.1:$port/mcp"
+    echo "Web UI:       http://127.0.0.1:$webport  (sign in with ./mcp/dev.sh ui)"
     ;;
   vault)
     id=$(as_me "select public.create_vault(:'name', 'open');" -v name="${2:?vault name}")
@@ -114,7 +126,16 @@ case "${1:-}" in
       -v name="${2:?token name}")
     echo "revoked $n token(s) named '$2'"
     ;;
-  down) "$engine" stop $srv $pg >/dev/null 2>&1 || true; echo "stopped (data kept)" ;;
+  ui)
+    curl -sf "http://127.0.0.1:$webport/healthz" >/dev/null || { echo "Web UI isn't running. Run ./mcp/dev.sh up first."; exit 1; }
+    link_file="$PWD/../web/.login"
+    if command -v xdg-open >/dev/null && xdg-open "$(cat "$link_file")" >/dev/null 2>&1; then
+      echo "Opened the web UI in your browser (single-use sign-in link, not shown here)."
+    else
+      echo "Couldn't open a browser. Open the single-use link stored in web/.login yourself."
+    fi
+    ;;
+  down) "$engine" stop $web $srv $pg >/dev/null 2>&1 || true; echo "stopped (data kept)" ;;
   logs) "$engine" logs -f $srv ;;
   *) sed -n '2,11p' "$0"; exit 1 ;;
 esac
