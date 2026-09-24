@@ -1168,29 +1168,34 @@ function connect(ctx: Ctx): Reply {
     ctx,
     "Connect",
     html`${pageHeader({ title: "Connect an agent", actions: html`<a class="button primary" href="/tokens">Create a token</a>` })}
-    <p class="lede">Any MCP client can use your vaults through one URL. Each agent gets its own <a href="/tokens">token</a>, which acts as you but can never approve, change rules or manage members.</p>
+    <p class="lede">Any MCP client can use your vaults through one URL. Clients that support sign-in (Claude Code, Claude.ai, ChatGPT) connect with your Reliquary account: you choose which vaults they reach and whether they can write. Others use a <a href="/tokens">token</a>. Either way the agent acts as you, but can never approve, change rules or manage members.</p>
     <p class="endpoint"><span class="muted small">MCP URL</span><code>${url}</code></p>
-    <p class="callout info">Keep tokens out of config files and chats: anything an agent can read, it can leak. Every setup below reads the token from a file, an environment variable or a password prompt.</p>
-    <nav class="tabs" aria-label="Clients"><a href="#claude-code">Claude Code</a><a href="#cursor">Cursor</a><a href="#vscode">VS Code</a><a href="#hermes">Hermes and others</a><a href="#chat">Claude.ai and ChatGPT</a></nav>
+    <nav class="tabs" aria-label="Clients"><a href="#claude-code">Claude Code</a><a href="#chat">Claude.ai and ChatGPT</a><a href="#cursor">Cursor</a><a href="#vscode">VS Code</a><a href="#hermes">Hermes and others</a></nav>
 
     <section id="claude-code"><h2>Claude Code (app or CLI)</h2>
-      <p>Save a token to a file with <code>./mcp/dev.sh token "Claude Code on Linux"</code>, then add this under <code>mcpServers</code> in <code>~/.claude.json</code>. Claude Code runs the helper at connect time, so the token never sits in its config. Start a new session to pick it up.</p>
-      <pre class="code">${helper}</pre></section>
+      <p>On each computer, add Reliquary once for your user:</p>
+      <pre class="code">claude mcp add --transport http --scope user reliquary ${url}</pre>
+      <p>Then in Claude Code run <code>/mcp</code>, choose <strong>reliquary</strong> and <strong>Authenticate</strong>. Your browser opens Reliquary: sign in, pick the vaults and access, and approve. Claude Code keeps the connection and refreshes it by itself. Revoke it any time on the <a href="/tokens">Tokens</a> page.</p></section>
+
+    <section id="chat"><h2>Claude.ai and ChatGPT</h2>
+      <p><strong>Claude.ai:</strong> Settings, Connectors, <strong>Add custom connector</strong>. Name it Reliquary and paste the MCP URL. Claude sends you here to sign in and approve.</p>
+      <p><strong>ChatGPT:</strong> Settings, Apps and Connectors, turn on developer mode under Advanced, then create a connector with the MCP URL and OAuth authentication. ChatGPT sends you here to sign in and approve.</p></section>
 
     <section id="cursor"><h2>Cursor</h2>
-      <p>Set <code>RELIQUARY_TOKEN</code> in the environment Cursor starts from, then <a href="${cursorLink}">add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:</p>
+      <p class="callout info">Tokens are for clients without sign-in. Keep them out of config files and chats: anything an agent can read, it can leak. The setups below read the token from an environment variable or a password prompt.</p>
+      <p>Create a token on the <a href="/tokens">Tokens</a> page, set it as <code>RELIQUARY_TOKEN</code> in the environment Cursor starts from, then <a href="${cursorLink}">add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:</p>
       <pre class="code">${cursorJson}</pre></section>
 
     <section id="vscode"><h2>VS Code</h2>
-      <p>Add this to <code>.vscode/mcp.json</code>. VS Code asks for the token once and stores it securely.</p>
+      <p>Add this to <code>.vscode/mcp.json</code>. VS Code asks for a token from the <a href="/tokens">Tokens</a> page once and stores it securely.</p>
       <pre class="code">${vscodeJson}</pre></section>
 
     <section id="hermes"><h2>Hermes and other clients</h2>
-      <p>Use Streamable HTTP with the URL above and this header, reading the token from wherever the client keeps secrets:</p>
-      <pre class="code">Authorization: Bearer &lt;your token&gt;</pre></section>
-
-    <section id="chat"><h2>Claude.ai and ChatGPT</h2>
-      <p>These add connectors through OAuth and need a public URL, so they arrive with hosting. Until then, use one of the clients above.</p></section>`,
+      <p>Use Streamable HTTP with the MCP URL and this header, reading the token from wherever the client keeps secrets:</p>
+      <pre class="code">Authorization: Bearer &lt;your token&gt;</pre>
+      <details><summary>Local development (a Reliquary checkout on this machine)</summary>
+        <p>With <code>./mcp/dev.sh token "Claude Code on Linux"</code> the token stays in a file, and Claude Code reads it through a helper at connect time. Add this under <code>mcpServers</code> in <code>~/.claude.json</code>:</p>
+        <pre class="code">${helper}</pre></details></section>`,
     "connect",
   );
 }

@@ -101,6 +101,7 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 | F46 | Delete an open file over MCP | `delete_file` deletes an open file as the agent's person, logged as the agent; canon files point to `propose`; read-only tokens delete nothing; a missing file is not found | `mcp/test/delete_file.test.mjs#delete_file:` |
 | F47 | Revise your own proposal in the web UI | The proposer (including the person whose agent proposed) gets Revise on a live write proposal; saving makes a new revision without approving it; others get no Revise, a 404 for the page, and the database's refusal on a forged post; needs the form token | `web/test/vaults.test.mjs#revise:` |
 | F48 | Parity table stays true | Every MCP tool is named in docs/parity.md's MCP column, and the column names no tool that doesn't exist | `mcp/test/parity.test.mjs#parity:` |
+| F49 | Connect by sign-in | The Connect page leads with `claude mcp add` plus `/mcp` Authenticate for Claude Code and the connector steps for Claude.ai and ChatGPT, before any token setup; the local headersHelper sits under Local development | `web/test/connect.test.mjs#connect:` |
 
 ## Not built yet (no rows until they ship)
 
