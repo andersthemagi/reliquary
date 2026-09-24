@@ -1,6 +1,6 @@
 # UX patterns for the web UI
 
-2026-09-24 · Status: RESEARCH. Phase 1 built 2026-09-24; phases 2 and 3 open
+2026-09-24 · Status: RESEARCH. Phases 1 and 2 built 2026-09-24; phase 3 waits for hosting
 
 How established products structure the same jobs as Reliquary's web UI, and
 what that means for our screens. Two research passes, sources checked
