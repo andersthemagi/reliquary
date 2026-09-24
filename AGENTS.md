@@ -20,7 +20,10 @@ Done so far:
 - the web UI in `web/` (local sign-in stand-in until Supabase Auth): review
   inbox, proposal pages with approve / request changes / reject / edit & approve,
   folder tree, rendered files, rules with a checker, search, Connect page, with
-  end-to-end tests (`./web/test.sh`). Structure: `docs/research/ux-patterns.md`.
+  end-to-end tests (`./web/test.sh`). Structure: `docs/research/ux-patterns.md`;
+- proposal threads (comments from people and, over MCP, their agents, in one
+  timeline with review notes) and private per-person snooze in the Review
+  inbox (`20260924170000_threads_snooze.sql`, `web/src/thread.ts`).
 Both need podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
