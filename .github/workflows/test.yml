@@ -1,0 +1,54 @@
+# The regression suite on every push and pull request. Make "test" and
+# "guard" required status checks on main (Settings > Branches) so nothing
+# merges red. Policy: docs/research/testing-strategy.md.
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    # Existing tests change only with a Changes-behaviour or Test-refactor
+    # trailer. Checks the commits a PR adds, or the commits a push adds.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Registry maps every test file
+        run: ./scripts/check-registry.sh
+      - name: Existing tests changed only on purpose
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            ./scripts/test-guard.sh "$PR_BASE"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] \
+               && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            ./scripts/test-guard.sh "$BEFORE"
+          else
+            echo "new branch or rewritten history: comparing with origin/main"
+            ./scripts/test-guard.sh origin/main
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Docker is the well-trodden engine on GitHub runners; the scripts use
+      # podman when it's installed unless told otherwise.
+      CONTAINER_ENGINE: docker
+    steps:
+      - uses: actions/checkout@v4
+      - name: All suites (sql, mcp, web) in parallel
+        run: ./test.sh
