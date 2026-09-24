@@ -7,10 +7,16 @@ transaction as the caller. Access is decided by the database (see
 ## Run it locally
 
 ```bash
-./dev.sh up                         # Postgres + server on http://127.0.0.1:8787/mcp
-./dev.sh vault "My vault"           # a vault owned by you
-./dev.sh token "Claude Code on Linux"   # prints a token once, plus the claude mcp add line
+./dev.sh up                    # Postgres + server on http://127.0.0.1:8787/mcp
+./dev.sh vault "My vault"      # a vault owned by you
+./dev.sh token "Hermes"        # token saved to mcp/.tokens/ (mode 600), never printed
+./dev.sh claude "Claude Code"  # with the claude CLI: wires it in without showing the token
+./dev.sh revoke "Hermes"       # revoke by name
 ```
+
+Tokens are never printed, because terminal output can land in an agent's
+context (Claude Code's `!` commands, for one), and secrets must never reach a
+model. If one does get printed, revoke it and mint another.
 
 Any MCP client that can send a header works the same way (Hermes, Cursor):
 `Authorization: Bearer rlq_...`.

@@ -3,8 +3,14 @@
 # connect your own agents before hosting and OAuth exist.
 #
 #   ./dev.sh up              start Postgres + server, apply new migrations
-#   ./dev.sh token "<name>"  mint an access token for you (shown once)
-#   ./dev.sh vault "<name>"  create a vault owned by you
+#   ./dev.sh vault "<name>"   create a vault owned by you
+#   ./dev.sh token "<name>"   mint a token into mcp/.tokens/ (never printed)
+#   ./dev.sh claude "<name>"  mint a token and add it to Claude Code (CLI)
+#   ./dev.sh revoke "<name>"  revoke your live tokens with that name
+#
+# Tokens are never written to the terminal: anything printed there can end up
+# in an agent's context (e.g. via Claude Code's ! commands), and secrets must
+# never reach a model.
 #   ./dev.sh down            stop (data kept in the reliquary-devdata volume)
 #
 # Secrets live in mcp/.env.dev (gitignored, mode 600).
@@ -81,12 +87,32 @@ case "${1:-}" in
     echo "vault ${2} created: $id"
     ;;
   token)
-    token=$(as_me "select public.create_access_token(:'name', 90);" -v name="${2:?token name, e.g. Claude Code on Linux}")
-    echo "Token for '${2}' (shown once, valid 90 days):"
-    echo "  $token"
-    echo
-    echo "Claude Code:"
-    echo "  claude mcp add --transport http reliquary http://127.0.0.1:$port/mcp --header \"Authorization: Bearer $token\""
+    name=${2:?token name, e.g. Hermes on Linux}
+    mkdir -p .tokens && chmod 700 .tokens
+    file=".tokens/$(echo "$name" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//').token"
+    ( umask 077
+      as_me "select public.create_access_token(:'name', 90);" -v name="$name" > "$file" )
+    copied=""
+    if command -v wl-copy >/dev/null; then tr -d '\n' < "$file" | wl-copy && copied=" and copied to the clipboard"
+    elif command -v xclip >/dev/null; then tr -d '\n' < "$file" | xclip -selection clipboard && copied=" and copied to the clipboard"
+    fi
+    echo "Token for '$name' saved to mcp/$file (mode 600, gitignored)$copied. Valid 90 days."
+    echo "Use it as the header  Authorization: Bearer <token>  with MCP URL http://127.0.0.1:$port/mcp"
+    ;;
+  claude)
+    name=${2:-Claude Code}
+    command -v claude >/dev/null || { echo "The claude CLI isn't on PATH. Use ./dev.sh token instead."; exit 1; }
+    token=$(as_me "select public.create_access_token(:'name', 90);" -v name="$name")
+    claude mcp remove reliquary -s user >/dev/null 2>&1 || true
+    claude mcp add --transport http -s user reliquary "http://127.0.0.1:$port/mcp" \
+      --header "Authorization: Bearer $token" >/dev/null
+    unset token
+    echo "Claude Code (user scope) now reaches Reliquary as '$name'. The token was not shown."
+    ;;
+  revoke)
+    n=$(as_me "select count(public.revoke_access_token(id)) from public.access_tokens where name = :'name' and revoked_at is null;" \
+      -v name="${2:?token name}")
+    echo "revoked $n token(s) named '$2'"
     ;;
   down) "$engine" stop $srv $pg >/dev/null 2>&1 || true; echo "stopped (data kept)" ;;
   logs) "$engine" logs -f $srv ;;

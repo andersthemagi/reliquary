@@ -12,3 +12,4 @@ supabase/.temp/
 *.log
 __pycache__/
 *.pyc
+mcp/.tokens/
