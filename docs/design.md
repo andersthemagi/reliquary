@@ -450,16 +450,17 @@ that with a vault per engagement:
 paying clients ask for it. Until an auditor has signed a report, the product
 never says "SOC 2 compliant". It lists the controls it actually has.
 
-**Erasure without breaking append-only.** The log and file history are
-never edited, but people have a right to be forgotten. So:
+**Erasure without breaking append-only.** The log is never edited, but
+people have a right to be forgotten. So the log holds no content at all,
+only events that point at versions. Content lives in `file_versions`,
+which is insert-only except for one operation: erasure blanks a version's
+text and stamps it. A trigger enforces that no other change is possible.
 
-- every file's text, and every diff in its history, is encrypted with the
-  file's own key;
-- erasure deletes the key and writes a tombstone event;
-- the history keeps its shape, but the content is unrecoverable, including
-  in backups once they age out.
-
-Closing a vault crypto-shreds everything in it after the export window.
+- The log keeps its sequence; the content is gone.
+- Backups still hold it until they age out, which the privacy policy states.
+- Closing a vault erases everything in it after the export window.
+- Per-file encryption keys (crypto-shredding) remain an option if backups
+  must forget immediately. Lean v1 doesn't need them.
 
 **GDPR, from the start:**
 

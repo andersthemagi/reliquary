@@ -10,8 +10,10 @@ Milestones and their exit checks are in the design's Build order table. Work
 on the current milestone only. A milestone is done when its check has held
 for a week of real use, not when the code merges.
 
-Current milestone: **none active.** The v3 design is a draft on branch
-`design/v3`. Milestone 1 (core, MCP and UI) starts when Andrés approves it.
+Current milestone: **1, core, MCP and UI** (vaults, files with canon/open
+policies, proposals with quorum, log, gate, remote MCP with OAuth, web UI).
+Done so far: the core schema in `supabase/migrations/`, with hostile tests in
+`supabase/tests/` (`./supabase/tests/run.sh`, needs podman or docker).
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
 minting, a Telegram surface). They are not product code, and are not
