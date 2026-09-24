@@ -44,6 +44,9 @@ test("auth: a login link works once, and a wrong code never", async () => {
 
 test("headers: scripts are forbidden and pages aren't cached", async () => {
   const r = await get("/");
+  // Browsers send Origin: null on form posts under "no-referrer", which broke
+  // every form. The policy must keep the real Origin on same-site requests.
+  assert.equal(r.headers.get("referrer-policy"), "same-origin");
   assert.match(r.headers.get("content-security-policy"), /default-src 'none'/);
   assert.doesNotMatch(r.headers.get("content-security-policy"), /script-src/);
   assert.equal(r.headers.get("cache-control"), "no-store");
@@ -89,6 +92,12 @@ test("csrf: a decision from another origin is refused", async () => {
   const csrf = csrfOf(await text(await get(`/v/${TEAM_VAULT}/proposals`)));
   const r = await post(`/v/${TEAM_VAULT}/proposals/${PROPOSAL}`, { decision: "approve", csrf },
     { origin: "https://evil.example" });
+  assert.equal(r.status, 403);
+});
+
+test("csrf: an opaque (null) origin is refused", async () => {
+  const csrf = csrfOf(await text(await get(`/v/${TEAM_VAULT}/proposals`)));
+  const r = await post(`/v/${TEAM_VAULT}/proposals/${PROPOSAL}`, { decision: "approve", csrf }, { origin: "null" });
   assert.equal(r.status, 403);
 });
 

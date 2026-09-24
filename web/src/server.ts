@@ -72,7 +72,11 @@ const SECURITY_HEADERS = {
   "content-security-policy":
     "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   "x-content-type-options": "nosniff",
-  "referrer-policy": "no-referrer",
+  // Not "no-referrer": under that policy browsers send `Origin: null` on
+  // form posts, which the same-origin check below (rightly) refuses.
+  // "same-origin" keeps the real Origin for this site and sends nothing to
+  // any other.
+  "referrer-policy": "same-origin",
   "cache-control": "no-store",
 };
 
@@ -128,7 +132,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST") {
       const origin = req.headers.origin;
       if (origin && origin !== `http://${req.headers.host}`) {
-        send(res, { status: 403, html: "<p>Cross-site request refused.</p>" });
+        send(res, { status: 403, html: "<p>Cross-site request refused. If you submitted this form yourself, reload the page and try again.</p>" });
+        console.info(`POST ${url.pathname} 403 origin=${origin === "null" ? "null" : "other"}`);
         return;
       }
       form = await readForm(req);
