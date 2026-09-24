@@ -608,7 +608,7 @@ export function registerTools(server: McpServer, id: Identity): void {
     {
       title: "List environment variables",
       description:
-        "Names of a vault's environment variables per environment, who last set each, and pushes waiting for a person to apply. Never values: you can't read, set or reveal one. Your person uses them with `reliquary run` or `reliquary env pull`. To add a .env to the vault, run `npx @reliquary-ai/cli env push --env <environment> --file .env` (sends it without printing values; a person applies it); never read a .env's values into the conversation.",
+        "Names of a vault's environment variables per environment, who last set each, and pushes waiting for a person to apply. Never values: you can't read, set or reveal one. Your person uses them with `reliquary run` or `reliquary env pull`. To add a .env to the vault, run `npx @reliquary-ai/cli env push --env <environment> --file .env` (sends the file without printing values; a person applies it); never read the file's values into the conversation.",
       inputSchema: {
         vault: VAULT,
         environment: z.string().min(1).max(100).optional().describe("e.g. development"),
