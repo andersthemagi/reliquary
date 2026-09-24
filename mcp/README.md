@@ -45,6 +45,14 @@ proposal with its whole thread), `comment_on_proposal`, `changes_since`.
 There is no approve tool: approving needs a person in the web UI. There is no
 snooze tool either, so an agent can't hide its proposals from its person.
 
+`changes_since` brings the discussion with it: each comment, request for
+changes, rejection, revision or edit event is followed by that note's text
+(fenced, with author, agent, kind, proposal id and revision), so an agent
+learns about replies from the feed instead of polling `read_proposal`. The
+log itself never holds note text; the server reads it through
+`public.change_notes`, as the caller, so RLS and token scope apply and erased
+notes show as `(erased)`.
+
 ## How a call is authorised
 
 1. The bearer token is hashed and resolved by `private.resolve_access_token`,
