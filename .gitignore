@@ -10,3 +10,5 @@ dist/
 supabase/.temp/
 .DS_Store
 *.log
+__pycache__/
+*.pyc

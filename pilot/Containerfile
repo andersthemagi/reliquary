@@ -1,0 +1,8 @@
+FROM docker.io/library/python:3.13-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY reliquary_pilot ./reliquary_pilot
+RUN useradd --system --no-create-home reliquary
+USER reliquary
+CMD ["python", "-m", "reliquary_pilot.bot"]
