@@ -445,29 +445,79 @@ capped by the request deadline, through Vercel's request context), with the
 idle timeout at 5 s on Vercel, and no new dependency; or 3.9.5+ pinned
 exactly, accepting the tree above.
 
+## Final sweep
+
+2026-09-25, `20260925190000_final_sweep.sql` and the app changes with it:
+items 1, 2 and 5 the third pass left. Numbers are `explain analyze` on
+Postgres 17 in a container, second of two runs, on synthetic data: 2,000
+vaults with 100 access-log rows each (a CLI read of one name), Ana's vault
+Big with 60 variables in three environments (set 300 days ago, two of them
+yesterday) and 100,000 CLI reads of development (each naming all 60, by 9
+readers) plus 2,000 reveals, all in time order over 300 days; and Ana's
+vault Old, whose 50,000 rows are the oldest in the log. 352,000 rows, 151 MB.
+
+### Readers since a value was set, exactly
+
+The Variables page's "read by" note looked at the vault's last 500 log
+rows, so a value read only long ago in a busy vault showed no readers. The
+suggested fix, an index on the log's reads `(vault_id, environment, at)`,
+makes the answer exact but not cheap: every read since the oldest value was
+set has to be grouped by its names (arrays of 60 here), and the planner
+doesn't even use the index (every read qualifies).
+
+Instead, `private.env_readers` keeps each reader's (environment, action,
+person, agent) newest read per set of names, maintained by an insert
+trigger on `env_access_log`; a read naming everything an older group named
+replaces it, so a CLI reader that reads the same environment keeps one row.
+`public.variable_readers(vault)` joins those groups to the values (owners and
+editors only, as the log's RLS). The migration backfills it from the whole
+log. On this data it gives exactly the rows a scan of the whole log gives
+(599; 0 missing, 0 extra).
+
+| Big's "read by" note | Rows looked at | Answer | Time |
+|---|---:|---|---:|
+| Before: the last 500 log rows | 500 | 543 rows (misses older readers) | 7.6 ms |
+| Exact, with the suggested partial index | 102,000 | 599 rows | 245 ms |
+| After: `variable_readers` | 69 groups | 599 rows | 3.8 ms |
+
+`private.env_readers` is 2,070 rows and 736 kB for the whole log. The
+trigger adds about 0.05 ms to a read (0.90 ms to 0.95 ms per insert-and-commit
+over 2,000 single-read transactions). A reader whose names grow on every
+read (a variable added between reads, 500 times) still has one group.
+
+### The access log's order for one vault
+
+The log's primary key was `(seq)`, and `where vault_id = $1 order by seq
+desc limit n` could walk it backwards from the newest row of the whole log.
+When one vault's rows are the oldest, that passes every other vault's rows
+first. The primary key is now `(vault_id, seq)`, which replaces the old
+`(vault_id, seq)` index: no index orders the log across vaults any more, so
+every plan for a vault's page starts at that vault, whatever the planner
+estimates. `seq` stays unique (an identity nobody may set).
+
+| Access log page (Ana, under RLS) | Before | After |
+|---|---:|---:|
+| Old, first page (its rows the oldest) | 62 ms, 302,000 rows filtered | 0.34 ms |
+| Big, first page | 0.42 ms | 0.34 ms |
+| Old, page after 40,000 rows | | 0.28 ms |
+| Old, filtered to an action it has none of | 62 ms (the whole log) | 9.8 ms (its own 50,000 rows) |
+| Big, filtered to one variable's name | | 0.33 ms |
+
+A rare action in a vault with many rows still reads all of that vault's
+rows; an index on `(vault_id, action, seq)` would fix that if the filter is
+used on big vaults, at the cost of another index on every log insert.
+
 ## Still to do
 
-1. **Readers "since it was set" look back 500 log rows.** A value read only
-   long ago, in a busy vault, shows no readers. An index on
-   `env_access_log (vault_id, environment, at) where action in ('read',
-   'reveal')` would let the page answer exactly; that's a behaviour change,
-   so not done here.
-2. **Planner choice on the access log.** With RLS now cheap, `order by seq
-   desc limit n` for one vault can pick a backward scan of the primary key
-   instead of `(vault_id, seq)`; on data where one vault's rows were all the
-   oldest it took 26 ms instead of 1 ms. Realistic, interleaved data picks
-   the index. Watch the Access log page's timing; a partial or covering
-   index would pin it if needed.
-3. **Confirm the pg_cron job after the next `db push`** (`select jobname,
+1. **Confirm the pg_cron job after the next `db push`** (`select jobname,
    active from cron.job`), and that `cron.job_run_details` shows it
    succeeding.
-4. **Watch the pooler client count** in the week of real use (see
+2. **Watch the pooler client count** in the week of real use (see
    `attachDatabasePool` above); act only if it climbs.
-5. **Web form posts still look the vault up first.** A file save runs
-   `vault()`, then the rule for a new path, then the write: three queries
-   in its transaction where the vault check could fold into the write's
-   (as the MCP tools now do). Small (POSTs are rare next to reads), so left.
-6. **`vault_ref` by name costs about 1 ms** among thousands of other
+3. **`vault_ref` by name costs about 1 ms** among thousands of other
    vaults, mostly RLS on `vault_members` and `vaults`; a security-definer
    lookup keyed on `(user_id)` then name would be faster but would move
    an access decision out of RLS. Not worth it at this size.
+4. **A rare action filter on a big vault's access log** reads that vault's
+   rows (9.8 ms for 50,000): add `(vault_id, action, seq)` only if the
+   Access log page's timing shows it.

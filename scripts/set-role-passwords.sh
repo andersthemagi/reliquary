@@ -1,22 +1,52 @@
 #!/usr/bin/env bash
-# Gives the app roles (reliquary_web, reliquary_mcp) login passwords on the
-# hosted project, without anyone seeing them:
-# - generates a random password per role into supabase/.<role>-password
-#   (mode 600, gitignored) for the Vercel env vars, unless the file exists;
+# Gives the app roles login passwords on the hosted project, without anyone
+# seeing them:
+#
+#   scripts/set-role-passwords.sh          reliquary_web and reliquary_mcp
+#   scripts/set-role-passwords.sh ops      reliquary_ops, the operator's role
+#                                          for re-encrypting variables
+#                                          (scripts/rotate-variables-key.sh)
+#   scripts/set-role-passwords.sh ops-off  reliquary_ops back to nologin, with
+#                                          no password, and its file removed
+#
+# - generates a random password per role into supabase/.<role>-db-password
+#   (mode 600, gitignored) for the Vercel env vars or the rotation script,
+#   unless the file exists;
 # - sends Postgres only a SCRAM-SHA-256 verifier computed here, so the
 #   plain password never reaches the server or its logs;
 # - checks each role can log in through the transaction pooler.
-# Uses supabase/.db-password (the postgres password) for the ALTER ROLE.
+# Never prints a password. Uses supabase/.db-password (the postgres
+# password) for the ALTER ROLE.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+case ${1:-} in
+  "") roles="reliquary_web reliquary_mcp" ;;
+  ops) roles="reliquary_ops" ;;
+  ops-off) roles="" ;;
+  *) echo "usage: scripts/set-role-passwords.sh [ops | ops-off]"; exit 2 ;;
+esac
 
 ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
 host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 [[ -s supabase/.db-password ]] || { echo "Missing supabase/.db-password."; exit 1; }
 
+if [[ ${1:-} == ops-off ]]; then
+  "$engine" run --rm --network host -v "$PWD":/app:Z -w /app \
+    -e REF="$ref" -e HOST="$host" docker.io/library/postgres:17 bash -c '
+set -euo pipefail
+export PGPASSWORD=$(tr -d "[:space:]" < supabase/.db-password)
+echo "alter role reliquary_ops nologin password null;" | psql -q \
+  "host=$HOST port=5432 dbname=postgres user=postgres.$REF sslmode=require" -v ON_ERROR_STOP=1 >/dev/null
+'
+  rm -f supabase/.ops-db-password
+  echo "reliquary_ops: nologin, no password; supabase/.ops-db-password removed"
+  exit 0
+fi
+
 "$engine" run --rm --network host -v "$PWD":/app:Z -w /app \
-  -e REF="$ref" -e HOST="$host" docker.io/library/postgres:17 bash -c '
+  -e REF="$ref" -e HOST="$host" -e ROLES="$roles" docker.io/library/postgres:17 bash -c '
 set -euo pipefail
 apt-get -qq update >/dev/null && apt-get -qq install -y nodejs >/dev/null 2>&1
 umask 077
@@ -34,7 +64,7 @@ verifier() {
   " "$1"
 }
 export PGPASSWORD=$(tr -d "[:space:]" < supabase/.db-password)
-for role in reliquary_web reliquary_mcp; do
+for role in $ROLES; do
   f=supabase/.${role#reliquary_}-db-password
   [[ -s $f ]] || node -e "process.stdout.write(require(\"crypto\").randomBytes(24).toString(\"base64url\"))" > "$f"
   chmod 600 "$f"

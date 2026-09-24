@@ -76,10 +76,13 @@ const keyIdOf = async (name, environment) =>
 const storedKeyIds = async () =>
   (await sql(`select key_id, "values", imports from private.variable_key_ids()`)).map((r) => `${r.key_id}:${r.values}+${r.imports}`).join(",");
 
-// The re-encryption, as scripts/rotate-variables-key.sh runs it.
+// The re-encryption, as scripts/rotate-variables-key.sh runs it: the web
+// app's DATABASE_URL and the operator's password (web/test.sh gives
+// reliquary_ops the password "test").
+const OPS_PASSWORD = "test";
 function rekey(env, args = []) {
   const r = spawnSync(process.execPath, ["dist/rekey.js", ...args], {
-    env: { PATH: process.env.PATH, DATABASE_URL: WEB_DB, ...env },
+    env: { PATH: process.env.PATH, DATABASE_URL: WEB_DB, OPS_DB_PASSWORD: OPS_PASSWORD, ...env },
     encoding: "utf8",
     timeout: 30_000,
   });
@@ -260,6 +263,60 @@ test("rekey: refuses to run with no keys or a malformed one, without printing it
   assert.equal(r.status, 2);
   assert.match(r.out, /VARIABLES_KEYS \(key k2\) must be 32 random bytes/);
   assert.equal(r.out.includes("KEYMARK"), false);
+});
+
+test("rekey: logs in as reliquary_ops, built from the web app's DATABASE_URL and OPS_DB_PASSWORD, keeping the pooler's project suffix", async () => {
+  const { opsDatabaseUrl } = await import("../dist/rekey.js");
+  assert.equal(
+    opsDatabaseUrl("postgres://reliquary_web.abcref:WEBPASS@pooler.example:6543/postgres", "OPSPASS-_1"),
+    "postgres://reliquary_ops.abcref:OPSPASS-_1@pooler.example:6543/postgres",
+  );
+  assert.equal(opsDatabaseUrl("postgres://reliquary_web:WEBPASS@127.0.0.1:5432/keys", "p/w@x"), "postgres://reliquary_ops:p%2Fw%40x@127.0.0.1:5432/keys");
+  assert.equal(opsDatabaseUrl("postgres://reliquary_ops:OPSPASS@127.0.0.1:5432/keys", undefined), "postgres://reliquary_ops:OPSPASS@127.0.0.1:5432/keys");
+  for (const [url, pw, want] of [
+    ["postgres://reliquary_web:WEBPASS@127.0.0.1/keys", undefined, /No OPS_DB_PASSWORD/],
+    ["postgres://postgres:WEBPASS@127.0.0.1/keys", "x", /reliquary_web\) or the operator's/],
+    ["not a url WEBPASS", "x", /isn't a postgres:\/\/ URL/],
+    [undefined, "x", /isn't a postgres:\/\/ URL/],
+  ]) {
+    assert.throws(() => opsDatabaseUrl(url, pw), (err) => want.test(err.message) && !err.message.includes("WEBPASS"));
+  }
+});
+
+// (Postgres here trusts local connections, so a wrong password can't be
+// shown failing; opsDatabaseUrl above shows which password is used.)
+test("rekey: without the operator's password, or with another role's DATABASE_URL, it changes nothing and prints no connection string", async () => {
+  const before = await storedKeyIds();
+  const none = rekey({ VARIABLES_KEYS: `k2:${K2},k1:${K1}`, OPS_DB_PASSWORD: "" });
+  assert.equal(none.status, 2);
+  assert.match(none.out, /No OPS_DB_PASSWORD: the re-encryption logs in as reliquary_ops/);
+  const other = rekey({ VARIABLES_KEYS: `k2:${K2},k1:${K1}`, DATABASE_URL: WEB_DB.replace("reliquary_web", "postgres") });
+  assert.equal(other.status, 2);
+  assert.match(other.out, /DATABASE_URL must be the web app's \(reliquary_web\) or the operator's \(reliquary_ops\)/);
+  for (const out of [none.out, other.out]) {
+    assert.doesNotMatch(out, /postgres:\/\/|:test@/);
+    clean(out);
+  }
+  assert.equal(await storedKeyIds(), before);
+});
+
+test("rekey: the web app's own role is refused the operator's functions (42501), so it can't run the re-encryption", async () => {
+  const web = new pg.Client({ connectionString: WEB_DB });
+  await web.connect();
+  try {
+    for (const q of [
+      `select * from private.variable_key_ids()`,
+      `select * from private.rekey_vaults('k2')`,
+      `select * from private.sealed_rows('${vault}')`,
+      `select private.reseal('${vault}', 'rotate_key', '[]')`,
+    ]) {
+      await assert.rejects(web.query(q), (err) => err.code === "42501");
+    }
+    // What it keeps: the key ids stored values name, for its start-up check.
+    assert.deepEqual((await web.query("select k from private.stored_key_ids() k order by 1")).rows.map((r) => r.k), ["k1", "k2"]);
+  } finally {
+    await web.end();
+  }
 });
 
 test("rekey: moves every value and pending import value to the current key, prints counts only, and exits 0", async () => {

@@ -67,6 +67,7 @@ Migrations must be applied in timestamp order; never edit one that shipped.
 | Secret | Where it lives | How to rotate | Effect |
 |---|---|---|---|
 | `reliquary_web` / `reliquary_mcp` DB passwords | `supabase/.web-db-password`, `.mcp-db-password`; Vercel `DATABASE_URL` | delete the file, run `scripts/set-role-passwords.sh`, run `scripts/vercel-env.sh <app> ...`, paste the new `DATABASE_URL` into that Vercel project, redeploy | that app can't reach the database until redeployed |
+| `reliquary_ops` DB password (the operator's role, key rotation only) | `supabase/.ops-db-password`; nowhere else (not Vercel) | `scripts/set-role-passwords.sh ops-off` (nologin, file removed), then `scripts/set-role-passwords.sh ops` when next needed | only `rotate-variables-key.sh` uses it; nologin between rotations is fine |
 | `SESSION_SECRET` (web) | `supabase/.web-session-secret`; Vercel | delete the file, run `vercel-env.sh web ...`, update Vercel, redeploy | everyone is signed out of the web UI once; CLI and connectors unaffected |
 | `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Vercel; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values are re-encrypted loses them |
 | `postgres` password | `supabase/.db-password`; GitHub secret `SUPABASE_DB_PASSWORD` | reset in the dashboard, rewrite the file, `tr -d '[:space:]' < supabase/.db-password \| gh secret set SUPABASE_DB_PASSWORD` | migrations and backups need the new one |
@@ -78,9 +79,15 @@ Values stay readable throughout: the web app holds the old and the new key
 while every ciphertext moves (docs/variables.md, "Key rotation"). Every
 script here prints key ids and counts, never a key, so they are safe to run
 from a chat; still, never open the key files in one. Do it at a quiet time,
-from a checkout of the deployed commit (the migration
-`20260925170000_variables_keys.sql` must be applied).
+from a checkout of the deployed commit (the migrations
+`20260925170000_variables_keys.sql` and `20260925190000_final_sweep.sql`
+must be applied).
 
+0. **The operator's role.** Re-encryption runs as `reliquary_ops`, which the
+   web app's role is not (it may not read stored ciphertext). Once, or after
+   `ops-off`: `scripts/set-role-passwords.sh ops` gives it a password in
+   `supabase/.ops-db-password` (mode 600, gitignored, never printed) and
+   checks it can log in through the pooler.
 1. **Add a key.** `scripts/vercel-env.sh new-variables-key` adds `k2` (the
    next id) to `supabase/.variables-keys-secret` as the current key. Copy
    it from that file into your password manager, yourself.
@@ -90,7 +97,9 @@ from a checkout of the deployed commit (the migration
    is still there (the first time only). Redeploy, and check the site is up.
    New values are now sealed with `k2`; old ones open with `k1`.
 3. **Re-encrypt.** `scripts/rotate-variables-key.sh`. It uses the database
-   and keys in `supabase/.vercel-web.env`, moves every value and pending
+   and keys in `supabase/.vercel-web.env`, logs in as `reliquary_ops` with
+   `supabase/.ops-db-password` (it stops with exit 2 and says so if that file
+   is missing: step 0), moves every value and pending
    import value to `k2`, and prints counts. Exit 0 ("Everything is on k2")
    means done. Exit 1: run it again (a deployment still writing `k1` during
    step 2's rollout); if it still says values can't be decrypted, those
@@ -101,6 +110,8 @@ from a checkout of the deployed commit (the migration
    `scripts/vercel-env.sh drop-variables-key k1`, then `scripts/vercel-env.sh
    web ...`, set `VARIABLES_KEYS` in Vercel again, redeploy.
    `scripts/rotate-variables-key.sh --check` should still exit 0.
+5. **Optionally, close the operator's role again:**
+   `scripts/set-role-passwords.sh ops-off`.
 
 If a deployment ever lacks a key that stored values name, the web app
 refuses to start and its log says which id: put that key back in

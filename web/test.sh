@@ -52,6 +52,8 @@ cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/su
 psql -c "create database keys"
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql -d keys >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
+# The operator's role, for test/variables_keys.test.mjs's re-encryption.
+echo "alter role reliquary_ops login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=')
 
 # A fresh checkout (CI, a new worktree) has no node_modules yet.

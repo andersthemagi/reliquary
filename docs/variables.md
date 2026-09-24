@@ -15,8 +15,11 @@ sign-in), `mcp/src/tools.ts` (`list_variables`). Imports (paste a `.env`,
 [Imports](#imports). Key rotation, custom environments and limits:
 `supabase/migrations/20260925170000_variables_keys.sql`, `web/src/rekey.ts`,
 `scripts/rotate-variables-key.sh`, `scripts/variables-keys.sh`, below under
-[Key rotation](#key-rotation) and [Environments](#environments). Tests: rows
-F50 to F71 and F130 to F133 in [tests/features.md](../tests/features.md).
+[Key rotation](#key-rotation) and [Environments](#environments). The
+operator's role, exact readers and the access log's key:
+`supabase/migrations/20260925190000_final_sweep.sql`. Tests: rows F50 to
+F71, F130 to F133 and F150 to F155 in
+[tests/features.md](../tests/features.md).
 
 ## What holds
 
@@ -35,8 +38,9 @@ F50 to F71 and F130 to F133 in [tests/features.md](../tests/features.md).
 - Ciphertext lives in `private.variable_secrets`: no grants to any role, RLS
   on with no policies. To people and their clients only `reveal_variable`
   and `read_variables` return it, and both write `env_access_log` in the
-  same transaction. The web app's own role also reads it to seal values
-  again, for a key rotation or an environment's rename
+  same transaction. To seal values again, the operator's role
+  (`reliquary_ops`) reads it for a key rotation, and the web app's own role
+  only an environment's values inside an owner's rename of it
   ([Key rotation](#key-rotation)).
 - A value leaves Reliquary only in two ways: a person reveals one in the web
   UI, or the CLI reads an environment for `reliquary run` or `reliquary env
@@ -140,7 +144,7 @@ caller's own token), `private.valid_variable_name(name)`.
 - On Vercel the web app refuses to start without a key; locally it starts,
   and value routes answer 503 `not_configured`. With keys, it also refuses to
   start while a stored value (or a pending import's) names a key id it
-  doesn't hold (`private.variable_key_ids()`), naming the id.
+  doesn't hold (`private.stored_key_ids()`, ids only), naming the id.
 - Values are UTF-8 text up to 64 KiB, without NUL characters (an environment
   variable can't hold one).
 
@@ -157,10 +161,19 @@ piece does:
   forgets an old one, `list` prints ids. `scripts/vercel-env.sh web` turns
   the file into `VARIABLES_KEYS`; an older `supabase/.variables-secret` is
   taken over as `k1`, the id its values carry. Neither prints a key.
+- **The operator's role.** `reliquary_ops` exists only for this: it can't
+  log in until an owner gives it a password (`scripts/set-role-passwords.sh
+  ops`, into gitignored `supabase/.ops-db-password`, never printed), is no
+  API role, reads no table itself, and may call only the four functions
+  below. `scripts/set-role-passwords.sh ops-off` makes it nologin again
+  between rotations.
 - **Re-encryption.** `scripts/rotate-variables-key.sh [--check]` runs
-  `web/src/rekey.ts` in a container against the database, as the web app's
-  role (`reliquary_web`), with the `DATABASE_URL` and `VARIABLES_KEYS` of
-  `supabase/.vercel-web.env`. Vault by vault, in one transaction each, it
+  `web/src/rekey.ts` in a container against the database, as the
+  operator's role, with the `DATABASE_URL` and `VARIABLES_KEYS` of
+  `supabase/.vercel-web.env` and the password in
+  `supabase/.ops-db-password` (`rekey.ts` logs in as `reliquary_ops` to the
+  database the web app's `DATABASE_URL` names, keeping the pooler's
+  `.project-ref` suffix, from `OPS_DB_PASSWORD`). Vault by vault, in one transaction each, it
   reads the sealed values and pending imports' values under any other key
   (`private.sealed_rows`), opens each with its key and its slot's additional
   data, seals it again under the current key for the same slot, and swaps it
@@ -174,20 +187,28 @@ piece does:
   (moved between rows, or a key given the wrong id) stays as it is and the
   run exits 1: keep the old key.
 - **Who can.** `private.variable_key_ids`, `rekey_vaults`, `sealed_rows` and
-  `reseal` are granted to `reliquary_web` alone: people, agents, CLI grants
-  and `reliquary_mcp` get 42501. So the web app's own role (the operator)
-  reads ciphertext without a reveal row; it can decrypt anyway (as the
-  design says, the operator holds both). `reseal` for a rename is allowed
-  only inside that rename's transaction, for that vault and new name.
+  `reseal` are granted to `reliquary_ops` alone: people, agents, CLI grants,
+  `reliquary_mcp` and `reliquary_web` get 42501. So the web app's own role
+  reads ciphertext only as people do (reveal and read, each logged), plus
+  one case: inside an owner's rename of an environment, that environment's
+  values, to seal them again for the new name (`private.renamed_rows` and
+  `private.reseal_renamed`). The rename records itself for its own
+  transaction (`private.environment_renames`, by transaction id), so a
+  setting the role could set for itself doesn't open it, and nothing is
+  open once that transaction ends. For its start-up check the web app gets
+  key ids only (`private.stored_key_ids`).
 - **The MCP app** refuses to start with `VARIABLES_KEY` or `VARIABLES_KEYS`
   set.
 
 | Function | Returns | Who may call |
 |---|---|---|
-| `private.variable_key_ids()` | table `(key_id, values, imports)`: key ids in use by values and by pending, unexpired imports | `reliquary_web` |
-| `private.rekey_vaults(p_key_id text)` | setof uuid: vaults with anything under another key | `reliquary_web` |
-| `private.sealed_rows(p_vault uuid, p_environment text default null, p_not_key text default null)` | table `(kind 'value' or 'import', ref, name, environment, key_id, nonce, ciphertext)` | `reliquary_web` |
-| `private.reseal(p_vault uuid, p_reason text, p_items jsonb)` | int, the rows replaced. `p_reason` `rotate_key` or `rename_environment`; items `[{"kind", "ref", "name", "environment", "old_nonce", "key_id", "nonce", "ciphertext"}]` (base64); malformed 22023 | `reliquary_web` |
+| `private.variable_key_ids()` | table `(key_id, values, imports)`: key ids in use by values and by pending, unexpired imports | `reliquary_ops` |
+| `private.rekey_vaults(p_key_id text)` | setof uuid: vaults with anything under another key | `reliquary_ops` |
+| `private.sealed_rows(p_vault uuid, p_environment text default null, p_not_key text default null)` | table `(kind 'value' or 'import', ref, name, environment, key_id, nonce, ciphertext)` | `reliquary_ops` |
+| `private.reseal(p_vault uuid, p_reason text, p_items jsonb)` | int, the rows replaced. `p_reason` `rotate_key` or `rename_environment` (only for an environment renamed in this transaction, else 42501); items `[{"kind", "ref", "name", "environment", "old_nonce", "key_id", "nonce", "ciphertext"}]` (base64); malformed 22023 | `reliquary_ops` |
+| `private.stored_key_ids()` | setof text: the key ids stored values and pending imports name | `reliquary_web` |
+| `private.renamed_rows(p_vault uuid, p_environment text)` | table `(ref, name, key_id, nonce, ciphertext)`: the values of an environment renamed to `p_environment` in this transaction; otherwise 42501 | `reliquary_web` |
+| `private.reseal_renamed(p_vault uuid, p_items jsonb)` | `private.reseal(p_vault, 'rename_environment', p_items)` | `reliquary_web` |
 
 ## Environments
 
@@ -200,7 +221,7 @@ typed-name delete).
 | Function | Returns | Notes |
 |---|---|---|
 | `public.create_environment(p_vault uuid, p_name text, p_owners_only boolean default false)` | void | Name `^[a-z][a-z0-9_-]{0,31}$` (22023), unique (23505), at most 20 a vault (55000). Owners-only: only owners set and read its values, as production. Logs `create_environment`, and `environment.create` in the feed |
-| `public.rename_environment(p_vault uuid, p_name text, p_new_name text)` | jsonb `{"moved", "names", "rejected_imports"}` | Not a default (55000). Its values move with it, versions kept. The caller must then seal every moved value again for the new name (the additional data names the environment) in the same transaction: `renameEnvironment` in `web/src/variables.ts` does, through `private.reseal`, and a value that doesn't open rolls the whole rename back. Logs `rename_environment` and `environment.rename` |
+| `public.rename_environment(p_vault uuid, p_name text, p_new_name text)` | jsonb `{"moved", "names", "rejected_imports"}` | Not a default (55000). Its values move with it, versions kept. The caller must then seal every moved value again for the new name (the additional data names the environment) in the same transaction: `renameEnvironment` in `web/src/variables.ts` does, through `private.renamed_rows` and `private.reseal_renamed`, and a value that doesn't open rolls the whole rename back. Logs `rename_environment` and `environment.rename` |
 | `public.delete_environment(p_vault uuid, p_name text, p_confirm text)` | jsonb `{"deleted", "names"}` | `p_confirm` must be the name (22023). A default holding values is refused (55000), and a vault keeps one environment (55000). Destroys its values; a variable left with no value goes too. Logs `delete_environment` with the names, and `environment.delete` |
 
 Pending imports (drafts and pushes) for an environment that is renamed or
@@ -244,6 +265,11 @@ createEnvironment(userId, vaultId, name, ownersOnly): Promise<void>
 renameEnvironment(userId, vaultId, from, to): Promise<{ moved: number; rejectedImports: number }>
   // seals the moved values again for the new name, in the same transaction
 deleteEnvironment(userId, vaultId, name, confirm): Promise<{ deleted: number; names: string[] }>
+readersSinceSet(userId, vaultId): Promise<{ name, environment, action: "read" | "reveal", actor, agent }[]>
+  // who read or revealed each value since it was last set, newest first, from
+  // public.variable_readers (owners and editors; others get none): exact over the
+  // whole access log, from each reader's newest read per set of names
+  // (private.env_readers, kept by a trigger on env_access_log)
 ```
 
 `variablesConfigured()` (secrets.ts) says whether the server has a key.

@@ -90,9 +90,10 @@ export async function createEnvironment(userId: string, vaultId: string, name: s
 
 // Renames an environment with its values. Each value's additional data
 // names its environment, so every moved value is opened and sealed again
-// for the new name here, in the rename's transaction (as the web app's own
-// role: people can't read ciphertext), and swapped in by private.reseal,
-// which allows it only after this rename. A value that doesn't open (an
+// for the new name here, in the rename's transaction, as the web app's own
+// role: private.renamed_rows gives it that environment's values and
+// private.reseal_renamed takes them back, both only for an environment
+// renamed in this transaction (by an owner, in person). A value that doesn't open (an
 // unknown key, or tampered) rolls the whole rename back: SecretsError.
 export async function renameEnvironment(userId: string, vaultId: string, from: string, to: string): Promise<{ moved: number; rejectedImports: number }> {
   return asPerson(userId, async (c) => {
@@ -100,7 +101,7 @@ export async function renameEnvironment(userId: string, vaultId: string, from: s
     if (r.moved > 0) {
       await c.query("select set_config('role', 'none', true)");
       const rows = (
-        await c.query("select ref, name, key_id, nonce, ciphertext from private.sealed_rows($1, $2) where kind = 'value'", [vaultId, to])
+        await c.query("select ref, name, key_id, nonce, ciphertext from private.renamed_rows($1, $2)", [vaultId, to])
       ).rows;
       const items = rows.map((x) => {
         const s = reseal({ keyId: x.key_id, nonce: x.nonce, ciphertext: x.ciphertext }, { vaultId, environment: from, name: x.name }, { vaultId, environment: to, name: x.name });
@@ -115,7 +116,7 @@ export async function renameEnvironment(userId: string, vaultId: string, from: s
           ciphertext: s.ciphertext.toString("base64"),
         };
       });
-      const n = Number((await c.query("select private.reseal($1, 'rename_environment', $2) as n", [vaultId, JSON.stringify(items)])).rows[0].n);
+      const n = Number((await c.query("select private.reseal_renamed($1, $2) as n", [vaultId, JSON.stringify(items)])).rows[0].n);
       if (n !== items.length) throw new SecretsError(`${to}: a value changed while it was being renamed`);
       await c.query("select set_config('role', 'authenticated', true)");
     }
@@ -183,29 +184,21 @@ export async function accessLog(
 
 // Who read or revealed each value since it was last set, for the Variables
 // page: one row per variable, environment, action, person and client, newest
-// first, looking back over the vault's last 500 access-log entries as the
-// page always has. The database does the matching, so the page gets a few
-// rows instead of 500 log entries (each CLI read names every variable).
+// first, over the vault's whole access log. The database keeps each
+// reader's newest read per set of names (private.env_readers, kept by a
+// trigger on the log) and matches them to the values
+// (public.variable_readers, owners and editors only), so this is exact at
+// any age and costs a few groups, not the log.
 export type ReaderRow = { name: string; environment: string; action: "read" | "reveal"; actor: string | null; agent: string | null };
 export async function readersSinceSet(userId: string, vaultId: string): Promise<ReaderRow[]> {
   return asPerson(userId, async (c) =>
-    (
-      await c.query(
-        `with recent as (
-           select seq, at, action, actor, agent, environment, names from public.env_access_log
-            where vault_id = $1 order by seq desc limit 500),
-         g as (
-           select environment, action, actor, agent, names, max(seq) as last, max(at) as at
-             from recent where action in ('read', 'reveal') group by 1, 2, 3, 4, 5)
-         select n.name, g.environment, g.action, g.actor, g.agent, max(g.last) as last
-           from g cross join unnest(g.names) n(name)
-           join public.variables v on v.vault_id = $1 and v.name = n.name
-           join public.variable_values vv on vv.variable_id = v.id and vv.environment = g.environment and g.at > vv.updated_at
-          group by 1, 2, 3, 4, 5
-          order by last desc`,
-        [vaultId],
-      )
-    ).rows.map((r) => ({ name: r.name, environment: r.environment, action: r.action, actor: r.actor, agent: r.agent })),
+    (await c.query(`select name, environment, action, actor, agent from public.variable_readers($1)`, [vaultId])).rows.map((r) => ({
+      name: r.name,
+      environment: r.environment,
+      action: r.action,
+      actor: r.actor,
+      agent: r.agent,
+    })),
   );
 }
 

@@ -1,8 +1,9 @@
 // Re-encrypting every stored value under the current key: the middle step of
 // rotating VARIABLES_KEY (docs/ops/runbook.md, "Rotating VARIABLES_KEY";
 // docs/variables.md, "Key rotation"). An operator runs it with
-// scripts/rotate-variables-key.sh, which runs this file in a container as
-// the web app's database role, with the web app's keys:
+// scripts/rotate-variables-key.sh, which runs this file in a container with
+// the web app's keys, as the operator's database role (reliquary_ops: only
+// it may call the functions below; the web app's own role may not):
 //
 //   node dist/rekey.js            re-encrypt, then report
 //   node dist/rekey.js --check    report only: which key ids hold how many
@@ -16,14 +17,42 @@
 // person set meanwhile is left alone (its nonce changed), and is on the
 // current key already.
 //
-// It prints counts and key ids, never a key, a value, a name or a vault id.
-// Exit 0: nothing is left on another key. 1: something is (a value that
-// doesn't open with its key, or one written by an older deployment
-// meanwhile): keep the old key and run it again. 2: it couldn't run.
+// The connection: DATABASE_URL is the web app's (reliquary_web, as in
+// supabase/.vercel-web.env), and OPS_DB_PASSWORD the operator's; this logs
+// in to the same database as reliquary_ops (keeping the pooler's
+// `.project-ref` suffix). A DATABASE_URL for reliquary_ops is used as it is.
+//
+// It prints counts and key ids, never a key, a value, a name, a vault id or
+// a connection string. Exit 0: nothing is left on another key. 1: something
+// is (a value that doesn't open with its key, or one written by an older
+// deployment meanwhile): keep the old key and run it again. 2: it couldn't
+// run.
 
 import { pathToFileURL } from "node:url";
-import type pg from "pg";
+import pg from "pg";
 import { configureVariables, currentKeyId, missingKeyIds, reseal, SecretsError } from "./secrets.js";
+
+// The operator's connection string from the web app's and the operator's
+// password. Errors never include either.
+export function opsDatabaseUrl(url: string | undefined, password: string | undefined): string {
+  let u: URL;
+  try {
+    u = new URL(url ?? "");
+  } catch {
+    throw new Error("DATABASE_URL isn't a postgres:// URL.");
+  }
+  const m = /^reliquary_(web|ops)(\.[A-Za-z0-9]+)?$/.exec(decodeURIComponent(u.username));
+  if (!/^postgres(ql)?:$/.test(u.protocol) || !m) {
+    throw new Error("DATABASE_URL must be the web app's (reliquary_web) or the operator's (reliquary_ops).");
+  }
+  if (!password) {
+    if (m[1] === "ops") return u.toString();
+    throw new Error("No OPS_DB_PASSWORD: the re-encryption logs in as reliquary_ops. Run scripts/set-role-passwords.sh ops first.");
+  }
+  u.username = `reliquary_ops${m[2] ?? ""}`;
+  u.password = encodeURIComponent(password);
+  return u.toString();
+}
 
 type Row = { kind: "value" | "import"; ref: string; name: string; environment: string; key_id: string; nonce: Buffer; ciphertext: Buffer };
 export type KeyCount = { keyId: string; values: number; imports: number };
@@ -113,7 +142,14 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv, say: (line: s
     say((err as Error).message); // names the variable, never a key
     return 2;
   }
-  const { pool } = await import("./db.js");
+  let pool: pg.Pool;
+  try {
+    const { poolConfig } = await import("./db.js");
+    pool = new pg.Pool(poolConfig({ ...env, DATABASE_URL: opsDatabaseUrl(env.DATABASE_URL, env.OPS_DB_PASSWORD) }));
+  } catch (err) {
+    say((err as Error).message); // names the variable, never its value
+    return 2;
+  }
   try {
     const current = currentKeyId()!;
     const before = await keyCounts(pool);
@@ -141,7 +177,11 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv, say: (line: s
     say(`Everything is on ${current}. Older keys can be dropped from VARIABLES_KEYS.`);
     return 0;
   } catch (err) {
-    say(`Failed: ${(err as { code?: string }).code ?? (err as Error).name}`); // never the error's text: it could hold a row
+    const code = (err as { code?: string }).code;
+    // Never the error's text: it could hold a row.
+    if (code === "42501") say("Failed: 42501 (only reliquary_ops may re-encrypt; is OPS_DB_PASSWORD the operator's?)");
+    else if (code === "28P01" || code === "28000") say(`Failed: ${code} (reliquary_ops couldn't log in: run scripts/set-role-passwords.sh ops)`);
+    else say(`Failed: ${code ?? (err as Error).name}`);
     return 2;
   } finally {
     await pool.end();

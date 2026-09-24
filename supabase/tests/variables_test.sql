@@ -237,22 +237,27 @@ select t.expect('ciphertext: no table or view an API role can read has a ciphert
      from information_schema.column_privileges
     where grantee in ('authenticated', 'anon', 'reliquary_web', 'reliquary_mcp', 'PUBLIC')
       and privilege_type = 'SELECT' and column_name in ('ciphertext', 'nonce')), 'none');
-select t.expect('ciphertext: no function an API role can call returns it except reveal and read',
+select t.expect('ciphertext: no function an API role or the web app''s role can call returns it except reveal and read',
   (select coalesce(string_agg(p.proname, ',' order by p.proname), 'none')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('public', 'private')
       and p.prosrc ~ 'variable_secrets'
       and (has_function_privilege('authenticated', p.oid, 'execute')
            or has_function_privilege('reliquary_mcp', p.oid, 'execute')
+           or has_function_privilege('reliquary_web', p.oid, 'execute')
            or has_function_privilege('anon', p.oid, 'execute'))
-      and p.proname not in ('reveal_variable', 'read_variables', 'set_variable')), 'none');
-select t.expect('ciphertext: the web app''s own role reaches it only through the re-encryption functions',
+      and p.proname not in ('reveal_variable', 'read_variables', 'set_variable')), 'renamed_rows');
+select t.expect('ciphertext: the web app''s own role reaches it beyond reveal and read only for a rename in progress; the re-encryption functions are the operator''s',
   (select coalesce(string_agg(p.proname, ',' order by p.proname), 'none')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('public', 'private')
-      and p.prosrc ~ 'variable_secrets'
-      and has_function_privilege('reliquary_web', p.oid, 'execute')
-      and not has_function_privilege('authenticated', p.oid, 'execute')), 'rekey_vaults,reseal,sealed_rows,variable_key_ids');
+      and p.proname in ('variable_key_ids', 'rekey_vaults', 'sealed_rows', 'reseal', 'renamed_rows', 'reseal_renamed', 'stored_key_ids')
+      and has_function_privilege('reliquary_web', p.oid, 'execute'))
+  || ' / ' || (select coalesce(string_agg(p.proname, ',' order by p.proname), 'none')
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname in ('public', 'private') and p.prosrc ~ 'variable_secrets'
+      and has_function_privilege('reliquary_ops', p.oid, 'execute')),
+  'renamed_rows,reseal_renamed,stored_key_ids / rekey_vaults,reseal,sealed_rows,variable_key_ids');
 
 -- ---------------------------------------------------------------------------
 -- Reveal: one value, a person in person

@@ -124,10 +124,10 @@ insert into t.ids select 'push1', (t.via('ana', t.g('ana-cli'), t.push_sql('team
 -- Key ids and who may rekey
 
 select t.expect('key ids: variable_key_ids counts stored values and pending imports by key id',
-  t.run_role('reliquary_web', $q$select string_agg(key_id || ':' || "values" || '+' || imports, ',') from private.variable_key_ids()$q$),
+  t.run_role('reliquary_ops', $q$select string_agg(key_id || ':' || "values" || '+' || imports, ',') from private.variable_key_ids()$q$),
   'k1:5+1');
 
-select t.expect('key ids: only the web app''s role lists key ids, rekeys or reseals; people, agents, the CLI and the MCP role are refused',
+select t.expect('key ids: only the operator''s role lists key ids, rekeys or reseals; people, agents, the CLI, the MCP role and the web app''s role are refused',
   t.run('ana', 'select count(*) from private.variable_key_ids()')
   || ',' || t.run('ana', format('select count(*) from private.sealed_rows(%L)', t.id('team')))
   || ',' || t.run('ana', t.reseal_sql('team', 'rotate_key', '[]'))
@@ -138,18 +138,22 @@ select t.expect('key ids: only the web app''s role lists key ids, rekeys or rese
   || ',' || t.run_role('reliquary_mcp', format('select count(*) from private.sealed_rows(%L)', t.id('team')))
   || ',' || t.run_role('reliquary_mcp', t.reseal_sql('team', 'rotate_key', '[]'))
   || ',' || t.run_session('reliquary_web', jsonb_build_object('sub', t.id('ana'), 'role', 'authenticated'),
-              t.reseal_sql('team', 'rotate_key', '[]')),
-  'ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501');
+              t.reseal_sql('team', 'rotate_key', '[]'))
+  || ',' || t.run_role('reliquary_web', 'select count(*) from private.variable_key_ids()')
+  || ',' || t.run_role('reliquary_web', $q$select count(*) from private.rekey_vaults('k2')$q$)
+  || ',' || t.run_role('reliquary_web', format('select count(*) from private.sealed_rows(%L)', t.id('team')))
+  || ',' || t.run_role('reliquary_web', t.reseal_sql('team', 'rotate_key', '[]')),
+  'ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501');
 
 select t.expect('key ids: rekey_vaults names the vaults with anything on another key',
-  t.run_role('reliquary_web', $q$select count(*) from private.rekey_vaults('k2')$q$)
-  || ',' || t.run_role('reliquary_web', $q$select count(*) from private.rekey_vaults('k1')$q$),
+  t.run_role('reliquary_ops', $q$select count(*) from private.rekey_vaults('k2')$q$)
+  || ',' || t.run_role('reliquary_ops', $q$select count(*) from private.rekey_vaults('k1')$q$),
   '3,0');
 
 select t.expect('key ids: sealed_rows gives one vault''s values and pending import values, optionally not on a key',
-  t.run_role('reliquary_web', format($q$select string_agg(kind || ':' || name || '@' || environment, ',' order by kind, name, environment) from private.sealed_rows(%L)$q$, t.id('team')))
-  || ' / ' || t.run_role('reliquary_web', format($q$select count(*) from private.sealed_rows(%L, null, 'k1')$q$, t.id('team')))
-  || ' / ' || t.run_role('reliquary_web', format($q$select count(*) from private.sealed_rows(%L, 'production')$q$, t.id('team'))),
+  t.run_role('reliquary_ops', format($q$select string_agg(kind || ':' || name || '@' || environment, ',' order by kind, name, environment) from private.sealed_rows(%L)$q$, t.id('team')))
+  || ' / ' || t.run_role('reliquary_ops', format($q$select count(*) from private.sealed_rows(%L, null, 'k1')$q$, t.id('team')))
+  || ' / ' || t.run_role('reliquary_ops', format($q$select count(*) from private.sealed_rows(%L, 'production')$q$, t.id('team'))),
   'import:NEW_KEY@development,value:API_KEY@development,value:API_KEY@production,value:DB_URL@development / 0 / 1');
 
 -- ---------------------------------------------------------------------------
@@ -160,7 +164,7 @@ create table t.before as
          t.feed_count('team') as feed, t.log_count('team', 'set') + t.log_count('team', 'rotate') as sets;
 
 select t.expect('reseal: moves values and pending import values of one vault to the new key',
-  t.run_role('reliquary_web', t.reseal_sql('team', 'rotate_key',
+  t.run_role('reliquary_ops', t.reseal_sql('team', 'rotate_key',
     jsonb_build_array(t.item('team', 'API_KEY', 'development', 'k2', 11), t.item('team', 'API_KEY', 'production', 'k2', 12),
                       t.item('team', 'DB_URL', 'development', 'k2', 13),
                       (select jsonb_build_object('kind', 'import', 'ref', t.id('push1'), 'name', 'NEW_KEY', 'environment', 'development',
@@ -195,7 +199,7 @@ select t.expect('reseal: owners and editors see the rotate_key row; viewers don'
 -- operator's item for nonce 4 must not overwrite the person's new value.
 select t.setv('ana', 'side', 'SIDE_KEY', 'development', 'k2', 40);
 select t.expect('reseal: a value set meanwhile (another nonce) is left alone, and nothing is logged',
-  t.run_role('reliquary_web', t.reseal_sql('side', 'rotate_key',
+  t.run_role('reliquary_ops', t.reseal_sql('side', 'rotate_key',
     jsonb_build_array(jsonb_build_object('kind', 'value', 'ref', (t.secret('side', 'SIDE_KEY', 'development')).variable_id,
       'name', 'SIDE_KEY', 'environment', 'development', 'old_nonce', t.b64(t.nonce(4)), 'key_id', 'k2',
       'nonce', t.b64(t.nonce(41)), 'ciphertext', t.b64(t.ct('stale'))))))
@@ -204,27 +208,27 @@ select t.expect('reseal: a value set meanwhile (another nonce) is left alone, an
   '0,000000000000000000000028,0');
 
 select t.expect('reseal: an item for another vault''s row changes nothing',
-  t.run_role('reliquary_web', t.reseal_sql('team', 'rotate_key', jsonb_build_array(t.item('priv', 'PRIV_KEY', 'development', 'k2', 50))))
+  t.run_role('reliquary_ops', t.reseal_sql('team', 'rotate_key', jsonb_build_array(t.item('priv', 'PRIV_KEY', 'development', 'k2', 50))))
   || ',' || (select key_id from t.secret('priv', 'PRIV_KEY', 'development')),
   '0,k1');
 
 select t.expect('reseal: malformed items, a bad key id, a short nonce or an unknown reason are refused',
-  t.run_role('reliquary_web', t.reseal_sql('priv', 'rotate_key', '{}'))
-  || ',' || t.run_role('reliquary_web', t.reseal_sql('priv', 'rotate_key', '[1]'))
-  || ',' || t.run_role('reliquary_web', t.reseal_sql('priv', 'rotate_key',
+  t.run_role('reliquary_ops', t.reseal_sql('priv', 'rotate_key', '{}'))
+  || ',' || t.run_role('reliquary_ops', t.reseal_sql('priv', 'rotate_key', '[1]'))
+  || ',' || t.run_role('reliquary_ops', t.reseal_sql('priv', 'rotate_key',
               jsonb_build_array(t.item('priv', 'PRIV_KEY', 'development', 'bad id', 51))))
-  || ',' || t.run_role('reliquary_web', t.reseal_sql('priv', 'rotate_key',
+  || ',' || t.run_role('reliquary_ops', t.reseal_sql('priv', 'rotate_key',
               jsonb_build_array(t.item('priv', 'PRIV_KEY', 'development', 'k2', 51) || '{"nonce": "AAAA"}')))
-  || ',' || t.run_role('reliquary_web', t.reseal_sql('priv', 'set', '[]')),
+  || ',' || t.run_role('reliquary_ops', t.reseal_sql('priv', 'set', '[]')),
   'ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023');
 
 select t.expect('reseal: for a rename only inside that rename''s transaction',
-  t.run_role('reliquary_web', t.reseal_sql('priv', 'rename_environment',
+  t.run_role('reliquary_ops', t.reseal_sql('priv', 'rename_environment',
     jsonb_build_array(t.item('priv', 'PRIV_KEY', 'development', 'k1', 52)))),
   'ERR 42501');
 
 select t.expect('reseal: after it, variable_key_ids shows what is left on the old key',
-  t.run_role('reliquary_web', $q$select string_agg(key_id || ':' || "values" || '+' || imports, ',') from private.variable_key_ids()$q$),
+  t.run_role('reliquary_ops', $q$select string_agg(key_id || ':' || "values" || '+' || imports, ',') from private.variable_key_ids()$q$),
   'k1:1+0,k2:4+1');
 
 -- ---------------------------------------------------------------------------
@@ -300,7 +304,15 @@ select t.expect('environments: the defaults keep their names; a taken name, the 
   'ERR 55000,ERR 55000,ERR 23505,ERR 22023,ERR 22023,ERR P0002');
 
 -- The rename and the web app's reseal, in one transaction, as the web app
--- does it: as the person, then as reliquary_web with the new name's items.
+-- does it: as the person, then as reliquary_web, which reads the renamed
+-- environment's values (private.renamed_rows) and swaps in the new name's
+-- (private.reseal_renamed).
+create function t.web_reseal_sql(p_vault text, p_env text) returns text language sql as $$
+  select format($q$select private.reseal_renamed(%L, (select jsonb_agg(jsonb_build_object('kind', 'value', 'ref', r.ref,
+      'name', r.name, 'environment', %L, 'old_nonce', encode(r.nonce, 'base64'), 'key_id', r.key_id, 'nonce', %L,
+      'ciphertext', %L)) from private.renamed_rows(%L, %L) r))$q$,
+    t.id(p_vault), p_env, t.b64(t.nonce(70)), t.b64(t.ct('resealed-' || p_env)), t.id(p_vault), p_env)
+$$;
 create function t.rename_and_reseal(p_vault text, p_from text, p_to text) returns text language plpgsql as $$
 declare
   r text;
@@ -308,11 +320,7 @@ declare
 begin
   r := t.run('ana', format($q$select public.rename_environment(%L, %L, %L)::text$q$, t.id(p_vault), p_from, p_to));
   if r like 'ERR %' then return r; end if;
-  n := t.run_role('reliquary_web', t.reseal_sql(p_vault, 'rename_environment',
-    (select jsonb_agg(jsonb_build_object('kind', 'value', 'ref', s.variable_id, 'name', v.name, 'environment', p_to,
-       'old_nonce', t.b64(s.nonce), 'key_id', s.key_id, 'nonce', t.b64(t.nonce(70)), 'ciphertext', t.b64(t.ct('resealed-' || p_to))))
-       from private.variable_secrets s join public.variables v on v.id = s.variable_id
-      where v.vault_id = t.id(p_vault) and s.environment = p_to)));
+  n := t.run_role('reliquary_web', t.web_reseal_sql(p_vault, p_to));
   return r || ' ' || n;
 end $$;
 
@@ -336,9 +344,11 @@ select t.expect('environments: a rename is logged (from, to, names) with the rej
 
 select t.expect('environments: the reseal allowance names the vault and the new name only',
   t.q(format($q$select t.run('ana', format('select public.rename_environment(%%L, ''qa'', ''qa2'')::text', %L::uuid)) || ' '
-    || t.run_role('reliquary_web', t.reseal_sql('team', 'rename_environment', jsonb_build_array(t.item('team', 'API_KEY', 'development', 'k2', 71))))$q$,
-    t.id('team'))),
-  '{"moved": 1, "names": ["STAGE_KEY"], "rejected_imports": 0} ERR 42501');
+    || t.run_role('reliquary_web', format('select private.reseal_renamed(%%L, %%L::jsonb)', %L::uuid,
+         jsonb_build_array(t.item('team', 'API_KEY', 'development', 'k2', 71))))
+    || ' ' || t.run_role('reliquary_web', format('select count(*) from private.renamed_rows(%%L, ''development'')', %L::uuid))$q$,
+    t.id('team'), t.id('team'), t.id('team'))),
+  '{"moved": 1, "names": ["STAGE_KEY"], "rejected_imports": 0} ERR 42501 ERR 42501');
 
 select t.expect('environments: deleting needs the name typed; a default with values, or the last one, is refused',
   t.run('ana', format($q$select public.delete_environment(%L, 'qa2', 'qa')$q$, t.id('team')))

@@ -93,7 +93,7 @@ setAccountMode(MODE);
 if (variablesConfigured()) {
   let stored: string[] | null = null;
   try {
-    stored = (await pool.query("select key_id from private.variable_key_ids()")).rows.map((r) => r.key_id as string);
+    stored = (await pool.query("select k from private.stored_key_ids() k")).rows.map((r) => r.k as string);
   } catch (err) {
     console.error("could not check the stored variable key ids", (err as { code?: string }).code ?? (err as Error).name);
   }

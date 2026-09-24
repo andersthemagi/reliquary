@@ -135,10 +135,10 @@ select t.expect('indexes: every foreign key in public has an index that leads wi
   'none');
 select t.expect_true('indexes: the log is indexed by vault, path and seq',
   exists (select 1 from pg_indexes where tablename = 'log' and indexdef like '%(vault_id, path, seq)%'));
-select t.expect('timeouts: both app roles close idle transactions after 15 s',
+select t.expect('timeouts: both app roles, and the operator''s role, close idle transactions after 15 s',
   (select string_agg(r.rolname, ',' order by r.rolname) from pg_db_role_setting s join pg_roles r on r.oid = s.setrole
     where 'idle_in_transaction_session_timeout=15s' = any(s.setconfig)),
-  'reliquary_mcp,reliquary_web');
+  'reliquary_mcp,reliquary_ops,reliquary_web');
 
 -- ---------------------------------------------------------------------------
 -- Rules for many paths at once, and the per-statement membership check

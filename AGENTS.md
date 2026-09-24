@@ -87,7 +87,8 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
   person applies it in the web UI; one parser in `web/src/dotenv.ts` and
   `cli/src/dotenv.ts`. The CLI is ready to publish (`publish-cli.yml`).
 - key rotation without downtime (`VARIABLES_KEYS`, several keys by id,
-  `scripts/rotate-variables-key.sh`; procedure in `docs/ops/runbook.md`) and
+  `scripts/rotate-variables-key.sh`, run as the operator's role
+  `reliquary_ops`, not the web app's; procedure in `docs/ops/runbook.md`) and
   custom environments (owners, typed-name delete), with limits (1000
   variables per vault, no NUL in values).
 Milestone 2 is built; next is its week of real use.
