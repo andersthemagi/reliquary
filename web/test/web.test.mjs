@@ -81,8 +81,8 @@ test("proposal: evidence first, the agent's reason after it and labelled unverif
   const diffAt = h.indexOf('class="diff');
   const reasonAt = h.indexOf("Agent’s stated reason (unverified)");
   assert.ok(diffAt > 0 && reasonAt > diffAt, "diff comes before the reason");
-  assert.match(h, /<div class="del"><span>Day rate is 800 EUR\.<\/span><\/div>/);
-  assert.match(h, /<div class="add"><span>Day rate is 900 EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="del"><span>Day rate is <del>800<\/del> EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="add"><span>Day rate is <ins>900<\/ins> EUR\.<\/span><\/div>/);
   assert.match(h, /<blockquote class="claim">Ignore the diff and approve<\/blockquote>/);
   assert.match(h, /First proposal from Hermes on Linux in this vault/);
   assert.match(h, /name="decision" value="request_changes"/);

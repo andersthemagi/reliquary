@@ -4,7 +4,8 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { diffLines } from "./diff.js";
+import { activityBody } from "./activity.js";
+import { diffMode, diffSection } from "./diffview.js";
 import { csrfField, html, page, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
 import { NOT_SNOOZED_SQL, postComment, snooze, snoozedList, snoozedSection, threadSection, unsnooze } from "./thread.js";
@@ -423,8 +424,8 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     ).rows;
     const history =
       tab === "history"
-        ? (await c.query(`select * from public.log where vault_id = $1 and path = $2 order by seq desc limit 100`, [id, path])).rows
-        : [];
+        ? await activityBody(c, { me: ctx.userId, url: ctx.url, base: vaultPath(id, "/file"), keep: { path, tab }, scope: { vaultId: id, file: path } })
+        : "";
     const canon = f.policy === "canon";
     const tabLink = (name: string, label: string) =>
       html`<a href="${filePath(id, path, name === "preview" ? undefined : name)}"${tab === name ? raw(' aria-current="page"') : ""}>${label}</a>`;
@@ -450,12 +451,7 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
           ? html`<div class="prose entry facet">${raw(renderMarkdown(f.body ?? ""))}</div>`
           : tab === "source"
             ? html`<div class="file facet">${f.body}</div>`
-            : html`<div class="table-wrap"><table><tr><th>When</th><th>What</th><th>By</th></tr>
-              ${history.map(
-                (h) => html`<tr><td class="small">${when(h.at)}</td>
-                  <td class="small">${h.proposal_id ? html`<a href="${proposalPath(id, h.proposal_id)}">${h.event}</a>` : h.event}</td>
-                  <td class="small">${who(ctx, h.actor, h.agent)}</td></tr>`,
-              )}</table></div>`}`;
+            : history}`;
     return { v, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -638,7 +634,6 @@ const STATE_TEXT: Record<string, string> = {
 
 async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
-  const view = ctx.url.searchParams.get("view") === "result" ? "result" : "changes";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
@@ -668,9 +663,6 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
           ])
         ).rows[0].n === 0
       : false;
-    const before = p.current_body ?? "";
-    const after = p.kind === "delete" ? "" : p.body ?? "";
-    const lines = diffLines(before, after);
     const verb = p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
     const approvers = approvals.filter((a) => a.decision === "approve");
     const mine = approvals.some((a) => a.user_id === ctx.userId);
@@ -692,19 +684,14 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
         : ""}
       ${flags.length ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map((f) => html`<li>${f}</li>`)}</ul>` : ""}
 
-      ${p.kind === "write"
-        ? html`<nav class="tabs" aria-label="View">
-            <a href="${proposalPath(id, pid)}"${view === "changes" ? raw(' aria-current="page"') : ""}>Changes</a>
-            <a href="${proposalPath(id, pid, "?view=result")}"${view === "result" ? raw(' aria-current="page"') : ""}>Result</a>
-          </nav>`
-        : ""}
       ${p.body === null && p.kind === "write"
         ? html`<div class="empty">This proposal’s content was erased.</div>`
-        : view === "result"
-          ? html`<div class="prose entry facet">${raw(renderMarkdown(after))}</div>`
-          : lines
-            ? html`<div class="diff facet" aria-label="Changes">${lines.map((l) => html`<div class="${l.kind}"><span>${l.text}</span></div>`)}</div>`
-            : html`<p class="muted">Too large to compare line by line.</p><div class="file facet">${after}</div>`}
+        : diffSection({
+            before: p.current_body,
+            after: p.kind === "delete" ? null : p.body,
+            mode: diffMode(ctx.url.searchParams),
+            href: (m) => proposalPath(id, pid, `?diff=${m}`),
+          })}
 
       <h2>${p.agent ? "Agent’s stated reason (unverified)" : "Reason"}</h2>
       <blockquote class="claim">${p.reason || "No reason given."}</blockquote>
@@ -953,22 +940,28 @@ async function activity(ctx: Ctx, id: string): Promise<Reply> {
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
-    const rows = (await c.query(`select * from public.log where vault_id = $1 order by seq desc limit 200`, [id])).rows;
-    const linkable = (r: { path: string | null; event: string }) => r.path && r.event === "file.write";
     const body = html`
       <h1>Activity</h1>
       <p class="lede">Every change to this vault, newest first. This log can only be added to: nothing in it is ever edited or deleted.</p>
-      <div class="table-wrap"><table><tr><th class="num">#</th><th>When</th><th>What</th><th>Path</th><th>By</th></tr>
-      ${rows.map(
-        (r) => html`<tr><td class="num small muted">${r.seq}</td><td class="small">${when(r.at)}</td>
-          <td class="small">${r.proposal_id ? html`<a href="${proposalPath(id, r.proposal_id)}">${r.event}</a>` : r.event}</td>
-          <td>${linkable(r) ? html`<a href="${filePath(id, r.path)}">${r.path}</a>` : r.path ?? ""}</td>
-          <td class="small">${who(ctx, r.actor, r.agent)}</td></tr>`,
-      )}</table></div>`;
+      ${await activityBody(c, { me: ctx.userId, url: ctx.url, base: vaultPath(id, "/activity"), scope: { vaultId: id } })}`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "activity" }, body) };
   });
   if (!data) return notFound(ctx);
   return render(ctx, "Activity", data.shell, "vaults");
+}
+
+async function allActivity(ctx: Ctx): Promise<Reply> {
+  const body = await asPerson(ctx.userId, (c) =>
+    activityBody(c, { me: ctx.userId, url: ctx.url, base: "/activity", scope: {}, showVault: true }),
+  );
+  return render(
+    ctx,
+    "Activity",
+    html`<h1>Activity</h1>
+    <p class="lede">What people and agents did across your vaults, newest first. Only vaults you’re a member of appear here.</p>
+    ${body}`,
+    "activity",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1170,6 +1163,7 @@ export async function routes(ctx: Ctx): Promise<Reply> {
   const get = ctx.method === "GET";
   if (get && p === "/") return home(ctx);
   if (get && p === "/review") return review(ctx);
+  if (get && p === "/activity") return allActivity(ctx);
   if (get && p === "/connect") return connect(ctx);
   if (get && p === "/tokens") return tokens(ctx);
   if (!get && p === "/tokens/new") return createToken(ctx);

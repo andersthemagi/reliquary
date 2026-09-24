@@ -19,6 +19,15 @@ owners and their agents (over MCP), with review notes and approvals in the
 same timeline. Reviewers can snooze a proposal in their Review inbox for a
 day, a week or until it changes; snoozes are private to each person.
 
+Proposal diffs come in three views, picked with `?diff=unified|split|rendered`
+links: a line diff with changed words marked, the same side by side, and both
+versions rendered as markdown (raw HTML escaped). Very large files skip the
+diff and show the proposed text whole. **Activity** (`/activity` across your
+vaults, `/v/:vault/activity`, and a file's History tab) reads the append-only
+log as you, so RLS limits it to your vaults. It filters by person, agent
+(or people / agents only), action, path prefix and date, 50 events a page,
+and never shows file text.
+
 **Local sign-in is a stand-in.** The server acts only as the one local
 person `dev.sh` created. Hosted, it will verify a Supabase Auth session
 instead; nothing else changes.

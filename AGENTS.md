@@ -27,7 +27,10 @@ Done so far:
   (`supabase/tests/token_scope_test.sql`);
 - proposal threads (comments from people and, over MCP, their agents, in one
   timeline with review notes) and private per-person snooze in the Review
-  inbox (`20260924170000_threads_snooze.sql`, `web/src/thread.ts`).
+  inbox (`20260924170000_threads_snooze.sql`, `web/src/thread.ts`);
+- unified / split / rendered diffs with word highlights, and Activity
+  (account-wide and per vault, filterable, paged; a file's History is the
+  same log), in `web/src/diff.ts`, `diffview.ts`, `activity.ts`.
 Both need podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session

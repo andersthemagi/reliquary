@@ -114,3 +114,29 @@ select pg_temp.reset();
 \echo TW_CLOSED=:tw_closed
 \echo TW_VIEW=:tw_view
 \echo DEE_PROPOSAL=:dee_p
+
+-- Diffs and activity (web/test/diff_activity.test.mjs) -----------------------
+-- Ben's "Side" vault, where Ana is a viewer: a canon file with a pending
+-- change whose text carries raw HTML, and enough writes to need two pages
+-- of activity. Dee writes a file only Dee can see.
+\o /dev/null
+select pg_temp.as_person(:'ben');
+select public.create_vault('Side', 'open') as v3 \gset
+select public.set_member(:'v3', :'ana', 'viewer');
+select public.write_file(:'v3', 'canon/page.md', E'# Old heading\n\nOld text stays.\n\nA line about the weather.');
+select public.set_policy(:'v3', 'canon/', 'canon', 1);
+select pg_temp.reset();
+select pg_temp.as_person(:'ben', 'Bulk bot');
+select public.write_file(:'v3', 'bulk/' || g || '.md', 'bulk') from generate_series(1, 60) g;
+select public.propose(:'v3', 'canon/page.md',
+  E'# New heading\n\nOld text stays.\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(2)>\n\nA line about the sunny weather.',
+  'html in text') as p5 \gset
+select pg_temp.reset();
+select pg_temp.as_person(:'dee');
+select public.write_file(:'v2', 'dee-only-plan.md', 'private');
+select pg_temp.reset();
+\o
+\echo SIDE_VAULT=:v3
+\echo P_HTML=:p5
+\echo BEN=:ben
+\echo DEE=:dee
