@@ -4,7 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-engine=$(command -v podman || command -v docker)
+# CONTAINER_ENGINE picks one explicitly (CI uses docker).
+engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 # TEST_SLOT lets parallel runs (e.g. separate worktrees) avoid each other.
 slot=${TEST_SLOT:-0}
 pg=reliquary-mcp-test-pg-$slot
@@ -27,6 +28,8 @@ cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql | psql >/dev/null
 echo "alter role reliquary_mcp login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=' )
 
+# A fresh checkout (CI, a new worktree) has no node_modules yet.
+[ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund
 "$engine" run --rm --network none -v "$PWD":/app:Z -w /app "$node" npx tsc
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
@@ -36,7 +39,11 @@ until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "${env_args[@]}" \
-  -e MCP_URL="http://127.0.0.1:$port/mcp" "$node" node --test --test-concurrency=1 test/*.test.mjs
+  -e MCP_URL="http://127.0.0.1:$port/mcp" -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" "$node" node --test --test-concurrency=1 test/*.test.mjs
 
 echo "== server log (must contain no tokens or file text)"
-"$engine" logs "$srv" 2>&1 | tee /dev/stderr | grep -E 'rlq_|800 EUR|Hermes|Falcon' && { echo "LEAK in server log"; exit 1; } || echo "clean"
+# Not `tee /dev/stderr`: when stderr is a file (./test.sh logs) that reopens
+# and truncates it, losing the test output.
+server_log=$("$engine" logs "$srv" 2>&1)
+printf '%s\n' "$server_log" >&2
+grep -E 'rlq_|800 EUR|Hermes|Falcon' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"

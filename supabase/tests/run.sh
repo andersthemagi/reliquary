@@ -5,7 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-engine=$(command -v podman || command -v docker)
+# CONTAINER_ENGINE picks one explicitly (CI uses docker).
+engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 # TEST_SLOT lets parallel runs (e.g. separate worktrees) avoid each other.
 slot=${TEST_SLOT:-0}
 name=reliquary-migrations-test-$slot

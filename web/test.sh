@@ -4,7 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-engine=$(command -v podman || command -v docker)
+# CONTAINER_ENGINE picks one explicitly (CI uses docker).
+engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 # TEST_SLOT lets parallel runs (e.g. separate worktrees) avoid each other.
 slot=${TEST_SLOT:-0}
 pg=reliquary-web-test-pg-$slot
@@ -27,6 +28,8 @@ cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql | psql >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=')
 
+# A fresh checkout (CI, a new worktree) has no node_modules yet.
+[ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund
 "$engine" run --rm --network none -v "$PWD":/app:Z -w /app "$node" npx tsc
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
