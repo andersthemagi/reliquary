@@ -6,7 +6,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 engine=$(command -v podman || command -v docker)
-name=reliquary-migrations-test
+# TEST_SLOT lets parallel runs (e.g. separate worktrees) avoid each other.
+slot=${TEST_SLOT:-0}
+name=reliquary-migrations-test-$slot
 
 cleanup() { "$engine" rm -f "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT

@@ -5,10 +5,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 engine=$(command -v podman || command -v docker)
-pg=reliquary-mcp-test-pg
-srv=reliquary-mcp-test-server
-pgport=54330
-port=8788
+# TEST_SLOT lets parallel runs (e.g. separate worktrees) avoid each other.
+slot=${TEST_SLOT:-0}
+pg=reliquary-mcp-test-pg-$slot
+srv=reliquary-mcp-test-server-$slot
+pgport=$((54330 + 10 * slot))
+port=$((8788 + 10 * slot))
 node=docker.io/library/node:22-slim
 
 cleanup() { "$engine" rm -f "$pg" "$srv" >/dev/null 2>&1 || true; }
