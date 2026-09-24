@@ -100,6 +100,14 @@ be byte for byte the MCP app's `MCP_RESOURCE`. On Vercel both are required.
 `CIMD_ALLOW_LOOPBACK=1` lets tests serve client metadata on loopback; the
 server refuses to start with it on Vercel.
 
+**The Reliquary CLI** is a first-party client of the same server
+(docs/variables.md): its client id is `<issuer>/cli/oauth-client.json`,
+served here, never fetched; it may only ask for the env API's resource,
+`<issuer>/api/env`, and no other client may. Its grants are kind `cli`
+(read environment variables, nothing else), its access tokens `rle_`, and
+`src/envapi.ts` serves `GET /api/env/vaults` and
+`GET /api/env/<vault>/<environment>` to them.
+
 Not signed in, `/oauth/authorize` currently shows the sign-in notice; with
 Supabase Auth (chunk B) it should send the person to sign in and back to the
 same authorize URL. The session cookie must be `SameSite=Lax` for that: the
@@ -195,6 +203,7 @@ never a JWT, refresh token, code, token hash or email (`test.sh` checks).
 | `SUPABASE_PUBLISHABLE_KEY` | no, but server-only | `sb_publishable_...` (Project Settings, API Keys) |
 | `JWT_ALG` | no | `ES256` or `RS256`: the `alg` of the current key in `/auth/v1/.well-known/jwks.json` |
 | `SESSION_SECRET` | **yes** | 32 random bytes, base64url; rotating it signs nobody out but voids open forms and flash notices |
+| `VARIABLES_KEY` | **yes** | 32 random bytes, base64url: encrypts environment variables (`src/secrets.ts`, docs/variables.md). Required on Vercel; keep a copy outside Vercel, since losing it loses every value. Never in the mcp project |
 | `PUBLIC_URL` | no | the site's https URL (required on Vercel) |
 
 The server refuses to start without these, naming the variable, never its

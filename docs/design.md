@@ -240,7 +240,7 @@ under 6 ms at 200k rows.
 | `propose` | New file, edit, move or retraction of a canon file, with a reason |
 | `list_proposals` | Pending and recent |
 | `list_routines`, `routine_runs` | Status and artifacts |
-| `list_env` | Variable names and which environments they are in. **Never values** |
+| `list_variables` | Variable names and which environments they are in. **Never values** |
 | `<connection>.<tool>` | Each granted connection's tools, proxied (see [Shared connections](#shared-connections)) |
 
 No MCP tool returns a variable's value or a connection's credential, on any
@@ -381,10 +381,12 @@ accounts.
   process. Prefer scoped, short-lived provider credentials where the
   provider offers them. A credential-injecting proxy (the Infisical Agent
   Vault pattern) is the stronger design for a later milestone.
-- **The hosted operator can decrypt.** Values are encrypted at rest and
-  decrypted only inside a `security definer` function that checks the
-  grant and writes the log in one transaction. An operator with database
-  access could still decrypt them. Teams that need otherwise get
+- **The hosted operator can decrypt.** Values are encrypted at rest by
+  the web app (AES-256-GCM, a key the database never sees), and their
+  ciphertext leaves the database only through a `security definer`
+  function that checks the grant and writes the log in one transaction
+  (docs/variables.md). An operator with the database and the web app's
+  environment could still decrypt them. Teams that need otherwise get
   client-side encryption (per-member `age` keys) as a separate feature.
 
 ## Continuity
@@ -496,7 +498,7 @@ meantime inherit the sub-processors' own SOC 2 reports.
 - **Supabase:**
   - Postgres with RLS for every rule;
   - Auth for accounts;
-  - Vault for variable encryption;
+  - the web app encrypts variables (docs/variables.md);
   - `pg_cron`, `pgmq` and `pg_net` for routines and notifications;
   - Edge Functions as the routine runtime.
 - **Next.js:** web UI, the remote MCP endpoint, REST, and OAuth

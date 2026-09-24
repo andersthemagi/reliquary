@@ -42,7 +42,9 @@ Any MCP client that can send a header works the same way (Hermes, Cursor):
 `list_vaults`, `create_vault`, `list_files`, `read_file`, `search`,
 `write_file` and `delete_file` (open files only), `propose`, `list_proposals`,
 `revise_proposal`, `read_proposal` (one proposal with its whole thread),
-`comment_on_proposal`, `changes_since`. There is no approve tool: approving
+`comment_on_proposal`, `changes_since`, `list_variables` (environment
+variable names only: no tool returns a value, and this app refuses to start
+with `VARIABLES_KEY` set; docs/variables.md). There is no approve tool: approving
 needs a person in the web UI. There is no snooze tool either, so an agent
 can't hide its proposals from its person, and no rules or members tool.
 `create_vault` only works through a token (or OAuth grant) that reaches all

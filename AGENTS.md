@@ -40,7 +40,21 @@ Done so far:
   `create_vault` over MCP for all-vaults read-write tokens
   (`20260924230000_agent_create_vault.sql`), `delete_file` over MCP, Revise
   for your own proposal in the web UI.
-Both need podman or docker; nothing needs Node installed on the host.
+
+Milestone 2: **environment variables**. Done so far (phase 1, the core;
+interface and phase 2's work in [docs/variables.md](docs/variables.md)):
+- environments, variables, ciphertext in `private.variable_secrets` and the
+  append-only `env_access_log` (`20260925090000_variables.sql`), with hostile
+  tests (`supabase/tests/variables_test.sql`): people set and reveal, a
+  `cli` grant reads, agents only list names;
+- encryption in the web app (`web/src/secrets.ts`, `VARIABLES_KEY`), the
+  web module for the Variables page (`web/src/variables.ts`), the CLI's
+  OAuth sign-in and the env API (`web/src/envapi.ts`), and `list_variables`
+  over MCP.
+Next (phase 2): the web Variables page and the CLI (`reliquary login | run |
+env pull`).
+
+All of it needs podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
 minting, a Telegram surface). They are not product code, and are not
