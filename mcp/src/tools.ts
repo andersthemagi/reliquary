@@ -91,19 +91,18 @@ export function registerTools(server: McpServer, id: Identity): void {
     "list_vaults",
     {
       title: "List vaults",
-      description: "Vaults you belong to, with your role in each.",
+      description: "Vaults this token can reach, with your role in each (viewer when the token is read-only).",
       annotations: { readOnlyHint: true },
     },
     async () =>
       run(async (c) => {
+        // role_in is the role as limited by this token's scope and access.
         const { rows } = await c.query(
-          `select v.id, v.name, m.role
+          `select v.id, v.name, private.role_in(v.id) as role
              from public.vaults v
-             join public.vault_members m on m.vault_id = v.id and m.user_id = $1
             order by v.name`,
-          [id.userId],
         );
-        if (rows.length === 0) return ok("You don't belong to any vaults yet.");
+        if (rows.length === 0) return ok("This token can't reach any vaults.");
         return ok(rows.map((r) => `${r.name} (${r.role}) id=${r.id}`).join("\n"));
       }),
   );

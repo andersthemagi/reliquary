@@ -63,3 +63,25 @@ select pg_temp.reset();
 \echo TEAM_VAULT=:v1
 \echo CHANGES_PROPOSAL=:p2
 \echo DEE_VAULT=:v2
+
+-- ---------------------------------------------------------------------------
+-- Token scope (test/scope.test.mjs): Ana gets a second vault (named to sort
+-- after Team), a read-only token for Team, a read-write token for Workshop
+-- only, one to revoke mid-session and one already expired.
+\o /dev/null
+select pg_temp.as_person(:'ana');
+select public.create_vault('Workshop') as ana_ws \gset
+select public.write_file(:'ana_ws', 'notes/shed.md', 'Workshop: garden shed plans.');
+select public.create_access_token('Team reader', 30, array[:'v1']::uuid[], 'read') as ana_team_ro \gset
+select public.create_access_token('Workshop writer', 30, array[:'ana_ws']::uuid[], 'write') as ana_ws_rw \gset
+select public.create_access_token('To revoke', 30, array[:'v1']::uuid[], 'read') as ana_revoke \gset
+select public.create_access_token('Already expired', 30) as ana_expired \gset
+select pg_temp.reset();
+update public.access_tokens set expires_at = now() - interval '1 second' where name = 'Already expired';
+\o
+
+\echo ANA_TEAM_RO=:ana_team_ro
+\echo ANA_WS_RW=:ana_ws_rw
+\echo ANA_REVOKE=:ana_revoke
+\echo ANA_EXPIRED=:ana_expired
+\echo WORKSHOP_VAULT=:ana_ws

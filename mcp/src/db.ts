@@ -19,21 +19,33 @@ export const pool = new pg.Pool({
 
 const TOKEN_SHAPE = /^rlq_[0-9a-f]{64}$/;
 
+const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
+
 export async function resolveToken(token: string): Promise<Identity | null> {
   if (!TOKEN_SHAPE.test(token)) return null;
-  const hash = createHash("sha256").update(token).digest("hex");
   const { rows } = await pool.query(
     "select token_id, user_id, name from private.resolve_access_token($1)",
-    [hash],
+    [hashOf(token)],
   );
   if (rows.length !== 1) return null;
   return { tokenId: rows[0].token_id, userId: rows[0].user_id, agent: rows[0].name };
 }
 
+// Records the name the MCP client reported at initialize (clientInfo.name),
+// for the Tokens page. Keyed by the token's hash, so only a caller holding
+// the token can set it. Best effort: never fails the request.
+export async function recordClient(token: string, clientName: string): Promise<void> {
+  if (!TOKEN_SHAPE.test(token)) return;
+  await pool
+    .query("select private.record_token_client($1, $2)", [hashOf(token), clientName.slice(0, 200)])
+    .catch(() => console.error("record client failed"));
+}
+
 // Runs fn in one transaction as the identity's person, acting through their
 // agent. The `act` claim is always set for token calls, so the database's
 // delegation ceiling (no approving, no policy or member changes, no erasure)
-// always applies.
+// always applies. `act.tok` names the token; the database limits every call
+// to that token's vaults and access (read-only or read-write).
 export async function asIdentity<T>(id: Identity, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
@@ -43,7 +55,7 @@ export async function asIdentity<T>(id: Identity, fn: (c: pg.PoolClient) => Prom
       JSON.stringify({
         sub: id.userId,
         role: "authenticated",
-        act: { sub: id.tokenId, name: id.agent },
+        act: { sub: id.tokenId, name: id.agent, tok: id.tokenId },
       }),
     ]);
     const result = await fn(client);

@@ -10,7 +10,7 @@
 import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { resolveToken } from "./db.js";
+import { recordClient, resolveToken } from "./db.js";
 import { registerTools } from "./tools.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -78,6 +78,12 @@ const httpServer = http.createServer(async (req, res) => {
   } catch (err) {
     send(res, 400, { error: (err as Error).message });
     return;
+  }
+
+  // The client's self-reported name, for the Tokens page. Never logged.
+  const init = body as { method?: unknown; params?: { clientInfo?: { name?: unknown } } } | null;
+  if (bearer && init?.method === "initialize" && typeof init.params?.clientInfo?.name === "string") {
+    await recordClient(bearer[1], init.params.clientInfo.name);
   }
 
   const mcp = new McpServer({ name: "reliquary", version: "0.1.0" });
