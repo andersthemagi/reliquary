@@ -14,7 +14,17 @@ file text is shown as plain text, never rendered. The CSP forbids scripts,
 every POST needs the session's CSRF token and a same-origin Origin, and
 sessions are HttpOnly, SameSite=Strict cookies.
 
-Controls sit at the top of every page (`pageHeader` in `src/html.ts`), never
+The look follows `docs/research/ui-design-system.md`: tokens for light and
+dark (the OS setting, or the Account menu's Auto / Light / Dark, stored in a
+cookie) at the top of `public/style.css`, Inter self-hosted from
+`public/fonts/` (SIL Open Font License, `OFL-Inter.txt`), sentence case,
+neutral surfaces, and vermilion only for the logo diamond, "you are here"
+bars and the Review count. Filled and hollow diamonds mark canon and open.
+`test/contrast.test.mjs` checks every token pair against WCAG AA in both
+themes.
+
+Controls sit at the top of every page (`pageHeader` in `src/html.ts`: crumbs,
+title with a status badge, actions with the primary last, meta), never
 only at the bottom. A proposal page opens with its status, the latest
 request for changes, the decision (note, Approve, Request changes, Reject,
 Edit then approve) and snooze; the diff follows, then the stated reason,
@@ -44,5 +54,5 @@ client name the agent reported. The database enforces the scope, not this
 page.
 
 ```bash
-./test.sh    # real Postgres + this server; sign-in, escaping, CSRF, approve, threads, snooze, tokens; log leak check
+./test.sh    # real Postgres + this server; sign-in, escaping, CSRF, approve, threads, snooze, tokens, contrast; log leak check
 ```
