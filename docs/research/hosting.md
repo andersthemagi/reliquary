@@ -444,7 +444,7 @@ email comes a week ahead ([project pausing](https://supabase.com/docs/guides/pla
   `ok` or `503 unavailable`. No version, no error text. With
   `KEEPALIVE_TOKEN` set, it requires `x-keepalive: <token>` so it can't be used
   to hammer the pooler. Plain `/healthz` stays DB-free.
-- **Workflow** `.github/workflows/keepalive.yml`: `schedule: cron: "17 */6 * * *"`
+- **Workflow** (replaced 2026-09-24 by `.github/workflows/uptime.yml`, hourly, since the project is on Pro) `.github/workflows/keepalive.yml`: `schedule: cron: "17 */6 * * *"`
   plus `workflow_dispatch`; `curl -fsS --max-time 30 -H "x-keepalive: $TOKEN"`;
   retry once. A failed run emails the owner, which is the alert.
 - GitHub notes: at least 5 min interval, may run late at the top of the hour;

@@ -1,0 +1,89 @@
+# Uptime: every hour, checks both production apps, including a database round
+# trip on each, and keeps one GitHub issue ("Production is down") in step with
+# the result: opened (which emails the owner) when checks fail twice in a row,
+# commented while it stays down, closed on recovery. Hourly keeps a private
+# repo well inside the free Actions minutes. It replaces the free-tier
+# keepalive: the Supabase project is on Pro and doesn't pause.
+#
+# Repository variables: WEB_URL, MCP_URL (origins). Until both are set, runs
+# skip with a notice.
+name: uptime
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production
+        id: check
+        env:
+          WEB: ${{ vars.WEB_URL }}
+          MCP: ${{ vars.MCP_URL }}
+        run: |
+          if [ -z "$WEB" ] || [ -z "$MCP" ]; then
+            echo "::notice title=uptime skipped::WEB_URL and MCP_URL are not both set"
+            echo "state=skip" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          fake="authorization: Bearer rle_$(printf '0%.0s' $(seq 64))"
+          # name|url|expected status|extra header. The env API with a fake CLI
+          # token answers 401 only after asking the database, so it proves the
+          # web app's database path too.
+          checks=(
+            "web sign-in|$WEB/signin|200|"
+            "web database|$WEB/api/env/vaults|401|$fake"
+            "OAuth metadata|$WEB/.well-known/oauth-authorization-server|200|"
+            "MCP database|$MCP/healthz?db=1|200|"
+            "MCP resource metadata|$MCP/.well-known/oauth-protected-resource/mcp|200|"
+          )
+          run_all() {
+            failed=()
+            for c in "${checks[@]}"; do
+              IFS='|' read -r name url want hdr <<< "$c"
+              args=(-s -o /dev/null --max-time 20 -w '%{http_code}')
+              [ -z "$hdr" ] || args+=(-H "$hdr")
+              got=$(curl "${args[@]}" "$url" 2>/dev/null) || got=000
+              [ "$got" = "$want" ] || failed+=("$name: HTTP $got (want $want)")
+            done
+          }
+          run_all
+          if [ ${#failed[@]} -gt 0 ]; then sleep 60; run_all; fi
+          if [ ${#failed[@]} -eq 0 ]; then
+            echo "all checks passed"; echo "state=up" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "${failed[@]}" | tee failures.txt
+            echo "state=down" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Keep the outage issue in step
+        if: steps.check.outputs.state == 'up' || steps.check.outputs.state == 'down'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE: ${{ steps.check.outputs.state }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Production is down"
+          open=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number -q '.[0].number')
+          # shellcheck disable=SC2016 # literal backticks: a Markdown code block
+          if [ "$STATE" = down ]; then
+            body=$(printf 'Failed checks:\n\n```\n%s\n```\n\nRun: %s' "$(cat failures.txt)" "$RUN_URL")
+            if [ -n "$open" ]; then
+              gh issue comment "$open" -R "$GITHUB_REPOSITORY" --body "$body"
+            else
+              gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+            fi
+            exit 1
+          elif [ -n "$open" ]; then
+            gh issue close "$open" -R "$GITHUB_REPOSITORY" --comment "Recovered: all checks pass. $RUN_URL"
+          fi
