@@ -1,6 +1,6 @@
 # UX patterns for the web UI
 
-2026-09-24 · Status: RESEARCH. Phases 1 and 2 built 2026-09-24; phase 3 waits for hosting
+2026-09-24 · Status: RESEARCH. Phases 1 and 2 built 2026-09-24; controls moved to the top 2026-09-24; phase 3 waits for hosting
 
 How established products structure the same jobs as Reliquary's web UI, and
 what that means for our screens. Two research passes, sources checked
@@ -25,7 +25,7 @@ clean). The structure is a first pass:
 |---|---|---|
 | Three verdicts: approve, request changes, reject (notes required on the last two) | [GitHub reviews](https://docs.github.com/articles/about-pull-request-reviews), [LangChain HITL](https://docs.langchain.com/oss/python/langchain/human-in-the-loop) | Today one Reject throws away nearly-right agent work. "Request changes" keeps the proposal open and sends the note back to the agent over MCP |
 | Edit, then approve | [Claude Code permissions](https://code.claude.com/docs/en/permissions), [Agent Inbox](https://github.com/langchain-ai/agent-inbox), GitHub suggested changes | "Edit & approve" opens the proposed text; history records that the approver edited the agent's version |
-| Evidence before claims | Claude Code (the diff *is* the prompt), [Lindy](https://docs.lindy.ai/testing/human-in-the-loop) | Diff first. The reason comes after it, as "Agent's stated reason (unverified)" |
+| Evidence before claims | Claude Code (the diff *is* the prompt), [Lindy](https://docs.lindy.ai/testing/human-in-the-loop) | The diff comes before the reason, which follows as "Agent's stated reason (unverified)". The decision controls sit above both (see "Controls at the top" below) |
 | Rendered view and word-level diff | [GitHub diff views](https://docs.github.com/articles/reviewing-proposed-changes-in-a-pull-request), [Google Docs suggestions](https://support.google.com/docs/answer/6033474) | A line diff makes reflowed prose look rewritten, so people approve what they didn't read. Add Rendered / Unified / Split views and word highlights |
 | Approvals bound to a revision | [GitHub stale-approval dismissal](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches), [GitLab](https://docs.gitlab.com/user/project/merge_requests/approvals/settings/) | Any change to a proposal voids earlier approvals, enforced in the database. "Stale" becomes "base changed: rebase or re-propose", not a dead end |
 | One inbox across workspaces | [GitHub notifications](https://docs.github.com/en/subscriptions-and-notifications/reference/inbox-filters), [Linear Inbox](https://linear.app/docs/inbox) | A top-level **Review** page: everything waiting on you, grouped by vault, with snooze. Home leads with it |
@@ -34,11 +34,31 @@ clean). The structure is a first pass:
 
 **Anti-patterns to avoid:**
 
-- approve buttons above the diff;
+- ~~approve buttons above the diff;~~ superseded 2026-09-24 by the owner's
+  decision below;
 - batch approval of anything but tiny, low-risk changes;
 - approvals that survive an edit;
 - terminal rejects with no feedback;
 - notification spam instead of daily digests.
+
+**Controls at the top (owner's decision, 2026-09-24).** Primary controls go
+at the top of the page; the diff follows immediately. On a proposal page the
+order is: title and status; the latest request for changes, if any; the
+decision (note, Approve, Request changes, Reject, Edit then approve) with
+snooze as a quieter control; then the diff with its view tabs, the agent's
+stated reason (unverified), approvals, and the discussion. This is GitHub's
+pull request pattern, where "Review changes" sits in the page header. Every
+other page follows the same rule: its main action lives in the page header
+(right-aligned on wide screens, wrapping on narrow ones), and a long form may
+repeat its submit at the bottom. The Review list offers snooze on each row.
+
+Why: the owner's rule is that controls shouldn't be hidden at the bottom of
+the page. Below a long diff and a thread, the decision takes a scroll past
+everything to reach, and on a revised proposal the feedback it answers was
+buried in the thread. The earlier worry, that buttons above the diff invite
+approving unread, is met another way: the diff follows the controls
+directly, with nothing between them but risk reasons and the latest
+feedback, and the reason still comes after the diff, labelled unverified.
 
 **Kept from our design, against one suggestion:** you may approve your own
 agent's proposal, because the agent isn't the approver. The page will say
@@ -105,7 +125,7 @@ Top nav:  Vaults ▾   Review (N)   Activity   Connect   Tokens        (theme in
 /v/:vault/file/<path>    Preview | Source | History, rule source in the header
 /v/:vault/edit/<path>    Edit (open) or propose (canon)
 /v/:vault/proposals      Open · changes requested · closed
-/v/:vault/proposals/:id  Diff first → reason (unverified) → approve / request changes / reject / edit & approve
+/v/:vault/proposals/:id  Status → latest feedback → approve / request changes / reject / edit & approve, snooze → diff → reason (unverified) → approvals → discussion
 /v/:vault/settings/rules
 /v/:vault/settings/members   (with hosting and invites)
 ```
