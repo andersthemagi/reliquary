@@ -100,14 +100,14 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   "$node" node --test --test-concurrency=1 test/*.test.mjs
 
 echo "== server log (must contain no tokens, codes or file text)"
-{ "$engine" logs "$srv"; "$engine" logs "$hosted"; } 2>&1 | grep -E 'rl[qe]_|code=|EUR|script|SEKRIT' && { echo "LEAK in server log"; exit 1; } || echo "clean"
+{ "$engine" logs "$srv"; "$engine" logs "$hosted"; } 2>&1 | grep -E 'rl[qei]_|code=|EUR|script|SEKRIT' && { echo "LEAK in server log"; exit 1; } || echo "clean"
 echo "== supabase-mode server logs (must contain no JWTs, refresh tokens, codes, token hashes or emails)"
 # test/auth.test.mjs wrote every code, token hash and refresh token it saw
 # to .auth-secrets-<slot>; none may appear in a log.
 [ -s .auth-secrets-$slot ] || { echo "auth.test.mjs recorded no secrets to look for"; exit 1; }
 { "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; } > .auth-logs-$slot 2>&1
 leak=0
-grep -E 'eyJ|@|token_hash|rlq_|EUR|script' .auth-logs-$slot && leak=1
+grep -E 'eyJ|@|token_hash|rlq_|rli_|EUR|script' .auth-logs-$slot && leak=1
 grep -F -f .auth-secrets-$slot .auth-logs-$slot && leak=1
 grep -qF "$session_secret" .auth-logs-$slot && { echo "(the session secret)"; leak=1; }
 rm -f .auth-logs-$slot

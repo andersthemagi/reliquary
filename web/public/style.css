@@ -464,6 +464,9 @@ a.dir { font-weight: 600; }
 
 .token-list .token-client, .env-log .token-client { display: block; color: var(--fg-muted); }
 .token-list tr.inactive td:not(.num) { color: var(--fg-muted); }
+/* Members: a role picker in a table cell (Settings, Members). */
+.role-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.role-form select { min-width: 7rem; }
 
 /* Empty states ------------------------------------------------------------- */
 

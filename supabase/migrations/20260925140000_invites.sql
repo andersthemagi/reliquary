@@ -259,7 +259,7 @@ begin
   perform private.require_human();
   select * into i from private.vault_invites where token_hash = private.token_hash(p_token) for update;
   if i.id is null or coalesce(p_token, '') !~ '^rli_[0-9a-f]{64}$' then
-    raise exception 'this invite link isn''t valid: check you copied all of it' using errcode = 'P0002';
+    raise exception 'this invite link is not valid: check you copied all of it' using errcode = 'P0002';
   end if;
   v_state := private.invite_state(i.accepted_at, i.revoked_at, i.expires_at);
   if v_state = 'accepted' then
@@ -305,7 +305,7 @@ language plpgsql stable security definer set search_path = '' as $$
 begin
   perform private.require_human();
   if private.role_in(p_vault) is distinct from 'owner' then
-    raise exception 'only owners see members'' connections' using errcode = '42501';
+    raise exception 'only owners see agent connections' using errcode = '42501';
   end if;
   return query
     select t.id, t.user_id, t.name, t.kind, t.client_name, t.access, t.all_vaults,
@@ -327,7 +327,7 @@ declare
 begin
   perform private.require_human();
   if private.role_in(p_vault) is distinct from 'owner' then
-    raise exception 'only owners revoke members'' connections' using errcode = '42501';
+    raise exception 'only owners revoke agent connections' using errcode = '42501';
   end if;
   select a.* into t from public.access_tokens a
     join public.vault_members m on m.vault_id = p_vault and m.user_id = a.user_id

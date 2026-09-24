@@ -14,6 +14,12 @@
 // The server has already checked Origin on POSTs. These forms carry the
 // double-submit token from auth.ts instead of a session CSRF token.
 // Nothing here logs; the server logs method, path and status only.
+//
+// Invites (members.ts): a signed-out invitee is sent here with
+// next=/invite?token=... . The pages then say what they were invited to and
+// which address to use, and for exactly the invited address (checked with
+// the database) sign-in may create the account; any other address signs in
+// as usual, never creating one.
 
 import type http from "node:http";
 import {
@@ -29,7 +35,20 @@ import {
   type Session,
 } from "./auth.js";
 import { html, notice, page, type Theme } from "./html.js";
+import { inviteTokenOf, maskEmail, peekInvite, type Peek } from "./invites.js";
 import type { Reply } from "./pages.js";
+
+// The live invite a sign-in is for, if `next` is an invite page.
+async function inviteFor(next: string): Promise<Peek | undefined> {
+  const token = inviteTokenOf(next);
+  if (!token) return undefined;
+  try {
+    const p = await peekInvite(token);
+    return p?.state === "pending" ? p : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export const SIGNIN_PATHS = new Set(["/signin", "/signin/code", "/auth/confirm"]);
 
@@ -69,12 +88,15 @@ type Out = { reply: Reply; cookies: string[] };
 
 const hidden = (name: string, value: string) => html`<input type="hidden" name="${name}" value="${value}">`;
 
-function emailForm(csrf: string, next: string, theme: Theme, error?: string): string {
+function emailForm(csrf: string, next: string, theme: Theme, error?: string, invite?: Peek): string {
   return page(
     "Sign in",
     html`<div class="signin">
-      <h1>Sign in to Reliquary</h1>
-      <p class="lede">We’ll email you a sign-in link and a 6-digit code.</p>
+      ${invite
+        ? html`<h1>Join ${invite.vaultName}</h1>
+          <p class="lede">You’ve been invited to <strong>${invite.vaultName}</strong> on Reliquary. Sign in with the address the invite was sent to, <strong>${maskEmail(invite.email)}</strong>: we’ll email it a sign-in link and a 6-digit code. New to Reliquary? The same step makes your account.</p>`
+        : html`<h1>Sign in to Reliquary</h1>
+          <p class="lede">We’ll email you a sign-in link and a 6-digit code.</p>`}
       ${error ? html`<p class="callout attention" role="alert">${error}</p>` : ""}
       <form method="post" action="/signin" class="panel">
         ${hidden("csrf", csrf)}${hidden("next", next)}
@@ -82,7 +104,7 @@ function emailForm(csrf: string, next: string, theme: Theme, error?: string): st
         <input type="text" id="email" name="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required>
         <div class="actions"><button class="primary">Email me a code</button></div>
       </form>
-      <p class="hint">Reliquary is invite-only: ask the person who runs your vault to add you.</p>
+      ${invite ? "" : html`<p class="hint">Reliquary is invite-only: ask the person who runs your vault to add you.</p>`}
     </div>`,
     { theme },
   );
@@ -145,7 +167,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (i.method === "GET" && p === "/signin") {
     const next = safeNext(i.url.searchParams.get("next"));
     if (i.session) return out({ redirect: next });
-    return out({ html: emailForm(pre(), next, i.theme) });
+    return out({ html: emailForm(pre(), next, i.theme, undefined, await inviteFor(next)) });
   }
 
   if (i.method === "GET" && p === "/auth/confirm") {
@@ -166,11 +188,22 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
 
   if (p === "/signin") {
     const email = (i.form.get("email") ?? "").trim();
+    const invite = await inviteFor(next);
     if (!EMAIL.test(email) || email.length > 254) {
-      return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.") });
+      return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.", invite) });
     }
-    const r = await sendSigninEmail(email);
+    const r = await sendSigninEmail(email, invite !== undefined && email.toLowerCase() === invite.email);
     if (r.unavailable) return out(unavailable(i.theme));
+    if (r.signupsOff) {
+      return out({
+        status: 403,
+        html: notice(
+          "No account yet",
+          html`There’s no Reliquary account for <strong>${email}</strong> yet, and this site isn’t making new accounts on its own right now. Ask the person who invited you to have an account made for that address, then open the invite link again.`,
+          i.theme,
+        ),
+      });
+    }
     // The emailed link can't carry `next`, so it waits in a cookie for the
     // link to be opened in this browser. A browser drops a cookie over 4 KB,
     // so a longer `next` is only kept by the code form.
