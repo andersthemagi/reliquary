@@ -35,7 +35,7 @@ export const OPERATOR = {
   closureNotice: null as string | null, // notice before the service closes
   subprocessorNoticeDays: null as string | null, // notice before a new sub-processor
   transferSafeguard: null as string | null, // basis for any transfer outside the EU
-  backupRetention: null as string | null, // how long database backups are kept
+  backupRetention: "Supabase keeps daily backups for 7 days; the operator also keeps up to 14 off-site copies, in which variable values exist only as ciphertext" as string | null, // how long database backups are kept
   hostingLogRetention: null as string | null, // how long the host keeps request logs
   disclosureResponse: null as string | null, // how soon a security report is acknowledged
   minimumAge: null as string | null, // e.g. 16

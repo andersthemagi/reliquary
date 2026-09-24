@@ -4,6 +4,8 @@
 [design.md](../design.md) (Access surfaces, Architecture, Privacy, Open
 decisions 3 and 5), [testing-strategy.md](testing-strategy.md)
 
+> **As built (2026-09-24):** the Supabase project is on the **Pro** plan (daily backups, no pausing), so the keepalive became an hourly uptime check; off-site backups and restores are in `docs/ops/runbook.md`.
+
 The owner has decided: the app runs on **Vercel** (Hobby now, Pro when
 commercial, functions in `fra1` Frankfurt); the database is a **free Supabase
 project in `eu-central-1`** (Frankfurt), kept awake by a scheduled ping. This
