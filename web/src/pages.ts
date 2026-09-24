@@ -721,14 +721,20 @@ async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
     if (!v) return null;
     const rows = (
       await c.query(
-        `select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
-                cur.body as current_body, (private.rule_for(p.vault_id, p.path)).quorum,
+        // Quorums from one set-based rules_for() for the page, not
+        // rule_for() per row.
+        `with page as (
+           select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
+                  row_number() over (order by p.created_at desc) as ord
+             from public.proposals p where p.vault_id = $1 and p.status = $2 order by p.created_at desc limit 100)
+         select p.*, cur.body as current_body, r.quorum,
                 (select count(*) from public.approvals a where a.proposal_id = p.id and a.decision = 'approve'
                   and a.revision = p.revision)::int as approvals
-           from public.proposals p
+           from page p
+           join private.rules_for($1, array(select distinct path from page)) r on r.path = p.path
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
-          where p.vault_id = $1 and p.status = $2 order by p.created_at desc limit 100`,
+          order by p.ord`,
         [id, status],
       )
     ).rows;
