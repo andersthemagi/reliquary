@@ -50,9 +50,11 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
 - encryption in the web app (`web/src/secrets.ts`, `VARIABLES_KEY`), the
   web module for the Variables page (`web/src/variables.ts`), the CLI's
   OAuth sign-in and the env API (`web/src/envapi.ts`), and `list_variables`
-  over MCP.
-Next (phase 2): the web Variables page and the CLI (`reliquary login | run |
-env pull`).
+  over MCP;
+- the CLI in `cli/` (`reliquary login | logout | vaults | run | env pull`,
+  to be published as `@reliquary-ai/cli`), with end-to-end tests
+  (`./cli/test.sh`).
+Next (phase 2): the web Variables page.
 
 All of it needs podman or docker; nothing needs Node installed on the host.
 
@@ -106,7 +108,7 @@ Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-st
   restructuring with the same assertions uses `Test-refactor: <why>`.
   `scripts/test-guard.sh` (CI, on every push and PR) fails otherwise.
 - **Run `./test.sh` before committing** (all suites in parallel; use your own
-  `TEST_SLOT`, it takes that slot and the next two). CI runs it on every push
+  `TEST_SLOT`, it takes that slot and the next three). CI runs it on every push
   and pull request.
 - **Mutation-check every new access rule once:** break it, watch its hostile
   test fail, restore it, and say so in the commit body.

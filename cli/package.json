@@ -1,0 +1,26 @@
+{
+  "name": "@reliquary-ai/cli",
+  "version": "0.1.0",
+  "description": "Reliquary's command line: run a command with a vault's environment variables, or pull them into a gitignored .env",
+  "type": "module",
+  "bin": {
+    "reliquary": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^7.0.2"
+  }
+}

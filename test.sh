@@ -3,8 +3,8 @@
 # committing; CI runs it on every push and pull request.
 #
 #   ./test.sh              all suites, in parallel
-#   ./test.sh sql web      only these (sql, mcp, web)
-#   TEST_SLOT=5 ./test.sh  suites use slots 5, 6 and 7 (default 0, 1, 2)
+#   ./test.sh sql web      only these (sql, mcp, web, cli)
+#   TEST_SLOT=5 ./test.sh  suites use slots 5, 6, 7 and 8 (default 0 to 3)
 #
 # Each suite gets its own TEST_SLOT, so containers and ports never collide,
 # and its own log. Failing suites print their full log; passing ones print a
@@ -14,12 +14,12 @@ cd "$(dirname "$0")"
 
 base=${TEST_SLOT:-0}
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(sql mcp web)
+[ ${#suites[@]} -eq 0 ] && suites=(sql mcp web cli)
 
-declare -A cmd=([sql]=./supabase/tests/run.sh [mcp]=./mcp/test.sh [web]=./web/test.sh)
-declare -A slot=([sql]=$base [mcp]=$((base + 1)) [web]=$((base + 2)))
+declare -A cmd=([sql]=./supabase/tests/run.sh [mcp]=./mcp/test.sh [web]=./web/test.sh [cli]=./cli/test.sh)
+declare -A slot=([sql]=$base [mcp]=$((base + 1)) [web]=$((base + 2)) [cli]=$((base + 3)))
 for s in "${suites[@]}"; do
-  [ -n "${cmd[$s]:-}" ] || { echo "unknown suite: $s (sql, mcp, web)"; exit 2; }
+  [ -n "${cmd[$s]:-}" ] || { echo "unknown suite: $s (sql, mcp, web, cli)"; exit 2; }
 done
 
 logs=$(mktemp -d)
@@ -30,7 +30,8 @@ echo "== registry"
 
 # Pull images once, so parallel suites don't race to fetch the same layers.
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
-for img in docker.io/library/postgres:17 docker.io/library/node:22-slim; do
+# node:22 (it has git) runs the CLI's tests.
+for img in docker.io/library/postgres:17 docker.io/library/node:22-slim docker.io/library/node:22; do
   "$engine" image inspect "$img" >/dev/null 2>&1 || "$engine" pull -q "$img" >/dev/null
 done
 
