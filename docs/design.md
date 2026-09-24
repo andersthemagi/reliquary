@@ -1,327 +1,461 @@
-# Reliquary v2: design
+# Reliquary v3: design
 
-2026-09-24 · Status: DRAFT, nothing built yet
+2026-09-24 · Status: DRAFT, replaces v2 (commit `4b11c25`)
 
-This file is the canonical design. Paths like `routines/local/`, `pulse` and
-`AGENTS.md` refer to the first consumer, Andrés's AIS-OS repo
-(`andersthemagi/repositio-arcanum`), which keeps a short page on its side of
-the contract at `strategy/reliquary-v2.md`.
+A shared vault of context, automations and credentials that people and any
+agent can use, with no machine of anyone's that has to stay on.
+
+The research behind this draft is in `docs/research/`
+([landscape-swot](research/landscape-swot.md),
+[org-chatbot-gate](research/org-chatbot-gate.md),
+[pricing](research/pricing.md)). The gate it relies on is proven in
+`spikes/gate/`; `pilot/` is a working Telegram surface on the same gate.
 
 ## Contents
 
-1. [Why](#why)
-2. [Principles](#principles)
-3. [Who owns what](#who-owns-what)
-4. [Architecture](#architecture)
-5. [Data model](#data-model)
-6. [Update feed and sync](#update-feed-and-sync)
-7. [Secrets](#secrets)
+1. [What changed from v2](#what-changed-from-v2)
+2. [What it is](#what-it-is)
+3. [Principles](#principles)
+4. [Concepts](#concepts)
+5. [Identity and permissions](#identity-and-permissions)
+6. [Access surfaces](#access-surfaces)
+7. [Context](#context)
 8. [Routines](#routines)
-9. [Access control](#access-control)
-10. [MCP tools](#mcp-tools)
-11. [Using it without an OS](#using-it-without-an-os)
-12. [Build order](#build-order)
-13. [Open questions](#open-questions)
-14. [Out of scope](#out-of-scope)
+9. [Environment variables](#environment-variables)
+10. [Continuity](#continuity)
+11. [Git mirror and export](#git-mirror-and-export)
+12. [Architecture](#architecture)
+13. [Data model](#data-model)
+14. [Hostile tests](#hostile-tests)
+15. [Build order](#build-order)
+16. [Open decisions](#open-decisions)
+17. [Out of scope](#out-of-scope)
 
-## Why
+## What changed from v2
 
-Three problems, one system.
+v2 was Andrés's personal infrastructure and a product at the same time:
+thirteen AIS-OS routines moved to a VPS worker, plus shared spaces synced
+into one repo. v3 separates the two.
 
-- **Routines depend on one laptop.** All thirteen routines are Claude desktop
-  scheduled tasks on the MacBook. Lid closed means nothing runs, and the only
-  detector that survives that (`health-check.sh` under launchd) lives on the
-  same machine.
-- **Context can't be shared in slices.** This repo is the context layer and
-  git syncs it between devices well. But git access is all or nothing, so
-  sharing one client's or one group's context means a separate repo and a
-  hand-kept private/neutral split, which is what AI Founding Table does today
-  (`shared/aft-collab/` vs `strategy/aift-collab-ops.md`).
-- **Secrets move by chat and email.** No shared place, no audit trail, no
-  revoke.
+- **Reliquary is the product.** It is a hosted vault reachable over MCP and a
+  web UI. Andrés's AIS-OS is its first customer, not its design centre.
+- **Customers run no servers.** v2 needed a VPS worker running `claude -p`.
+  v3 routines run on Reliquary, with the customer's own model key.
+- **Andrés's personal routines are out of scope.** Moving them off the
+  MacBook is an AIS-OS decision (Claude Code cloud routines, n8n, or
+  launchd). Any that act on shared context become Reliquary routines.
+- **Secrets become a product feature:** shared environment variables per
+  vault, Vercel-style, and a large part of the continuity story.
+- **The gate generalises.** Access is decided by who will see the output:
+  the person for their own agent, the declared audience for a routine,
+  everyone present for a chat.
 
-CommonThread (repo `commonthread-project-brain`, prototyped 2026-09-23 via
-Stripe Projects) proved the core loop: plain-language context, agents
-propose, humans approve, append-only log, served over MCP. v2 is a rebuild
-around all three problems, not an extension of that prototype.
+## What it is
+
+```
+ ChatGPT (connector) ─┐
+ Claude Code ─────────┤
+ Cursor ──────────────┼─ MCP ─┐        ┌──────────── a vault ─────────────┐
+ Hermes (Nous) ───────┤       ├──────▶ │ context   entries, notes, log    │
+ scripts, CI ─────────┘       │  gate  │ routines  automations on context │
+ browser ──────── web UI ─────┤        │ env       shared variables        │
+ terminal ─────── CLI ────────┘        │ members   people and agents      │
+                                       └──────────────┬───────────────────┘
+                                                      └──▶ optional git mirror
+```
+
+Three jobs:
+
+1. **Share context across people and whatever agent each one uses.** A
+   ChatGPT user and a Claude Code user read and propose to the same
+   approved context.
+2. **Automate on that context without anyone's machine.** A routine runs on
+   a schedule or on a change, reads through the gate, and produces an
+   artifact.
+3. **Build with the same accounts, and survive losing a person.** Shared
+   variables, access logs, and emergency access mean the team and their
+   agents can carry on.
 
 ## Principles
 
-1. **AIS-OS first.** This repo stays the source of truth for everything that
-   is Andrés's own. Reliquary holds only what must live off-device: shared
-   spaces, secrets, routine state. When in doubt, it stays in the repo.
-2. **Standalone for people without an OS.** A client or volunteer gets a web
-   dashboard and one MCP URL. For them that is the whole product.
-3. **Pull, not push.** Every consumer asks "what changed since cursor N".
-   Offline devices catch up on their next pull. Webhooks may come later as a
-   hint to pull sooner, never as the delivery mechanism.
-4. **One fact, one owner.** Same rule as `AGENTS.md`. No record is editable in
-   two places; each kind of data has exactly one writer of record.
-5. **Nothing becomes true without a human.** Agents and routines propose.
-   People approve. Carried over from CommonThread unchanged.
-6. **Secrets never enter model context.** Not through MCP, not through
-   logs, not through the change feed.
-7. **Verify the artifact, not the intention.** A run is only "ok" when it
-   reports what it produced. Silence is a failure state, not a quiet day.
-8. **Private stays private by default.** Nothing leaves this repo for a
-   shared space unless its file is explicitly mapped to one. Money, vendor
-   contacts and notes on named people stay out, the rule AFT already follows.
+1. **Any agent, any model.** One MCP URL for every client. Routines run on
+   the vault's own model key. No feature requires a specific vendor.
+2. **The database enforces access.** Every rule in the access table is RLS
+   or a trigger, and every rule has a hostile test.
+3. **Your agent is you, minus a few things.** An agent connected by a person
+   acts with that person's permissions, except the actions that need the
+   person present ([Identity and permissions](#identity-and-permissions)).
+4. **Nothing becomes canon without a person.** Agents and routines write
+   notes or proposals. People approve, or write canon themselves.
+5. **Secret values never enter model context.** Not through MCP, logs,
+   change events, errors, or routine prompts. Where a value must reach a
+   process, say plainly what that process can do with it.
+6. **Verify the artifact.** A routine run is only `ok` when it reports what
+   it produced.
+7. **Your data can leave.** Export and git mirror from day one; self-hosting
+   stays possible. A vault must outlive any one person, Reliquary included.
+8. **Nobody's machine has to stay on.** Nothing a vault needs runs on a
+   member's laptop.
 
-## Who owns what
+## Concepts
 
-| Data | Owner (writer of record) | Others |
-|---|---|---|
-| Tasks, journal, decisions, pipeline, finances, voice, skills | This repo | Never synced out |
-| A shared space's approved context | Reliquary | Mirrored read-only into the repo |
-| This repo's contributions to a shared space | This repo | Sent to Reliquary as proposals |
-| Secrets | Reliquary | Pulled into `.env` by the CLI, never committed |
-| Routine prompts | This repo (`routines/local/*.md`) | Workers read them from their clone |
-| Schedules, job queue, run log | Reliquary | Mirrored into `routines/index.md` weekly |
-| Routine outputs (commits) | This repo | Run log stores the commit SHA only |
+- **Account.** A person, signed in with email or OAuth. Accounts own
+  nothing directly; vaults do.
+- **Vault.** The container: members, context, routines, environment
+  variables, and an append-only log. A team, a client, or a project each
+  gets its own vault. (v2 called it a space.)
+- **Member.** An account with a role in a vault: `owner`, `editor` or
+  `viewer`.
+- **Agent connection.** An MCP client a member authorised through OAuth. It
+  acts *as that member*, with the delegation limits below. Attributed as
+  "Claude Code for Andrés".
+- **Service agent.** A headless agent with its own token and explicit
+  grants, not tied to a person: CI, a Hermes instance on a server, a chat
+  bot.
+- **Entry.** A unit of context. Two kinds:
+  - **canon:** approved, presented as fact;
+  - **note:** attributed and unconfirmed, can expire. This is where chat
+    remarks and routine observations land.
+- **Proposal.** A suggested new entry, edit, or retraction, waiting for a
+  person to approve it.
+- **Routine.** A declarative automation inside a vault: a trigger, a
+  prompt, an audience, and outputs.
+- **Environment.** A named set of variables in a vault (`development`,
+  `preview`, `production`, or custom), like Vercel's.
+- **Log.** Every change to a vault, append-only, with a monotonic sequence
+  number for the feed.
 
-## Architecture
+## Identity and permissions
 
-```
-            ┌──────────────── Reliquary (Supabase + Next.js) ────────────────┐
-            │ spaces · entries · proposals · change feed · secrets (Vault)   │
-            │ routines · job queue (pgmq) · run log · watchdog (pg_cron)     │
-            │ dashboard · MCP endpoint · REST API · Discord alerts (pg_net)  │
-            └───────▲──────────────▲────────────────▲───────────────▲────────┘
-                    │ pull feed,   │ claim job,     │ MCP           │ web
-                    │ propose      │ report run     │               │
-         ┌──────────┴───┐   ┌──────┴────────┐  ┌────┴─────────┐  ┌──┴──────────┐
-         │ AIS-OS clones│   │ Workers (VPS) │  │ Collaborators'│  │ Clients and │
-         │ Mac, Linux,  │   │ claude -p on  │  │ agents: Cursor│  │ volunteers  │
-         │ VPS          │   │ subscription  │  │ Lovable, etc. │  │ (no OS)     │
-         └──────────────┘   └───────────────┘  └──────────────┘  └─────────────┘
-```
+### Roles
 
-- **Reliquary server:** Supabase for data, auth, Vault, `pg_cron`, `pgmq` and
-  `pg_net`. Next.js for dashboard, MCP and REST, same stack as CommonThread.
-  One Supabase project for Andrés's own operations; client instances come
-  later and are a separate question (see open questions).
-- **Workers:** a small runner on a Hetzner VPS that claims jobs, runs
-  `claude -p` on the subscription, reports back. Stateless apart from its
-  repo clones. Add workers to scale; replace a broken one, don't repair it.
-- **Collectors (milestone 5):** plain scripts with their own API tokens that
-  pull Gmail, Calendar, Granola and Contra. They replace claude.ai connectors
-  in unattended runs, the part of the stack nobody has made reliable
-  headless (claude-code issues #79685, #96106).
-- **CLI (`reliquary`):** `feed pull`, `propose`, `env pull`. Used by the
-  AIS-OS sync routine and by people who want secrets in their `.env`.
+| Action | owner | editor | viewer | service agent |
+|---|---|---|---|---|
+| Read context | yes | yes | yes | if granted |
+| Write notes | yes | yes | no | if granted |
+| Propose | yes | yes | no | if granted |
+| Write canon directly | yes | yes | no | never |
+| Approve or reject proposals | yes | yes | no | never |
+| Create and edit routines | yes | yes | no | never |
+| Use environment variables (pull, run) | if granted | if granted | no | if granted, per environment |
+| Reveal a variable's value in the UI | if granted | if granted | no | never |
+| Manage members, grants, emergency access | yes | no | no | never |
+| Export, configure git mirror | yes | no | no | never |
 
-## Data model
+### Delegation: agents act as their person, with a ceiling
 
-Carried from CommonThread: `projects` (renamed `spaces`), `project_members`,
-`context_entries`, `context_proposals`, `change_events`, `agent_tokens`, the
-RLS helpers, the append-only trigger, the proposal-review trigger.
+When Andrés's Claude Code calls Reliquary, the session carries two
+identities: the agent and the person it acts for (an RFC 8693 `act` claim).
+RLS checks both.
 
-New or changed:
+The agent gets the person's permissions **except** these, which need the
+person present in the web UI:
 
-- `change_events.seq bigint generated always as identity`: the feed cursor.
-  Monotonic, gap-tolerant, never reused. `origin` column names the writer
-  (`dashboard`, `mcp:<token>`, `sync:<device>`, `routine:<name>`) so sync
-  can skip its own echoes.
-- `context_entries.source_path`: the repo file an entry mirrors, if any.
-- `secrets(id, space_id, name, vault_secret_id, created_by, rotated_at)`:
-  metadata only; the value lives in Supabase Vault.
-- `secret_grants(secret_id, member_id, granted_by, revoked_at)`.
-- `secret_access_log(secret_id, member_id, action, at, client)`: append-only.
-- `routines(id, name, prompt_path, schedule_cron, timezone, needs[],
-  timeout_s, enabled, owner)`. `needs[]` lists required connectors or
-  collectors, checked before a run starts.
-- `routine_runs(id, routine_id, scheduled_for, claimed_by, started_at,
-  finished_at, status, exit_code, artifact jsonb, error)`. `status` is one
-  of `queued`, `running`, `ok`, `failed`, `skipped`, `missed`, `timed_out`.
-  `artifact` holds what the run produced (commit SHA, files touched, Discord
-  2xx), because a green exit code proves nothing.
-- `workers(id, host, last_heartbeat, version)`.
+- approving or rejecting proposals;
+- revealing a variable's value;
+- managing members, grants or emergency access;
+- deleting a vault or exporting it.
 
-## Update feed and sync
+**Why the ceiling:** an agent reads text other people wrote. Prompt
+injection turns any permission the agent holds into a permission the
+injected text holds. The ceiling keeps the few irreversible or
+trust-granting actions behind a human click. Everything else, including
+writing canon where the person may, is open to their agent. Each vault
+chooses whether its agents write canon directly or as proposals; see
+[Open decisions](#open-decisions).
 
-**Protocol.** One call: `changes_since(space, cursor)` returns events with
-`seq > cursor`, oldest first, capped at 500, plus the new cursor. Same shape
-over MCP, REST and the CLI. Consumers store the cursor themselves. Deleted
-or retracted entries appear as events, never as gaps.
+### The gate: filter on who will see the output
 
-**AIS-OS side.** A `reliquary-sync` step, run by `pulse` every 2h and on
-demand:
+Every read resolves an **audience**, and returns only what everyone in it
+may see:
 
-1. `git pull`, then for each mapped space, `reliquary feed pull` from the
-   stored cursor (kept in `.git/reliquary-cursors`, per clone, never
-   committed).
-2. Write approved entries into the mapped folder as read-only mirrors with a
-   header naming the entry id. Commit as the sync step.
-3. For repo files mapped to a space that changed since the last push, send
-   the diff as a proposal, never as a direct write. It shows up in the
-   space's approval queue like any agent's proposal.
-4. Skip events whose `origin` is this device.
+| Caller | Audience |
+|---|---|
+| A member's agent, or the member in the UI | that member |
+| A service agent | its grants |
+| A routine | the audience it declares (e.g. the vault's editors, or one channel) |
+| A chat surface (group) | everyone present, intersected (`pilot/`) |
 
-**Mapping.** A committed file, `reliquary.map.yml`, lists which repo paths
-map to which space, in which direction. Anything unlisted never leaves the
-repo. That file is the whole privacy boundary on the AIS-OS side, so the
-pre-commit hook lints it: a mapped path under `finances/`, `context/`,
-`decisions/` or `pipeline/` fails the commit.
+This is the rule proven in `spikes/gate/`, with 63 hostile tests and p95
+under 6 ms at 200k entries.
 
-**Conflicts.** Reliquary owns approved shared context, so on conflict the
-approved entry wins and the repo mirror is overwritten. The repo's version
-is not lost: it goes up as a proposal and waits for review.
+## Access surfaces
 
-## Secrets
+- **Remote MCP.** One URL per vault, with OAuth 2.1 as the MCP authorization
+  spec (2026-07-28) requires: protected resource metadata, audience-bound
+  tokens, no token passthrough. It works with ChatGPT connectors, Claude
+  (Code, desktop, web), Cursor, Hermes and anything else that speaks remote
+  MCP. Setup is paste the URL and sign in.
+- **Service agent tokens.** For headless agents that can't do an OAuth
+  dance. Tokens are hashed, scoped, expiring and revocable, and are traded
+  for short-lived sessions (the minting design in `spikes/gate/`).
+- **Web UI.** Browse, search, edit, review proposals, manage routines,
+  environment variables, members and the log. This is where the
+  human-present actions happen. It has to work on a phone.
+- **CLI.** `reliquary env pull`, `reliquary run -- <cmd>`,
+  `reliquary feed pull`, `reliquary export`.
+- **REST.** The same shapes as MCP, for scripts.
+- **Later: chat surfaces.** Telegram first (`pilot/`), using the
+  intersection gate.
 
-**Rules.**
+### MCP tools
 
-- MCP read tools never return secret values. No tool does. An agent sees
-  that a secret named `STRIPE_SECRET_KEY` exists in a space, nothing more.
-- Values reach a machine only through `reliquary env pull`, which writes
-  `.env` and never prints to stdout. The CLI refuses to write inside a path
-  git tracks unless `.env` is gitignored.
-- Every read, grant, revoke and rotation lands in `secret_access_log`.
-- Grants are per secret, per person. Revoking a member revokes their grants.
-- Change events for secrets carry the name and action, never the value.
+| Tool | Notes |
+|---|---|
+| `search_context` | Full text first; embeddings when it proves too weak |
+| `read_entry` | Entry text returned as quoted data with author and approval date |
+| `changes_since` | The feed: events after a cursor, oldest first |
+| `write_note` | Attributed, optionally expiring |
+| `propose` | New entry, edit or retraction, with a reason |
+| `write_entry` | Direct canon write, only where the person and vault allow it |
+| `list_proposals` | Pending and recent |
+| `list_routines`, `routine_runs` | Status and artifacts |
+| `list_env` | Variable names and which environments they are in. **Never values** |
 
-**Storage.** Supabase Vault, decrypted only inside a `security definer`
-function that checks the grant and writes the access log in the same
-transaction.
+No MCP tool returns a variable's value, on any scope.
 
-**Trust model, said plainly to clients:** the operator (Andrés) could read
-any secret stored this way. That is fine where clients already trust Red
-Mage with their accounts, which is every current engagement. If a client
-needs secrets the operator cannot read, that is client-side encryption
-(`age` keys per member), a separate milestone, not a patch to this one.
+## Context
 
-**Until milestone 3 ships:** share secrets with a 1Password or Bitwarden
-shared vault. Not through Reliquary context, not through chat.
+- **Entries** are markdown with a title, tags and an optional `path` (used
+  by the git mirror). They carry `valid_from` / `valid_to`, so facts can
+  expire or be superseded without deletion. Retractions are events with a
+  reason.
+- **Canon** is written by a person (or their agent where the vault allows
+  it) or promoted from a proposal. **Notes** are attributed, labelled
+  unconfirmed, and may expire. Promoting a note to canon is a proposal.
+- **The feed** has one call, `changes_since(vault, cursor)`, the same over
+  MCP, REST and CLI. Deletions and retractions appear as events, never as
+  gaps.
+- **Entry text is data.** Every surface wraps it as quoted content with
+  author and date. Proposals that address an AI system are flagged in
+  review.
 
 ## Routines
 
-**Scheduling.** `pg_cron` runs one tick a minute: for each enabled routine
-due now, enqueue a job in `pgmq` and insert a `routine_runs` row as
-`queued`. Schedules are cron expressions in `Europe/Madrid`.
+A routine is **declarative**: configuration, not code. That keeps it
+hostable with no sandbox and keeps the gate in charge.
 
-**Claiming.** Workers poll every 30s, read one message with a visibility
-timeout equal to the routine's `timeout_s`, mark the run `running`, and
-heartbeat every minute. A worker that dies leaves the message to reappear;
-a second worker picks it up. At most one run per routine at a time, enforced
-by a partial unique index on `routine_runs (routine_id) where status =
-'running'`.
+```yaml
+name: weekly-digest
+trigger:
+  schedule: "0 8 * * MON"          # vault timezone
+  # or: on_change: { tags: [client-x] }
+  # or: manual
+audience: editors                  # who will see the output; reads are gated to it
+reads:
+  query: "status OR blocker"       # context the run starts with
+  since: last_run
+model:
+  provider: anthropic              # or openai, …
+  name: claude-opus-5
+  key: env:production/ANTHROPIC_API_KEY
+prompt: |
+  Summarise what changed this week and what is blocked.
+outputs:
+  - note: { tags: [digest], expires: 30d }
+  - notify: { channel: discord, webhook: env:production/DISCORD_WEBHOOK }
+limits: { timeout: 120s, max_output_tokens: 4000 }
+```
 
-**Running.** The worker:
+- **Triggers:** a cron schedule, a change in the vault matching a filter
+  (the feed drives this), or a manual run. Incoming webhooks come later.
+- **What a run may do:** read context through the gate as its audience,
+  call the model with the vault's key, and use Reliquary's own tools
+  (search, note, propose). It **may not** run code, touch git, or make
+  arbitrary HTTP calls. Outbound calls are only the declared notify targets.
+- **Outputs are artifacts:** notes, proposals, notifications. A run without
+  one is a failure. Canon never comes straight from a routine; that takes a
+  person.
+- **Secrets in routines** are resolved server-side at egress (the model key,
+  a webhook URL) and never placed in the prompt.
+- **Runtime:** `pg_cron` enqueues due runs (`pgmq`). A serverless function
+  claims a run, executes it, and writes the artifact and status. No worker
+  VMs.
+- **Watchdog,** inside the database (carried from v2):
+  - `queued` runs older than 15 minutes become `missed`;
+  - running runs past their timeout become `timed_out`;
+  - every `failed`, `missed` or `timed_out` run notifies the routine's
+    owner;
+  - an external heartbeat covers Reliquary itself going quiet.
+- **Run log** (`routine_runs`) is append-only: `queued`, `running`, `ok`,
+  `failed`, `skipped`, `missed`, `timed_out`, plus the artifact.
 
-1. `git pull` in its clone. Takes the repo write-lock
-   (`scripts/acquire-lock.sh`) exactly as a desktop routine does today.
-2. Preflight: checks every item in `needs[]` is reachable. Any missing
-   means the run is `skipped` with the reason, and Discord hears about it.
-   This is the fix for connectors silently loading with zero tools.
-3. `claude -p "$(cat routines/local/<name>.md)" --permission-mode auto
-   --permission-prompts none --output-format json`, under `timeout`.
-   Never `--bare`: that skips the hooks and skills the routine relies on.
-4. Reports `artifact` and `status`, releases the lock.
+Routines needing real code, repo access or third-party data (Gmail,
+calendars) are a later decision: connectors, or a sandboxed runner. Until
+then, those stay in each member's own tooling and talk to Reliquary over
+MCP.
 
-**Watchdog.** A second `pg_cron` job every 5 minutes, inside the database,
-independent of any worker:
+## Environment variables
 
-- a `queued` run older than 15 minutes becomes `missed`;
-- a `running` run past its timeout becomes `timed_out`;
-- no worker heartbeat for 10 minutes;
-- any `failed`, `missed`, `timed_out` or `skipped` since the last check.
+Shared credentials, so a team and their agents build with the same
+accounts.
 
-Each posts to Discord via `pg_net`. A free healthchecks.io check pinged by
-the watchdog covers the last gap: Supabase itself going quiet.
+- Each vault has **environments** (`development`, `preview`, `production`,
+  custom). A variable has a name, an encrypted value, the environments it
+  belongs to, and who may use it.
+- **Grants** go per member, per environment. For example, an editor gets
+  `development` and `preview` but not `production`.
+- **Getting values onto a machine:**
+  - `reliquary run --env development -- <cmd>` injects variables into one
+    process and writes nothing to disk. This is the preferred path.
+  - `reliquary env pull --env development` writes `.env`, refuses unless
+    `.env` is gitignored, and never prints values.
+- **Every** read, grant, revoke, rotation and reveal lands in
+  `env_access_log`, which is append-only. Change events carry the name and
+  action, never the value.
+- **Rotation:** set a new value, see who pulled the old one since when, and
+  revoke their access.
 
-**Auth on workers.** A full `/login` (not `setup-token`, which cannot load
-claude.ai connectors). The worker reports the login's expiry in its
-heartbeat and the watchdog warns 7 days out.
+**Stated plainly, in the product too:**
 
-**Migration.** One routine at a time. Each move disables the desktop
-scheduled task the same day, because both surfaces firing is a double
-run. `autopush` does not move: workers commit and push their own work.
-`token-usage-weekly` stays on the Mac: it writes to `~/token-dashboard`.
+- **Agents can read what reaches them.** An agent that can run shell
+  commands in a process or folder holding a variable can read that
+  variable. `run` limits exposure to one process; it does not stop that
+  process. Prefer scoped, short-lived provider credentials where the
+  provider offers them. A credential-injecting proxy (the Infisical Agent
+  Vault pattern) is the stronger design for a later milestone.
+- **The hosted operator can decrypt.** Values are encrypted at rest and
+  decrypted only inside a `security definer` function that checks the
+  grant and writes the log in one transaction. An operator with database
+  access could still decrypt them. Teams that need otherwise get
+  client-side encryption (per-member `age` keys) as a separate feature.
 
-## Access control
+## Continuity
 
-Roles per space: `owner`, `collaborator`, `viewer`, `agent`.
+"If I get hit by a bus, my team and their agents carry on":
 
-| Action | owner | collaborator | viewer | agent |
-|---|---|---|---|---|
-| Read approved context | yes | yes | yes | if token has `read` |
-| Propose | yes | yes | no | if token has `propose` |
-| Approve or reject | yes | yes | no | never |
-| Add context directly | yes | yes | no | if token has `write` |
-| Manage members and tokens | yes | no | no | never |
-| Read a secret | if granted | if granted | never | never |
+- **Two owners are recommended.** The UI warns when a vault has one.
+- **Emergency access.** An owner names a trusted member. That member can
+  request owner access; it is granted automatically after a waiting period
+  (e.g. 7 days) unless an owner declines. Every step is logged. Same
+  pattern as Bitwarden and 1Password emergency access.
+- **Agents keep working.** Service agents and routines belong to the vault,
+  not a person. A departed member's agent connections die with their
+  membership, but vault routines and service agents continue.
+- **The vault outlives Reliquary.** Export and the git mirror mean the
+  context never depends on the hosted service existing. Variables export
+  encrypted to the owners' keys.
 
-Agent tokens stay hashed, scoped and individually revocable, as in
-CommonThread. Every guarantee in this table is enforced by RLS or a
-trigger, not by the API layer, and each one has a hostile test (a token for
-space A reading space B, an agent approving its own proposal, anyone
-editing a `change_events` row, an agent calling the secret function) that
-runs on every push.
+## Git mirror and export
 
-## MCP tools
+- **Export:** the whole vault's context as markdown files plus a log file,
+  from the UI or `reliquary export`. Available on every plan.
+- **Git mirror (optional per vault):**
+  - every canon change becomes a commit to a configured remote;
+  - commits are authored by the person who approved or wrote it, with the
+    agent as a co-author trailer;
+  - Reliquary stays the writer of record: the mirror is one-way by default;
+  - two-way is opt-in, and then pushes to the mirror arrive as proposals,
+    never as direct writes.
+- **AIS-OS** consumes a vault the way v2 intended: a mirror or
+  `reliquary feed pull` into a mapped folder, and proposals back up.
 
-| Tool | Scope | Notes |
-|---|---|---|
-| `read_context` | read | Approved entries, filterable by tag and path |
-| `search_context` | read | Full text first; embeddings only if FTS proves too weak |
-| `changes_since` | read | The feed |
-| `propose_change` | propose | New entry, edit or retraction, with a reason |
-| `list_proposals` | read | Pending and recent |
-| `list_secrets` | read | Names and metadata only |
-| `routine_status` | read | Last run per routine, owner only |
+## Architecture
 
-Tool results wrap entry text as quoted data with the author and approval
-date, so an entry that reads like an instruction is presented as content,
-not as a command. Proposals that address an AI system get flagged in the
-review queue, the same check `check-ingest-safety.py` does for this repo.
+- **Supabase:**
+  - Postgres with RLS for every rule;
+  - Auth for accounts;
+  - Vault for variable encryption;
+  - `pg_cron`, `pgmq` and `pg_net` for routines and notifications;
+  - Edge Functions as the routine runtime.
+- **Next.js:** web UI, the remote MCP endpoint, REST, and OAuth
+  authorization-server duties (unless Supabase Auth covers the MCP spec's
+  needs; decide in milestone 1).
+- **CLI:** a small binary (`reliquary`), for env and feed.
+- **No customer-side infrastructure.** Self-hosting is the same stack on a
+  customer's own Supabase.
+- **Multi-tenant** hosted instance: vaults are the tenancy boundary, and RLS
+  enforces it.
 
-## Using it without an OS
+## Data model
 
-1. Owner invites by email and picks a role.
-2. The invite lands on the dashboard: the space's context, the approval
-   queue, and a "Connect your AI tool" panel with a copy-paste MCP URL and a
-   token scoped `read,propose`.
-3. Plain-language intake: one box, "tell us something about this project",
-   which becomes a proposal like any other.
-4. Export: approved context as an `AGENTS.md` for tools without MCP.
+Carried from the spike and CommonThread, renamed where needed:
 
-No CLI, no git, no repo. That path has to work for a volunteer on a phone.
+- `accounts`, `vaults`, `vault_members(role)`, `emergency_access`.
+- `agent_connections` (OAuth clients a member authorised: client name,
+  scopes, revoked_at).
+- `service_agents`, `service_agent_grants`.
+- `sessions` (minted: vault, acting member or service agent, agent identity,
+  audience, expiry).
+- `entries(kind, title, body, tags, path, audience, author, approved_by,
+  valid_from, valid_to)`, `proposals`.
+- `log(seq bigint identity, vault_id, event, actor, agent, origin, at)`:
+  append-only, the feed.
+- `routines(config jsonb, enabled, owner)`, `routine_runs` (append-only
+  history).
+- `environments`, `variables(name, vault_secret_id, environments[])`,
+  `variable_grants`, `env_access_log` (append-only).
+- `git_mirrors(remote, direction, last_pushed_seq)`.
+
+## Hostile tests
+
+Every one runs on every push. Carried from v2 and the spike:
+
+- a session for vault A reading vault B;
+- an agent approving a proposal;
+- anyone editing or deleting a `log`, `routine_runs` or `env_access_log`
+  row;
+- any MCP tool, log line, change event or error containing a variable's
+  value;
+- forged, replayed or expired sessions;
+- revocation taking effect on the next query.
+
+New in v3:
+
+- **Delegation ceiling:** a member's agent attempting each human-present
+  action.
+- **Routine audience:** a routine declaring `audience: editors` never reads
+  an entry a viewer-only note restricts; its output inherits no wider
+  audience than its reads.
+- **Routine escape:** a routine attempting an undeclared notify target, a
+  code or git action, or putting an `env:` reference into its prompt text.
+- **Environment grants:** an editor granted `development` pulling
+  `production`; a revoked member's next pull failing; a service agent
+  revealing a value.
+- **Emergency access:** granted only after the wait, and cancelled by any
+  owner's decline.
+- **Git mirror:** a push to a one-way mirror changing nothing; on a two-way
+  mirror, a push only ever producing a proposal.
 
 ## Build order
 
-Each milestone ends in something checkable. The next one does not start
-until the previous one's check has held for a week of real use.
+Each milestone ends in something checkable. The next starts only after the
+previous check has held for a week of real use.
 
 | # | Milestone | Done when |
 |---|---|---|
-| 1 | Routines: schema, queue, watchdog, one worker on the VPS | 3 routines (`nightly`, `luma-signup-conflict-check`, `watchdog`) run only on the VPS for 7 days with zero missed runs and every failure reaching Discord |
-| 2 | All routines moved | Every routine but `token-usage-weekly` runs on the VPS; no desktop scheduled task left enabled for them |
-| 3 | Spaces, feed, sync | AI Founding Table is a space; a change approved in the dashboard shows up in this repo within one `pulse`, and a repo edit shows up as a proposal |
-| 4 | Secrets | Two people pull the same secret into `.env`; revoking one blocks their next pull; the access log shows all three events |
-| 5 | Collectors | Granola via its own token for `post-call-watcher`; the routine's `needs[]` no longer lists a claude.ai connector |
-| 6 | No-OS onboarding, first client pilot | A client adds and approves context without being walked through it |
+| 1 | **Core, MCP and UI.** Vaults, entries, notes, proposals, log, gate, remote MCP with OAuth, web UI for review | Andrés uses one vault from ChatGPT, Claude Code and Hermes for a week. Each sees the same context; proposals are approved in the browser; hostile tests green |
+| 2 | **Routines.** Declarative runs on the vault's key, watchdog, run log | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
+| 3 | **Second person and environment variables** | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; the access log shows all of it; emergency access tested end to end |
+| 4 | **Export and git mirror** | A vault round-trips through export, and a one-way mirror stays in sync for a week |
+| 5 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
 
-## Open questions
+## Open decisions
 
-- **Client instances:** one multi-tenant Reliquary with spaces per client,
-  or one instance per client provisioned through Stripe Projects? The
-  former is simpler to run; the latter is the productizable Launch Kit and
-  gives the client their own billing. Decide at milestone 6, not before.
-- **Supabase plan:** free projects pause after inactivity. Worker polling
-  should keep it awake, but routines are the one thing that cannot pause.
-  Pro plan ($25/mo) from milestone 1 is probably right.
-- **Does `pulse` own sync, or a new `reliquary-sync` routine?** `pulse` owns
-  `tasks/` today, and sync writes mirrored folders, not tasks, so a
-  separate routine may keep ownership clean.
-- **Name:** "Reliquary" is a common word; check npm, domains and software
-  trademarks before it appears in client material. "Red Mage Reliquary" is
-  safe internally either way.
+1. **Agent writes: direct canon or proposals by default?**
+   *Recommendation:* direct in single-member vaults, proposals in shared
+   vaults, switchable per vault. Approving stays human-present either way.
+2. **"Vault" or "space".** "Vault" matches how Andrés talks about it, but
+   collides with Supabase Vault and 1Password vaults in docs.
+   *Recommendation:* use vault in the product, and say "secret store" for
+   the encryption layer.
+3. **OAuth authorization server:** Supabase Auth, if it meets the MCP spec
+   (resource indicators, client ID metadata documents); otherwise a small
+   one in Next.js. Decide in milestone 1.
+4. **Variable storage:** Supabase Vault (simplest, operator can decrypt) or
+   Infisical as a backend (more mature, another service).
+   *Recommendation:* Supabase Vault for milestone 3, behind an interface.
+5. **Hosting model:** multi-tenant, or an instance per customer? v2 left
+   this to later. v3 assumes multi-tenant with a self-host path.
+6. **Name:** check npm, domains and trademarks before any client material.
 
 ## Out of scope
 
-- Replacing this repo, or syncing all of it anywhere.
-- Real-time collaboration or live cursors.
-- Running models other than Claude on workers. Possible later, since
-  routines are plain prompts, but not designed for now.
-- End-to-end encrypted secrets (see [Secrets](#secrets)).
-- Anything that makes Reliquary depend on the MacBook.
+- Andrés's personal AIS-OS routines. They consume Reliquary; they aren't
+  part of it.
+- Routines that run arbitrary code, touch git, or pull third-party data,
+  until a later decision on connectors or a sandbox.
+- Real-time collaboration and live cursors.
+- Client-side (end-to-end) encrypted variables, as a later separate
+  feature.
+- A Reliquary-hosted model. Every model call uses the vault's own key.
