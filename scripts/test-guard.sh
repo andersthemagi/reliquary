@@ -32,7 +32,7 @@ fi
 mb=$(git merge-base "$base" HEAD) || { echo "test-guard: no merge base with $base"; exit 2; }
 if [ "$mb" = "$(git rev-parse HEAD)" ]; then echo "test-guard: nothing to check since $base"; exit 0; fi
 
-paths=(supabase/tests mcp/test web/test)
+paths=(supabase/tests mcp/test web/test cli/test)
 
 # Removed lines per file, ignoring blanks and comment-only lines.
 removed=$(git diff -U0 -w -M "$mb" HEAD -- "${paths[@]}" | awk '

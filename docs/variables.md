@@ -302,6 +302,9 @@ module mounted with a line or two, using `web/src/variables.ts` only.
 
 ### CLI: `npx @reliquary-ai/cli` (binary `reliquary`)
 
+Built in `cli/` (see [cli/README.md](../cli/README.md)); credentials are in
+the file, not yet the keychain.
+
 A small Node package, no native dependencies. It talks to exactly the
 endpoints above.
 
@@ -333,7 +336,8 @@ endpoints above.
 - **`reliquary env pull [--vault V] [--env E] [--file .env]`**: refuses
   unless the target file is inside a git work tree and ignored by it (`git
   check-ignore -q <file>` exits 0); outside a repository, refuse too (the
-  guardrail is "only into a gitignored `.env`"). Writes atomically with mode
+  guardrail is "only into a gitignored `.env`") unless the person passes
+  `--outside-repo`, an explicit escape for a directory that is no project. Writes atomically with mode
   0600, one `NAME="value"` per line in name order, escaping `\` as `\\`,
   `"` as `\"`, newline as `\n` and carriage return as `\r`, with a header
   comment saying where it came from and when. Prints the file name and the

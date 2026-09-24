@@ -11,7 +11,7 @@ registry=tests/features.md
 status=0
 fail() { echo "registry: $*"; status=1; }
 
-refs=$(grep -oE '`(supabase|mcp|web)/[^`]+`' "$registry" | tr -d '`' | sort -u)
+refs=$(grep -oE '`(supabase|mcp|web|cli)/[^`]+`' "$registry" | tr -d '`' | sort -u)
 
 while IFS= read -r ref; do
   [ -n "$ref" ] || continue
@@ -25,7 +25,7 @@ while IFS= read -r ref; do
   fi
 done <<< "$refs"
 
-for t in supabase/tests/*_test.sql mcp/test/*.test.mjs web/test/*.test.mjs; do
+for t in supabase/tests/*_test.sql mcp/test/*.test.mjs web/test/*.test.mjs cli/test/*.test.mjs; do
   grep -qxF "$t" <<< "$(sed 's/#.*//' <<< "$refs")" || fail "$t is not in $registry; add it to a feature row"
 done
 

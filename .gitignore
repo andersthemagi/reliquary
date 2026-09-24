@@ -19,3 +19,4 @@ supabase/.db-password
 supabase/.*-db-password
 supabase/.*-secret
 supabase/.vercel-*.env
+cli/.test-*
