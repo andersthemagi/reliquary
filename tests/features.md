@@ -71,6 +71,13 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 | F31 | Design system | Every token pair meets WCAG AA in light and dark; the explicit dark theme matches the automatic one; the theme switch sets a cookie and refuses off-site returns; fonts, icon and stylesheet are local; copy has no em dashes or straight apostrophes | `web/test/contrast.test.mjs#contrast:`, `web/test/web.test.mjs#theme:`, `web/test/web.test.mjs#assets:`, `web/test/web.test.mjs#copy:`, `web/test/threads.test.mjs#copy:`, `web/test/diff_activity.test.mjs#copy:` |
 | F32 | Web routes contract | Every page the UI links to renders with the shell; unknown paths and malformed ids are 404 | `web/test/routes.test.mjs#route:` |
 
+## Hosting
+
+| ID | Feature | Acceptance criteria | Tests |
+|---|---|---|---|
+| F33 | Health and keepalive | `/healthz` answers `ok` without the database; `/healthz?db=1` runs `select 1` and answers only `ok` or 503 `unavailable`, uncached; with `KEEPALIVE_TOKEN` set it needs a matching `x-keepalive` header (constant-time compare), and the token never reaches the log | `mcp/test/healthz.test.mjs#healthz:` |
+| F34 | Role statement timeouts | `reliquary_web` and `reliquary_mcp` log in with a 10s `statement_timeout`, kept across `set local role authenticated` | `supabase/tests/role_timeouts_test.sql#timeout:`, `mcp/test/healthz.test.mjs#timeout:` |
+
 ## Not built yet (no rows until they ship)
 
 OAuth for MCP, Supabase Auth in the web UI, plain export, environment

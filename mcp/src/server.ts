@@ -3,14 +3,16 @@
 //
 //   POST /mcp      MCP (Authorization: Bearer rlq_...)
 //   GET  /healthz  liveness
+//   GET  /healthz?db=1  keepalive: `select 1`, then `ok` or 503 `unavailable`
 //
 // Logs carry method, status and an identity prefix. Never tokens, arguments,
 // or file text.
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { recordClient, resolveToken } from "./db.js";
+import { pool, recordClient, resolveToken } from "./db.js";
 import { registerTools } from "./tools.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -46,11 +48,37 @@ function send(res: http.ServerResponse, status: number, body: object, headers: R
   res.end(JSON.stringify(body));
 }
 
+// With KEEPALIVE_TOKEN set, /healthz?db=1 needs `x-keepalive: <token>`, so it
+// can't be used to hammer the pooler. Compared as digests: constant time,
+// whatever the lengths.
+function keepaliveAllowed(header: string | string[] | undefined): boolean {
+  const want = process.env.KEEPALIVE_TOKEN;
+  if (!want) return true;
+  if (typeof header !== "string") return false;
+  const digest = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(digest(header), digest(want));
+}
+
 const httpServer = http.createServer(async (req, res) => {
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
 
   if (path === "/healthz") {
-    res.writeHead(200, { "content-type": "text/plain" }).end("ok");
+    const plain = { "content-type": "text/plain", "cache-control": "no-store" };
+    if (new URL(req.url ?? "/", "http://localhost").searchParams.get("db") !== "1") {
+      res.writeHead(200, plain).end("ok");
+      return;
+    }
+    // Keepalive (docs/research/hosting.md, section 6): one `select 1` as this
+    // role, touching no table. Only `ok` or `unavailable`, never error text.
+    if (!keepaliveAllowed(req.headers["x-keepalive"])) {
+      res.writeHead(401, plain).end("unauthorized");
+      return;
+    }
+    const up = await Promise.race([
+      pool.query("select 1").then(() => true, () => false),
+      new Promise<boolean>((r) => setTimeout(r, 5000, false).unref()),
+    ]);
+    res.writeHead(up ? 200 : 503, plain).end(up ? "ok" : "unavailable");
     return;
   }
   if (path !== "/mcp") {
