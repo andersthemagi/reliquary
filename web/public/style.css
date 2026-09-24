@@ -462,7 +462,7 @@ td .quiet { color: var(--fg-muted); }
 a.dir { font-weight: 600; }
 .prose .table-wrap, .prose table { border: 0; }
 
-.token-list .token-client { display: block; color: var(--fg-muted); }
+.token-list .token-client, .env-log .token-client { display: block; color: var(--fg-muted); }
 .token-list tr.inactive td:not(.num) { color: var(--fg-muted); }
 
 /* Empty states ------------------------------------------------------------- */
@@ -740,6 +740,47 @@ table.activity .nowrap { white-space: nowrap; }
 table.activity .path-cell { overflow-wrap: anywhere; }
 .pager { display: flex; justify-content: space-between; gap: var(--space-6); padding: var(--space-5) 0; font-weight: 500; font-size: var(--text-sm); }
 .pager .older { margin-left: auto; }
+
+/* Variables ------------------------------------------------------------------ */
+
+/* A column per environment where there's room; where there isn't (a phone,
+   or a narrow content column beside the sidebar), one block per variable
+   with a labelled line per environment. No horizontal scroll either way. */
+.vars-wrap { container: vars / inline-size; margin: 0 0 var(--space-6); }
+table.vars { table-layout: fixed; }
+table.vars th[scope="row"] { background: transparent; font-weight: 500; color: var(--fg); white-space: normal; vertical-align: top; }
+table.vars th[scope="row"] code { overflow-wrap: anywhere; font-size: var(--text-sm); color: var(--fg); }
+table.vars td { vertical-align: top; }
+table.vars tbody tr:hover > td { background: transparent; }
+@container vars (max-width: 44rem) {
+  table.vars, table.vars tbody, table.vars tr, table.vars th, table.vars td { display: block; }
+  table.vars thead { display: none; }
+  table.vars tr + tr { border-top: 1px solid var(--border); }
+  table.vars th[scope="row"] { background: var(--bg-subtle); border-top: 0; }
+  table.vars td {
+    height: auto; border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); column-gap: var(--space-4); align-items: start;
+  }
+  table.vars td::before { content: attr(data-label); font-size: 0.8125rem; font-weight: 600; color: var(--fg-muted); }
+  table.vars tr > td:first-child { border-top: 0; }
+  table.env-log td:first-child { background: var(--bg-subtle); font-weight: 500; }
+}
+@container vars (max-width: 26rem) {
+  table.vars td { grid-template-columns: minmax(0, 1fr); }
+  table.env-log td { grid-template-columns: 5rem minmax(0, 1fr); }
+}
+
+.var-set { font-weight: 600; font-size: var(--text-sm); }
+.var-readers { display: block; color: var(--fg-muted); margin-top: var(--space-1); }
+.var-readers a { color: var(--link); text-decoration: underline; font-weight: 400; }
+.var-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.var-actions form { margin: 0; }
+table.env-log td:nth-child(2) { min-width: 7rem; }
+table.env-log tr.refused td { background: color-mix(in srgb, var(--danger-bg) 50%, transparent); }
+.var-caveats { list-style: none; padding: 0; margin: var(--space-5) 0 0; display: grid; gap: var(--space-3); max-width: var(--measure); }
+.var-caveats strong { color: var(--fg); }
+pre.secret { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 0; }
+textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm); }
 
 /* Small screens ---------------------------------------------------------------- */
 

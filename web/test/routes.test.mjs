@@ -47,6 +47,8 @@ const pages = [
   [`${V}/proposals/${PROPOSAL}?view=split`, "proposal, split diff"],
   [`${V}/proposals/${PROPOSAL}?view=rendered`, "proposal, rendered"],
   [`${V}/proposals/${PROPOSAL}/edit`, "edit, then approve"],
+  [`${V}/variables`, "variables"],
+  [`${V}/variables/log`, "variables access log"],
 ];
 
 for (const [path, what] of pages) {

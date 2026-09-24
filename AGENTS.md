@@ -50,9 +50,11 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
 - encryption in the web app (`web/src/secrets.ts`, `VARIABLES_KEY`), the
   web module for the Variables page (`web/src/variables.ts`), the CLI's
   OAuth sign-in and the env API (`web/src/envapi.ts`), and `list_variables`
-  over MCP.
-Next (phase 2): the web Variables page and the CLI (`reliquary login | run |
-env pull`).
+  over MCP;
+- phase 2's web Variables page (`web/src/variablespage.ts`): names by
+  environment, set / rotate / delete, reveal by POST, the access log, and the
+  CLI on Connect, with tests (`web/test/variables_page.test.mjs`).
+Next (phase 2): the CLI (`reliquary login | run | env pull`).
 
 All of it needs podman or docker; nothing needs Node installed on the host.
 

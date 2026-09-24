@@ -9,6 +9,7 @@ import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
 import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
+import { variablesRoutes } from "./variablespage.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -37,11 +38,11 @@ export type Ctx = {
 // formAction: one more origin the page's forms may submit (and redirect) to.
 export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-type Vault = { id: string; name: string; role: string };
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export type Vault = { id: string; name: string; role: string };
 
 // Errors from our own migrations are safe to show; others aren't.
-function message(err: unknown): string {
+export function message(err: unknown): string {
   const e = err as { code?: string; message?: string };
   if (["42501", "P0002", "22023", "23505", "55000"].includes(e.code ?? "")) {
     const m = e.message ?? "Not allowed";
@@ -50,7 +51,7 @@ function message(err: unknown): string {
   throw err;
 }
 
-const who = (ctx: Ctx, id: string | null, agent: string | null) =>
+export const who = (ctx: Ctx, id: string | null, agent: string | null) =>
   `${id === ctx.userId ? "you" : id ? id.slice(0, 8) : "system"}${agent ? ` via ${agent}` : ""}`;
 
 // Canon and open as badges: a filled or hollow diamond (drawn in CSS) and
@@ -60,13 +61,13 @@ const tag = (policy: string) =>
 const canWrite = (v: Vault) => v.role === "owner" || v.role === "editor";
 
 const q = encodeURIComponent;
-const vaultPath = (id: string, rest = "") => `/v/${id}${rest}`;
+export const vaultPath = (id: string, rest = "") => `/v/${id}${rest}`;
 const filePath = (id: string, path: string, tab?: string) =>
   `/v/${id}/file?path=${q(path)}${tab ? `&tab=${tab}` : ""}`;
 const treePath = (id: string, dir: string) => (dir ? `/v/${id}/tree?path=${q(dir)}` : `/v/${id}`);
 const proposalPath = (id: string, pid: string, rest = "") => `/v/${id}/proposals/${pid}${rest}`;
 
-function ago(d: Date): string {
+export function ago(d: Date): string {
   const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
   if (s < 90) return "just now";
   if (s < 5400) return `${Math.round(s / 60)} min ago`;
@@ -74,7 +75,7 @@ function ago(d: Date): string {
   return `${Math.round(s / 86400)} days ago`;
 }
 
-function render(ctx: Ctx, title: string, body: Raw, nav?: Nav): Reply {
+export function render(ctx: Ctx, title: string, body: Raw, nav?: Nav): Reply {
   return {
     html: page(title, body, {
       user: ctx.userId,
@@ -88,7 +89,7 @@ function render(ctx: Ctx, title: string, body: Raw, nav?: Nav): Reply {
   };
 }
 
-const notFound = (ctx: Ctx): Reply => ({
+export const notFound = (ctx: Ctx): Reply => ({
   status: 404,
   html: page(
     "Not found",
@@ -98,7 +99,7 @@ const notFound = (ctx: Ctx): Reply => ({
   ),
 });
 
-async function vault(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Vault | undefined> {
+export async function vault(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Vault | undefined> {
   if (!UUID.test(id)) return undefined;
   const { rows } = await c.query(
     `select v.id, v.name, m.role from public.vaults v
@@ -168,9 +169,9 @@ const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-type Section = "files" | "proposals" | "activity" | "rules" | "search";
+export type Section = "files" | "proposals" | "activity" | "rules" | "search" | "variables";
 
-async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
+export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   const files = (
     await c.query(
       `select path, (private.rule_for(vault_id, path)).policy from public.files
@@ -227,12 +228,13 @@ async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?
         ${link("proposals", vaultPath(v.id, "/proposals"), html`Proposals${open ? html`<span class="count">${open}</span>` : ""}`)}
         ${link("activity", vaultPath(v.id, "/activity"), "Activity")}
         ${link("rules", vaultPath(v.id, "/rules"), "Rules")}
+        ${link("variables", vaultPath(v.id, "/variables"), "Variables")}
       </nav>
       <nav class="tree" aria-label="Files">${tree}</nav>
     </aside>
     <details class="tree-mobile"><summary>Browse ${v.name}</summary>
       <nav class="side-links" aria-label="Vault (mobile)">
-        ${link("files", vaultPath(v.id), "Files")}${link("proposals", vaultPath(v.id, "/proposals"), "Proposals")}${link("activity", vaultPath(v.id, "/activity"), "Activity")}${link("rules", vaultPath(v.id, "/rules"), "Rules")}
+        ${link("files", vaultPath(v.id), "Files")}${link("proposals", vaultPath(v.id, "/proposals"), "Proposals")}${link("activity", vaultPath(v.id, "/activity"), "Activity")}${link("rules", vaultPath(v.id, "/rules"), "Rules")}${link("variables", vaultPath(v.id, "/variables"), "Variables")}
       </nav>
       <nav class="tree" aria-label="Files (mobile)">${tree}</nav></details>
     <div class="content">${body}</div>
@@ -1170,7 +1172,7 @@ function connect(ctx: Ctx): Reply {
     html`${pageHeader({ title: "Connect an agent", actions: html`<a class="button primary" href="/tokens">Create a token</a>` })}
     <p class="lede">Any MCP client can use your vaults through one URL. Clients that support sign-in (Claude Code, Claude.ai, ChatGPT) connect with your Reliquary account: you choose which vaults they reach and whether they can write. Others use a <a href="/tokens">token</a>. Either way the agent acts as you, but can never approve, change rules or manage members.</p>
     <p class="endpoint"><span class="muted small">MCP URL</span><code>${url}</code></p>
-    <nav class="tabs" aria-label="Clients"><a href="#claude-code">Claude Code</a><a href="#chat">Claude.ai and ChatGPT</a><a href="#cursor">Cursor</a><a href="#vscode">VS Code</a><a href="#hermes">Hermes and others</a></nav>
+    <nav class="tabs" aria-label="Clients"><a href="#claude-code">Claude Code</a><a href="#chat">Claude.ai and ChatGPT</a><a href="#cursor">Cursor</a><a href="#vscode">VS Code</a><a href="#hermes">Hermes and others</a><a href="#cli">Environment variables</a></nav>
 
     <section id="claude-code"><h2>Claude Code (app or CLI)</h2>
       <p>On each computer, add Reliquary once for your user:</p>
@@ -1195,7 +1197,16 @@ function connect(ctx: Ctx): Reply {
       <pre class="code">Authorization: Bearer &lt;your token&gt;</pre>
       <details><summary>Local development (a Reliquary checkout on this machine)</summary>
         <p>With <code>./mcp/dev.sh token "Claude Code on Linux"</code> the token stays in a file, and Claude Code reads it through a helper at connect time. Add this under <code>mcpServers</code> in <code>~/.claude.json</code>:</p>
-        <pre class="code">${helper}</pre></details></section>`,
+        <pre class="code">${helper}</pre></details></section>
+
+    <section id="cli"><h2>Environment variables (the Reliquary CLI)</h2>
+      <p>Your programs get a vault’s variables through the CLI, never through an agent. Sign this computer in once; your browser opens Reliquary to choose which vaults it reads:</p>
+      <pre class="code">npx @reliquary-ai/cli login</pre>
+      <p>Then run a command with one environment’s variables, written nowhere on disk:</p>
+      <pre class="code">npx @reliquary-ai/cli run --env development -- &lt;command&gt;</pre>
+      <p>Or write them to a <code>.env</code> file, which the CLI only does where git ignores it:</p>
+      <pre class="code">npx @reliquary-ai/cli env pull --env development</pre>
+      <p class="small muted">Add <code>--vault &lt;name&gt;</code> if you belong to more than one vault. The sign-in is on the <a href="/tokens">Tokens</a> page as Reliquary CLI; revoke it there. Set values on a vault’s Variables page.</p></section>`,
     "connect",
   );
 }
@@ -1374,6 +1385,7 @@ export async function routes(ctx: Ctx): Promise<Reply> {
   if (get && rest === "/rules") return rules(ctx, id);
   if (!get && rest === "/rules") return setRule(ctx, id);
   if (get && rest === "/search") return search(ctx, id);
+  if (rest === "/variables" || rest.startsWith("/variables/")) return variablesRoutes(ctx, id, rest);
   const pm = /^\/proposals\/([^/]+)(\/[a-z]+)?$/.exec(rest);
   if (pm) {
     const [, pid, action = ""] = pm;
