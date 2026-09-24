@@ -37,7 +37,7 @@ export const setStyleVersion = (v: string) => {
   styleVersion = v;
 };
 
-export type Nav = "home" | "review" | "vaults" | "connect" | "tokens";
+export type Nav = "home" | "review" | "vaults" | "activity" | "connect" | "tokens";
 
 export type PageOpts = {
   user?: string;
@@ -70,8 +70,9 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
   <a class="wordmark" href="/">Reliquary</a>
   ${opts.user
     ? html`<nav aria-label="Main">
-    <a href="/review"${current("review")}>Review${count ? html`<span class="count" aria-label="${count} waiting">${count}</span>` : ""}</a>
     <a href="/"${current("home", "vaults")}>Vaults</a>
+    <a href="/review"${current("review")}>Review${count ? html`<span class="count" aria-label="${count} waiting">${count}</span>` : ""}</a>
+    <a href="/activity"${current("activity")}>Activity</a>
     <a href="/connect"${current("connect")}>Connect</a>
     <a href="/tokens"${current("tokens")}>Tokens</a>
   </nav>`

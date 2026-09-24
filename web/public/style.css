@@ -426,3 +426,87 @@ section { scroll-margin-top: 16px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
+
+/* diffs and activity ------------------------------------------------------------ */
+
+/* Word highlights sit inside a line's own tint, one step stronger. */
+:root { --add-strong: rgb(82 120 64 / 0.34); --del-strong: rgb(232 57 58 / 0.3); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --add-strong: rgb(120 170 100 / 0.36); --del-strong: rgb(232 57 58 / 0.42); }
+}
+:root[data-theme="dark"] { --add-strong: rgb(120 170 100 / 0.36); --del-strong: rgb(232 57 58 / 0.42); }
+
+.diff ins { background: var(--add-strong); color: inherit; text-decoration: none; }
+.diff del { background: var(--del-strong); color: inherit; text-decoration: line-through; text-decoration-color: var(--accent-ink); }
+
+/* Folded unchanged lines: a ruled strip that opens in place. */
+.diff .fold > summary {
+  cursor: pointer; list-style: none; padding: 5px 20px 5px 36px;
+  color: var(--muted); font-size: 0.8125rem; font-weight: 500;
+  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+  transition: color 150ms ease-out;
+}
+.diff .fold > summary::-webkit-details-marker { display: none; }
+.diff .fold > summary:hover { color: var(--ink); }
+.diff .fold[open] > summary { border-bottom-color: transparent; }
+
+/* Split: current left, proposed right. It scrolls inside its own box on a
+   narrow screen, so the page never scrolls sideways. */
+.split-scroll { overflow-x: auto; margin: 16px 0; max-width: 100%; }
+.diff.split { max-width: none; min-width: 32rem; margin: 0; padding: 8px 12px 12px 8px; }
+.diff.split .row {
+  display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem minmax(0, 1fr);
+  gap: 0; padding: 0; white-space: normal;
+}
+.diff.split .row > span { padding: 3px 12px 3px 6px; white-space: pre-wrap; word-break: break-word; }
+.diff.split .row > .ln { text-align: right; color: var(--muted); font-size: 0.8125rem; padding-right: 8px; user-select: none; }
+.diff.split .row > .ln + span + .ln { box-shadow: inset 1px 0 0 var(--rule); }
+.diff.split .add::before, .diff.split .del::before { margin-right: 6px; }
+.diff.split .none { background: var(--ground); opacity: 0.5; }
+.diff.split .head > span {
+  font-weight: 600; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); padding: 8px 12px 8px 6px; border-bottom: 1px solid var(--rule);
+}
+
+/* Rendered: proposed and current as they'll read. Side by side when there's
+   room (current left, like the split), stacked with the proposal first. */
+.rendered { display: grid; gap: 16px 24px; margin: 16px 0; }
+.rendered .prose { max-width: none; }
+.rendered .empty { border-top: 1px solid var(--rule-strong); }
+.pane-label {
+  font: 600 0.75rem/1.2 "Barlow", sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 8px;
+}
+@media (min-width: 1000px) {
+  .rendered { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .rendered .current { grid-column: 1; grid-row: 1; }
+  .rendered .proposed { grid-column: 2; grid-row: 1; }
+}
+
+/* Activity: a GET form of filters over ruled rows, a page at a time. */
+form.filters { max-width: none; }
+.filter-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 14px 16px; }
+.filter-fields label { margin: 0 0 6px; }
+.filter-fields > div { min-width: 0; }
+.filters .actions { margin-top: 16px; }
+input[type="date"] {
+  width: 100%; font: 400 1rem/1.5 "Barlow", sans-serif; color: var(--ink);
+  background: var(--ground); border: 1px solid var(--rule-strong); border-radius: 0;
+  padding: 8px 12px; transition: border-color 150ms ease-out;
+}
+input[type="date"]:hover { border-color: var(--ink); }
+input[type="date"]:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 0; border-color: transparent; }
+table.activity .num:first-child { padding-right: 16px; color: var(--muted); }
+table.activity .nowrap { white-space: nowrap; }
+table.activity .path-cell { overflow-wrap: anywhere; }
+.pager {
+  display: flex; justify-content: space-between; gap: 24px; padding: 16px 0;
+  font-weight: 600; font-size: 0.875rem;
+}
+.pager .older { margin-left: auto; }
+
+@media (max-width: 640px) {
+  .filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  form.filters { padding: 16px; }
+  table.activity .nowrap { white-space: normal; }
+}
