@@ -300,22 +300,29 @@ async function home(ctx: Ctx): Promise<Reply> {
     ).rows,
     waiting: (await c.query(`${WAITING_SQL} order by p.created_at limit 5`, [ctx.userId])).rows,
   }));
+  // One primary per page: New vault. Review, when something waits, sits
+  // before it as a secondary button.
   return render(
     ctx,
     "Home",
     html`${pageHeader({
       title: "Reliquary",
-      actions: (ctx.reviewCount ?? 0) > 0 ? html`<a class="button primary" href="/review">Review ${ctx.reviewCount} waiting</a>` : "",
+      actions: html`${(ctx.reviewCount ?? 0) > 0 ? html`<a class="button" href="/review">Review ${ctx.reviewCount} waiting</a>` : ""}
+        <a class="button primary" href="/vaults/new">New vault</a>`,
     })}
     <p class="lede">Shared context your agents read and propose to. Changes to canon files wait for your approval.</p>
-    <h2>Needs your review</h2>
+    ${vaults.length === 0
+      ? ""
+      : html`<h2>Needs your review</h2>
     ${waiting.length
       ? html`<ul class="rows">${waiting.map((p) => reviewRow(ctx, p, true))}</ul>
         ${(ctx.reviewCount ?? 0) > waiting.length ? html`<p class="small"><a href="/review">All ${ctx.reviewCount} waiting</a></p>` : ""}`
-      : html`<div class="empty">Nothing is waiting on you.</div>`}
+      : html`<div class="empty">Nothing is waiting on you.</div>`}`}
     <h2>Your vaults</h2>
     ${vaults.length === 0
-      ? html`<div class="empty"><strong>No vaults yet.</strong> Create one with <code>./mcp/dev.sh vault "Name"</code>, then <a href="/connect">connect an agent</a>.</div>`
+      ? html`<div class="empty first-vault"><strong>Create your first vault.</strong>
+          <p>A vault holds the files you and your agents share: notes, briefs, decisions. You choose which of them are canon, so an agent can only propose changes and you approve them.</p>
+          <p><a class="button" href="/vaults/new">Create your first vault</a></p></div>`
       : html`<ul class="rows">${vaults.map(
           (v) => html`<li>
             <span><a class="name" href="${vaultPath(v.id)}">${v.name}</a>
@@ -324,6 +331,58 @@ async function home(ctx: Ctx): Promise<Reply> {
         )}</ul>`}`,
     "home",
   );
+}
+
+// ---------------------------------------------------------------------------
+// New vault. The database decides who may create one (a person, or their
+// agent through an all-vaults read-write token); here it is always the
+// person. They become its owner.
+
+async function newVault(ctx: Ctx): Promise<Reply> {
+  return render(
+    ctx,
+    "New vault",
+    html`${pageHeader({
+      crumb: html`<p class="crumb"><a href="/">Vaults</a></p>`,
+      title: "New vault",
+      actions: html`<a class="button quiet" href="/">Cancel</a>
+        <button class="primary" form="new-vault">Create vault</button>`,
+    })}
+    <p class="lede">A vault holds the files you and your agents share. You’ll be its owner: you add members and set its rules.</p>
+    <form method="post" action="/vaults/new" class="panel choice-form" id="new-vault">
+      ${csrfField(ctx.csrf)}
+      <label for="vn">Name</label>
+      <input id="vn" type="text" name="name" placeholder="Client work" required maxlength="100">
+      <fieldset>
+        <legend>Default policy</legend>
+        <label class="choice"><input type="radio" name="default_policy" value="open" checked>
+          <span><strong>Open:</strong> members and their agents write files directly. Every change is logged.</span></label>
+        <label class="choice"><input type="radio" name="default_policy" value="canon">
+          <span><strong>Canon:</strong> every change is a proposal that people approve before it applies.</span></label>
+        <p class="hint">This is what a file is unless a rule says otherwise. You can make folders or files canon or open later, on the vault’s Rules page.</p>
+      </fieldset>
+      <div class="actions"><button class="primary">Create vault</button>
+        <a class="button quiet" href="/">Cancel</a></div>
+    </form>`,
+    "vaults",
+  );
+}
+
+async function createVault(ctx: Ctx): Promise<Reply> {
+  const name = (ctx.form.get("name") ?? "").trim();
+  // Anything but canon is the ordinary default, open.
+  const policy = ctx.form.get("default_policy") === "canon" ? "canon" : "open";
+  try {
+    const id = await asPerson(
+      ctx.userId,
+      async (c) => (await c.query(`select public.create_vault($1, $2) as id`, [name, policy])).rows[0].id as string,
+    );
+    ctx.setFlash(`Created ${name}. You’re its owner. Add files, or connect an agent to it.`);
+    return { redirect: vaultPath(id) };
+  } catch (err) {
+    ctx.setFlash(message(err));
+    return { redirect: "/vaults/new" };
+  }
 }
 
 async function review(ctx: Ctx): Promise<Reply> {
@@ -708,6 +767,9 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
     const decidable = canWrite(v) && p.status === "open" && !mine;
     const rejectable = canWrite(v) && (decidable || p.status === "changes_requested");
     const editable = canWrite(v) && (p.status === "open" || p.status === "changes_requested") && p.kind === "write" && p.body !== null;
+    // The proposer revises their own proposal (as their agent can over MCP):
+    // a new revision, approved by nobody.
+    const revisable = editable && p.proposed_by === ctx.userId;
     const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: canWrite(v) });
     const feedback = await latestFeedback(c, ctx, p);
     const snoozeForm = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
@@ -748,7 +810,9 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
         badge: html`<span class="badge state ${p.status}">${STATE_TEXT[p.status]}</span>`,
         meta: html`<p class="meta"><span>Revision ${p.revision}</span>
           <span>By ${who(ctx, p.proposed_by, p.agent)}</span><span>${when(p.created_at)}</span></p>`,
-        actions: editable && rejectable ? html`<a class="button" href="${proposalPath(id, pid, "/edit")}">Edit, then approve</a>` : "",
+        actions: html`${revisable ? html`<a class="button" href="${proposalPath(id, pid, "/revise")}">Revise</a>` : ""}${
+          editable && rejectable ? html`<a class="button" href="${proposalPath(id, pid, "/edit")}">Edit, then approve</a>` : ""
+        }`,
       })}
       <div class="review-top">
         ${p.proposed_by === ctx.userId && p.agent
@@ -818,6 +882,66 @@ async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<Reply> {
   });
   if (!data) return notFound(ctx);
   return render(ctx, "Edit, then approve", data.shell, "vaults");
+}
+
+// Revising your own proposal: the same editor, without approving. The
+// database only lets the proposer (or their agent) revise.
+async function proposalRevise(ctx: Ctx, id: string, pid: string): Promise<Reply> {
+  if (!UUID.test(pid)) return notFound(ctx);
+  const data = await asPerson(ctx.userId, async (c) => {
+    const v = await vault(c, ctx, id);
+    if (!v || !canWrite(v)) return null;
+    const p = (
+      await c.query(
+        `select * from public.proposals where id = $1 and vault_id = $2 and kind = 'write' and proposed_by = $3
+            and status in ('open', 'changes_requested') and body is not null`,
+        [pid, id, ctx.userId],
+      )
+    ).rows[0];
+    if (!p) return null;
+    const body = html`
+      ${pageHeader({
+        crumb: html`<p class="crumb"><a href="${proposalPath(id, pid)}">Back to the proposal</a></p>`,
+        title: "Revise your proposal",
+        path: true,
+        actions: html`<a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>
+          <button class="primary" form="revise-proposal">Save revision</button>`,
+      })}
+      <p class="lede">Change the proposed text of <code>${p.path}</code>. Saving makes it revision ${p.revision + 1} and sends it back for review; approvals of earlier revisions no longer count.</p>
+      <form method="post" action="${proposalPath(id, pid, "/revise")}" class="panel" id="revise-proposal">
+        ${csrfField(ctx.csrf)}
+        <label for="content">Proposed text</label>
+        <textarea id="content" name="content">${p.body}</textarea>
+        <label for="reason">What changed</label>
+        <input id="reason" type="text" name="reason" placeholder="Optional, for the reviewers">
+        <div class="actions"><button class="primary">Save revision</button>
+          <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a></div>
+      </form>`;
+    return { v, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
+  });
+  if (!data) return notFound(ctx);
+  return render(ctx, "Revise your proposal", data.shell, "vaults");
+}
+
+async function reviseProposal(ctx: Ctx, id: string, pid: string): Promise<Reply> {
+  if (!UUID.test(pid)) return notFound(ctx);
+  try {
+    const revision = await asPerson(
+      ctx.userId,
+      async (c) =>
+        (
+          await c.query(`select public.revise_proposal($1, $2, $3) as r`, [
+            pid,
+            (ctx.form.get("content") ?? "").replaceAll("\r\n", "\n"),
+            ctx.form.get("reason") || null,
+          ])
+        ).rows[0].r as number,
+    );
+    ctx.setFlash(`Revised. This is revision ${revision}, waiting for review again.`);
+  } catch (err) {
+    ctx.setFlash(message(err));
+  }
+  return { redirect: proposalPath(id, pid) };
 }
 
 const DECIDED: Record<string, string> = {
@@ -1135,7 +1259,7 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
           ? html`<div class="choice-list">${vaults.map(
               (v) => html`<label class="choice"><input type="checkbox" name="vault" value="${v.id}"> ${v.name}</label>`,
             )}</div>`
-          : html`<p class="hint">You don’t belong to any vaults yet.</p>`}
+          : html`<p class="hint">You don’t belong to any vaults yet. <a href="/vaults/new">Create one</a>.</p>`}
         <p class="hint">Ticking a vault limits the token to the ticked vaults.</p>
       </fieldset>
       <fieldset>
@@ -1223,6 +1347,8 @@ export async function routes(ctx: Ctx): Promise<Reply> {
   if (get && p === "/activity") return allActivity(ctx);
   if (get && p === "/connect") return connect(ctx);
   if (get && p === "/tokens") return tokens(ctx);
+  if (get && p === "/vaults/new") return newVault(ctx);
+  if (!get && p === "/vaults/new") return createVault(ctx);
   if (!get && p === "/tokens/new") return createToken(ctx);
   let m = /^\/tokens\/([^/]+)\/revoke$/.exec(p);
   if (!get && m) return revokeToken(ctx, m[1]);
@@ -1249,6 +1375,8 @@ export async function routes(ctx: Ctx): Promise<Reply> {
     if (get && action === "") return proposalView(ctx, id, pid);
     if (get && action === "/edit") return proposalEdit(ctx, id, pid);
     if (!get && action === "/edit") return editAndApprove(ctx, id, pid);
+    if (get && action === "/revise") return proposalRevise(ctx, id, pid);
+    if (!get && action === "/revise") return reviseProposal(ctx, id, pid);
     if (!get && action === "/decide") return decide(ctx, id, pid);
     if (!get && action === "/repropose") return repropose(ctx, id, pid);
     if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx));

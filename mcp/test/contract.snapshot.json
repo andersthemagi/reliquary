@@ -52,6 +52,57 @@
     "annotations": null
   },
   {
+    "name": "create_vault",
+    "title": "Create a vault",
+    "description": "Create a new vault owned by your person; the log records that you made it. Only works through a connection that reaches all of your person's vaults with read-write access: a token limited to chosen vaults, or read-only, is refused. default_policy is what every file is unless a rule says otherwise: open (members and agents write directly) or canon (every change is a proposal people approve). Rules for folders and files are policy, so only people set them, in Reliquary's Rules page; you can't add members either.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "The vault's name"
+        },
+        "default_policy": {
+          "description": "open (the default) or canon",
+          "type": "string",
+          "enum": [
+            "open",
+            "canon"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": null
+  },
+  {
+    "name": "delete_file",
+    "title": "Delete an open file",
+    "description": "Delete a file whose policy is open. Its earlier versions are kept and the deletion is logged. Canon files can't be deleted directly: use propose with delete set to true.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "vault",
+        "path"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": null
+  },
+  {
     "name": "list_files",
     "title": "List files",
     "description": "Files in a vault, optionally under a folder prefix like 'clients/'.",

@@ -60,8 +60,9 @@ done
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
-"$engine" run --rm --network host -v "$PWD":/app:Z -w /app "${env_args[@]}" \
-  -e MCP_URL="http://127.0.0.1:$port/mcp" -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" \
+# docs/ read-only, for test/parity.test.mjs (every tool is in docs/parity.md).
+"$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" \
+  -e MCP_URL="http://127.0.0.1:$port/mcp" -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
   "$node" node --test --test-concurrency=1 test/*.test.mjs
 

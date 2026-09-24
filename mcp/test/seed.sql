@@ -147,3 +147,27 @@ select pg_temp.reset();
 \echo FEED_PROPOSAL=:fp
 \echo FEED_REJECTED=:fp_old
 \echo FEED_ERASED=:fp_gone
+
+-- Create vault and delete_file (test/create_vault.test.mjs,
+-- test/delete_file.test.mjs). Eve exists only here, with her own vault Eve
+-- home (an open notes/ and a canon canon/), so the other tests' lists don't
+-- change. Her tokens: all vaults read-write, all vaults read-only, Eve home
+-- only read-write.
+\set eve '00000000-0000-0000-0000-00000000000e'
+\o /dev/null
+select pg_temp.as_person(:'eve');
+select public.create_vault('Eve home', 'open') as eve_home \gset
+select public.set_policy(:'eve_home', 'canon/', 'canon', 1);
+select public.write_file(:'eve_home', 'notes/scratch.md', 'Scratch notes.');
+select public.write_file(:'eve_home', 'notes/keep.md', 'Keep this.');
+select public.propose(:'eve_home', 'canon/charter.md', 'Charter.', 'first') as eve_p \gset
+select public.decide(:'eve_p', 'approve');
+select public.create_access_token('Eve all rw', 30, null, 'write') as eve_all_rw \gset
+select public.create_access_token('Eve all ro', 30, null, 'read') as eve_all_ro \gset
+select public.create_access_token('Eve home rw', 30, array[:'eve_home']::uuid[], 'write') as eve_home_rw \gset
+select pg_temp.reset();
+\o
+\echo EVE_HOME=:eve_home
+\echo EVE_ALL_RW=:eve_all_rw
+\echo EVE_ALL_RO=:eve_all_ro
+\echo EVE_HOME_RW=:eve_home_rw

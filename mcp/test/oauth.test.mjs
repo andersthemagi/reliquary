@@ -166,8 +166,8 @@ test("flow: a client with a metadata document goes from a 401 to tools/list", as
   const c = await connect(t.access_token);
   const names = (await c.listTools()).tools.map((x) => x.name).sort();
   assert.deepEqual(names, [
-    "changes_since", "comment_on_proposal", "list_files", "list_proposals", "list_vaults",
-    "propose", "read_file", "read_proposal", "revise_proposal", "search", "write_file",
+    "changes_since", "comment_on_proposal", "create_vault", "delete_file", "list_files", "list_proposals",
+    "list_vaults", "propose", "read_file", "read_proposal", "revise_proposal", "search", "write_file",
   ]);
   await c.close();
 });
@@ -182,6 +182,24 @@ test("flow: the refreshed access token works too", async () => {
   const next = await r.json();
   assert.equal(r.status, 200);
   assert.equal((await mcpPost({ Authorization: `Bearer ${next.access_token}` })).status, 200);
+});
+
+test("scope: an all-vaults read-write grant creates a vault; a grant for chosen vaults can't", async () => {
+  const all = await connectWithOAuth([["reach", "all"], ["access", "write"]]);
+  const c = await connect(all.access_token);
+  const made = await call(c, "create_vault", { name: "Ben via OAuth" });
+  assert.equal(made.isError, false, made.text);
+  assert.match((await call(c, "list_vaults")).text, /^Ben via OAuth \(owner\) id=/m);
+  await c.close();
+
+  const probe = await connectWithOAuth();
+  const team = await teamId(probe.html);
+  const scoped = await connectWithOAuth([["reach", "some"], ["vault", team], ["access", "write"]]);
+  const s = await connect(scoped.access_token);
+  const refused = await call(s, "create_vault", { name: "Ben scoped via OAuth" });
+  assert.equal(refused.isError, true);
+  assert.match(refused.text, /^Not allowed: creating a vault needs/);
+  await s.close();
 });
 
 test("scope: a read-only grant for Team sees Team only, as a viewer, and writes nothing", async () => {

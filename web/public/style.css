@@ -359,14 +359,17 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .inline-field input { flex: 1; }
 .result { margin: var(--space-4) 0 0; }
 
-/* Token form */
-.token-form fieldset { border: 0; padding: 0; margin: var(--space-5) 0 0; min-width: 0; }
-.token-form legend { font-weight: 600; font-size: var(--text-sm); padding: 0; margin-bottom: var(--space-2); }
-.token-form label.choice {
+/* Forms with radio or checkbox choices (tokens, new vault) */
+:is(.token-form, .choice-form) fieldset { border: 0; padding: 0; margin: var(--space-5) 0 0; min-width: 0; }
+:is(.token-form, .choice-form) legend { font-weight: 600; font-size: var(--text-sm); padding: 0; margin-bottom: var(--space-2); }
+:is(.token-form, .choice-form) label.choice {
   display: flex; align-items: center; gap: 10px; margin: 0; min-height: 32px;
   font-weight: 400; font-size: var(--text-md); line-height: var(--lh-md); cursor: pointer;
 }
-.token-form .choice input { flex: none; }
+.token-form .choice input, .choice-form .choice input { flex: none; }
+/* A choice with a sentence after it: the control aligns with the first line. */
+.choice-form label.choice { align-items: flex-start; }
+.choice-form label.choice input { margin-top: 4px; }
 .token-form .choice-list { margin: 0 0 0 7px; padding-left: 18px; border-left: 1px solid var(--border); }
 .token-form select.token-expiry { min-width: 12rem; }
 
@@ -470,6 +473,8 @@ a.dir { font-weight: 600; }
   font-size: var(--text-sm); line-height: var(--lh-sm);
 }
 .empty strong { display: block; color: var(--fg); font-size: var(--text-md); margin-bottom: var(--space-2); }
+.empty p { max-width: var(--measure); margin: 0 auto var(--space-4); }
+.empty p:last-child { margin-bottom: 0; }
 
 /* Tabs ----------------------------------------------------------------------- */
 

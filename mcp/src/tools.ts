@@ -138,6 +138,30 @@ export function registerTools(server: McpServer, id: Identity): void {
   );
 
   server.registerTool(
+    "create_vault",
+    {
+      title: "Create a vault",
+      description:
+        "Create a new vault owned by your person; the log records that you made it. Only works through a connection that reaches all of your person's vaults with read-write access: a token limited to chosen vaults, or read-only, is refused. default_policy is what every file is unless a rule says otherwise: open (members and agents write directly) or canon (every change is a proposal people approve). Rules for folders and files are policy, so only people set them, in Reliquary's Rules page; you can't add members either.",
+      inputSchema: {
+        name: z.string().min(1).max(100).describe("The vault's name"),
+        default_policy: z.enum(["open", "canon"]).optional().describe("open (the default) or canon"),
+      },
+    },
+    async ({ name, default_policy }) =>
+      run(async (c) => {
+        const { rows } = await c.query("select public.create_vault($1, $2) as id", [name, default_policy ?? "open"]);
+        const v = rows[0].id;
+        const made = (await c.query("select name, default_policy from public.vaults where id = $1", [v])).rows[0];
+        return ok(
+          `Created vault ${made.name} id=${v}, owned by your person, default policy ${made.default_policy}. ` +
+            `The log records it as made by ${id.agent}. Refer to it by id if another vault has the same name. ` +
+            "Ask your person to set folder rules in Reliquary if some files should be canon.",
+        );
+      }),
+  );
+
+  server.registerTool(
     "list_files",
     {
       title: "List files",
@@ -227,6 +251,22 @@ export function registerTools(server: McpServer, id: Identity): void {
         const v = await vaultId(c, vault);
         await c.query("select public.write_file($1, $2, $3)", [v, path, content]);
         return ok(`Wrote ${path}. The change is logged as ${id.agent}.`);
+      }),
+  );
+
+  server.registerTool(
+    "delete_file",
+    {
+      title: "Delete an open file",
+      description:
+        "Delete a file whose policy is open. Its earlier versions are kept and the deletion is logged. Canon files can't be deleted directly: use propose with delete set to true.",
+      inputSchema: { vault: z.string(), path: z.string() },
+    },
+    async ({ vault, path }) =>
+      run(async (c) => {
+        const v = await vaultId(c, vault);
+        await c.query("select public.delete_file($1, $2)", [v, path]);
+        return ok(`Deleted ${path}. The change is logged as ${id.agent}.`);
       }),
   );
 
