@@ -93,7 +93,11 @@ milestone work.
   values, managing members, and deleting or exporting a vault. Those need the
   person present in the UI.
 - **Append-only means append-only.** `log`, `env_access_log` and
-  `routine_runs` history are never updated or deleted in place.
+  `routine_runs` history are never updated or deleted in place. The one
+  sanctioned exception is `delete_vault` (an owner, in person, typed name):
+  it removes a whole vault for erasure and leaves a record in
+  `private.vault_deletions`. Any new append-only table must let that path
+  through, and nothing else.
 - **Nothing becomes canon without a person.** Agents and routines write notes
   or proposals; people approve or write canon.
 - **A run is only `ok` with an artifact.** A run that reports nothing it
