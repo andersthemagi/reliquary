@@ -71,8 +71,8 @@ echo "== server log (must contain no tokens or file text)"
 # and truncates it, losing the test output.
 server_log=$("$engine" logs "$srv" 2>&1)
 printf '%s\n' "$server_log" >&2
-grep -E 'rlq_|800 EUR|Hermes|Falcon' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
-# OAuth: no personal token, access or refresh token, or code in either app's log.
+grep -E 'rlq_|800 EUR|Hermes|Falcon|CIPHERTEXT-MARKER' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
+# OAuth: no personal token, access (MCP or CLI) or refresh token, or code in either app's log.
 web_log=$("$engine" logs "$web" 2>&1)
-grep -E 'rl[qorc]_[0-9a-f]' <<< "$server_log
+grep -E 'rl[qorce]_[0-9a-f]' <<< "$server_log
 $web_log" && { echo "LEAK: a token or code in a server log"; exit 1; } || echo "clean (oauth)"

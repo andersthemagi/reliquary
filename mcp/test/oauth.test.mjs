@@ -167,7 +167,7 @@ test("flow: a client with a metadata document goes from a 401 to tools/list", as
   const names = (await c.listTools()).tools.map((x) => x.name).sort();
   assert.deepEqual(names, [
     "changes_since", "comment_on_proposal", "create_vault", "delete_file", "list_files", "list_proposals",
-    "list_vaults", "propose", "read_file", "read_proposal", "revise_proposal", "search", "write_file",
+    "list_variables", "list_vaults", "propose", "read_file", "read_proposal", "revise_proposal", "search", "write_file",
   ]);
   await c.close();
 });

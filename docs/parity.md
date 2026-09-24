@@ -54,6 +54,11 @@ and, for the agent, its token's vaults and access.
 | Erase a file (blank every version) | none | none | person (owner) | Web: **gap** (`erase_file` exists in the database). MCP: **ceiling** (irreversible) |
 | Rename a vault, change its default policy | none | none | | **Gap** on both sides: no database function yet. The default can be worked around with a rule per folder |
 | Delete or export a vault | none | none | person (owner) | Not built (milestone 1 has no vault deletion or export). MCP: **ceiling** when it lands |
+| List environment variables (names, environments, who set them) | `/v/:v/variables` (milestone 2, phase 2) | `list_variables` | both | Names only, on both sides of MCP: no tool returns a value, a ciphertext or a nonce ([docs/variables.md](variables.md)) |
+| Set, rotate or delete a variable's value | `/v/:v/variables` (phase 2) | none | person (owners everywhere; editors outside production) | **Ceiling**: a value typed to an agent has already reached a model. `set_variable` and `delete_variable` are `require_human` |
+| Reveal one value | `/v/:v/variables` (phase 2) | none | person | **Ceiling** (design: revealing a value needs the person present). `reveal_variable` refuses any `act` claim and logs the refusal |
+| Use values in a process | none (the CLI: `reliquary run`, `reliquary env pull`) | none | person, through the CLI | **Ceiling**: values never reach a model. The CLI signs in as its own OAuth client, bound to the env API; its grant reads values and nothing else |
+| Read a vault's variable access log | `/v/:v/variables` (phase 2) | none | owner, editor | **Gap**, left on purpose: RLS lets an owner's or editor's read-write agent read `env_access_log`, but nothing needs a tool for it yet |
 
 ## Fixed in this change
 

@@ -436,6 +436,58 @@ export function registerTools(server: McpServer, id: Identity): void {
       }),
   );
 
+  // Environment variables: names only. No tool returns a value, a ciphertext
+  // or a nonce, on any token (AGENTS.md, "Secrets never reach a model"); the
+  // database gives agents no way to read them anyway (docs/variables.md).
+  server.registerTool(
+    "list_variables",
+    {
+      title: "List environment variables",
+      description:
+        "Names of a vault's environment variables, the environments each has a value in (development, preview, production, ...), and when and by whom each was last set. Never values: you can't read, set or reveal one. To use them, your person runs `reliquary run -- <command>` or `reliquary env pull` on their own machine; values are set in Reliquary's web UI.",
+      inputSchema: {
+        vault: z.string().describe("Vault name or id"),
+        environment: z.string().optional().describe("Only this environment, e.g. 'development'"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ vault, environment }) =>
+      run(async (c) => {
+        const v = await vaultId(c, vault);
+        const order = "case $ when 'development' then 0 when 'preview' then 1 when 'production' then 2 else 3 end";
+        const envs = (
+          await c.query(
+            `select e.name, e.owners_only from public.environments e where e.vault_id = $1
+              order by ${order.replace("$", "e.name")}, e.name`,
+            [v],
+          )
+        ).rows;
+        if (environment !== undefined && !envs.some((e) => e.name === environment)) {
+          return fail(`No environment named ${environment}. This vault has: ${envs.map((e) => e.name).join(", ")}.`);
+        }
+        const { rows } = await c.query(
+          `select v.name, vv.environment, vv.updated_at, vv.updated_by
+             from public.variables v join public.variable_values vv on vv.variable_id = v.id
+            where v.vault_id = $1 and ($2::text is null or vv.environment = $2)
+            order by v.name, ${order.replace("$", "vv.environment")}, vv.environment
+            limit 2000`,
+          [v, environment ?? null],
+        );
+        const head =
+          `Environments: ${envs.map((e) => `${e.name}${e.owners_only ? " (owners only)" : ""}`).join(", ")}.\n` +
+          "Names only; values never leave Reliquary over MCP.";
+        if (rows.length === 0) return ok(`${head}\nNo variables${environment ? ` in ${environment}` : ""}.`);
+        const out = [head];
+        let last = "";
+        for (const r of rows) {
+          if (r.name !== last) out.push(r.name);
+          last = r.name;
+          out.push(`  ${r.environment}  set ${r.updated_at.toISOString()} by ${r.updated_by}${r.updated_by === id.userId ? " (your person)" : ""}`);
+        }
+        return ok(out.join("\n"));
+      }),
+  );
+
   // Threads: a proposal's discussion. Everything in it was written by people
   // or agents, so every entry is fenced as data.
 

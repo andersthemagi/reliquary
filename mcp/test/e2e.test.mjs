@@ -46,7 +46,7 @@ test("tools: the expected set, and no way to approve", async () => {
   const names = (await c.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(names, [
     "changes_since", "comment_on_proposal", "create_vault", "delete_file", "list_files", "list_proposals",
-    "list_vaults", "propose", "read_file", "read_proposal", "revise_proposal", "search", "write_file",
+    "list_variables", "list_vaults", "propose", "read_file", "read_proposal", "revise_proposal", "search", "write_file",
   ]);
   await c.close();
 });

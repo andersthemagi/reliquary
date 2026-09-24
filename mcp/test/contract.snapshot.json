@@ -158,6 +158,31 @@
     }
   },
   {
+    "name": "list_variables",
+    "title": "List environment variables",
+    "description": "Names of a vault's environment variables, the environments each has a value in (development, preview, production, ...), and when and by whom each was last set. Never values: you can't read, set or reveal one. To use them, your person runs `reliquary run -- <command>` or `reliquary env pull` on their own machine; values are set in Reliquary's web UI.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "description": "Vault name or id"
+        },
+        "environment": {
+          "description": "Only this environment, e.g. 'development'",
+          "type": "string"
+        }
+      },
+      "required": [
+        "vault"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    }
+  },
+  {
     "name": "list_vaults",
     "title": "List vaults",
     "description": "Vaults this token can reach, with your role in each (viewer when the token is read-only).",
