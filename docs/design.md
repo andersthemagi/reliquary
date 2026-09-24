@@ -487,6 +487,15 @@ vault it was are revoked; tokens that reach other vaults keep those. What
 remains is one row in `private.vault_deletions`: the vault id, who deleted
 it, when, and counts, with no name, path or text.
 
+The other members are told, once: each gets a row in
+`private.vault_deletion_notices` (the vault's name, who deleted it, when),
+shown on their Home page and deleted as it is shown, or unseen after 30
+days. The name is kept there on purpose: every recipient could read it the
+moment before, and "a vault you were in" tells someone in several vaults
+nothing. It goes to nobody else, never into `vault_deletions`, and the
+delete page tells the owner before they confirm
+(`20260925160000_membership_polish.sql`).
+
 Why not a soft delete with a purge later: every policy and function would
 have to learn a "deleted" state, the data would sit in the live database
 for the whole window, and the purge would be a job someone must remember to

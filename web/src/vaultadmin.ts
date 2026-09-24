@@ -13,7 +13,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
-import { membersRoutes } from "./members.js";
+import { leaveRoutes, membersRoutes } from "./members.js";
 import { csrfField, html, pageHeader, type Raw } from "./html.js";
 import { message, notFound, render, UUID, vault, vaultPath, vaultShell, type Ctx, type Reply, type Vault } from "./pages.js";
 
@@ -46,8 +46,11 @@ const crumb = (id: string, v: Vault, here?: string) =>
 // Settings
 
 async function settings(ctx: Ctx, id: string): Promise<Reply> {
-  return page(ctx, id, "Settings", async (_c, v) => {
+  return page(ctx, id, "Settings", async (c, v) => {
     const owner = v.role === "owner";
+    const owners = (await c.query(`select count(*)::int as n from public.vault_members where vault_id = $1 and role = 'owner'`, [id]))
+      .rows[0].n as number;
+    const soleOwner = owner && owners <= 1;
     return html`
       ${pageHeader({ crumb: crumb(id, v), title: "Settings" })}
       <h2>General</h2>
@@ -75,6 +78,10 @@ async function settings(ctx: Ctx, id: string): Promise<Reply> {
       ${owner
         ? html`<p>Download every file’s current text as a <code>.tar.gz</code>, with a manifest of rules and variable names. <a href="${settingsPath(id, "/export")}">Export this vault</a></p>`
         : html`<p class="muted">Owners can export this vault.</p>`}
+      <h2>Leave</h2>
+      ${soleOwner
+        ? html`<p>You’re the only owner, so you can’t leave. Make someone else an owner on <a href="${settingsPath(id, "/members")}">Members</a> first, or delete the vault.</p>`
+        : html`<p>Stop being a member of ${v.name}. You and your agents lose access at once; to come back, an owner invites you again. <a href="${settingsPath(id, "/leave")}">Leave this vault</a></p>`}
       ${owner
         ? html`<h2>Danger zone</h2>
           <div class="danger-zone">
@@ -210,6 +217,9 @@ async function deletePage(ctx: Ctx, id: string, error?: string): Promise<Reply> 
         <ul>
           <li>Nothing is kept to restore from. Backups hold it until they age out, then it is gone everywhere.</li>
           <li>Want a copy? <a href="${settingsPath(id, "/export")}">Export it first</a>. Variable values are never exported.</li>
+          ${n.members > 1
+            ? html`<li>The other members are told once, on their Home page, within 30 days: the vault’s name, your email and the date. Nothing else is kept.</li>`
+            : ""}
         </ul>
         <form method="post" action="${settingsPath(id, "/delete")}" class="panel">
           ${csrfField(ctx.csrf)}
@@ -311,6 +321,7 @@ export async function adminRoutes(ctx: Ctx, id: string, rest: string): Promise<R
   const get = ctx.method === "GET";
   if (rest === "/config") return get ? settings(ctx, id) : saveSettings(ctx, id);
   if (rest === "/config/members" || rest.startsWith("/config/members/")) return membersRoutes(ctx, id, rest);
+  if (rest === "/config/leave") return leaveRoutes(ctx, id);
   if (rest === "/config/export") return get ? exportPage(ctx, id) : exportDownload(ctx, id);
   if (rest === "/config/delete") return get ? deletePage(ctx, id) : deleteVault(ctx, id);
   if (rest === "/erase") return get ? erasePage(ctx, id) : eraseFile(ctx, id);

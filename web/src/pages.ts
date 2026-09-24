@@ -10,10 +10,11 @@ import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
 import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
+import { fillPeople, personRef } from "./people.js";
 import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
 import { adminRoutes } from "./vaultadmin.js";
-import { inviteRoutes } from "./members.js";
+import { deletionNotices, inviteRoutes } from "./members.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -62,8 +63,10 @@ export function message(err: unknown): string {
   throw err;
 }
 
+// Who did something: "you", someone's email where the reader may see it
+// (people.ts), or "system".
 export const who = (ctx: Ctx, id: string | null, agent: string | null) =>
-  `${id === ctx.userId ? "you" : id ? id.slice(0, 8) : "system"}${agent ? ` via ${agent}` : ""}`;
+  `${id === ctx.userId ? "you" : id ? personRef(id) : "system"}${agent ? ` via ${agent}` : ""}`;
 
 // Canon and open as badges: a filled or hollow diamond (drawn in CSS) and
 // the word, so the policy never rests on the mark alone.
@@ -316,6 +319,7 @@ async function home(ctx: Ctx): Promise<Reply> {
     ).rows,
     waiting: (await c.query(`${WAITING_SQL} order by p.created_at limit 5`, [ctx.userId])).rows,
   }));
+  const gone = await asPerson(ctx.userId, deletionNotices);
   // One primary per page: New vault. Review, when something waits, sits
   // before it as a secondary button.
   return render(
@@ -327,6 +331,7 @@ async function home(ctx: Ctx): Promise<Reply> {
         <a class="button primary" href="/vaults/new">New vault</a>`,
     })}
     <p class="lede">Shared context your agents read and propose to. Changes to canon files wait for your approval.</p>
+    ${gone}
     ${vaults.length === 0
       ? ""
       : html`<h2>Needs your review</h2>
@@ -1401,7 +1406,13 @@ async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
 // transaction mustn't stay open across that.
 export async function routes(ctx: Ctx): Promise<Reply> {
   const shared = ctx.method === "GET" && ctx.url.pathname !== "/oauth/authorize";
-  return shared ? readOnlyRequest(ctx.userId, () => route(ctx)) : route(ctx);
+  // The people a page names, by email where the reader may see it, in one
+  // lookup (people.ts), inside the page's own transaction on a GET.
+  const run = async (): Promise<Reply> => {
+    const reply = await route(ctx);
+    return reply.html ? { ...reply, html: await fillPeople(ctx.userId, reply.html) } : reply;
+  };
+  return shared ? readOnlyRequest(ctx.userId, run) : run();
 }
 
 async function route(ctx: Ctx): Promise<Reply> {

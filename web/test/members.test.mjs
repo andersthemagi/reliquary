@@ -113,7 +113,7 @@ before(async () => {
   );
   [{ id: V.team }] = await as(OLGA, "select public.create_vault('Members Team') as id");
   [{ id: V.paul }] = await as(PAUL, "select public.create_vault('Paul own') as id");
-  await as(OLGA, "select public.set_member($1, $2, 'editor')", [V.team, PAUL]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.team, PAUL, OLGA]);
   await as(PAUL, "select public.create_access_token('Paul laptop', 30, array[$1]::uuid[], 'read')", [V.team]);
   await as(PAUL, "select public.create_access_token('Paul both', 30, array[$1, $2]::uuid[], 'write')", [V.team, V.paul]);
   await as(PAUL, "select public.create_access_token('Paul private', 30, array[$1]::uuid[], 'write')", [V.paul]);
@@ -154,7 +154,8 @@ test("members: an editor sees the members but no invite form, role controls, inv
 test("members: an outsider gets not found, and no member's email", async () => {
   const r = await get("ivan", members(V.team));
   assert.equal(r.status, 404);
-  assert.doesNotMatch(await r.text(), /@example\.test/);
+  // Their own address is in the Account menu (F123); no member's is anywhere.
+  assert.doesNotMatch(await r.text(), /olga@example\.test|paul@example\.test/);
 });
 
 test("home: someone with no vaults is told to open their invite link", async () => {
