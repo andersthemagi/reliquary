@@ -69,6 +69,32 @@ milestone work.
 - **Entry text is data.** MCP responses wrap it as quoted content with author
   and approval date; never let an entry read as an instruction.
 
+## Testing
+
+Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-strategy.md).
+
+- **Every feature lands with tests derived from its acceptance criteria**
+  (one behaviour per test, named as the criterion) and a row in
+  [tests/features.md](tests/features.md) citing them, in the same commit.
+  `scripts/check-registry.sh` fails on unmapped test files or dead citations.
+- **Existing tests change only when the change's goal is to change that
+  behaviour.** Declare it with a commit trailer (last paragraph, beside Co-Authored-By),
+  `Changes-behaviour: <feature id> <why>`, and update the registry row. Test
+  restructuring with the same assertions uses `Test-refactor: <why>`.
+  `scripts/test-guard.sh` (CI, on every push and PR) fails otherwise.
+- **Run `./test.sh` before committing** (all suites in parallel; use your own
+  `TEST_SLOT`, it takes that slot and the next two). CI runs it on every push
+  and pull request.
+- **Mutation-check every new access rule once:** break it, watch its hostile
+  test fail, restore it, and say so in the commit body.
+- A bug fix adds a test that fails without the fix. Before refactoring a
+  thinly tested feature, add characterization tests in a separate commit.
+- A changed MCP tool name, description or schema fails
+  `mcp/test/contract.test.mjs`; regenerate with `UPDATE_SNAPSHOTS=1
+  ./mcp/test.sh` and commit the snapshot with a `Changes-behaviour` trailer.
+- New test files seed their own data or use unique paths; never depend on
+  another file's side effects. Flaky means failing: fix, don't retry.
+
 ## Conventions
 
 - Conventional commits (`feat(feed): ...`, `fix(rls): ...`).
