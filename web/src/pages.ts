@@ -686,32 +686,39 @@ async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
   const path = (f.get("path") ?? "").trim();
   const content = (f.get("content") ?? "").replaceAll("\r\n", "\n");
   const reason = f.get("reason") ?? "";
-  let action = f.get("action") ?? "";
+  const action = f.get("action") ?? "";
+  if (!["create", "write", "delete", "propose", "propose-delete"].includes(action)) return { status: 400, html: "Bad request" };
   try {
+    // One query in the transaction: the vault is checked inside it
+    // (private.vault_ref, under RLS: RLV01 when the person can't see it), as
+    // the MCP tools do. "create" follows the path's rule: a canon path
+    // becomes a proposal, an open one a write (only the branch taken runs).
     const outcome = await asPerson(ctx.userId, async (c) => {
-      if (!(await vault(c, ctx, id))) return { kind: "missing" } as const;
+      const V = `(select private.vault_ref($1) as id offset 0) v`;
       if (action === "create") {
-        const policy = (await c.query(`select (private.rule_for($1, $2)).policy`, [id, path])).rows[0].policy;
-        action = policy === "canon" ? "propose" : "write";
+        const r = (
+          await c.query(
+            `select case when x.canon then public.propose(x.id, $2, $3, $4, false) end as pid,
+                    case when not x.canon then public.write_file(x.id, $2, $3) end as written
+               from (select v.id, (private.rule_for(v.id, $2)).policy = 'canon' as canon from ${V} offset 0) x`,
+            [id, path, content, reason],
+          )
+        ).rows[0];
+        return r.pid ? ({ kind: "proposed", pid: r.pid as string } as const) : ({ kind: "write" } as const);
       }
       if (action === "write") {
-        await c.query(`select public.write_file($1, $2, $3)`, [id, path, content]);
+        await c.query(`select public.write_file(v.id, $2, $3) from ${V}`, [id, path, content]);
         return { kind: "write" } as const;
       }
       if (action === "delete") {
-        await c.query(`select public.delete_file($1, $2)`, [id, path]);
+        await c.query(`select public.delete_file(v.id, $2) from ${V}`, [id, path]);
         return { kind: "delete" } as const;
       }
-      if (action === "propose" || action === "propose-delete") {
-        const del = action === "propose-delete";
-        const pid = (await c.query(`select public.propose($1, $2, $3, $4, $5) as id`, [id, path, del ? null : content, reason, del]))
-          .rows[0].id as string;
-        return { kind: "proposed", pid } as const;
-      }
-      return { kind: "bad" } as const;
+      const del = action === "propose-delete";
+      const pid = (await c.query(`select public.propose(v.id, $2, $3, $4, $5) as id from ${V}`, [id, path, del ? null : content, reason, del]))
+        .rows[0].id as string;
+      return { kind: "proposed", pid } as const;
     });
-    if (outcome.kind === "missing") return notFound(ctx);
-    if (outcome.kind === "bad") return { status: 400, html: "Bad request" };
     if (outcome.kind === "delete") {
       ctx.setFlash(`Deleted ${path}.`);
       return { redirect: vaultPath(id) };
@@ -723,6 +730,7 @@ async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
     ctx.setFlash(`Saved ${path}.`);
     return { redirect: filePath(id, path) };
   } catch (err) {
+    if ((err as { code?: string }).code === "RLV01") return notFound(ctx);
     ctx.setFlash(message(err));
     return { redirect: path ? filePath(id, path) : vaultPath(id) };
   }

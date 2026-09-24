@@ -507,6 +507,19 @@ A rare action in a vault with many rows still reads all of that vault's
 rows; an index on `(vault_id, action, seq)` would fix that if the filter is
 used on big vaults, at the cost of another index on every log insert.
 
+### Web file saves
+
+A file form's save ran `vault()`, then (for a new file) the path's rule,
+then the write. The vault check now happens inside the write's own query
+(`private.vault_ref`, as the MCP tools do), and a new file's rule and its
+write or proposal are one query (only the branch taken runs). Someone who
+isn't a member gets `RLV01`, answered Not found, as before.
+
+| One file form POST (measured by `web/test/final_sweep.test.mjs`) | Before | After |
+|---|---:|---:|
+| Write, delete or propose: round trips | 4 | 3 |
+| New file (create): round trips | 5 | 3 |
+
 ## Still to do
 
 1. **Confirm the pg_cron job after the next `db push`** (`select jobname,

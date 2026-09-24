@@ -89,19 +89,28 @@ async function begin(client: pg.PoolClient, userId: string): Promise<void> {
 // call opens a fresh one, so a caught error can't poison the rest of the
 // page. POSTs keep a transaction per call. Calls must not overlap (none do:
 // no page runs asPerson() calls concurrently).
+//
+// The transaction commits only when the whole page was built: if fn throws
+// (a query, or rendering after the queries), it rolls back. That matters
+// for the one write a GET makes, Home taking its deletion notices
+// (public.take_deletion_notices): a page that failed to render leaves them
+// for next time.
 type Shared = { userId: string; client: pg.PoolClient | null; open: boolean; done: boolean; broken: boolean };
 const shared = new AsyncLocalStorage<Shared>();
 
 export async function readOnlyRequest<T>(userId: string, fn: () => Promise<T>): Promise<T> {
   const s: Shared = { userId, client: null, open: false, done: false, broken: false };
+  let ok = false;
   try {
-    return await shared.run(s, fn);
+    const result = await shared.run(s, fn);
+    ok = true;
+    return result;
   } finally {
     s.done = true;
     const client = s.client;
     s.client = null;
     if (client) {
-      if (s.open) await client.query("commit").catch(() => (s.broken = true));
+      if (s.open) await client.query(ok ? "commit" : "rollback").catch(() => (s.broken = true));
       s.open = false;
       client.release(s.broken || undefined);
     }

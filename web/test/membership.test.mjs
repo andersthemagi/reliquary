@@ -256,6 +256,44 @@ test("notices: a former member sees the deletion once on Home; nobody else does"
   assert.doesNotMatch(await page("zed", "/"), /Polish Doomed/);
 });
 
+// Home as the server builds it (pages.ts routes(), in one transaction), in
+// this process, with a request whose page fails after its queries, while
+// rendering: the notice is taken only by a page that was built.
+test("notices: a Home page that fails while rendering leaves the notice for next time", async () => {
+  const [{ id }] = await as(BEA, "select public.create_vault('Polish Doomed Twice') as id");
+  await sql("select test_support.add_member($1, $2, 'viewer', $3)", [id, CY, BEA]);
+  await as(BEA, "select public.delete_vault($1, 'Polish Doomed Twice')", [id]);
+  const waiting = async () =>
+    Number((await sql("select count(*) as n from private.vault_deletion_notices where user_id = $1 and vault_name = 'Polish Doomed Twice'", [CY]))[0].n);
+  const { usePool } = await import("../dist/db.js");
+  const { routes } = await import("../dist/pages.js");
+  const db = new pg.Pool({ connectionString: WEB_DB, max: 1 });
+  usePool(db);
+  const home = (fail) => ({
+    userId: CY,
+    csrf: "0",
+    url: new URL("http://web.test/"),
+    form: new URLSearchParams(),
+    method: "GET",
+    theme: "auto",
+    mcpUrl: "",
+    setFlash() {},
+    get flash() {
+      if (fail) throw new Error("rendering failed");
+      return undefined;
+    },
+  });
+  try {
+    await assert.rejects(routes(home(true)), /rendering failed/);
+    assert.equal(await waiting(), 1, "a page that failed to render leaves the notice");
+    const shown = await routes(home(false));
+    assert.match(shown.html, /<strong>Polish Doomed Twice<\/strong> was deleted by/);
+    assert.equal(await waiting(), 0, "a page that was built takes it");
+  } finally {
+    await db.end();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Export
 
