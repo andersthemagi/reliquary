@@ -606,8 +606,10 @@ previous check has held for a week of real use.
    this to later. v3 assumes multi-tenant with a self-host path.
 6. **Name**, checked 2026-09-24, and to finish before any client material:
    - npm: `reliquary` is taken, by a dormant secrets-management package
-     (last published 2022). A scoped `@reliquary/*` package name is
-     unverified.
+     (last published 2022). **Andrés holds the `@reliquary-ai` scope**:
+     packages are `@reliquary-ai/cli`, `@reliquary-ai/mcp`, and so on.
+   - `reliquary-ai.com`, `.dev`, `.app` and `.io` looked unregistered on
+     2026-09-24. Worth registering to match the scope.
    - Domains: `reliquary.com`, `.dev`, `.app` and `getreliquary.com` are
      registered with no live site; `reliquary.ai` is for sale; `reliquary.io`
      looks unregistered.
