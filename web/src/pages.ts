@@ -123,12 +123,25 @@ export async function vault(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Vau
   return rows[0];
 }
 
+// Quorums for a list of proposals that spans vaults, from one
+// rules_for_pairs() call for the whole list (one membership check), not
+// rule_for() per row (100 waiting across 10 vaults: see server-load.md,
+// "Third pass"). `list` is a query with vault_id, path and ord columns;
+// the result is its rows with `quorum`, in `ord` order.
+const withQuorums = (list: string) => `
+  with w as (${list}),
+       k as (select array_agg(vault_id) as vs, array_agg(path) as ps
+               from (select distinct vault_id, path from w) d)
+  select w.*, r.quorum
+    from w cross join k
+    left join private.rules_for_pairs(k.vs, k.ps) r on r.vault_id = w.vault_id and r.path = w.path
+   order by w.ord`;
+
 // Proposals waiting on this person: open, in a vault they can approve in, and
 // not yet decided by them at the current revision.
 const WAITING_SQL = `
   select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
          p.revision, p.status, cur.body as current_body, p.body,
-         (private.rule_for(p.vault_id, p.path)).quorum,
          (select count(*) from public.approvals a
            where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision)::int as approvals
     from public.proposals p
@@ -139,6 +152,12 @@ const WAITING_SQL = `
    where p.status = 'open'
      and not exists (select 1 from public.approvals a
                       where a.proposal_id = p.id and a.user_id = $1 and a.revision = p.revision)${NOT_SNOOZED_SQL}`;
+
+// The waiting list in `order` (over WAITING_SQL's columns, as q.*), at
+// most `limit` rows, each with its quorum.
+const waitingSql = (order: string, limit?: number) =>
+  withQuorums(`select q.*, row_number() over (order by ${order}) as ord from (${WAITING_SQL}) q
+                order by ${order}${limit ? ` limit ${limit}` : ""}`);
 
 export async function reviewCount(userId: string): Promise<number> {
   return asPerson(userId, async (c) => (await c.query(`select count(*)::int as n from (${WAITING_SQL}) w`, [userId])).rows[0].n);
@@ -314,7 +333,7 @@ async function home(ctx: Ctx): Promise<Reply> {
         [ctx.userId],
       )
     ).rows,
-    waiting: (await c.query(`${WAITING_SQL} order by p.created_at limit 5`, [ctx.userId])).rows,
+    waiting: (await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows,
   }));
   // One primary per page: New vault. Review, when something waits, sits
   // before it as a secondary button.
@@ -404,19 +423,19 @@ async function createVault(ctx: Ctx): Promise<Reply> {
 
 async function review(ctx: Ctx): Promise<Reply> {
   const { waiting, revising, snoozed } = await asPerson(ctx.userId, async (c) => ({
-    waiting: (await c.query(`${WAITING_SQL} order by v.name, p.created_at`, [ctx.userId])).rows,
+    waiting: (await c.query(waitingSql("q.vault, q.created_at"), [ctx.userId])).rows,
     snoozed: await snoozedList(c, ctx.userId),
     revising: (
       await c.query(
-        `select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
-                p.revision, p.body, cur.body as current_body, (private.rule_for(p.vault_id, p.path)).quorum, 0 as approvals
+        withQuorums(`select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
+                p.revision, p.body, cur.body as current_body, 0 as approvals,
+                row_number() over (order by p.created_at) as ord
            from public.proposals p join public.vaults v on v.id = p.vault_id
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
           where p.status = 'changes_requested'
             and exists (select 1 from public.approvals a where a.proposal_id = p.id and a.user_id = $1
-                         and a.decision = 'request_changes')
-          order by p.created_at`,
+                         and a.decision = 'request_changes')`),
         [ctx.userId],
       )
     ).rows,

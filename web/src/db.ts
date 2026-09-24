@@ -129,6 +129,54 @@ async function inShared<T>(s: Shared, fn: (c: pg.PoolClient) => Promise<T>): Pro
   }
 }
 
+// A CLI grant, as the env API resolves it (envapi.ts).
+export type Grant = { grantId: string; userId: string; name: string };
+
+const HEX64 = /^[0-9a-f]{64}$/;
+
+// One env API request's work on one pooled connection, as the MCP server
+// does it (docs/research/server-load.md, "Third pass"): check out, then in
+// one round trip begin, resolve the CLI token's hash for `resource` and
+// become its person through the grant (private.env_begin: the claims
+// envapi's asGrant sets), run fn, commit. Null when the token doesn't
+// resolve (nothing held, nothing written). For GET routes only: a push
+// reads its body after authenticating, and a transaction must not stay
+// open across that.
+//
+// Before: resolve on one checkout (1 round trip), then begin, the claims,
+// the work and commit on a second (3 + work). Now: 1 checkout, 2 + work.
+export async function asCliToken<T>(
+  tokenHash: string,
+  resource: string,
+  fn: (c: pg.PoolClient, g: Grant) => Promise<T>,
+): Promise<{ grant: Grant; result: T } | null> {
+  // The hash is hex we computed; the resource our own configured URL. Both
+  // are escaped anyway: inlined so begin and the resolve go as one simple
+  // query (a parameterised query can't carry two statements).
+  if (!HEX64.test(tokenHash)) return null;
+  const client = await db.connect();
+  let broken = false;
+  try {
+    const results = (await client.query(
+      `begin; select token_id, user_id, name from private.env_begin(${client.escapeLiteral(tokenHash)}, ${client.escapeLiteral(resource)})`,
+    )) as unknown as pg.QueryResult[];
+    const rows = results[1]?.rows ?? [];
+    if (rows.length !== 1) {
+      await client.query("rollback");
+      return null;
+    }
+    const grant: Grant = { grantId: rows[0].token_id, userId: rows[0].user_id, name: rows[0].name };
+    const result = await fn(client, grant);
+    await client.query("commit");
+    return { grant, result };
+  } catch (err) {
+    await client.query("rollback").catch(() => (broken = true));
+    throw err;
+  } finally {
+    client.release(broken || undefined);
+  }
+}
+
 export async function asPerson<T>(userId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const s = shared.getStore();
   if (s && !s.done && s.userId === userId) return inShared(s, fn);

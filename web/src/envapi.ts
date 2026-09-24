@@ -23,7 +23,7 @@
 import { createHash } from "node:crypto";
 import type http from "node:http";
 import type pg from "pg";
-import { pool } from "./db.js";
+import { asCliToken, pool, type Grant } from "./db.js";
 import { DOTENV_MAX_ENTRIES, DOTENV_MAX_VALUE_BYTES, isVariableName, startsPrograms } from "./dotenv.js";
 import { envResource, issuer } from "./oauth.js";
 import { fromDb, open, SecretsError, variablesConfigured } from "./secrets.js";
@@ -36,8 +36,6 @@ const ENVIRONMENT = /^[a-z][a-z0-9_-]{0,31}$/;
 // A push is a .env file: 1 MiB is plenty, and bounds what one request can
 // make the server seal (200 values of 64 KiB would be 12.8 MiB).
 const MAX_PUSH_BYTES = 1024 * 1024;
-
-type Grant = { grantId: string; userId: string; name: string };
 
 const HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -52,9 +50,14 @@ function send(res: http.ServerResponse, status: number, body: object, extra: Rec
   res.writeHead(status, { ...HEADERS, ...extra }).end(JSON.stringify(body));
 }
 
+const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
+
+// Resolves on its own checkout: for a push (which reads its body after
+// authenticating) and a wrong method. GET routes resolve inside their
+// transaction instead (asCliToken, getRoute).
 async function resolve(token: string): Promise<Grant | null> {
   const { rows } = await pool.query("select token_id, user_id, name from private.resolve_cli_token($1, $2)", [
-    createHash("sha256").update(token).digest("hex"),
+    hashOf(token),
     envResource(),
   ]);
   return rows.length === 1 ? { grantId: rows[0].token_id, userId: rows[0].user_id, name: rows[0].name } : null;
@@ -168,6 +171,48 @@ function routeOf(parts: string[]): Route {
   return "other";
 }
 
+// A GET route's answer: a reply, or the variables to decrypt and send.
+type Answer =
+  | { status: number; body: object; outcome: string }
+  | { read: { variables: any[] }; vaultId: string; environment: string };
+
+// A GET route's database work, in the transaction asCliToken opened as the
+// grant's person. Values are decrypted by the caller, after commit.
+async function getRoute(c: pg.PoolClient, route: Route, parts: string[]): Promise<Answer> {
+  if (route === "vaults") {
+    const rows = (await c.query("select vault_id, vault_name, role, environments from public.env_vaults()")).rows;
+    return {
+      status: 200,
+      body: { vaults: rows.map((r) => ({ id: r.vault_id, name: r.vault_name, role: r.role, environments: r.environments })) },
+      outcome: "ok",
+    };
+  }
+  if (route === ":vault/:environment" && UUID.test(parts[0]) && ENVIRONMENT.test(parts[1])) {
+    const [vaultId, environment] = parts;
+    if (!variablesConfigured()) return { status: 503, body: { error: "not_configured" }, outcome: "not_configured" };
+    const r = (await c.query("select public.read_variables($1, $2) as r", [vaultId, environment])).rows[0].r;
+    if (!r.ok) return { status: STATUS[r.error] ?? 403, body: { error: r.error }, outcome: r.error };
+    return { read: r, vaultId, environment };
+  }
+  if (route === "imports/:id" && UUID.test(parts[1])) {
+    const r = (await c.query("select public.env_import_status($1) as r", [parts[1]])).rows[0].r;
+    if (!r.ok) return { status: STATUS[r.error] ?? 404, body: { error: r.error }, outcome: r.error };
+    return {
+      status: 200,
+      body: {
+        import: r.id,
+        status: r.status,
+        environments: r.environments,
+        names: r.names,
+        expires_at: r.expires_at,
+        decided_at: r.decided_at,
+      },
+      outcome: r.status,
+    };
+  }
+  return { status: 404, body: { error: "not_found" }, outcome: "not_found" };
+}
+
 // Handles the env API's paths and returns true; false for any other path.
 export async function envApi(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean> {
   const path = url.pathname;
@@ -190,67 +235,46 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
   const route = routeOf(parts);
   const method = route === ":vault/:environment/imports" ? "POST" : "GET";
   let outcome = "ok";
+  const challenge = () => {
+    // RFC 6750: no error code when no credentials were sent.
+    const value = `Bearer realm="reliquary", resource_metadata="${issuer()}${PRM_PATH}"${req.headers.authorization ? ', error="invalid_token"' : ""}`;
+    send(res, 401, { error: "invalid_token" }, { "www-authenticate": value });
+    outcome = "invalid_token";
+  };
   try {
     const bearer = TOKEN.exec(req.headers.authorization ?? "");
-    const grant = bearer ? await resolve(bearer[1]) : null;
-    if (!grant) {
-      // RFC 6750: no error code when no credentials were sent.
-      const challenge = `Bearer realm="reliquary", resource_metadata="${issuer()}${PRM_PATH}"${req.headers.authorization ? ', error="invalid_token"' : ""}`;
-      send(res, 401, { error: "invalid_token" }, { "www-authenticate": challenge });
-      outcome = "invalid_token";
-    } else if (req.method !== method) {
-      send(res, 405, { error: "method_not_allowed" }, { allow: method });
-      outcome = "method";
-    } else if (route === "vaults") {
-      const rows = await asGrant(grant, async (c) =>
-        (await c.query("select vault_id, vault_name, role, environments from public.env_vaults()")).rows,
-      );
-      send(res, 200, { vaults: rows.map((r) => ({ id: r.vault_id, name: r.vault_name, role: r.role, environments: r.environments })) });
-    } else if (route === ":vault/:environment" && UUID.test(parts[0]) && ENVIRONMENT.test(parts[1])) {
-      const [vaultId, environment] = parts;
-      if (!variablesConfigured()) {
-        send(res, 503, { error: "not_configured" });
-        outcome = "not_configured";
-      } else {
-        const r = await asGrant(grant, async (c) =>
-          (await c.query("select public.read_variables($1, $2) as r", [vaultId, environment])).rows[0].r,
-        );
-        if (!r.ok) {
-          send(res, STATUS[r.error] ?? 403, { error: r.error });
-          outcome = r.error;
-        } else {
-          const variables: Record<string, string> = {};
-          try {
-            for (const v of r.variables) variables[v.name] = open(fromDb(v), { vaultId, environment, name: v.name });
-            send(res, 200, { vault: vaultId, environment, variables });
-          } catch (err) {
-            if (!(err instanceof SecretsError)) throw err;
-            send(res, 500, { error: "decrypt_failed" });
-            outcome = "decrypt_failed";
-          }
+    if (method === "GET" && req.method === "GET") {
+      // One checkout: the token is resolved inside the route's transaction.
+      const out = bearer ? await asCliToken(hashOf(bearer[1]), envResource(), (c) => getRoute(c, route, parts)) : null;
+      if (!out) challenge();
+      else if ("read" in out.result) {
+        // Decrypted after the transaction has committed (the read is logged).
+        const { vaultId, environment, read } = out.result;
+        const variables: Record<string, string> = {};
+        try {
+          for (const v of read.variables) variables[v.name] = open(fromDb(v), { vaultId, environment, name: v.name });
+          send(res, 200, { vault: vaultId, environment, variables });
+        } catch (err) {
+          if (!(err instanceof SecretsError)) throw err;
+          send(res, 500, { error: "decrypt_failed" });
+          outcome = "decrypt_failed";
         }
-      }
-    } else if (route === ":vault/:environment/imports" && UUID.test(parts[0]) && ENVIRONMENT.test(parts[1])) {
-      outcome = await push(req, res, grant, parts[0], parts[1]);
-    } else if (route === "imports/:id" && UUID.test(parts[1])) {
-      const r = await asGrant(grant, async (c) => (await c.query("select public.env_import_status($1) as r", [parts[1]])).rows[0].r);
-      if (!r.ok) {
-        send(res, STATUS[r.error] ?? 404, { error: r.error });
-        outcome = r.error;
       } else {
-        send(res, 200, {
-          import: r.id,
-          status: r.status,
-          environments: r.environments,
-          names: r.names,
-          expires_at: r.expires_at,
-          decided_at: r.decided_at,
-        });
-        outcome = r.status;
+        send(res, out.result.status, out.result.body);
+        outcome = out.result.outcome;
       }
     } else {
-      send(res, 404, { error: "not_found" });
-      outcome = "not_found";
+      const grant = bearer ? await resolve(bearer[1]) : null;
+      if (!grant) challenge();
+      else if (req.method !== method) {
+        send(res, 405, { error: "method_not_allowed" }, { allow: method });
+        outcome = "method";
+      } else if (route === ":vault/:environment/imports" && UUID.test(parts[0]) && ENVIRONMENT.test(parts[1])) {
+        outcome = await push(req, res, grant, parts[0], parts[1]);
+      } else {
+        send(res, 404, { error: "not_found" });
+        outcome = "not_found";
+      }
     }
   } catch (err) {
     if (err instanceof BadRequest) {

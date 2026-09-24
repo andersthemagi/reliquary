@@ -43,6 +43,16 @@ import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8790);
 const MAX_BODY = 2 * 1024 * 1024;
+// Forms that carry a file's text (write or propose a file, edit and
+// approve, revise a proposal) may be bigger: the database takes 1 MiB of
+// text, and a browser percent-encodes each non-ASCII UTF-8 byte as three
+// characters, so 1 MiB of non-Latin text is about 3 MiB of form. 3 MiB plus
+// 64 KiB for the other fields (a 4000-character reason is at most 48 KB
+// encoded). Every other form keeps 2 MB. Vercel's own ceiling for a
+// function's request body is 4.5 MB.
+const MAX_FILE_FORM = 3 * 1024 * 1024 + 64 * 1024;
+const FILE_FORM = /^\/v\/[^/]+\/(file|proposals\/[^/]+\/(edit|revise))$/;
+const bodyLimit = (pathname: string): number => (FILE_FORM.test(pathname) ? MAX_FILE_FORM : MAX_BODY);
 const MCP_URL = process.env.MCP_PUBLIC_URL ?? "http://127.0.0.1:8787/mcp";
 
 let PUBLIC_ORIGIN = "";
@@ -112,13 +122,13 @@ function staticCache(url: URL): string {
 
 const cookie = readCookie;
 
-function readForm(req: http.IncomingMessage): Promise<URLSearchParams> {
+function readForm(req: http.IncomingMessage, limit = MAX_BODY): Promise<URLSearchParams> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => {
       size += c.length;
-      if (size > MAX_BODY) {
+      if (size > limit) {
         // Stop reading; the 413 goes out with `connection: close`, which
         // ends the upload.
         req.removeAllListeners("data");
@@ -333,9 +343,10 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       try {
-        form = await readForm(req);
+        form = await readForm(req, bodyLimit(url.pathname));
       } catch {
-        send(res, { status: 413, html: notice("Too large", "That form is over 2 MB, so nothing was saved. Go back and send less.", theme) }, { connection: "close" }, auth.cookies);
+        const cap = bodyLimit(url.pathname) === MAX_BODY ? "2 MB" : "3 MB";
+        send(res, { status: 413, html: notice("Too large", `That form is over ${cap}, so nothing was saved. Go back and send less.`, theme) }, { connection: "close" }, auth.cookies);
         console.info(`POST ${url.pathname} 413`);
         return;
       }

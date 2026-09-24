@@ -157,8 +157,9 @@ test("limits: a Referer from another site doesn't choose where the refusal goes"
 });
 
 test("limits: a form over 2 MB is answered 413, not an error page", async () => {
+  // Not a file form (those take up to about 3 MB: efficiency_3.test.mjs).
   const token = await csrf(`${V}/new`);
-  const r = await post(`${V}/file`, { csrf: token, action: "write", path: "notes/too-big.md", content: "x".repeat(2 * 1024 * 1024 + 1) });
+  const r = await post(`${V}/rules`, { csrf: token, path: "notes/", policy: "canon", note: "x".repeat(2 * 1024 * 1024 + 1) });
   assert.equal(r.status, 413);
   assert.match(await r.text(), /over 2 MB, so nothing was saved/);
 });
