@@ -51,7 +51,10 @@ function message(err: unknown): string {
 const who = (ctx: Ctx, id: string | null, agent: string | null) =>
   `${id === ctx.userId ? "you" : id ? id.slice(0, 8) : "system"}${agent ? ` via ${agent}` : ""}`;
 
-const tag = (policy: string) => html`<span class="tag ${policy}">${policy}</span>`;
+// Canon and open as badges: a filled or hollow diamond (drawn in CSS) and
+// the word, so the policy never rests on the mark alone.
+const tag = (policy: string) =>
+  html`<span class="badge policy ${policy}">${policy === "canon" ? "Canon" : policy === "open" ? "Open" : policy}</span>`;
 const canWrite = (v: Vault) => v.role === "owner" || v.role === "editor";
 
 const q = encodeURIComponent;
@@ -152,7 +155,7 @@ const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
   return html`<li>
     <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${verb} ${p.path}</a>
       <span class="muted small"> · ${showVault ? `${p.vault} · ` : ""}by ${who(ctx, p.proposed_by, p.agent)} · ${ago(p.created_at)}</span></span>
-    <span class="row-end small">${r.length ? html`<span class="risk-count">${r.length} to check</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
+    <span class="row-end small">${r.length ? html`<span class="badge attention risk-count">${r.length} to check</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
       snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : ""
     }</span>
   </li>`;
@@ -209,7 +212,7 @@ async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?
 
   const link = (section: Section, href: string, label: Raw | string) =>
     html`<a href="${href}"${current.section === section ? raw(' aria-current="page"') : ""}>${label}</a>`;
-  const tree = files.length ? renderNode(root, "") : html`<p class="muted small">No files yet.</p>`;
+  const tree = files.length ? renderNode(root, "") : html`<p class="muted small tree-empty">No files yet.</p>`;
   return html`<div class="vault">
     <aside class="side">
       <a class="side-title" href="${vaultPath(v.id)}">${v.name}</a>
@@ -398,8 +401,8 @@ async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Reply> {
         title: dir ? dir.slice(0, -1).split("/").pop()! : v.name,
         path: !!dir,
         meta: rule ? ruleLine(ctx, id, rule) : undefined,
-        actions: html`${canWrite(v) ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : ""}
-          ${!dir ? html`<a class="button" href="/connect">Connect an agent</a>` : ""}`,
+        actions: html`${!dir ? html`<a class="button" href="/connect">Connect an agent</a>` : ""}
+          ${canWrite(v) ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : ""}`,
       })}
       ${children.length === 0
         ? html`<div class="empty"><strong>This vault is empty.</strong> ${canWrite(v) ? "Create the first file, or connect an agent and ask it to write one." : "Nothing has been shared here yet."}</div>`
@@ -461,7 +464,7 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
             : "",
       })}
       ${pending.length
-        ? html`<p class="flash">${pending.length === 1
+        ? html`<p class="callout info">${pending.length === 1
             ? html`There’s an open proposal for this file. <a href="${proposalPath(id, pending[0].id)}">Review it</a>`
             : html`There are ${pending.length} open proposals for this file. <a href="${vaultPath(id, "/proposals")}">Review them</a>`}</p>`
         : ""}
@@ -469,9 +472,9 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
       ${f.erased_at
         ? html`<div class="empty">This file’s content was erased.</div>`
         : tab === "preview"
-          ? html`<div class="prose entry facet">${raw(renderMarkdown(f.body ?? ""))}</div>`
+          ? html`<div class="prose entry">${raw(renderMarkdown(f.body ?? ""))}</div>`
           : tab === "source"
-            ? html`<div class="file facet">${f.body}</div>`
+            ? html`<div class="file">${f.body}</div>`
             : history}`;
     return { v, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
   });
@@ -499,8 +502,8 @@ async function editView(ctx: Ctx, id: string): Promise<Reply> {
         crumb: crumbs(id, v, path, false),
         title: `${canon ? "Propose a change to" : "Edit"} ${path.split("/").pop()}`,
         path: true,
-        actions: html`<button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>
-          <a class="button quiet" href="${filePath(id, path)}">Cancel</a>`,
+        actions: html`<a class="button quiet" href="${filePath(id, path)}">Cancel</a>
+          <button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>`,
       })}
       ${canon ? html`<p class="lede">This file is canon, so your edit becomes a proposal that people approve.</p>` : ""}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="edit-file">
@@ -515,7 +518,7 @@ async function editView(ctx: Ctx, id: string): Promise<Reply> {
           <a class="button quiet" href="${filePath(id, path)}">Cancel</a></div>
       </form>
       <h2>Delete</h2>
-      <form method="post" action="${vaultPath(id, "/file")}">
+      <form method="post" action="${vaultPath(id, "/file")}" class="danger-zone">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="path" value="${path}">
         <input type="hidden" name="action" value="${canon ? "propose-delete" : "delete"}">
@@ -538,8 +541,8 @@ async function newFile(ctx: Ctx, id: string): Promise<Reply> {
       ${pageHeader({
         crumb: dir ? crumbs(id, v, dir, true) : undefined,
         title: "New file",
-        actions: html`<button class="primary" form="new-file">Create file</button>
-          <a class="button quiet" href="${treePath(id, dir)}">Cancel</a>`,
+        actions: html`<a class="button quiet" href="${treePath(id, dir)}">Cancel</a>
+          <button class="primary" form="new-file">Create file</button>`,
       })}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="new-file">
         ${csrfField(ctx.csrf)}
@@ -720,19 +723,18 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
                 <button name="decision" value="request_changes">Request changes</button>`
               : ""}
             <button class="danger" name="decision" value="reject">Reject</button>
-            ${editable ? html`<a class="button quiet" href="${proposalPath(id, pid, "/edit")}">Edit, then approve</a>` : ""}
           </div>
         </form>`
       : "";
     const status =
       p.status === "stale" && canWrite(v) && p.kind === "write" && p.body !== null
-        ? html`<div class="panel"><p>The file changed after this was proposed, so it wasn’t applied. You can propose the same text again against the current version; the diff will show what it would change now.</p>
+        ? html`<div class="callout attention"><p>The file changed after this was proposed, so it wasn’t applied. You can propose the same text again against the current version; the diff will show what it would change now.</p>
             <form method="post" action="${proposalPath(id, pid, "/repropose")}">${csrfField(ctx.csrf)}
               <button class="primary">Propose again</button></form></div>`
         : p.status === "changes_requested"
-          ? html`<p class="muted">Waiting for the proposer to revise.${rejectable ? " You can still edit it yourself, or reject it." : ""}</p>`
+          ? html`<p class="callout neutral">Waiting for the proposer to revise.${rejectable ? " You can still edit it yourself, or reject it." : ""}</p>`
           : p.status === "open" && mine
-            ? html`<p class="muted">You’ve decided on this revision. It needs more approvals before it applies.</p>`
+            ? html`<p class="callout neutral">You’ve decided on this revision. It needs more approvals before it applies.</p>`
             : "";
 
     const body = html`
@@ -740,15 +742,17 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
         crumb: html`<p class="crumb"><a href="${vaultPath(id, "/proposals")}">Proposals</a></p>`,
         title: `${verb} ${p.path}`,
         path: true,
-        meta: html`<p class="meta"><span class="state ${p.status}">${STATE_TEXT[p.status]}</span><span>Revision ${p.revision}</span>
+        badge: html`<span class="badge state ${p.status}">${STATE_TEXT[p.status]}</span>`,
+        meta: html`<p class="meta"><span>Revision ${p.revision}</span>
           <span>By ${who(ctx, p.proposed_by, p.agent)}</span><span>${when(p.created_at)}</span></p>`,
+        actions: editable && rejectable ? html`<a class="button" href="${proposalPath(id, pid, "/edit")}">Edit, then approve</a>` : "",
       })}
       <div class="review-top">
         ${p.proposed_by === ctx.userId && p.agent
-          ? html`<p class="note">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
+          ? html`<p class="callout info">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
           : ""}
         ${feedback}
-        ${flags.length ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map((f) => html`<li>${f}</li>`)}</ul>` : ""}
+        ${flags.length ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map((f) => html`<li class="badge attention">${f}</li>`)}</ul>` : ""}
         ${status}${controls}${snoozeForm}
       </div>
 
@@ -794,8 +798,8 @@ async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<Reply> {
         crumb: html`<p class="crumb"><a href="${proposalPath(id, pid)}">Back to the proposal</a></p>`,
         title: "Edit, then approve",
         path: true,
-        actions: html`<button class="primary" form="edit-approve">Save edit and approve</button>
-          <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>`,
+        actions: html`<a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>
+          <button class="primary" form="edit-approve">Save edit and approve</button>`,
       })}
       <p class="lede">Change the proposed text of <code>${p.path}</code>. Saving records your edit as a new revision and approves it. If this path needs more than one approval, the others approve your edited version.</p>
       <form method="post" action="${proposalPath(id, pid, "/edit")}" class="panel" id="edit-approve">
@@ -1039,7 +1043,7 @@ function connect(ctx: Ctx): Reply {
     html`${pageHeader({ title: "Connect an agent", actions: html`<a class="button primary" href="/tokens">Create a token</a>` })}
     <p class="lede">Any MCP client can use your vaults through one URL. Each agent gets its own <a href="/tokens">token</a>, which acts as you but can never approve, change rules or manage members.</p>
     <p class="endpoint"><span class="muted small">MCP URL</span><code>${url}</code></p>
-    <p class="note">Keep tokens out of config files and chats: anything an agent can read, it can leak. Every setup below reads the token from a file, an environment variable or a password prompt.</p>
+    <p class="callout info">Keep tokens out of config files and chats: anything an agent can read, it can leak. Every setup below reads the token from a file, an environment variable or a password prompt.</p>
     <nav class="tabs" aria-label="Clients"><a href="#claude-code">Claude Code</a><a href="#cursor">Cursor</a><a href="#vscode">VS Code</a><a href="#hermes">Hermes and others</a><a href="#chat">Claude.ai and ChatGPT</a></nav>
 
     <section id="claude-code"><h2>Claude Code (app or CLI)</h2>
@@ -1112,7 +1116,7 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
     html`${pageHeader({ title: "Tokens", actions: html`<button class="primary" form="new-token">Create token</button>` })}
     <p class="lede">A token lets one agent act as you over MCP, in the vaults you choose. A read-only agent can read, search and follow changes. A read-write agent can also write open files and propose changes. No agent can approve, change rules or manage members. <a href="/connect">How to connect an agent</a></p>
     ${fresh
-      ? html`<div class="reveal facet" role="status"><strong>${fresh.name}</strong>
+      ? html`<div class="callout attention reveal" role="status"><strong>${fresh.name}</strong>
           <p class="muted small">Copy it now. It won’t be shown again. Put it in your agent’s settings, never in a chat.</p>
           <p class="secret">${fresh.token}</p></div>`
       : ""}

@@ -62,12 +62,15 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>${title} · Reliquary</title>
-<link rel="preload" href="/fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/inter-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/style.css?v=${styleVersion}">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top">
-  <a class="wordmark" href="/">Reliquary</a>
+  <div class="top-inner">
+  <a class="wordmark" href="/"><span class="logo" aria-hidden="true"></span>Reliquary</a>
   ${opts.user
     ? html`<nav aria-label="Main">
     <a href="/"${current("home", "vaults")}>Vaults</a>
@@ -75,22 +78,28 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
     <a href="/activity"${current("activity")}>Activity</a>
     <a href="/connect"${current("connect")}>Connect</a>
     <a href="/tokens"${current("tokens")}>Tokens</a>
-  </nav>`
+  </nav>
+  ${opts.csrf
+    ? html`<details class="account menu-wrap">
+    <summary class="button quiet">Account</summary>
+    <div class="menu">
+      <p class="menu-meta">Signed in as <strong>${opts.user.slice(0, 8)}</strong> (local)</p>
+      <form method="post" action="/theme" class="theme" aria-label="Theme">
+        ${csrfField(opts.csrf)}<input type="hidden" name="back" value="${opts.path ?? "/"}">
+        <span class="menu-label">Theme</span>
+        <span class="segmented">${themeButton("auto", "Auto")}${themeButton("light", "Light")}${themeButton("dark", "Dark")}</span>
+      </form>
+    </div>
+  </details>`
+    : ""}`
     : ""}
+  </div>
 </header>
-<main>
-${opts.flash ? html`<p class="flash" role="status">${opts.flash}</p>` : ""}
+<main id="main">
+${opts.flash ? html`<p class="callout info flash" role="status">${opts.flash}</p>` : ""}
 ${body}
 </main>
-${opts.user && opts.csrf
-    ? html`<footer>
-  <span>Red Mage · Reliquary</span>
-  <form method="post" action="/theme" class="theme">
-    ${csrfField(opts.csrf)}<input type="hidden" name="back" value="${opts.path ?? "/"}">
-    <span>Theme</span>${themeButton("auto", "Auto")}${themeButton("light", "Light")}${themeButton("dark", "Dark")}
-  </form>
-</footer>`
-    : ""}
+${opts.user ? html`<footer><span>Reliquary</span><span>Shared context for people and their agents</span></footer>` : ""}
 </body>
 </html>`.html;
 }
@@ -105,20 +114,26 @@ export function when(d: Date | null | undefined): string {
   return d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
 }
 
-// The top of a page: breadcrumb, title, a meta line, and the page's main
-// actions, right-aligned on wide screens and wrapping below on narrow ones.
-// A page's primary action lives here, never only at the bottom. A submit
-// button for a form further down uses the form="" attribute (no script).
+// The top of a page: breadcrumb, then the title with an optional status
+// badge and the page's main actions (right-aligned on wide screens, wrapping
+// below the title on narrow ones), then a meta line. A page's primary action
+// lives here, never only at the bottom. A submit button for a form further
+// down uses the form="" attribute (no script). At most one primary, last.
 export function pageHeader(o: {
   title: Raw | string;
   crumb?: Raw;
+  badge?: Raw;
   meta?: Raw;
   actions?: Raw | "";
-  path?: boolean; // the title is a file path or name, not a word
+  path?: boolean; // the title is a file path or name: long, may need to break
 }): Raw {
   return html`<div class="page-head">
-    <div class="page-head-text">${o.crumb ?? ""}<h1${o.path ? raw(' class="path"') : ""}>${o.title}</h1>${o.meta ?? ""}</div>
-    ${o.actions && o.actions.html.trim() ? html`<div class="page-actions">${o.actions}</div>` : ""}
+    ${o.crumb ?? ""}
+    <div class="page-title-row">
+      <div class="page-title"><h1${o.path ? raw(' class="path"') : ""}>${o.title}</h1>${o.badge ?? ""}</div>
+      ${o.actions && o.actions.html.trim() ? html`<div class="page-actions">${o.actions}</div>` : ""}
+    </div>
+    ${o.meta ?? ""}
   </div>`;
 }
 

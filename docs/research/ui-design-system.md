@@ -1,7 +1,8 @@
 # A design system for the web UI
 
-2026-09-24 · Status: RESEARCH, proposal not yet built · Companion to
-[ux-patterns.md](ux-patterns.md) (structure, already decided)
+2026-09-24 · Status: BUILT 2026-09-24 (steps 1 to 9 and 11; step 10, form
+errors, still to do; the "Review changes" popover superseded, see "As built")
+· Companion to [ux-patterns.md](ux-patterns.md) (structure, already decided)
 
 The owner's brief: the current look suits Red Mage, but Reliquary is a
 separate product. It should be friendly and conventional for anyone, not
@@ -427,6 +428,38 @@ not classes, so most steps need no test changes; check before merging.
 | 9 | Sidebar restyle and diamond marks in the tree; mobile `<details>` as a button | `pages.ts` `vaultShell`, `style.css` |
 | 10 | Forms: error summary plus inline errors, "(optional)" labels. Needs routes to return the form with values instead of redirecting with a flash, so it is its own change | `pages.ts`, `server.ts` |
 | 11 | Docs: update ux-patterns.md "Where we are", `web/README.md`, and AGENTS.md's done list | docs |
+
+### As built (2026-09-24)
+
+Where the build differs from the plan above, and why:
+
+- **No "Review changes" popover.** Superseded by the owner's decision in
+  ux-patterns.md ("Controls at the top"): the decision form (note, Approve,
+  Request changes, Reject) stays visible under the header without opening
+  anything, as a compact box; "Edit, then approve" is the header's
+  secondary action. No `?review=1`.
+- **Nav order stays Vaults, Review, Activity, Connect, Tokens**, as
+  ux-patterns.md and the tests have it, not Review first.
+- **Measure is 60ch, not 72ch.** In Inter, `ch` (the width of a zero) is
+  wider than an average letter; 60ch is about 75 characters a line, which
+  the Impeccable detector and the usual 65 to 75 guidance want.
+- **Page titles stay 24px on phones** instead of dropping to 20px: with
+  `h2` at 18px, 20px left no clear step between them.
+- **Unified diff rows are 24px** (18px lines plus 3px above and below), so
+  the tint doesn't sit flush on the text.
+- **Delete stays on the edit page**, in a bordered danger section, rather
+  than moving to a More menu with a confirm page: that is a new route, left
+  for the forms change (step 10).
+- **Font files:** `@fontsource-variable/inter` 5.3.0, latin subset. Upright
+  is the `opsz` + `wght` file (73 KB), so titles get Inter's display cut
+  automatically; italic is `wght` only (52 KB, loaded only when used).
+- **Favicon**: the vermilion diamond, `public/favicon.svg`.
+- **Checks:** `web/test/contrast.test.mjs` parses the three token blocks,
+  asserts every pair in the tables above (and the diff and callout pairs
+  the CSS uses) in both themes, and that the explicit dark theme matches the
+  automatic one. The detector is clean on the main pages in light, dark and
+  at 390px, except `overused-font` for Inter, which this design chooses on
+  purpose (waived in `style.css`).
 
 ### What to test after each step
 

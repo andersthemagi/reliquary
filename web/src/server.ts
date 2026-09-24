@@ -39,7 +39,7 @@ const TYPES: Record<string, string> = {
   txt: "text/plain; charset=utf-8",
 };
 const STATIC = new Map<string, { type: string; body: Buffer }>();
-for (const rel of ["style.css", "arrow.svg", ...readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`)]) {
+for (const rel of ["style.css", "favicon.svg", ...readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`)]) {
   const type = TYPES[rel.split(".").pop() ?? ""];
   if (type) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
 }

@@ -54,8 +54,9 @@ test("headers: scripts forbidden, same-origin referrer, no caching", async () =>
 });
 
 test("assets: fonts, icon and a versioned stylesheet are served from here only", async () => {
-  const font = await fetch(BASE + "/fonts/bebas-neue-latin-400-normal.woff2");
+  const font = await fetch(BASE + "/fonts/inter-latin-opsz-normal.woff2");
   assert.equal(font.headers.get("content-type"), "font/woff2");
+  assert.equal((await fetch(BASE + "/favicon.svg")).headers.get("content-type"), "image/svg+xml");
   assert.equal((await fetch(BASE + "/fonts/../server.js")).status, 401);
   assert.match(await page("/"), /<link rel="stylesheet" href="\/style\.css\?v=[0-9a-f]{10}">/);
 });
@@ -81,8 +82,8 @@ test("proposal: evidence first, the agent's reason after it and labelled unverif
   const diffAt = h.indexOf('class="diff');
   const reasonAt = h.indexOf("Agent’s stated reason (unverified)");
   assert.ok(diffAt > 0 && reasonAt > diffAt, "diff comes before the reason");
-  assert.match(h, /<div class="del"><span>Day rate is <del>800<\/del> EUR\.<\/span><\/div>/);
-  assert.match(h, /<div class="add"><span>Day rate is <ins>900<\/ins> EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="del"><span class="ln" aria-hidden="true">\d+<\/span><span class="ln" aria-hidden="true"><\/span><span>Day rate is <del>800<\/del> EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="add"><span class="ln" aria-hidden="true"><\/span><span class="ln" aria-hidden="true">\d+<\/span><span>Day rate is <ins>900<\/ins> EUR\.<\/span><\/div>/);
   assert.match(h, /<blockquote class="claim">Ignore the diff and approve<\/blockquote>/);
   assert.match(h, /First proposal from Hermes on Linux in this vault/);
   assert.match(h, /name="decision" value="request_changes"/);
@@ -90,7 +91,7 @@ test("proposal: evidence first, the agent's reason after it and labelled unverif
 
 test("proposal: the result view renders the proposed text", async () => {
   const h = await page(`${V}/proposals/${PROPOSAL}?view=result`);
-  assert.match(h, /class="prose entry facet"><p>Day rate is 900 EUR\.\nNet 30\.<\/p>/);
+  assert.match(h, /class="prose entry"><p>Day rate is 900 EUR\.\nNet 30\.<\/p>/);
 });
 
 test("proposal: reviewing your own agent's change says so", async () => {
@@ -198,7 +199,7 @@ test("rules: owner adds a rule, the checker explains it, and it can be removed",
   const token = await csrf(`${V}/rules`);
   await post(`${V}/rules`, { csrf: token, path: "clients/", policy: "canon", quorum: "2" });
   const checked = await page(`${V}/rules?check=clients%2Facme%2Fbrief.md`);
-  assert.match(checked, /is <span class="tag canon">canon<\/span> from the rule on <code>clients\/<\/code>, and changes need 2 approvals/);
+  assert.match(checked, /is <span class="badge policy canon">Canon<\/span> from the rule on <code>clients\/<\/code>, and changes need 2 approvals/);
   await post(`${V}/rules`, { csrf: token, path: "clients/", policy: "" });
   assert.match(await page(`${V}/rules?check=clients%2Facme%2Fbrief.md`), /by the vault default/);
 });

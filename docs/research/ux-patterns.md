@@ -8,8 +8,9 @@ what that means for our screens. Two research passes, sources checked
 
 ## Where we are
 
-The visual layer is done (Red Mage, light and dark; Impeccable detector
-clean). The structure is a first pass:
+The visual layer follows [ui-design-system.md](ui-design-system.md)
+(conventional, neutral, Inter, light and dark; built 2026-09-24). Before
+phase 1 the structure was a first pass:
 
 - a flat file table;
 - one proposals list per vault with Approve / Reject;
