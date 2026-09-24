@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#1c1917"/>
+  <rect x="0" y="0" width="1200" height="8" fill="#e8393a"/>
+  <g transform="translate(133 142)">
+    <rect x="-26" y="-26" width="52" height="52" fill="#e8393a" transform="rotate(45)"/>
+  </g>
+  <text x="190" y="160" font-family="Inter" font-weight="700" font-size="56" fill="#fafaf9">Reliquary</text>
+  <text x="96" y="330" font-family="Inter" font-weight="700" font-size="72" fill="#fafaf9">Your agents propose.</text>
+  <text x="96" y="420" font-family="Inter" font-weight="700" font-size="72" fill="#e8393a">You approve.</text>
+  <text x="96" y="520" font-family="Inter" font-size="30" fill="#a8a29e">Shared context and credentials for people and their AI agents</text>
+  <text x="96" y="572" font-family="Inter" font-size="26" fill="#78716c">by Red Mage · reliquary.redmage.cc</text>
+</svg>

@@ -131,7 +131,11 @@ export function sitePage(o: { title: string; description: string; path: string; 
 <meta property="og:title" content="${fullTitle}">
 <meta property="og:description" content="${o.description}">
 <meta property="og:url" content="${url}">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="${siteOrigin}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Reliquary. Your agents propose, you approve.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/fonts/inter-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${styleHref()}">
