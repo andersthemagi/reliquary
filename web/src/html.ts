@@ -105,5 +105,22 @@ export function when(d: Date | null | undefined): string {
   return d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
 }
 
+// The top of a page: breadcrumb, title, a meta line, and the page's main
+// actions, right-aligned on wide screens and wrapping below on narrow ones.
+// A page's primary action lives here, never only at the bottom. A submit
+// button for a form further down uses the form="" attribute (no script).
+export function pageHeader(o: {
+  title: Raw | string;
+  crumb?: Raw;
+  meta?: Raw;
+  actions?: Raw | "";
+  path?: boolean; // the title is a file path or name, not a word
+}): Raw {
+  return html`<div class="page-head">
+    <div class="page-head-text">${o.crumb ?? ""}<h1${o.path ? raw(' class="path"') : ""}>${o.title}</h1>${o.meta ?? ""}</div>
+    ${o.actions && o.actions.html.trim() ? html`<div class="page-actions">${o.actions}</div>` : ""}
+  </div>`;
+}
+
 // Hidden field carrying the CSRF token for every form.
 export const csrfField = (token: string) => html`<input type="hidden" name="csrf" value="${token}">`;

@@ -552,3 +552,34 @@ table.activity .path-cell { overflow-wrap: anywhere; }
   form.filters { padding: 16px; }
   table.activity .nowrap { white-space: normal; }
 }
+
+/* page header and actions ---------------------------------------------------------------- */
+
+/* Title block on the left, the page's main actions on the right; the actions
+   wrap under the title on narrow screens. Controls live at the top of a
+   page, never only at the bottom (docs/research/ux-patterns.md). */
+.page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; margin: 0 0 16px; }
+.page-head-text { flex: 1 1 24rem; min-width: 0; }
+.page-head-text .meta { margin-bottom: 0; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-bottom: 4px; }
+.form-title { margin-top: 0; }
+
+/* Proposal page: feedback, risks, the decision and snooze above the diff. */
+.review-top { margin: 0 0 24px; max-width: 78ch; }
+.review-top > * + * { margin-top: 12px; }
+.review-top form.panel { margin-bottom: 0; }
+.review-top .snooze, .review-top .snoozed-note { margin-top: 12px; }
+.feedback h2 { margin: 0 0 6px; }
+.feedback p { margin: 0 0 6px; }
+textarea.note-field { min-height: 0; height: auto; }
+.decide label .hint { font-weight: 400; margin-left: 6px; }
+.decide .actions { margin-top: 12px; }
+
+/* Review list: per-row snooze, compact and on the row's right. */
+.rows .row-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; }
+.rows form.row-snooze { margin: 0; padding: 0; border: 0; gap: 6px; font-size: 0.8125rem; }
+.rows form.row-snooze button { padding: 4px 8px; }
+@media (max-width: 640px) {
+  .page-actions { width: 100%; }
+  .rows .row-end { justify-content: flex-start; }
+}

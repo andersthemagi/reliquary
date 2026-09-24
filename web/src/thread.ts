@@ -51,12 +51,70 @@ const LABEL: Record<string, string> = {
 const live = (status: string) => status === "open" || status === "changes_requested";
 
 // ---------------------------------------------------------------------------
-// The proposal page's discussion, below the decision section.
+// The top of a proposal page: the latest request for changes, so a reviewer
+// of a revised proposal reads it before deciding, and snooze. Both sit with
+// the decision controls, above the diff.
+
+export async function latestFeedback(c: pg.PoolClient, ctx: Ctx, p: { id: string; status: string; revision: number }): Promise<Raw> {
+  if (!live(p.status)) return html``;
+  const n = (
+    await c.query(
+      `select body, author, agent, revision, at from public.proposal_notes
+        where proposal_id = $1 and kind = 'request_changes' and erased_at is null
+        order by at desc limit 1`,
+      [p.id],
+    )
+  ).rows[0];
+  if (!n) return html``;
+  return html`<section class="feedback" aria-labelledby="feedback">
+    <h2 id="feedback">Latest requested changes</h2>
+    <p class="small muted">${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${ago(n.at)}${
+      p.revision > n.revision ? html` · <strong>revised since: this is revision ${p.revision}</strong>` : ""
+    }</p>
+    <blockquote class="claim">${n.body}</blockquote>
+  </section>`;
+}
+
+const snoozeButtons = html`<button name="for" value="day">For a day</button>
+      <button name="for" value="week">For a week</button>
+      <button name="for" value="change">Until it changes</button>`;
+
+export async function snoozeControl(
+  c: pg.PoolClient,
+  ctx: Ctx,
+  o: { vaultId: string; p: { id: string; status: string }; waitingOnMe: boolean },
+): Promise<Raw> {
+  const { vaultId: id, p } = o;
+  const snoozed = (await c.query(`select until from public.active_snoozes where proposal_id = $1 and user_id = $2`, [p.id, ctx.userId]))
+    .rows[0];
+  if (snoozed)
+    return html`<form method="post" action="${proposalPath(id, p.id, "/unsnooze")}" class="snoozed-note">
+        ${csrfField(ctx.csrf)}<input type="hidden" name="back" value="proposal">
+        <span>Snoozed in your Review ${snoozed.until ? html`until ${when(snoozed.until)}, or ` : ""}until it changes.</span>
+        <button class="quiet">Unsnooze</button>
+      </form>`;
+  if (!o.waitingOnMe || !live(p.status)) return html``;
+  return html`<form method="post" action="${proposalPath(id, p.id, "/snooze")}" class="snooze">
+      ${csrfField(ctx.csrf)}
+      <span>Not now? Hide it from your Review</span>
+      ${snoozeButtons}
+      <p class="hint">Only you see this. A new revision or someone else’s comment brings it back.</p>
+    </form>`;
+}
+
+// Snooze from a row of the Review list; the handler redirects to /review.
+export const rowSnooze = (ctx: Ctx, vaultId: string, pid: string, label: string) =>
+  html`<form method="post" action="${proposalPath(vaultId, pid, "/snooze")}" class="snooze row-snooze" aria-label="Snooze ${label}">
+    ${csrfField(ctx.csrf)}<span>Snooze</span>${snoozeButtons}
+  </form>`;
+
+// ---------------------------------------------------------------------------
+// The proposal page's discussion, at the end of the page.
 
 export async function threadSection(
   c: pg.PoolClient,
   ctx: Ctx,
-  o: { vaultId: string; p: { id: string; status: string }; canWrite: boolean; waitingOnMe: boolean },
+  o: { vaultId: string; p: { id: string; status: string }; canWrite: boolean },
 ): Promise<Raw> {
   const { vaultId: id, p } = o;
   const entries = (
@@ -70,25 +128,6 @@ export async function threadSection(
       [p.id],
     )
   ).rows;
-  const snoozed = (await c.query(`select until from public.active_snoozes where proposal_id = $1 and user_id = $2`, [p.id, ctx.userId]))
-    .rows[0];
-
-  const snooze = snoozed
-    ? html`<form method="post" action="${proposalPath(id, p.id, "/unsnooze")}" class="snoozed-note">
-        ${csrfField(ctx.csrf)}<input type="hidden" name="back" value="proposal">
-        <span>Snoozed in your Review ${snoozed.until ? html`until ${when(snoozed.until)}, or ` : ""}until it changes.</span>
-        <button class="quiet">Unsnooze</button>
-      </form>`
-    : o.waitingOnMe && live(p.status)
-      ? html`<form method="post" action="${proposalPath(id, p.id, "/snooze")}" class="snooze">
-          ${csrfField(ctx.csrf)}
-          <span>Not now? Hide it from your Review</span>
-          <button name="for" value="day">For a day</button>
-          <button name="for" value="week">For a week</button>
-          <button name="for" value="change">Until it changes</button>
-          <p class="hint">Only you see this. A new revision or someone else’s comment brings it back.</p>
-        </form>`
-      : "";
 
   const timeline = entries.length
     ? html`<ol class="notes thread">${entries.map(
@@ -111,7 +150,7 @@ export async function threadSection(
         </form>`
       : html`<p class="muted small">Viewers can read the discussion but not add to it.</p>`;
 
-  return html`${snooze}<section class="discussion" aria-labelledby="discussion"><h2 id="discussion">Discussion</h2>${timeline}${form}</section>`;
+  return html`<section class="discussion" aria-labelledby="discussion"><h2 id="discussion">Discussion</h2>${timeline}${form}</section>`;
 }
 
 // ---------------------------------------------------------------------------

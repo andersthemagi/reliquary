@@ -6,9 +6,20 @@ import type pg from "pg";
 import { asPerson } from "./db.js";
 import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
-import { csrfField, html, page, raw, when, type Nav, type Raw, type Theme } from "./html.js";
+import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
-import { NOT_SNOOZED_SQL, postComment, snooze, snoozedList, snoozedSection, threadSection, unsnooze } from "./thread.js";
+import {
+  latestFeedback,
+  NOT_SNOOZED_SQL,
+  postComment,
+  rowSnooze,
+  snooze,
+  snoozeControl,
+  snoozedList,
+  snoozedSection,
+  threadSection,
+  unsnooze,
+} from "./thread.js";
 
 export type Ctx = {
   userId: string;
@@ -135,13 +146,15 @@ function risks(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const reviewRow = (ctx: Ctx, p: any, showVault = false) => {
+const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
   const r = risks(p);
   const verb = p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
   return html`<li>
     <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${verb} ${p.path}</a>
       <span class="muted small"> · ${showVault ? `${p.vault} · ` : ""}by ${who(ctx, p.proposed_by, p.agent)} · ${ago(p.created_at)}</span></span>
-    <span class="small">${r.length ? html`<span class="risk-count">${r.length} to check</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span></span>
+    <span class="row-end small">${r.length ? html`<span class="risk-count">${r.length} to check</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
+      snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : ""
+    }</span>
   </li>`;
 };
 
@@ -284,7 +297,10 @@ async function home(ctx: Ctx): Promise<Reply> {
   return render(
     ctx,
     "Home",
-    html`<h1>Reliquary</h1>
+    html`${pageHeader({
+      title: "Reliquary",
+      actions: (ctx.reviewCount ?? 0) > 0 ? html`<a class="button primary" href="/review">Review ${ctx.reviewCount} waiting</a>` : "",
+    })}
     <p class="lede">Shared context your agents read and propose to. Changes to canon files wait for your approval.</p>
     <h2>Needs your review</h2>
     ${waiting.length
@@ -329,11 +345,13 @@ async function review(ctx: Ctx): Promise<Reply> {
   return render(
     ctx,
     "Review",
-    html`<h1>Review</h1>
-    <p class="lede">Every change waiting on your approval, across your vaults. Read the change itself before the reason.</p>
+    html`${pageHeader({ title: "Review" })}
+    <p class="lede">Every change waiting on your approval, across your vaults. Read the change itself before the reason. Not now? Snooze one: it comes back when its time is up or it changes.</p>
     ${waiting.length === 0
       ? html`<div class="empty"><strong>Nothing is waiting on you.</strong> When an agent proposes a change to a canon file, it shows up here.</div>`
-      : [...byVault.entries()].map(([name, items]) => html`<h2>${name}</h2><ul class="rows">${items.map((p) => reviewRow(ctx, p))}</ul>`)}
+      : [...byVault.entries()].map(
+          ([name, items]) => html`<h2>${name}</h2><ul class="rows review-rows">${items.map((p) => reviewRow(ctx, p, false, true))}</ul>`,
+        )}
     ${revising.length
       ? html`<h2>Waiting on the proposer</h2>
         <p class="muted small">You asked for changes. These come back here when they’re revised.</p>
@@ -375,13 +393,14 @@ async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Reply> {
     }
     const readme = here.find((f) => /^readme\.md$/i.test(f.path.slice(dir.length)));
     const body = html`
-      ${dir ? crumbs(id, v, dir, true) : ""}
-      <h1${dir ? raw(' class="path"') : ""}>${dir ? dir.slice(0, -1).split("/").pop() : v.name}</h1>
-      ${rule ? ruleLine(ctx, id, rule) : ""}
-      <div class="actions">
-        ${canWrite(v) ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : ""}
-        ${!dir ? html`<a class="button" href="/connect">Connect an agent</a>` : ""}
-      </div>
+      ${pageHeader({
+        crumb: dir ? crumbs(id, v, dir, true) : undefined,
+        title: dir ? dir.slice(0, -1).split("/").pop()! : v.name,
+        path: !!dir,
+        meta: rule ? ruleLine(ctx, id, rule) : undefined,
+        actions: html`${canWrite(v) ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : ""}
+          ${!dir ? html`<a class="button" href="/connect">Connect an agent</a>` : ""}`,
+      })}
       ${children.length === 0
         ? html`<div class="empty"><strong>This vault is empty.</strong> ${canWrite(v) ? "Create the first file, or connect an agent and ask it to write one." : "Nothing has been shared here yet."}</div>`
         : html`<div class="table-wrap"><table>
@@ -430,21 +449,23 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const tabLink = (name: string, label: string) =>
       html`<a href="${filePath(id, path, name === "preview" ? undefined : name)}"${tab === name ? raw(' aria-current="page"') : ""}>${label}</a>`;
     const body = html`
-      ${crumbs(id, v, path, false)}
-      <h1 class="path">${path.split("/").pop()}</h1>
-      ${ruleLine(ctx, id, rule)}
-      <p class="meta"><span>Last written by ${who(ctx, f.author, f.agent)}</span><span>${when(f.created_at)}</span></p>
+      ${pageHeader({
+        crumb: crumbs(id, v, path, false),
+        title: path.split("/").pop()!,
+        path: true,
+        meta: html`${ruleLine(ctx, id, rule)}
+          <p class="meta"><span>Last written by ${who(ctx, f.author, f.agent)}</span><span>${when(f.created_at)}</span></p>`,
+        actions:
+          canWrite(v) && !f.erased_at
+            ? html`<a class="button${canon ? "" : " primary"}" href="${vaultPath(id, `/edit?path=${q(path)}`)}">${canon ? "Propose a change" : "Edit"}</a>`
+            : "",
+      })}
       ${pending.length
         ? html`<p class="flash">${pending.length === 1
             ? html`There’s an open proposal for this file. <a href="${proposalPath(id, pending[0].id)}">Review it</a>`
             : html`There are ${pending.length} open proposals for this file. <a href="${vaultPath(id, "/proposals")}">Review them</a>`}</p>`
         : ""}
-      <div class="tabbar">
-        <nav class="tabs" aria-label="File view">${tabLink("preview", "Preview")}${tabLink("source", "Source")}${tabLink("history", "History")}</nav>
-        ${canWrite(v) && !f.erased_at
-          ? html`<a class="button${canon ? "" : " primary"}" href="${vaultPath(id, `/edit?path=${q(path)}`)}">${canon ? "Propose a change" : "Edit"}</a>`
-          : ""}
-      </div>
+      <nav class="tabs" aria-label="File view">${tabLink("preview", "Preview")}${tabLink("source", "Source")}${tabLink("history", "History")}</nav>
       ${f.erased_at
         ? html`<div class="empty">This file’s content was erased.</div>`
         : tab === "preview"
@@ -474,10 +495,15 @@ async function editView(ctx: Ctx, id: string): Promise<Reply> {
     if (!f) return null;
     const canon = f.policy === "canon";
     const body = html`
-      ${crumbs(id, v, path, false)}
-      <h1 class="path">${canon ? "Propose a change to" : "Edit"} ${path.split("/").pop()}</h1>
+      ${pageHeader({
+        crumb: crumbs(id, v, path, false),
+        title: `${canon ? "Propose a change to" : "Edit"} ${path.split("/").pop()}`,
+        path: true,
+        actions: html`<button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>
+          <a class="button quiet" href="${filePath(id, path)}">Cancel</a>`,
+      })}
       ${canon ? html`<p class="lede">This file is canon, so your edit becomes a proposal that people approve.</p>` : ""}
-      <form method="post" action="${vaultPath(id, "/file")}" class="panel">
+      <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="edit-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="path" value="${path}">
         <input type="hidden" name="action" value="${canon ? "propose" : "write"}">
@@ -509,9 +535,13 @@ async function newFile(ctx: Ctx, id: string): Promise<Reply> {
     const v = await vault(c, ctx, id);
     if (!v || !canWrite(v)) return null;
     const body = html`
-      ${dir ? crumbs(id, v, dir, true) : ""}
-      <h1>New file</h1>
-      <form method="post" action="${vaultPath(id, "/file")}" class="panel">
+      ${pageHeader({
+        crumb: dir ? crumbs(id, v, dir, true) : undefined,
+        title: "New file",
+        actions: html`<button class="primary" form="new-file">Create file</button>
+          <a class="button quiet" href="${treePath(id, dir)}">Cancel</a>`,
+      })}
+      <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="new-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="action" value="create">
         <label for="p">Path</label><input id="p" type="text" name="path" value="${dir}" placeholder="notes/standup.md" required>
@@ -613,7 +643,7 @@ async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
       stale: "No stale proposals. One goes stale when its file changes before it’s approved.",
     };
     const body = html`
-      <h1>Proposals</h1>
+      ${pageHeader({ title: "Proposals" })}
       <nav class="tabs" aria-label="Proposal status">${STATES.map(
         ([s, label]) => html`<a href="${vaultPath(id, `/proposals?status=${s}`)}"${s === status ? raw(' aria-current="page"') : ""}>${label}</a>`,
       )}</nav>
@@ -672,17 +702,55 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
     const decidable = canWrite(v) && p.status === "open" && !mine;
     const rejectable = canWrite(v) && (decidable || p.status === "changes_requested");
     const editable = canWrite(v) && (p.status === "open" || p.status === "changes_requested") && p.kind === "write" && p.body !== null;
-    const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: canWrite(v), waitingOnMe: decidable });
+    const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: canWrite(v) });
+    const feedback = await latestFeedback(c, ctx, p);
+    const snoozeForm = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
+
+    // The decision sits at the top, under the title, as on a GitHub pull
+    // request: the note, then the verdicts, all visible without opening
+    // anything. The diff follows immediately. (docs/research/ux-patterns.md)
+    const controls = rejectable
+      ? html`<form method="post" action="${proposalPath(id, pid, "/decide")}" class="panel decide" aria-label="Your review">
+          ${csrfField(ctx.csrf)}
+          <label for="note">Note <span class="hint">Required to request changes or reject. The proposer sees it.</span></label>
+          <textarea id="note" name="note" class="note-field" rows="2"></textarea>
+          <div class="actions">
+            ${decidable
+              ? html`<button class="primary" name="decision" value="approve">Approve</button>
+                <button name="decision" value="request_changes">Request changes</button>`
+              : ""}
+            <button class="danger" name="decision" value="reject">Reject</button>
+            ${editable ? html`<a class="button quiet" href="${proposalPath(id, pid, "/edit")}">Edit, then approve</a>` : ""}
+          </div>
+        </form>`
+      : "";
+    const status =
+      p.status === "stale" && canWrite(v) && p.kind === "write" && p.body !== null
+        ? html`<div class="panel"><p>The file changed after this was proposed, so it wasn’t applied. You can propose the same text again against the current version; the diff will show what it would change now.</p>
+            <form method="post" action="${proposalPath(id, pid, "/repropose")}">${csrfField(ctx.csrf)}
+              <button class="primary">Propose again</button></form></div>`
+        : p.status === "changes_requested"
+          ? html`<p class="muted">Waiting for the proposer to revise.${rejectable ? " You can still edit it yourself, or reject it." : ""}</p>`
+          : p.status === "open" && mine
+            ? html`<p class="muted">You’ve decided on this revision. It needs more approvals before it applies.</p>`
+            : "";
 
     const body = html`
-      <p class="crumb"><a href="${vaultPath(id, "/proposals")}">Proposals</a></p>
-      <h1 class="path">${verb} ${p.path}</h1>
-      <p class="meta"><span class="state ${p.status}">${STATE_TEXT[p.status]}</span><span>Revision ${p.revision}</span>
-        <span>By ${who(ctx, p.proposed_by, p.agent)}</span><span>${when(p.created_at)}</span></p>
-      ${p.proposed_by === ctx.userId && p.agent
-        ? html`<p class="note">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
-        : ""}
-      ${flags.length ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map((f) => html`<li>${f}</li>`)}</ul>` : ""}
+      ${pageHeader({
+        crumb: html`<p class="crumb"><a href="${vaultPath(id, "/proposals")}">Proposals</a></p>`,
+        title: `${verb} ${p.path}`,
+        path: true,
+        meta: html`<p class="meta"><span class="state ${p.status}">${STATE_TEXT[p.status]}</span><span>Revision ${p.revision}</span>
+          <span>By ${who(ctx, p.proposed_by, p.agent)}</span><span>${when(p.created_at)}</span></p>`,
+      })}
+      <div class="review-top">
+        ${p.proposed_by === ctx.userId && p.agent
+          ? html`<p class="note">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
+          : ""}
+        ${feedback}
+        ${flags.length ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map((f) => html`<li>${f}</li>`)}</ul>` : ""}
+        ${status}${controls}${snoozeForm}
+      </div>
 
       ${p.body === null && p.kind === "write"
         ? html`<div class="empty">This proposal’s content was erased.</div>`
@@ -701,29 +769,6 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
         approvers.length ? `: ${approvers.map((a) => who(ctx, a.user_id, null)).join(", ")}` : "."
       }</p>
 
-      ${p.status === "stale" && canWrite(v) && p.kind === "write" && p.body !== null
-        ? html`<div class="panel"><p>The file changed after this was proposed, so it wasn’t applied. You can propose the same text again against the current version; the diff will show what it would change now.</p>
-            <form method="post" action="${proposalPath(id, pid, "/repropose")}">${csrfField(ctx.csrf)}
-              <button class="primary">Propose again</button></form></div>`
-        : ""}
-      ${p.status === "changes_requested" ? html`<p class="muted">Waiting for the proposer to revise. You can still edit it yourself, or reject it.</p>` : ""}
-      ${rejectable
-        ? html`<form method="post" action="${proposalPath(id, pid, "/decide")}" class="panel decide">
-            ${csrfField(ctx.csrf)}
-            <label for="note">Note</label>
-            <textarea id="note" name="note" class="short" placeholder="Required to request changes or reject. The proposer sees it."></textarea>
-            <div class="actions">
-              ${decidable
-                ? html`<button class="primary" name="decision" value="approve">Approve</button>
-                  <button name="decision" value="request_changes">Request changes</button>`
-                : ""}
-              <button class="danger" name="decision" value="reject">Reject</button>
-              ${editable ? html`<a class="button quiet" href="${proposalPath(id, pid, "/edit")}">Edit, then approve</a>` : ""}
-            </div>
-          </form>`
-        : p.status === "open" && mine
-          ? html`<p class="muted">You’ve decided on this revision. It needs more approvals before it applies.</p>`
-          : ""}
       ${thread}`;
     return { v, p, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
   });
@@ -745,10 +790,15 @@ async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<Reply> {
     ).rows[0];
     if (!p) return null;
     const body = html`
-      <p class="crumb"><a href="${proposalPath(id, pid)}">Back to the proposal</a></p>
-      <h1 class="path">Edit, then approve</h1>
+      ${pageHeader({
+        crumb: html`<p class="crumb"><a href="${proposalPath(id, pid)}">Back to the proposal</a></p>`,
+        title: "Edit, then approve",
+        path: true,
+        actions: html`<button class="primary" form="edit-approve">Save edit and approve</button>
+          <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>`,
+      })}
       <p class="lede">Change the proposed text of <code>${p.path}</code>. Saving records your edit as a new revision and approves it. If this path needs more than one approval, the others approve your edited version.</p>
-      <form method="post" action="${proposalPath(id, pid, "/edit")}" class="panel">
+      <form method="post" action="${proposalPath(id, pid, "/edit")}" class="panel" id="edit-approve">
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
         <textarea id="content" name="content">${p.body}</textarea>
@@ -851,8 +901,20 @@ async function rules(ctx: Ctx, id: string): Promise<Reply> {
     const checked = check ? await ruleFor(c, id, check) : null;
     const owner = v.role === "owner";
     const body = html`
-      <h1>Rules</h1>
+      ${pageHeader({ title: "Rules" })}
       <p class="lede">Everything is ${tag(def)} unless a rule says otherwise. A rule on a folder (ending in <code>/</code>) covers everything inside it; the most specific rule wins. Canon changes need approval from people. Agents can only propose them.</p>
+      ${owner
+        ? html`<form method="post" action="${vaultPath(id, "/rules")}" class="panel" id="add-rule" aria-labelledby="add-rule-title">
+            <h2 id="add-rule-title" class="form-title">Add or change a rule</h2>
+            ${csrfField(ctx.csrf)}
+            <div class="fields">
+              <div><label for="pp">Path or folder</label><input id="pp" type="text" name="path" placeholder="clients/" required></div>
+              <div><label for="pol">Policy</label><select id="pol" name="policy"><option value="canon">Canon</option><option value="open">Open</option></select></div>
+              <div><label for="qq">Approvals</label><input id="qq" class="narrow" type="text" name="quorum" value="1" inputmode="numeric"></div>
+            </div>
+            <div class="actions"><button class="primary">Save rule</button></div>
+          </form>`
+        : html`<p class="muted small">Only owners change rules.</p>`}
       <form method="get" action="${vaultPath(id, "/rules")}" class="panel">
         <label for="check">What applies to a path?</label>
         <div class="inline-field"><input id="check" type="text" name="check" value="${check}" placeholder="clients/acme/brief.md">
@@ -870,7 +932,7 @@ async function rules(ctx: Ctx, id: string): Promise<Reply> {
           : ""}
       </form>
       ${list.length === 0
-        ? html`<div class="empty">No rules yet.${owner ? " Add one below, for example to make a clients/ folder canon." : ""}</div>`
+        ? html`<div class="empty">No rules yet.${owner ? " Add one above, for example to make a clients/ folder canon." : ""}</div>`
         : html`<div class="table-wrap"><table><tr><th>Path</th><th>Policy</th><th class="num">Approvals</th><th class="hide-sm">Set</th>${owner ? html`<th></th>` : ""}</tr>
           ${list.map(
             (r) => html`<tr><td><code>${r.path}</code></td><td>${tag(r.policy)}</td>
@@ -881,19 +943,7 @@ async function rules(ctx: Ctx, id: string): Promise<Reply> {
                     <input type="hidden" name="path" value="${r.path}"><input type="hidden" name="policy" value="">
                     <button class="quiet">Remove</button></form></td>`
                 : ""}</tr>`,
-          )}</table></div>`}
-      ${owner
-        ? html`<h2>Add or change a rule</h2>
-          <form method="post" action="${vaultPath(id, "/rules")}" class="panel">
-            ${csrfField(ctx.csrf)}
-            <div class="fields">
-              <div><label for="pp">Path or folder</label><input id="pp" type="text" name="path" placeholder="clients/" required></div>
-              <div><label for="pol">Policy</label><select id="pol" name="policy"><option value="canon">Canon</option><option value="open">Open</option></select></div>
-              <div><label for="qq">Approvals</label><input id="qq" class="narrow" type="text" name="quorum" value="1" inputmode="numeric"></div>
-            </div>
-            <div class="actions"><button class="primary">Save rule</button></div>
-          </form>`
-        : html`<p class="muted small">Only owners change rules.</p>`}`;
+          )}</table></div>`}`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "rules" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -920,7 +970,7 @@ async function search(ctx: Ctx, id: string): Promise<Reply> {
     if (!v) return null;
     const rows = query ? (await c.query(`select path, policy, body from public.search($1, $2, 30)`, [id, query])).rows : [];
     const body = html`
-      <h1>Search</h1>
+      ${pageHeader({ title: "Search" })}
       ${query
         ? rows.length
           ? html`<p class="muted small">${rows.length} result${rows.length > 1 ? "s" : ""} for “${query}”</p>
@@ -941,7 +991,7 @@ async function activity(ctx: Ctx, id: string): Promise<Reply> {
     const v = await vault(c, ctx, id);
     if (!v) return null;
     const body = html`
-      <h1>Activity</h1>
+      ${pageHeader({ title: "Activity" })}
       <p class="lede">Every change to this vault, newest first. This log can only be added to: nothing in it is ever edited or deleted.</p>
       ${await activityBody(c, { me: ctx.userId, url: ctx.url, base: vaultPath(id, "/activity"), scope: { vaultId: id } })}`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "activity" }, body) };
@@ -957,7 +1007,7 @@ async function allActivity(ctx: Ctx): Promise<Reply> {
   return render(
     ctx,
     "Activity",
-    html`<h1>Activity</h1>
+    html`${pageHeader({ title: "Activity" })}
     <p class="lede">What people and agents did across your vaults, newest first. Only vaults you’re a member of appear here.</p>
     ${body}`,
     "activity",
@@ -986,7 +1036,7 @@ function connect(ctx: Ctx): Reply {
   return render(
     ctx,
     "Connect",
-    html`<h1>Connect an agent</h1>
+    html`${pageHeader({ title: "Connect an agent", actions: html`<a class="button primary" href="/tokens">Create a token</a>` })}
     <p class="lede">Any MCP client can use your vaults through one URL. Each agent gets its own <a href="/tokens">token</a>, which acts as you but can never approve, change rules or manage members.</p>
     <p class="endpoint"><span class="muted small">MCP URL</span><code>${url}</code></p>
     <p class="note">Keep tokens out of config files and chats: anything an agent can read, it can leak. Every setup below reads the token from a file, an environment variable or a password prompt.</p>
@@ -1059,14 +1109,14 @@ async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promis
   return render(
     ctx,
     "Tokens",
-    html`<h1>Tokens</h1>
+    html`${pageHeader({ title: "Tokens", actions: html`<button class="primary" form="new-token">Create token</button>` })}
     <p class="lede">A token lets one agent act as you over MCP, in the vaults you choose. A read-only agent can read, search and follow changes. A read-write agent can also write open files and propose changes. No agent can approve, change rules or manage members. <a href="/connect">How to connect an agent</a></p>
     ${fresh
       ? html`<div class="reveal facet" role="status"><strong>${fresh.name}</strong>
           <p class="muted small">Copy it now. It won’t be shown again. Put it in your agent’s settings, never in a chat.</p>
           <p class="secret">${fresh.token}</p></div>`
       : ""}
-    <form method="post" action="/tokens/new" class="panel token-form">
+    <form method="post" action="/tokens/new" class="panel token-form" id="new-token">
       ${csrfField(ctx.csrf)}
       <label for="tn">Name it after the agent and machine</label>
       <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100">

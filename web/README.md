@@ -14,9 +14,13 @@ file text is shown as plain text, never rendered. The CSP forbids scripts,
 every POST needs the session's CSRF token and a same-origin Origin, and
 sessions are HttpOnly, SameSite=Strict cookies.
 
-Each proposal has a discussion below its decision: comments from editors,
-owners and their agents (over MCP), with review notes and approvals in the
-same timeline. Reviewers can snooze a proposal in their Review inbox for a
+Controls sit at the top of every page (`pageHeader` in `src/html.ts`), never
+only at the bottom. A proposal page opens with its status, the latest
+request for changes, the decision (note, Approve, Request changes, Reject,
+Edit then approve) and snooze; the diff follows, then the stated reason,
+approvals, and the discussion: comments from editors, owners and their
+agents (over MCP), with review notes and approvals in the same timeline.
+Reviewers can snooze a proposal from its page or its row in Review, for a
 day, a week or until it changes; snoozes are private to each person.
 
 Proposal diffs come in three views, picked with `?diff=unified|split|rendered`

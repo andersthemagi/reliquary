@@ -117,7 +117,8 @@ test("proposal: unified is the default view, with word highlights, before the re
   assert.match(h, /<del>800<\/del>/);
   assert.match(h, /<ins>900<\/ins>/);
   assert.ok(h.indexOf('class="diff') < h.indexOf("Agent’s stated reason"));
-  assert.ok(h.indexOf('class="diff') < h.indexOf('name="decision"'));
+  // The decision sits above the diff, which follows it immediately.
+  assert.ok(h.indexOf('name="decision"') < h.indexOf('class="diff'));
 });
 
 test("proposal: split view shows current and proposed side by side, in its own scroll box", async () => {

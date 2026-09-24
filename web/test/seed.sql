@@ -140,3 +140,28 @@ select pg_temp.reset();
 \echo P_HTML=:p5
 \echo BEN=:ben
 \echo DEE=:dee
+
+-- Controls at the top (test/controls.test.mjs). A "Controls" vault Ana owns,
+-- with two of Ben's agent's proposals waiting on her: one she asked changes
+-- on and the agent then revised, and one to snooze from the Review list. The
+-- test rejects both when it is done, so the other tests' Review counts hold.
+\o /dev/null
+select pg_temp.as_person(:'ana');
+select public.create_vault('Controls', 'open') as cv \gset
+select public.set_member(:'cv', :'ben', 'editor');
+select public.set_policy(:'cv', 'canon/', 'canon', 1);
+select pg_temp.reset();
+select pg_temp.as_person(:'ben', 'Hermes on Linux');
+select public.propose(:'cv', 'canon/figures.md', 'Q1 figures.', 'figures') as c_revised \gset
+select public.propose(:'cv', 'canon/row.md', 'Row.', 'row') as c_row \gset
+select pg_temp.reset();
+select pg_temp.as_person(:'ana');
+select public.decide(:'c_revised', 'request_changes', 'Add the <b>March</b> figures.');
+select pg_temp.reset();
+select pg_temp.as_person(:'ben', 'Hermes on Linux');
+select public.revise_proposal(:'c_revised', E'Q1 figures.\nMarch: 12.', 'added March');
+select pg_temp.reset();
+\o
+\echo CONTROL_VAULT=:cv
+\echo C_REVISED=:c_revised
+\echo C_ROW=:c_row
