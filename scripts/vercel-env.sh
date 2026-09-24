@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Prints the environment variables for the two Vercel projects, built from the
-# gitignored secret files, as KEY=VALUE lines you can paste into Vercel
-# (Project Settings -> Environment Variables accepts a pasted .env block).
-# Run it yourself: it prints secrets to your terminal, so never run it where a
-# model or a log can read the output.
+# Writes the environment variables for one Vercel project, built from the
+# gitignored secret files, to supabase/.vercel-<app>.env (mode 600,
+# gitignored) as KEY=VALUE lines you can paste into Vercel (Project Settings
+# -> Environment Variables accepts a pasted .env block). It prints only the
+# file's path and the variable names, never a value, so it is safe to run
+# from anywhere, including a chat with a model.
 #
 #   scripts/vercel-env.sh web https://<web-host> https://<mcp-host>
 #   scripts/vercel-env.sh mcp https://<web-host> https://<mcp-host>
@@ -12,6 +13,7 @@
 # (Project Settings -> API Keys); it is printed as a placeholder.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+umask 077
 
 app=${1:?web or mcp}
 web=${2:?the web app origin, e.g. https://reliquary-web.vercel.app}
@@ -23,6 +25,7 @@ web=${web%/}; mcp=${mcp%/}
 pw() { tr -d '[:space:]' < "supabase/.$1-db-password"; }
 enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(),safe=""))'; }
 
+out=supabase/.vercel-$app.env
 case $app in
   web)
     secret=supabase/.web-session-secret
@@ -36,7 +39,7 @@ case $app in
     if [[ ! -s $vkey ]]; then
       (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$vkey")
     fi
-    cat <<EOF
+    cat > "$out" <<EOF
 VARIABLES_KEY=$(cat "$vkey")
 DATABASE_URL=postgres://reliquary_web.$ref:$(pw web | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
@@ -51,7 +54,7 @@ SESSION_SECRET=$(cat "$secret")
 EOF
     ;;
   mcp)
-    cat <<EOF
+    cat > "$out" <<EOF
 DATABASE_URL=postgres://reliquary_mcp.$ref:$(pw mcp | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 MCP_RESOURCE=$mcp/mcp
@@ -60,3 +63,6 @@ EOF
     ;;
   *) echo "web or mcp"; exit 1 ;;
 esac
+chmod 600 "$out"
+echo "Wrote $out (mode 600, gitignored). Names only:"
+cut -d= -f1 "$out" | sed "s/^/  /"
