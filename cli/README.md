@@ -4,17 +4,22 @@
 with your browser, then either runs one command with the variables in its
 environment, or writes them to a `.env` that git ignores. Those are the only
 two ways a value leaves Reliquary for a machine (AGENTS.md, "Secrets never
-reach a model"); nothing here prints a value.
+reach a model"); nothing here prints a value. It can also send a project's
+`.env` to a vault, where a person applies it in the web UI: an agent can run
+that for you without a value ever passing through the conversation.
 
 The contract it implements is [docs/variables.md](../docs/variables.md)
 ("The CLI's sign-in", "The env API", "CLI"). No runtime dependencies: Node
 20 or later and its built-ins.
 
 ```bash
-npx @reliquary-ai/cli login          # once published; until then, see "From this repo"
-reliquary run --vault Team -- npm run dev
-reliquary env pull --vault Team --env preview
+npx @reliquary-ai/cli login                    # sign this computer in (once)
+npx @reliquary-ai/cli run --vault Team -- npm run dev
+npx @reliquary-ai/cli env pull --vault Team --env preview
+npx @reliquary-ai/cli env push --vault Team --file .env --wait
 ```
+
+Or install it once: `npm install -g @reliquary-ai/cli`, then `reliquary ...`.
 
 ## Commands
 
@@ -25,6 +30,7 @@ reliquary env pull --vault Team --env preview
 | `reliquary vaults` | Each vault this sign-in reaches: id, name, your role, the environments you may read |
 | `reliquary run [--vault V] [--env E] -- <command> [args...]` | Fetches the environment and starts the command directly (no shell) with your environment plus the variables. stdio is inherited, SIGINT, SIGTERM, SIGHUP, SIGQUIT and SIGUSR2 are forwarded, and it exits with the command's code (128 + signal if it was killed; 127 if it wasn't found). Writes nothing to disk. If a variable replaces one you already had, it says so by name |
 | `reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]` | Writes the environment to the file (default `.env`), mode 600, one `NAME="value"` per line in name order (`\`, `"`, newline and carriage return escaped) under a header saying where it came from. Prints the names, never the values |
+| `reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]` | Sends the file's variables to the vault **for approval**: nothing is set until an owner or editor applies it on the vault's Variables page (it expires in 24 hours). Lines it can't take (bad or reserved names, empty values, an unclosed quote) are listed with their reasons and not sent. Prints the names, which are new and which replace a value, and the approval link (stdout); never a value. `--wait` exits 0 once it's applied, 1 if it's rejected or expires, 3 if the timeout comes first |
 
 Options for every command: `--server <url>`, `-h`/`--help`; and
 `-v`/`--version`.
@@ -37,11 +43,11 @@ nothing. A project may commit `.reliquary.json` (found from the current
 directory upwards) to set defaults; it holds ids and names, never values:
 
 ```json
-{ "server": "https://reliquary-context.vercel.app", "vault": "<vault id>", "environment": "development" }
+{ "server": "https://reliquary.redmage.cc", "vault": "<vault id>", "environment": "development" }
 ```
 
 **The server** is `--server`, else `RELIQUARY_URL`, else `server` in
-`.reliquary.json`, else `https://reliquary-context.vercel.app`. It must be
+`.reliquary.json`, else `https://reliquary.redmage.cc`. It must be
 https (plain http only for 127.0.0.1, [::1] or localhost). The CLI reads its
 `/.well-known/oauth-authorization-server`, requires the issuer to be that
 same origin and every endpoint on it, and derives its client id
@@ -62,6 +68,23 @@ value lands). If the temporary name `<file>.reliquary-<random>.tmp` is ignored
 as well (a `.gitignore` line like `.env*` or `.env.*`), the file is written
 beside it and renamed into place; otherwise it is rewritten in place, so a
 value never sits in a file git could pick up.
+
+## env push: send a .env without showing it to anyone
+
+For "please add this project's `.env` to the vault": the agent (or you) runs
+`reliquary env push --vault Team --file .env`. The CLI parses the file with
+the web app's own parser (`src/dotenv.ts` is the same file as
+`web/src/dotenv.ts`): comments, `export`, quotes, escapes in double quotes and
+multi-line quoted values; no `${VAR}` expansion. It sends the names and values
+over TLS to the env API, where they are encrypted on receipt and held as a
+pending import. The link it prints opens the preview: names, new or replacing
+a value, never a value; Apply sets them (as you, logged per variable), Reject
+drops them.
+
+A push needs a sign-in that was allowed to push: the consent page's box "Also
+let it send .env files here", ticked by default. A sign-in without it is told
+to log in again. Editors can't push production values; the CLI says so before
+sending anything.
 
 ## Sign-in and where it's kept
 
@@ -97,6 +120,20 @@ login`. 403: your role can't read that environment. 404: no such vault or
 environment for this sign-in. 503: the server has no key for variables.
 Exit codes: 1 for errors, 2 for usage, and `run` passes the command's own.
 
+## Publishing
+
+The package is `@reliquary-ai/cli`, published from `cli/` by
+`.github/workflows/publish-cli.yml` when a tag `cli-v<version>` is pushed
+(the version must match `package.json`; the CLI's tests run first; npm
+provenance is on). It needs the repository secret `NPM_TOKEN`; without it the
+workflow skips. To check what would be published:
+
+```bash
+podman run --rm -v "$PWD/cli":/app:Z -w /app docker.io/library/node:22-slim sh -c 'npm ci && npm pack --dry-run'
+```
+
+It holds `dist/`, `README.md` and `package.json`; no tests, sources or maps.
+
 ## From this repo
 
 Build with podman or docker (nothing needs Node on the host):
@@ -106,8 +143,8 @@ podman run --rm -v "$PWD/cli":/app:Z -w /app docker.io/library/node:22-slim sh -
 node cli/dist/cli.js --help     # with Node 20+ on the host
 ```
 
-To try it against production (the hosted web app must have the phase 1
-migration and `VARIABLES_KEY`): `node cli/dist/cli.js login`, allow it in the
+To try it against production (the hosted web app must have the variables
+migrations and `VARIABLES_KEY`): `node cli/dist/cli.js login`, allow it in the
 browser, set a value on the web app's Variables page, then
 `node cli/dist/cli.js run --vault <name> -- node -e 'console.log(Object.keys(process.env).length)'`
 and `node cli/dist/cli.js env pull --vault <name>` inside a repository that
@@ -127,7 +164,9 @@ login through the consent form over HTTP with a signed-in session, refresh
 and concurrent refresh, revocation on the Tokens page, logout, the token
 refused at `/mcp`, `run` (hashes of values in the child, exit codes, SIGTERM,
 nothing on disk), and `env pull` (ignored, not ignored, tracked, outside a
-repository, symlink, modes, atomic and in-place). Every value and token the
-tests see is recorded; none may appear in the CLI's output or either
-server's log. Registry rows F60 to F62 in
+repository, symlink, modes, atomic and in-place), and `env push` (the
+approval link, the web UI applying and rejecting, `--wait` and its timeout, a
+sign-in without the push permission, an editor's production). Every value and
+token the tests see is recorded; none may appear in the CLI's output or
+either server's log. Registry rows F60 to F62, F67 and F70 in
 [tests/features.md](../tests/features.md).
