@@ -20,7 +20,7 @@ export type AccessLogRow = {
   agent: string | null;
   tokenId: string | null;
   clientId: string | null;
-  action: "set" | "rotate" | "delete" | "read" | "reveal" | "refused";
+  action: "set" | "rotate" | "delete" | "read" | "reveal" | "refused" | "push" | "reject";
   environment: string | null;
   names: string[];
   detail: Record<string, unknown>;
@@ -127,4 +127,144 @@ export async function accessLog(
       detail: r.detail,
     })),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Imports (docs/variables.md, "Imports"): a pasted .env becomes a draft here;
+// a CLI push (envapi.ts) becomes a pending import. Either way the values are
+// sealed for their final slot (vault, environment, name) before the database
+// sees them, and applying copies the ciphertext without opening it. The
+// database decides who may create, see, apply and reject.
+
+export type ImportItem = { name: string; environment: string; key_id: string; nonce: string; ciphertext: string };
+export type ImportRefusal = { line: number; name: string | null; reason: string };
+export type CreateImportResult =
+  | { ok: true; id: string; source: "web" | "cli"; environments: string[]; names: string[]; overwrites: string[]; expires_at: string }
+  | { ok: false; error: "unauthorized" | "forbidden" | "push_not_allowed" | "not_found" | "rate_limited" };
+export type EnvImport = {
+  id: string;
+  vaultId: string;
+  environments: string[];
+  names: string[];
+  refused: ImportRefusal[];
+  source: "web" | "cli";
+  createdBy: string;
+  agent: string | null;
+  createdAt: Date;
+  expiresAt: Date;
+  status: "pending" | "applied" | "rejected" | "expired";
+  decidedBy: string | null;
+  decidedAt: Date | null;
+};
+export type DecideResult =
+  | { ok: true; applied?: number; names?: string[]; environments?: string[] }
+  | { ok: false; error: "unauthorized" | "forbidden" | "not_found" | "expired" | "applied" | "rejected" };
+
+// Every value in every environment, sealed for its slot, as create_env_import
+// takes them. Throws SecretsError (no key, or a value over 64 KiB).
+export function sealItems(vaultId: string, environments: string[], entries: { name: string; value: string }[]): ImportItem[] {
+  const items: ImportItem[] = [];
+  for (const e of entries) {
+    for (const environment of environments) {
+      const s = seal(e.value, { vaultId, environment, name: e.name });
+      items.push({ name: e.name, environment, key_id: s.keyId, nonce: s.nonce.toString("base64"), ciphertext: s.ciphertext.toString("base64") });
+    }
+  }
+  return items;
+}
+
+// A pasted .env, as a draft for the person to review and apply (30 minutes).
+export async function createImport(
+  userId: string,
+  vaultId: string,
+  environments: string[],
+  entries: { name: string; value: string }[],
+  refused: ImportRefusal[],
+): Promise<CreateImportResult> {
+  const items = sealItems(vaultId, environments, entries);
+  return asPerson(userId, async (c) =>
+    (
+      await c.query("select public.create_env_import($1, $2, $3, $4) as r", [
+        vaultId, environments, JSON.stringify(items), JSON.stringify(refused),
+      ])
+    ).rows[0].r,
+  );
+}
+
+const IMPORT_COLUMNS = `i.id, i.vault_id, i.environments, i.names, i.refused, i.source, i.created_by, i.agent,
+  i.created_at, i.expires_at, private.env_import_state(i.status, i.expires_at) as status, i.decided_by, i.decided_at`;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toImport = (r: any): EnvImport => ({
+  id: r.id,
+  vaultId: r.vault_id,
+  environments: r.environments,
+  names: r.names,
+  refused: r.refused,
+  source: r.source,
+  createdBy: r.created_by,
+  agent: r.agent,
+  createdAt: r.created_at,
+  expiresAt: r.expires_at,
+  status: r.status,
+  decidedBy: r.decided_by,
+  decidedAt: r.decided_at,
+});
+
+// One import the person may see (RLS: pushes for owners and editors, a draft
+// for its author), with the version each of its names already has in each
+// of its environments.
+export async function getImport(
+  userId: string,
+  vaultId: string,
+  importId: string,
+): Promise<{ imp: EnvImport; existing: Map<string, Map<string, number>> } | null> {
+  return asPerson(userId, async (c) => {
+    const rows = (await c.query(`select ${IMPORT_COLUMNS} from public.env_imports i where i.id = $1 and i.vault_id = $2`, [importId, vaultId])).rows;
+    if (!rows.length) return null;
+    const imp = toImport(rows[0]);
+    const existing = new Map<string, Map<string, number>>();
+    const found = (
+      await c.query(
+        `select v.name, vv.environment, vv.version from public.variables v join public.variable_values vv on vv.variable_id = v.id
+          where v.vault_id = $1 and v.name = any($2) and vv.environment = any($3)`,
+        [vaultId, imp.names, imp.environments],
+      )
+    ).rows;
+    for (const r of found) {
+      if (!existing.has(r.name)) existing.set(r.name, new Map());
+      existing.get(r.name)!.set(r.environment, r.version);
+    }
+    return { imp, existing };
+  });
+}
+
+// Pending pushes (from the CLI) the person may see, in one vault or across
+// all of theirs, newest first. `mayApply`: their role allows every
+// environment the push is for.
+export async function pendingPushes(userId: string, vaultId?: string): Promise<(EnvImport & { vaultName: string; mayApply: boolean })[]> {
+  return asPerson(userId, async (c) =>
+    (
+      await c.query(
+        `select ${IMPORT_COLUMNS}, v.name as vault_name,
+                coalesce(private.role_in(i.vault_id) = 'owner'
+                  or (private.role_in(i.vault_id) = 'editor'
+                      and not exists (select 1 from public.environments e
+                                       where e.vault_id = i.vault_id and e.name = any(i.environments) and e.owners_only)), false) as may_apply
+           from public.env_imports i join public.vaults v on v.id = i.vault_id
+          where i.source = 'cli' and i.status = 'pending' and i.expires_at > now()
+            and ($1::uuid is null or i.vault_id = $1)
+          order by i.created_at desc limit 50`,
+        [vaultId ?? null],
+      )
+    ).rows.map((r) => ({ ...toImport(r), vaultName: r.vault_name, mayApply: r.may_apply })),
+  );
+}
+
+export async function applyImport(userId: string, importId: string): Promise<DecideResult> {
+  return asPerson(userId, async (c) => (await c.query("select public.apply_env_import($1) as r", [importId])).rows[0].r);
+}
+
+export async function rejectImport(userId: string, importId: string): Promise<DecideResult> {
+  return asPerson(userId, async (c) => (await c.query("select public.reject_env_import($1) as r", [importId])).rows[0].r);
 }

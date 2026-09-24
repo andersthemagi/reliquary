@@ -1,0 +1,443 @@
+[
+ {
+  "name": "plain lines",
+  "input": "A=1\nB=two",
+  "entries": [
+   [
+    1,
+    "A",
+    "1"
+   ],
+   [
+    2,
+    "B",
+    "two"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "comments, blank lines and indentation are skipped; # after a space or tab starts a comment, # inside a word doesn't",
+  "input": "# a comment\n\n   # indented comment\n  A=1 # trailing\nB=x#y\nC=1\t# tab then comment",
+  "entries": [
+   [
+    4,
+    "A",
+    "1"
+   ],
+   [
+    5,
+    "B",
+    "x#y"
+   ],
+   [
+    6,
+    "C",
+    "1"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "export before a name is ignored",
+  "input": "export A=1\nexport  B = 2",
+  "entries": [
+   [
+    1,
+    "A",
+    "1"
+   ],
+   [
+    2,
+    "B",
+    "2"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "spaces around = and after the value are dropped",
+  "input": "A = spaced value   \nB\t=\tt",
+  "entries": [
+   [
+    1,
+    "A",
+    "spaced value"
+   ],
+   [
+    2,
+    "B",
+    "t"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "an = inside a value is kept",
+  "input": "URL=postgres://u:p@h/db?x=1&y=2\nEQ==start",
+  "entries": [
+   [
+    1,
+    "URL",
+    "postgres://u:p@h/db?x=1&y=2"
+   ],
+   [
+    2,
+    "EQ",
+    "=start"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "double quotes take \\n \\r \\t \\\" \\\\ and \\$, and keep other backslashes",
+  "input": "A=\"l1\\nl2\\r\\t\\\"q\\\" \\\\ \\$HOME \\x \\0\"",
+  "entries": [
+   [
+    1,
+    "A",
+    "l1\nl2\r\t\"q\" \\ $HOME \\x \\0"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "single quotes and backticks are literal",
+  "input": "A='raw \\n \"x\" $HOME # not a comment'\nB=`it's \"quoted\"`",
+  "entries": [
+   [
+    1,
+    "A",
+    "raw \\n \"x\" $HOME # not a comment"
+   ],
+   [
+    2,
+    "B",
+    "it's \"quoted\""
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "a # inside double quotes is part of the value; spaces inside quotes are kept",
+  "input": "A=\"x # y\"\nB=\"  padded  \"",
+  "entries": [
+   [
+    1,
+    "A",
+    "x # y"
+   ],
+   [
+    2,
+    "B",
+    "  padded  "
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "a double-quoted value may span lines (a PEM key)",
+  "input": "KEY=\"-----BEGIN KEY-----\nabc\ndef\n-----END KEY-----\"\nNEXT=1",
+  "entries": [
+   [
+    1,
+    "KEY",
+    "-----BEGIN KEY-----\nabc\ndef\n-----END KEY-----"
+   ],
+   [
+    5,
+    "NEXT",
+    "1"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "single-quoted values may span lines too",
+  "input": "A='one\ntwo'\nB=3",
+  "entries": [
+   [
+    1,
+    "A",
+    "one\ntwo"
+   ],
+   [
+    3,
+    "B",
+    "3"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "CRLF line endings, inside a quoted value too",
+  "input": "A=\"x\r\ny\"\r\nB=2\r\n",
+  "entries": [
+   [
+    1,
+    "A",
+    "x\ny"
+   ],
+   [
+    3,
+    "B",
+    "2"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "CR-only line endings",
+  "input": "A=1\rB=2",
+  "entries": [
+   [
+    1,
+    "A",
+    "1"
+   ],
+   [
+    2,
+    "B",
+    "2"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "a byte order mark at the start is dropped",
+  "input": "\ufeffA=1",
+  "entries": [
+   [
+    1,
+    "A",
+    "1"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "a comment may follow a closing quote; other text may not",
+  "input": "A=\"v\" # note\nB=\"v\" junk\nC='w'   ",
+  "entries": [
+   [
+    1,
+    "A",
+    "v"
+   ],
+   [
+    3,
+    "C",
+    "w"
+   ]
+  ],
+  "refused": [
+   [
+    2,
+    "B",
+    "text after the closing quote"
+   ]
+  ]
+ },
+ {
+  "name": "an empty value is refused",
+  "input": "A=\nB=\"\"\nC= # only a comment\nD=  ",
+  "entries": [],
+  "refused": [
+   [
+    1,
+    "A",
+    "no value"
+   ],
+   [
+    2,
+    "B",
+    "no value"
+   ],
+   [
+    3,
+    "C",
+    "no value"
+   ],
+   [
+    4,
+    "D",
+    "no value"
+   ]
+  ]
+ },
+ {
+  "name": "bad names are refused without being repeated",
+  "input": "1BAD=x\nMY-KEY=y\n=z\nno equals here\nexport\nsk live=1",
+  "entries": [],
+  "refused": [
+   [
+    1,
+    null,
+    "the name isn't letters, digits and underscores (not starting with a digit, at most 128)"
+   ],
+   [
+    2,
+    null,
+    "the name isn't letters, digits and underscores (not starting with a digit, at most 128)"
+   ],
+   [
+    3,
+    null,
+    "the name isn't letters, digits and underscores (not starting with a digit, at most 128)"
+   ],
+   [
+    4,
+    null,
+    "not NAME=value (no = sign)"
+   ],
+   [
+    5,
+    null,
+    "not NAME=value (no = sign)"
+   ],
+   [
+    6,
+    null,
+    "the name isn't letters, digits and underscores (not starting with a digit, at most 128)"
+   ]
+  ]
+ },
+ {
+  "name": "names that change how programs start are refused, in any case",
+  "input": "PATH=/x\nld_preload=y\nNODE_OPTIONS=--z\nGIT_SSH_COMMAND=ssh\nPATHS=ok",
+  "entries": [
+   [
+    5,
+    "PATHS",
+    "ok"
+   ]
+  ],
+  "refused": [
+   [
+    1,
+    "PATH",
+    "changes how programs start, so it can't be a shared variable"
+   ],
+   [
+    2,
+    "ld_preload",
+    "changes how programs start, so it can't be a shared variable"
+   ],
+   [
+    3,
+    "NODE_OPTIONS",
+    "changes how programs start, so it can't be a shared variable"
+   ],
+   [
+    4,
+    "GIT_SSH_COMMAND",
+    "changes how programs start, so it can't be a shared variable"
+   ]
+  ]
+ },
+ {
+  "name": "a name given twice: the later one is used",
+  "input": "A=1\nB=2\nA=3",
+  "entries": [
+   [
+    2,
+    "B",
+    "2"
+   ],
+   [
+    3,
+    "A",
+    "3"
+   ]
+  ],
+  "refused": [
+   [
+    1,
+    "A",
+    "given again on line 3, which is used"
+   ]
+  ]
+ },
+ {
+  "name": "a quote never closed stops the parse, so the rest can't become variables",
+  "input": "A=1\nB=\"never closed\nC=3\nD=4",
+  "entries": [
+   [
+    1,
+    "A",
+    "1"
+   ]
+  ],
+  "refused": [
+   [
+    2,
+    "B",
+    "the double quote opened here is never closed, so nothing from line 2 on was read"
+   ]
+  ]
+ },
+ {
+  "name": "a NUL character in a value is refused",
+  "input": "A=x\u0000y\nB=ok",
+  "entries": [
+   [
+    2,
+    "B",
+    "ok"
+   ]
+  ],
+  "refused": [
+   [
+    1,
+    "A",
+    "the value holds a NUL character"
+   ]
+  ]
+ },
+ {
+  "name": "unicode is kept as written",
+  "input": "EMOJI=h\u00e9llo \u2713\nQ=\"\u00fc\"",
+  "entries": [
+   [
+    1,
+    "EMOJI",
+    "h\u00e9llo \u2713"
+   ],
+   [
+    2,
+    "Q",
+    "\u00fc"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "an unquoted quote in the middle is literal",
+  "input": "A=abc\"def'ghi",
+  "entries": [
+   [
+    1,
+    "A",
+    "abc\"def'ghi"
+   ]
+  ],
+  "refused": []
+ },
+ {
+  "name": "no variable expansion",
+  "input": "A=1\nB=${A}-$A",
+  "entries": [
+   [
+    1,
+    "A",
+    "1"
+   ],
+   [
+    2,
+    "B",
+    "${A}-$A"
+   ]
+  ],
+  "refused": []
+ }
+]

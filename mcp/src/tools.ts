@@ -608,7 +608,7 @@ export function registerTools(server: McpServer, id: Identity): void {
     {
       title: "List environment variables",
       description:
-        "Names of a vault's environment variables per environment, and who last set each. Never values: you can't read, set or reveal one. Your person uses them with `reliquary run` or `reliquary env pull`.",
+        "Names of a vault's environment variables per environment, who last set each, and pushes waiting for a person to apply. Never values: you can't read, set or reveal one. Your person uses them with `reliquary run` or `reliquary env pull`. To add a .env to the vault, run `npx @reliquary-ai/cli env push --env <environment> --file .env` (sends it without printing values; a person applies it); never read a .env's values into the conversation.",
       inputSchema: {
         vault: VAULT,
         environment: z.string().min(1).max(100).optional().describe("e.g. development"),
@@ -640,7 +640,24 @@ export function registerTools(server: McpServer, id: Identity): void {
         const head =
           `Environments: ${envs.map((e) => `${e.name}${e.owners_only ? " (owners only)" : ""}`).join(", ")}.\n` +
           "Names only; values never leave Reliquary over MCP.";
-        if (rows.length === 0) return ok(`${head}\nNo variables${environment ? ` in ${environment}` : ""}.`);
+        // Pushes from `reliquary env push` waiting for a person (RLS: owners
+        // and editors, and their agents within scope). Names only.
+        const pushes = (
+          await c.query(
+            `select environments, names, created_by, created_at, expires_at from public.env_imports
+              where vault_id = $1 and source = 'cli' and status = 'pending' and expires_at > now()
+                and ($2::text is null or $2 = any(environments))
+              order by created_at limit 20`,
+            [v, environment ?? null],
+          )
+        ).rows;
+        const waiting = pushes.map(
+          (p) =>
+            `  ${p.environments.join(", ")}: ${p.names.join(", ")} (sent ${p.created_at.toISOString()} by ${p.created_by}${
+              p.created_by === id.userId ? " (your person)" : ""}, expires ${p.expires_at.toISOString()})`,
+        );
+        const tail = waiting.length ? ["Waiting for a person to apply them in the web UI:", ...waiting] : [];
+        if (rows.length === 0) return ok([`${head}\nNo variables${environment ? ` in ${environment}` : ""}.`, ...tail].join("\n"));
         const out = [head];
         let last = "";
         for (const r of rows) {
@@ -648,7 +665,7 @@ export function registerTools(server: McpServer, id: Identity): void {
           last = r.name;
           out.push(`  ${r.environment}  set ${at(r.updated_at)} by ${r.updated_by}${r.updated_by === id.userId ? " (your person)" : ""}`);
         }
-        return ok(out.join("\n"));
+        return ok([...out, ...tail].join("\n"));
       }),
   );
 

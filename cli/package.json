@@ -1,7 +1,24 @@
 {
   "name": "@reliquary-ai/cli",
   "version": "0.1.0",
-  "description": "Reliquary's command line: run a command with a vault's environment variables, or pull them into a gitignored .env",
+  "description": "Reliquary's command line: run a command with a vault's environment variables, pull them into a gitignored .env, or push a .env for a person to approve",
+  "keywords": [
+    "reliquary",
+    "environment-variables",
+    "dotenv",
+    "secrets",
+    "cli"
+  ],
+  "homepage": "https://reliquary.redmage.cc",
+  "bugs": {
+    "url": "https://github.com/andersthemagi/reliquary/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andersthemagi/reliquary.git",
+    "directory": "cli"
+  },
+  "license": "UNLICENSED",
   "type": "module",
   "bin": {
     "reliquary": "dist/cli.js"
@@ -14,10 +31,12 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepack": "tsc"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "devDependencies": {
     "@types/node": "^20.19.0",

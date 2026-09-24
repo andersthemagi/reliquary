@@ -1,8 +1,11 @@
 // The env API: how the Reliquary CLI gets variable values (docs/variables.md).
 //
-//   GET /api/env/vaults                  vaults and environments it may read
-//   GET /api/env/<vault id>/<environment>   that environment's values
-//   GET /.well-known/oauth-protected-resource/api/env   RFC 9728 metadata
+//   GET  /api/env/vaults                  vaults and environments it may read
+//   GET  /api/env/<vault id>/<environment>   that environment's values
+//   POST /api/env/<vault id>/<environment>/imports   a push: values for a
+//        person to approve in the web UI (never set directly)
+//   GET  /api/env/imports/<import id>     a push's status, for --wait
+//   GET  /.well-known/oauth-protected-resource/api/env   RFC 9728 metadata
 //
 // Authorization: Bearer rle_... , an access token from our own authorization
 // server (oauth.ts) for the resource `<issuer>/api/env`, issued only to the
@@ -14,18 +17,25 @@
 //
 // Values are decrypted here (secrets.ts), sent once with no-store, and
 // never logged: the log line is the route's shape, status and outcome.
+// Pushed values are sealed here on receipt and stored as a pending import
+// (create_env_import); only a person in the web UI applies them.
 
 import { createHash } from "node:crypto";
 import type http from "node:http";
 import type pg from "pg";
 import { pool } from "./db.js";
+import { DOTENV_MAX_ENTRIES, DOTENV_MAX_VALUE_BYTES, isVariableName, startsPrograms } from "./dotenv.js";
 import { envResource, issuer } from "./oauth.js";
 import { fromDb, open, SecretsError, variablesConfigured } from "./secrets.js";
+import { sealItems, type ImportRefusal } from "./variables.js";
 
 const PRM_PATH = "/.well-known/oauth-protected-resource/api/env";
 const TOKEN = /^Bearer (rle_[0-9a-f]{64})$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ENVIRONMENT = /^[a-z][a-z0-9_-]{0,31}$/;
+// A push is a .env file: 1 MiB is plenty, and bounds what one request can
+// make the server seal (200 values of 64 KiB would be 12.8 MiB).
+const MAX_PUSH_BYTES = 1024 * 1024;
 
 type Grant = { grantId: string; userId: string; name: string };
 
@@ -71,7 +81,91 @@ async function asGrant<T>(g: Grant, fn: (c: pg.PoolClient) => Promise<T>): Promi
   }
 }
 
-const STATUS: Record<string, number> = { unauthorized: 401, forbidden: 403, not_found: 404 };
+const STATUS: Record<string, number> = { unauthorized: 401, forbidden: 403, not_found: 404, push_not_allowed: 403, rate_limited: 429 };
+
+// A refusal with a fixed code: never an echo of the request.
+class BadRequest extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+  ) {
+    super(code);
+  }
+}
+
+// The request body as JSON, at most `limit` bytes. Never logged or echoed.
+function readJson(req: http.IncomingMessage, limit: number): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    if (!/^application\/json\b/.test(req.headers["content-type"] ?? "")) {
+      req.resume();
+      reject(new BadRequest(415, "unsupported_media_type"));
+      return;
+    }
+    if (Number(req.headers["content-length"] ?? 0) > limit) {
+      req.resume();
+      reject(new BadRequest(413, "too_large"));
+      return;
+    }
+    let size = 0;
+    let done = false;
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => {
+      if (done) return;
+      size += c.length;
+      if (size > limit) {
+        done = true;
+        chunks.length = 0;
+        reject(new BadRequest(413, "too_large"));
+      } else chunks.push(c);
+    });
+    req.on("end", () => {
+      if (done) return;
+      done = true;
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch {
+        reject(new BadRequest(400, "invalid_request"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+// A push: {"variables": {"NAME": "value", ...}, "refused": [{"line", "name", "reason"}]}.
+// The CLI parsed its file with the same rules (dotenv.ts); names and values
+// are checked again here, and names once more by the database.
+function pushBody(body: unknown): { entries: { name: string; value: string }[]; refused: ImportRefusal[] } {
+  const bad = () => new BadRequest(400, "invalid_request");
+  if (typeof body !== "object" || body === null || Array.isArray(body)) throw bad();
+  const { variables, refused = [] } = body as { variables?: unknown; refused?: unknown };
+  if (typeof variables !== "object" || variables === null || Array.isArray(variables)) throw bad();
+  const entries = Object.entries(variables as Record<string, unknown>);
+  if (entries.length === 0 || entries.length > DOTENV_MAX_ENTRIES) throw bad();
+  for (const [name, value] of entries) {
+    if (!isVariableName(name) || startsPrograms(name)) throw bad();
+    if (typeof value !== "string" || value === "" || value.includes("\u0000")) throw bad();
+    if (Buffer.byteLength(value, "utf8") > DOTENV_MAX_VALUE_BYTES) throw bad();
+  }
+  if (!Array.isArray(refused) || refused.length > 1000) throw bad();
+  const lines = refused.map((r): ImportRefusal => {
+    const o = (r ?? {}) as { line?: unknown; name?: unknown; reason?: unknown };
+    if (typeof o !== "object" || !Number.isInteger(o.line) || (o.line as number) < 1) throw bad();
+    if (typeof o.reason !== "string" || o.reason.length > 200) throw bad();
+    if (o.name !== null && o.name !== undefined && (typeof o.name !== "string" || !isVariableName(o.name))) throw bad();
+    return { line: o.line as number, name: (o.name as string | null | undefined) ?? null, reason: o.reason };
+  });
+  return { entries: entries.map(([name, value]) => ({ name, value: value as string })), refused: lines };
+}
+
+type Route = "vaults" | ":vault/:environment" | ":vault/:environment/imports" | "imports/:id" | "other";
+
+function routeOf(parts: string[]): Route {
+  if (parts.length === 1 && parts[0] === "vaults") return "vaults";
+  if (parts.length === 2 && parts[0] === "imports") return "imports/:id";
+  if (parts.length === 2) return ":vault/:environment";
+  if (parts.length === 3 && parts[2] === "imports") return ":vault/:environment/imports";
+  return "other";
+}
 
 // Handles the env API's paths and returns true; false for any other path.
 export async function envApi(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean> {
@@ -92,7 +186,8 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
   if (path !== "/api/env" && !path.startsWith("/api/env/")) return false;
 
   const parts = path.split("/").slice(3); // after "", "api", "env"
-  const route = parts.length === 1 && parts[0] === "vaults" ? "vaults" : parts.length === 2 ? ":vault/:environment" : "other";
+  const route = routeOf(parts);
+  const method = route === ":vault/:environment/imports" ? "POST" : "GET";
   let outcome = "ok";
   try {
     const bearer = TOKEN.exec(req.headers.authorization ?? "");
@@ -102,8 +197,8 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
       const challenge = `Bearer realm="reliquary", resource_metadata="${issuer()}${PRM_PATH}"${req.headers.authorization ? ', error="invalid_token"' : ""}`;
       send(res, 401, { error: "invalid_token" }, { "www-authenticate": challenge });
       outcome = "invalid_token";
-    } else if (req.method !== "GET") {
-      send(res, 405, { error: "method_not_allowed" }, { allow: "GET" });
+    } else if (req.method !== method) {
+      send(res, 405, { error: "method_not_allowed" }, { allow: method });
       outcome = "method";
     } else if (route === "vaults") {
       const rows = await asGrant(grant, async (c) =>
@@ -134,16 +229,80 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
           }
         }
       }
+    } else if (route === ":vault/:environment/imports" && UUID.test(parts[0]) && ENVIRONMENT.test(parts[1])) {
+      outcome = await push(req, res, grant, parts[0], parts[1]);
+    } else if (route === "imports/:id" && UUID.test(parts[1])) {
+      const r = await asGrant(grant, async (c) => (await c.query("select public.env_import_status($1) as r", [parts[1]])).rows[0].r);
+      if (!r.ok) {
+        send(res, STATUS[r.error] ?? 404, { error: r.error });
+        outcome = r.error;
+      } else {
+        send(res, 200, {
+          import: r.id,
+          status: r.status,
+          environments: r.environments,
+          names: r.names,
+          expires_at: r.expires_at,
+          decided_at: r.decided_at,
+        });
+        outcome = r.status;
+      }
     } else {
       send(res, 404, { error: "not_found" });
       outcome = "not_found";
     }
   } catch (err) {
-    console.error("env api error", (err as { code?: string }).code ?? (err as Error).name);
-    if (!res.headersSent) send(res, 500, { error: "server_error" });
-    outcome = "server_error";
+    if (err instanceof BadRequest) {
+      if (!res.headersSent) send(res, err.status, { error: err.code });
+      outcome = err.code;
+    } else {
+      console.error("env api error", (err as { code?: string }).code ?? (err as Error).name);
+      if (!res.headersSent) send(res, 500, { error: "server_error" });
+      outcome = "server_error";
+    }
   }
   // The route's shape only: never a vault id, environment, name, token or value.
   console.info(`${req.method} /api/env/${route} ${res.statusCode} ${outcome}`);
   return true;
+}
+
+// POST /api/env/<vault>/<environment>/imports: seal what the CLI sent and
+// make a pending import for a person to approve. Nothing is set here.
+async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: Grant, vaultId: string, environment: string): Promise<string> {
+  if (!variablesConfigured()) {
+    req.resume();
+    send(res, 503, { error: "not_configured" });
+    return "not_configured";
+  }
+  const { entries, refused } = pushBody(await readJson(req, MAX_PUSH_BYTES));
+  const items = sealItems(vaultId, [environment], entries);
+  let r;
+  try {
+    r = await asGrant(grant, async (c) =>
+      (
+        await c.query("select public.create_env_import($1, $2, $3, $4) as r", [
+          vaultId, [environment], JSON.stringify(items), JSON.stringify(refused),
+        ])
+      ).rows[0].r,
+    );
+  } catch (err) {
+    // 22023: the database refused the input (a name, the shape).
+    if ((err as { code?: string }).code === "22023") throw new BadRequest(400, "invalid_request");
+    throw err;
+  }
+  if (!r.ok) {
+    send(res, STATUS[r.error] ?? 403, { error: r.error });
+    return r.error;
+  }
+  send(res, 201, {
+    import: r.id,
+    status: "pending",
+    vault: vaultId,
+    environment,
+    names: r.names,
+    overwrites: r.overwrites,
+    expires_at: r.expires_at,
+    url: `${issuer()}/v/${vaultId}/variables/imports/${r.id}`,
+  });
+  return "pending";
 }

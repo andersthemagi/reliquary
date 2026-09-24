@@ -94,7 +94,7 @@ echo "== server logs (must contain no value, token, code or the key)"
 { "$engine" logs "$web"; "$engine" logs "$mcp"; } > "$work/logs" 2>&1
 [ -s "$work/state/secrets" ] || { echo "the tests recorded no secrets to look for"; exit 1; }
 leak=0
-grep -E 'SEKRIT|rl[qecr]_[0-9a-f]' "$work/logs" && leak=1
+grep -E 'SEKRIT|PUSHVAL|rl[qecr]_[0-9a-f]' "$work/logs" && leak=1
 grep -F -f "$work/state/secrets" "$work/logs" && leak=1
 grep -qF "$key" "$work/logs" && { echo "(the key)"; leak=1; }
 [ $leak = 0 ] || { echo "LEAK in a server log"; exit 1; }

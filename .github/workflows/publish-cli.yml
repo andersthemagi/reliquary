@@ -1,0 +1,75 @@
+# Publishes the CLI (cli/, @reliquary-ai/cli) to npm when a tag cli-v<version>
+# is pushed, e.g. `git tag cli-v0.2.0 && git push origin cli-v0.2.0`. The tag
+# must match cli/package.json's version. The CLI's end-to-end tests run first;
+# the package is published with npm provenance (a signed statement that this
+# workflow, at this commit, built it).
+#
+# Secret: NPM_TOKEN (Settings > Secrets and variables > Actions), an npm
+# granular access token that can publish @reliquary-ai/cli. Until it's set,
+# the workflow skips with a notice.
+name: publish-cli
+
+on:
+  push:
+    tags: ["cli-v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+concurrency:
+  group: publish-cli
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CONTAINER_ENGINE: docker
+    steps:
+      - name: Is NPM_TOKEN set
+        id: cfg
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::notice title=publish skipped::NPM_TOKEN is not set, so nothing is published"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.cfg.outputs.ready == 'true'
+
+      - name: The tag matches cli/package.json
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          want="${GITHUB_REF_NAME#cli-v}"
+          have=$(node -p "require('./cli/package.json').version")
+          if [ "$want" != "$have" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, but cli/package.json is version $have"
+            exit 1
+          fi
+
+      - name: CLI tests
+        if: steps.cfg.outputs.ready == 'true'
+        run: TEST_SLOT=0 ./test.sh cli
+
+      - name: Pack (dry run)
+        if: steps.cfg.outputs.ready == 'true'
+        working-directory: cli
+        run: |
+          npm ci --no-audit --no-fund
+          npm pack --dry-run
+
+      - name: Publish
+        if: steps.cfg.outputs.ready == 'true'
+        working-directory: cli
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # The token goes to a user-level .npmrc, never the repository's.
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
+          npm publish --provenance --access public

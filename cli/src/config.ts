@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { CliError, UsageError } from "./errors.js";
 
-export const DEFAULT_SERVER = "https://reliquary-context.vercel.app";
+export const DEFAULT_SERVER = "https://reliquary.redmage.cc";
 export const PROJECT_FILE = ".reliquary.json";
 const TIMEOUT_MS = 30_000;
 
