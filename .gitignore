@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+dist/
+.env
+.env.*
+!.env.example
+.projects/state.local.json
+.projects/vault/
+supabase/.temp/
+.DS_Store
+*.log
