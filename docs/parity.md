@@ -47,7 +47,7 @@ and, for the agent, its token's vaults and access.
 | Unsnooze | POST `/v/:v/proposals/:p/unsnooze` | none | person (the database allows the agent) | **Gap**, and not worth closing: an agent has no inbox to bring things back into |
 | Changes feed / activity | `/activity`, `/v/:v/activity`, a file's History tab | `changes_since` | both | The web pages are for reading; `changes_since` is a cursor feed for agents. Same log |
 | Create a token | `/tokens` (POST `/tokens/new`) | none | person | **Ceiling**: grants are the person's (design: "managing grants") |
-| Revoke a token | POST `/tokens/:id/revoke` | none | person (the database allows the agent) | **Gap**, deliberately left: an agent revoking tokens is grant management; see below |
+| Revoke a token | POST `/tokens/:id/revoke` | none | person | **Ceiling**: revoking is grant management. `revoke_access_token` is `require_human` (`20260925110000_hardening.sql`), so no token, OAuth client or CLI grant can revoke; an OAuth client still ends its own grant through the token endpoint (RFC 7009) |
 | Approve an OAuth client (consent) | `/oauth/authorize` | none | person | **Ceiling**: consent is a grant, and must be a person |
 | Connect an agent (setup help) | `/connect` | none | person | Not an action; there is nothing to do over MCP |
 | Manage members | none | none | person (owner) | Web: **gap** (`set_member` exists in the database; only seeds and `./mcp/dev.sh` use it). MCP: **ceiling** |
@@ -73,6 +73,13 @@ and, for the agent, its token's vaults and access.
   person could only "edit, then approve", which also approves. Now a Revise
   action for the proposer.
 
+## Fixed since
+
+- **Revoke a token** (2026-09-25, `20260925110000_hardening.sql`): the
+  database let an agent revoke its person's tokens (`require_person`). It is
+  now `require_human`, a ceiling like creating one, with hostile tests in
+  `supabase/tests/hardening_test.sql`.
+
 ## Gaps left
 
 | Gap | Side | Why it's not in this change |
@@ -80,5 +87,4 @@ and, for the agent, its token's vaults and access.
 | Manage members (invite, change role, remove) | web | Needs a way to name a person who isn't in the vault (email lookup through Supabase Auth, or invitations), which is a design decision, not a form |
 | Erase a file | web | Irreversible; wants a confirm page (design system step 5's "More" menu and confirm), so it's its own change |
 | Rename a vault, change its default policy | both | No database function; add one (owner, person only for the default policy, since it is policy) |
-| Revoke a token | MCP | The database allows an agent to revoke its person's tokens (`revoke_access_token` is `require_person`). An agent cutting off other agents is grant management; decide whether to tighten the database to `require_human` rather than add a tool |
 | Unsnooze | MCP | Allowed by the database, pointless for an agent; left out |

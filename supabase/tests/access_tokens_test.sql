@@ -58,9 +58,12 @@ select t.expect('mcp role: cannot call the unchecked write helper',
 select t.expect('revoke: another person cannot revoke Ana''s token',
   t.run('dee', format($q$select public.revoke_access_token(%L)$q$,
     (select id from public.access_tokens where name = 'Claude Code on MacBook'))), 'ERR P0002');
+select t.expect('revoke: a person''s agent cannot revoke their token',
+  t.run('ana', format($q$select public.revoke_access_token(%L)$q$,
+    (select id from public.access_tokens where name = 'Claude Code on MacBook')), 'Claude Code'), 'ERR 42501');
 select t.run('ana', format($q$select public.revoke_access_token(%L)$q$,
-  (select id from public.access_tokens where name = 'Claude Code on MacBook')), 'Claude Code');
-select t.expect('revoke: a person''s agent can revoke their token, and it stops resolving',
+  (select id from public.access_tokens where name = 'Claude Code on MacBook')));
+select t.expect('revoke: a person revokes their token, and it stops resolving',
   t.run_role('reliquary_mcp', format($q$select count(*) from private.resolve_access_token(%L)$q$,
     (select encode(extensions.digest(token, 'sha256'), 'hex') from t.tokens where name = 'ana'))), '0');
 update public.access_tokens set expires_at = now() - interval '1 second' where name = 'Hermes on Linux';
