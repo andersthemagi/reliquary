@@ -33,6 +33,8 @@ import { fileURLToPath } from "node:url";
 import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
 import { envApi } from "./envapi.js";
+import { landing } from "./landing.js";
+import { publicRoute } from "./legal.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
 import { configureVariables } from "./secrets.js";
@@ -206,6 +208,12 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
       return;
     }
+    // The public site's legal pages, robots.txt, sitemap.xml (legal.ts).
+    const pub = req.method === "GET" ? publicRoute(url.pathname, theme) : undefined;
+    if (pub) {
+      res.writeHead(200, { ...SECURITY_HEADERS, "content-type": pub.type }).end(pub.body);
+      return;
+    }
     // OAuth endpoints a client calls without a session (oauth.ts).
     if (await oauthPublic(req, res, url)) return;
     // The env API, for the Reliquary CLI's bearer tokens (envapi.ts).
@@ -251,10 +259,12 @@ const server = http.createServer(async (req, res) => {
     if (!session) {
       if (MODE === "supabase") {
         // Signed out: a page sends you to sign in and back; a form post
-        // can't be replayed after sign-in, so it just says so.
-        if (req.method === "GET") send(res, { redirect: signinUrl(url.pathname + url.search) }, {}, auth.cookies);
+        // can't be replayed after sign-in, so it just says so. `/` with no
+        // session cookies at all is a visitor: the landing page (landing.ts).
+        if (req.method === "GET" && url.pathname === "/" && !auth.cookies.length) send(res, { html: landing(theme) });
+        else if (req.method === "GET") send(res, { redirect: signinUrl(url.pathname + url.search) }, {}, auth.cookies);
         else send(res, { status: 401, html: notice("Signed out", html`Your session ended. <a href="/signin">Sign in</a> and try again.`, theme) }, {}, auth.cookies);
-        console.info(`${req.method} ${url.pathname} ${req.method === "GET" ? 303 : 401}`);
+        console.info(`${req.method} ${url.pathname} ${res.statusCode}`);
       } else {
         send(res, { status: 401, html: notice("Signed out", html`Run <code>./mcp/dev.sh ui</code> to open a sign-in link.`, theme) });
       }
