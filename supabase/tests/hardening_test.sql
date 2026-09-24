@@ -175,3 +175,20 @@ select t.expect('rls: every member_read policy checks the readable set once per 
     where schemaname = 'public' and policyname = 'member_read' and qual like '%is_member%'
       and tablename not in ('environments', 'variables', 'variable_values')),
   null);
+
+-- ---------------------------------------------------------------------------
+-- Erasing nothing
+
+create table t.log_before as select count(*) as n from public.log where vault_id = t.id('team');
+select t.expect('erase: a path with no file and no proposal is refused',
+  t.run('ana', format($q$select public.erase_file(%L, 'notes/never-existed.md')$q$, t.id('team'))), 'ERR P0002');
+select t.expect_true('erase: and nothing is logged',
+  (select count(*) from public.log where vault_id = t.id('team')) = (select n from t.log_before));
+select t.expect('erase: an outsider is refused as before, whether or not the path exists',
+  t.run('dee', format($q$select public.erase_file(%L, 'notes/never-existed.md')$q$, t.id('team'))), 'ERR 42501');
+select t.expect('erase: a path with only a proposal still erases its text',
+  t.run('ana', format($q$select public.erase_file(%L, 'canon/n.md')$q$, t.id('team'))), '0');
+select t.expect_true('erase: and that proposal''s text is blank',
+  (select body is null from public.proposals where id = t.id('prop')));
+select t.expect('erase: a real file is erased and its versions counted',
+  t.run('ana', format($q$select public.erase_file(%L, 'notes/big.md')$q$, t.id('team'))), '1');

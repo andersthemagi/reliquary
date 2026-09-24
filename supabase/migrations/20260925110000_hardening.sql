@@ -199,3 +199,41 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function private.rules_for(uuid, text[]) from public, anon;
 grant execute on function private.rules_for(uuid, text[]) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 9. Erasing nothing is an error
+--
+-- erase_file logged a file.erase for any path, even one with nothing at it,
+-- which put a false entry in the vault's log. It now refuses (P0002) a path
+-- with no file (live or deleted) and no proposal. A path with only
+-- proposals still erases their text and discussion. Otherwise as in
+-- 20260924150000_review.sql.
+
+create or replace function public.erase_file(p_vault uuid, p_path text)
+returns int
+language plpgsql volatile security definer set search_path = '' as $$
+declare n int;
+begin
+  perform private.require_human();
+  if private.role_in(p_vault) is distinct from 'owner' then
+    raise exception 'only owners erase' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.files where vault_id = p_vault and path = p_path)
+     and not exists (select 1 from public.proposals where vault_id = p_vault and path = p_path) then
+    raise exception 'no such file' using errcode = 'P0002';
+  end if;
+  update public.file_versions v set body = null, erased_at = now()
+  from public.files f
+  where f.id = v.file_id and f.vault_id = p_vault and f.path = p_path and v.erased_at is null;
+  get diagnostics n = row_count;
+  update public.proposals set body = null
+  where vault_id = p_vault and path = p_path;
+  update public.proposal_notes set body = null, erased_at = now()
+  where erased_at is null and proposal_id in
+    (select id from public.proposals where vault_id = p_vault and path = p_path);
+  update public.files set deleted_at = coalesce(deleted_at, now())
+  where vault_id = p_vault and path = p_path;
+  perform private.log_event(p_vault, 'file.erase', p_path, null, null,
+    jsonb_build_object('versions', n));
+  return n;
+end $$;
