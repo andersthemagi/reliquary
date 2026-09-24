@@ -132,7 +132,7 @@ before(async () => {
   await startServer(owner, RHEA);
   await startServer(editor, SOL);
   [{ id: vault }] = await as(RHEA, "select public.create_vault('Env Admin') as id");
-  await as(RHEA, "select public.set_member($1, $2, 'editor')", [vault, SOL]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [vault, SOL, RHEA]);
   vals.dev = value("dev");
   await vars.setVariable(RHEA, vault, "API_KEY", "development", vals.dev);
 });

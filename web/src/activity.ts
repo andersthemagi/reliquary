@@ -10,6 +10,7 @@
 
 import type pg from "pg";
 import { html, raw, when, type Raw } from "./html.js";
+import { personRef } from "./personref.js";
 
 export const PAGE_SIZE = 50;
 
@@ -26,6 +27,7 @@ const EVENTS: [string, string][] = [
   ["proposal.stale", "Went stale"],
   ["policy.set", "Changed a rule"],
   ["member.set", "Changed members"],
+  ["member.leave", "Left the vault"],
   ["invite.create", "Invited someone"],
   ["invite.accept", "Joined by invite"],
   ["invite.revoke", "Withdrew an invite"],
@@ -161,8 +163,8 @@ async function options(c: pg.PoolClient, me: string, vaultId?: string): Promise<
 
 const q = encodeURIComponent;
 const who = (me: string, id: string | null, agent: string | null) =>
-  `${id === me ? "you" : id ? id.slice(0, 8) : "system"}${agent ? ` via ${agent}` : ""}`;
-const person = (me: string, id: string) => (id === me ? "You" : id.slice(0, 8));
+  `${id === me ? "you" : id ? personRef(id) : "system"}${agent ? ` via ${agent}` : ""}`;
+const person = (me: string, id: string) => (id === me ? "You" : personRef(id));
 
 export type ActivityOpts = {
   me: string;

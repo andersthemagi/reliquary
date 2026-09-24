@@ -45,12 +45,12 @@ until "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q 2>/
 sleep 1
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql | psql >/dev/null
+cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
 # A second database for test/variables_keys.test.mjs: key rotation moves
 # every stored value and the server checks every stored key id, so it can't
 # share a database with files that seal under keys of their own.
 psql -c "create database keys"
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql | psql -d keys >/dev/null
+cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql -d keys >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=')
 

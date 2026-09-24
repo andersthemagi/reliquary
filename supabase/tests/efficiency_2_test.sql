@@ -9,8 +9,8 @@
 insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
 insert into t.ids select 'side', t.run('ana', $q$select public.create_vault('Side')$q$)::uuid;
 insert into t.ids select 'priv', t.run('dee', $q$select public.create_vault('Private')$q$)::uuid;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('team'), t.id('ben')));
-select t.run('ana', format($q$select public.set_member(%L, %L, 'viewer')$q$, t.id('team'), t.id('cal')));
+select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
+select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
 select t.run('ana', format($q$select public.write_file(%L, 'notes/a.md', 'alpha words here')$q$, t.id('team')));
 select t.run('ana', format($q$select public.write_file(%L, 'notes/s.md', 'side words')$q$, t.id('side')));
 
@@ -252,7 +252,7 @@ create function t.answers(p_fn text, p_query text, p_limit int default 20) retur
   select t.run('cal', format($q$select coalesce(string_agg(path || ':' || policy || ':' || round(rank::numeric, 6), ' ' order by ord), '(none)')
     from (select *, row_number() over () as ord from %s(%L, %L, %s)) x$q$, p_fn, t.id('find'), p_query, p_limit))
 $$;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'viewer')$q$, t.id('find'), t.id('cal')));
+select test_support.add_member(t.id('find'), t.id('cal'), 'viewer', t.id('ana'));
 select t.expect('search: the same answers as before, in the same order, for words, phrases, or, exclusions, paths and nothing',
   (select string_agg(q || '=' || (t.answers('public.search', q, 20) = t.answers('t.search_before', q, 20))::text, ',' order by q)
      from unnest(array['workshop', '"workshop agenda agenda"', 'retainer or pricing', 'workshop -retainer',
@@ -303,7 +303,7 @@ select t.expect('precheck: at 20 pending in a vault, refused as rate_limited and
 select t.expect('precheck: names it would log must be names',
   t.run('ana', t.precheck('rate', array['PATH'])) || ',' || t.run('ana', t.precheck('rate', array['bad name'])),
   'ERR 22023,ERR 22023');
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('rate'), t.id('ben')));
+select test_support.add_member(t.id('rate'), t.id('ben'), 'editor', t.id('ana'));
 select t.expect('precheck: another person, and the same person in another vault, may go on',
   t.err(t.run('ben', t.precheck('rate'))) || ',' || t.err(t.run('ana', t.precheck('side'))),
   'ok,ok');

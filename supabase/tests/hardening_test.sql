@@ -148,7 +148,7 @@ select t.run('ana', format($q$select public.set_policy(%L, 'notes/one.md', 'cano
 create table t.paths (p text);
 insert into t.paths values ('canon/a.md'), ('canon/deep/b.md'), ('canon/deep/'), ('notes/one.md'), ('notes/two.md'),
   ('top.md'), ('canon'), ('canonical/x.md');
-select t.run('ana', format($q$select public.set_member(%L, %L, 'viewer')$q$, t.id('team'), t.id('cal')));
+select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
 select t.expect('rules_for: agrees with rule_for on every path (exact, longest folder, default)',
   t.run('cal', format($q$select count(*) from unnest(%L::text[]) p
       join private.rules_for(%L, %L::text[]) r on r.path = p

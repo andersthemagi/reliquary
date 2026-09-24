@@ -104,12 +104,13 @@ const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
   svg: "image/svg+xml",
+  png: "image/png",
   woff2: "font/woff2",
   txt: "text/plain; charset=utf-8",
 };
 const STATIC = new Map<string, { type: string; body: Buffer }>();
 const fonts = existsSync(join(PUBLIC, "fonts")) ? readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`) : [];
-for (const rel of ["style.css", "favicon.svg", ...fonts]) {
+for (const rel of ["style.css", "favicon.svg", "og.png", ...fonts]) {
   const type = TYPES[rel.split(".").pop() ?? ""];
   if (type && existsSync(join(PUBLIC, rel))) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
 }

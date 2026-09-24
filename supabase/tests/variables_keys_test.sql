@@ -9,8 +9,8 @@ insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Tea
 insert into t.ids select 'side', t.run('ana', $q$select public.create_vault('Side')$q$)::uuid;
 insert into t.ids select 'priv', t.run('dee', $q$select public.create_vault('Private')$q$)::uuid;
 insert into t.ids select 'solo', t.run('dee', $q$select public.create_vault('Solo')$q$)::uuid;
-select t.run('ana', format($q$select public.set_member(%L, %L, 'editor')$q$, t.id('team'), t.id('ben')));
-select t.run('ana', format($q$select public.set_member(%L, %L, 'viewer')$q$, t.id('team'), t.id('cal')));
+select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
+select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
 
 create function t.q(p_sql text) returns text language plpgsql as $$
 declare v text;

@@ -20,7 +20,9 @@ $$;
 \o /dev/null
 select pg_temp.as_person(:'ana');
 select public.create_vault('Team', 'open') as v1 \gset
-select public.set_member(:'v1', :'ben', 'editor');
+select pg_temp.reset();
+select test_support.add_member(:'v1', :'ben', 'editor', :'ana');
+select pg_temp.as_person(:'ana');
 select public.set_policy(:'v1', 'canon/', 'canon', 1);
 select public.propose(:'v1', 'canon/pricing.md', E'Day rate is 800 EUR.\nNet 30.', 'initial') as p0 \gset
 select public.decide(:'p0', 'approve');
@@ -59,7 +61,9 @@ select pg_temp.reset();
 -- left (Dee adds her to Dee private, she mints a token for it, Dee removes her).
 \o /dev/null
 select pg_temp.as_person(:'dee');
-select public.set_member(:'v2', :'ana', 'viewer');
+select pg_temp.reset();
+select test_support.add_member(:'v2', :'ana', 'viewer', :'dee');
+select pg_temp.as_person(:'dee');
 select pg_temp.reset();
 select pg_temp.as_person(:'ana');
 select public.create_access_token('Seeded reader', 30, array[:'v1']::uuid[], 'read');
@@ -81,7 +85,9 @@ update public.access_tokens set expires_at = now() - interval '1 day' where name
 \o /dev/null
 select pg_temp.as_person(:'ana');
 select public.create_vault('Threads', 'open') as tv \gset
-select public.set_member(:'tv', :'ben', 'editor');
+select pg_temp.reset();
+select test_support.add_member(:'tv', :'ben', 'editor', :'ana');
+select pg_temp.as_person(:'ana');
 select public.set_policy(:'tv', 'canon/', 'canon', 1);
 select pg_temp.reset();
 select pg_temp.as_person(:'ben', 'Hermes on Linux');
@@ -91,7 +97,9 @@ select pg_temp.reset();
 select pg_temp.as_person(:'ben');
 select public.propose(:'tv', 'canon/old.md', 'Old.', 'old') as tw_closed \gset
 select public.create_vault('Shop', 'open') as shop \gset
-select public.set_member(:'shop', :'ana', 'viewer');
+select pg_temp.reset();
+select test_support.add_member(:'shop', :'ana', 'viewer', :'ben');
+select pg_temp.as_person(:'ben');
 select pg_temp.reset();
 select pg_temp.as_person(:'ana');
 select public.decide(:'tw_closed', 'reject', 'Not needed.');
@@ -122,7 +130,9 @@ select pg_temp.reset();
 \o /dev/null
 select pg_temp.as_person(:'ben');
 select public.create_vault('Side', 'open') as v3 \gset
-select public.set_member(:'v3', :'ana', 'viewer');
+select pg_temp.reset();
+select test_support.add_member(:'v3', :'ana', 'viewer', :'ben');
+select pg_temp.as_person(:'ben');
 select public.write_file(:'v3', 'canon/page.md', E'# Old heading\n\nOld text stays.\n\nA line about the weather.');
 select public.set_policy(:'v3', 'canon/', 'canon', 1);
 select pg_temp.reset();
@@ -148,7 +158,9 @@ select pg_temp.reset();
 \o /dev/null
 select pg_temp.as_person(:'ana');
 select public.create_vault('Controls', 'open') as cv \gset
-select public.set_member(:'cv', :'ben', 'editor');
+select pg_temp.reset();
+select test_support.add_member(:'cv', :'ben', 'editor', :'ana');
+select pg_temp.as_person(:'ana');
 select public.set_policy(:'cv', 'canon/', 'canon', 1);
 select pg_temp.reset();
 select pg_temp.as_person(:'ben', 'Hermes on Linux');

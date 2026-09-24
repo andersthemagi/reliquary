@@ -9,6 +9,7 @@ import type pg from "pg";
 import { asPerson } from "./db.js";
 import { csrfField, html, when, type Raw } from "./html.js";
 import type { Ctx, Reply } from "./pages.js";
+import { personRef } from "./personref.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const proposalPath = (id: string, pid: string, rest = "") => `/v/${id}/proposals/${pid}${rest}`;
@@ -29,7 +30,7 @@ function message(err: unknown): string {
 }
 
 const who = (ctx: Ctx, id: string | null, agent: string | null) =>
-  `${id === ctx.userId ? "you" : id ? id.slice(0, 8) : "system"}${agent ? ` via ${agent}` : ""}`;
+  `${id === ctx.userId ? "you" : id ? personRef(id) : "system"}${agent ? ` via ${agent}` : ""}`;
 
 function ago(d: Date): string {
   const s = Math.max(0, (Date.now() - d.getTime()) / 1000);

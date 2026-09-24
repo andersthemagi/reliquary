@@ -23,8 +23,12 @@ $$;
 \o /dev/null
 select pg_temp.as_person(:'ana');
 select public.create_vault('Team', 'open') as v1 \gset
-select public.set_member(:'v1', :'ben', 'editor');
-select public.set_member(:'v1', :'cal', 'viewer');
+select pg_temp.reset();
+select test_support.add_member(:'v1', :'ben', 'editor', :'ana');
+select pg_temp.as_person(:'ana');
+select pg_temp.reset();
+select test_support.add_member(:'v1', :'cal', 'viewer', :'ana');
+select pg_temp.as_person(:'ana');
 select public.set_policy(:'v1', 'canon/', 'canon', 1);
 select public.write_file(:'v1', 'notes/standup.md', 'Standup is at 10:00 in room B.');
 select public.propose(:'v1', 'canon/pricing.md', 'Day rate is 800 EUR.', 'initial rate') as p1 \gset
@@ -92,8 +96,12 @@ update public.access_tokens set expires_at = now() - interval '1 second' where n
 \o /dev/null
 select pg_temp.as_person(:'ana');
 select public.create_vault('Threads', 'open') as tv \gset
-select public.set_member(:'tv', :'ben', 'editor');
-select public.set_member(:'tv', :'cal', 'viewer');
+select pg_temp.reset();
+select test_support.add_member(:'tv', :'ben', 'editor', :'ana');
+select pg_temp.as_person(:'ana');
+select pg_temp.reset();
+select test_support.add_member(:'tv', :'cal', 'viewer', :'ana');
+select pg_temp.as_person(:'ana');
 select public.set_policy(:'tv', 'canon/', 'canon', 1);
 select public.propose(:'tv', 'canon/done.md', 'Done.', 'closed one') as tp_closed \gset
 select public.decide(:'tp_closed', 'approve');
@@ -122,8 +130,12 @@ select pg_temp.reset();
 \o /dev/null
 select pg_temp.as_person(:'ana');
 select public.create_vault('Tidings', 'open') as fv \gset
-select public.set_member(:'fv', :'ben', 'editor');
-select public.set_member(:'fv', :'cal', 'viewer');
+select pg_temp.reset();
+select test_support.add_member(:'fv', :'ben', 'editor', :'ana');
+select pg_temp.as_person(:'ana');
+select pg_temp.reset();
+select test_support.add_member(:'fv', :'cal', 'viewer', :'ana');
+select pg_temp.as_person(:'ana');
 select public.set_policy(:'fv', 'canon/', 'canon', 1);
 select pg_temp.reset();
 select set_config('request.jwt.claims', json_build_object('sub', :'ben', 'act', json_build_object('sub', 'x', 'name', 'Hermes on Linux'))::text, false),
