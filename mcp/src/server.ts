@@ -1,9 +1,14 @@
 // Reliquary's remote MCP endpoint: Streamable HTTP, stateless, one MCP
-// server per request, authenticated by a personal access token.
+// server per request, authenticated by a personal access token or an OAuth
+// access token from the web app's authorization server.
 //
-//   POST /mcp      MCP (Authorization: Bearer rlq_...)
+//   POST /mcp      MCP (Authorization: Bearer rlq_... or rlo_...)
+//   GET  /.well-known/oauth-protected-resource[/mcp]  RFC 9728 metadata
 //   GET  /healthz  liveness
 //   GET  /healthz?db=1  keepalive: `select 1`, then `ok` or 503 `unavailable`
+//
+// A 401 names the protected resource metadata (WWW-Authenticate:
+// resource_metadata=...), which is how an MCP client finds where to sign in.
 //
 // Logs carry method, status and an identity prefix. Never tokens, arguments,
 // or file text.
@@ -12,12 +17,54 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { pool, recordClient, resolveToken } from "./db.js";
+import { pool, recordClient, resolveOAuthToken, resolveToken } from "./db.js";
 import { registerTools } from "./tools.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8787);
 const MAX_BODY = 1024 * 1024;
+
+// OAuth (docs/research/hosting.md, section 4). MCP_RESOURCE is this server's
+// canonical URL, byte for byte what the authorization server binds tokens to
+// (the web app reads the same value); AUTH_ISSUER is the web app. Both are
+// required on Vercel; locally they default to the dev.sh addresses.
+function oauthConfig() {
+  const onVercel = !!process.env.VERCEL;
+  if (onVercel && (!process.env.MCP_RESOURCE || !process.env.AUTH_ISSUER)) {
+    console.error("Refusing to start: VERCEL is set but MCP_RESOURCE or AUTH_ISSUER is not");
+    process.exit(1);
+  }
+  const resource = process.env.MCP_RESOURCE ?? `http://${HOST}:${PORT}/mcp`;
+  const issuer = process.env.AUTH_ISSUER ?? "http://127.0.0.1:8790";
+  let r: URL;
+  try {
+    r = new URL(resource);
+    const i = new URL(issuer);
+    if (!/^https?:$/.test(r.protocol) || r.hash || !/^https?:$/.test(i.protocol) || i.search || i.hash) throw new Error();
+  } catch {
+    console.error("MCP_RESOURCE and AUTH_ISSUER must be http(s) URLs without fragments");
+    process.exit(1);
+  }
+  // RFC 9728, 3.1: the well-known segment goes between host and path.
+  const prmPath = "/.well-known/oauth-protected-resource" + (r.pathname === "/" ? "" : r.pathname);
+  return { resource, issuer, prmPath, prmUrl: r.origin + prmPath };
+}
+const OAUTH = oauthConfig();
+
+const prm = () => ({
+  resource: OAUTH.resource,
+  authorization_servers: [OAUTH.issuer],
+  bearer_methods_supported: ["header"],
+  scopes_supported: [],
+  resource_name: "Reliquary",
+});
+
+// Personal tokens (rlq_) and OAuth access tokens (rlo_) resolve to the same
+// kind of identity. Nothing else is accepted, and no token is passed on.
+async function identify(token: string) {
+  if (token.startsWith("rlo_")) return resolveOAuthToken(token, OAUTH.resource);
+  return resolveToken(token);
+}
 
 function readJson(req: http.IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -81,15 +128,30 @@ const httpServer = http.createServer(async (req, res) => {
     res.writeHead(up ? 200 : 503, plain).end(up ? "ok" : "unavailable");
     return;
   }
+  if (path === OAUTH.prmPath || path === "/.well-known/oauth-protected-resource") {
+    if (req.method !== "GET" && req.method !== "OPTIONS") {
+      send(res, 405, { error: "method_not_allowed" }, { Allow: "GET" });
+      return;
+    }
+    const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "mcp-protocol-version" };
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, cors).end();
+      return;
+    }
+    send(res, 200, prm(), { ...cors, "cache-control": "public, max-age=300" });
+    return;
+  }
   if (path !== "/mcp") {
     send(res, 404, { error: "not_found" });
     return;
   }
 
   const bearer = /^Bearer (\S+)$/.exec(req.headers.authorization ?? "");
-  const identity = bearer ? await resolveToken(bearer[1]).catch(() => null) : null;
+  const identity = bearer ? await identify(bearer[1]).catch(() => null) : null;
   if (!identity) {
-    send(res, 401, { error: "invalid_token" }, { "WWW-Authenticate": 'Bearer realm="reliquary"' });
+    // RFC 6750: no error code when no credentials were sent.
+    const challenge = `Bearer realm="reliquary", resource_metadata="${OAUTH.prmUrl}"${bearer ? ', error="invalid_token"' : ""}`;
+    send(res, 401, { error: "invalid_token" }, { "WWW-Authenticate": challenge });
     console.info("mcp 401");
     return;
   }

@@ -20,6 +20,7 @@ import http from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { html, notice, setStyleVersion, type Theme } from "./html.js";
+import { oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Reply } from "./pages.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -133,6 +134,10 @@ const SECURITY_HEADERS = {
 };
 
 function send(res: http.ServerResponse, reply: Reply, extra: Record<string, string> = {}): void {
+  if (reply.formAction) {
+    const csp = SECURITY_HEADERS["content-security-policy"].replace("form-action 'self'", `form-action 'self' ${reply.formAction}`);
+    extra = { ...extra, "content-security-policy": csp };
+  }
   if (reply.redirect) {
     res.writeHead(303, { location: reply.redirect, ...SECURITY_HEADERS, ...extra }).end();
     return;
@@ -156,6 +161,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
       return;
     }
+    // OAuth endpoints a client calls without a session (oauth.ts).
+    if (await oauthPublic(req, res, url)) return;
     if (url.pathname === "/login" && req.method === "GET") {
       const code = url.searchParams.get("code") ?? "";
       if (!loginCode || !sameSecret(code, loginCode)) {

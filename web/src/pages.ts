@@ -4,6 +4,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
 import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
@@ -33,7 +34,8 @@ export type Ctx = {
   reviewCount?: number;
   setFlash: (message: string) => void;
 };
-export type Reply = { status?: number; html?: string; redirect?: string };
+// formAction: one more origin the page's forms may submit (and redirect) to.
+export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 type Vault = { id: string; name: string; role: string };
@@ -1224,6 +1226,7 @@ export async function routes(ctx: Ctx): Promise<Reply> {
   if (!get && p === "/tokens/new") return createToken(ctx);
   let m = /^\/tokens\/([^/]+)\/revoke$/.exec(p);
   if (!get && m) return revokeToken(ctx, m[1]);
+  if (p === "/oauth/authorize") return authorize(ctx);
 
   m = /^\/v\/([^/]+)(\/.*)?$/.exec(p);
   if (!m) return notFound(ctx);

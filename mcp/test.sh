@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end test: Postgres with every migration, the MCP server, and the
 # official MCP client, all in containers on the host network (127.0.0.1).
+# For OAuth (test/oauth.test.mjs) the web app runs too, as the authorization
+# server.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -10,11 +12,13 @@ engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 slot=${TEST_SLOT:-0}
 pg=reliquary-mcp-test-pg-$slot
 srv=reliquary-mcp-test-server-$slot
+web=reliquary-mcp-test-web-$slot
 pgport=$((54330 + 10 * slot))
 port=$((8788 + 10 * slot))
+webport=$((port + 1))
 node=docker.io/library/node:22-slim
 
-cleanup() { "$engine" rm -f "$pg" "$srv" >/dev/null 2>&1 || true; }
+cleanup() { "$engine" rm -f "$pg" "$srv" "$web" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot"; }
 trap cleanup EXIT
 cleanup
 
@@ -26,20 +30,40 @@ psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 
 
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql | psql >/dev/null
 echo "alter role reliquary_mcp login password 'test';" | psql
+echo "alter role reliquary_web login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=' )
+
+# The web app as the OAuth authorization server, signed in as Ben. It is
+# built inside its own container from a read-only view of web/, so it never
+# races web/test.sh over web/dist or web/node_modules. CIMD_ALLOW_LOOPBACK
+# lets the test serve client metadata on loopback.
+"$engine" run -d --name "$web" --network host -v "$PWD/../web":/src:ro,z -v "$PWD":/mcp:z \
+  -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
+  -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000b -e LOGIN_FILE="/mcp/.login-oauth-$slot" \
+  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e PORT=$webport "$node" sh -c \
+  'mkdir -p /app && cd /src && cp -r src public package.json package-lock.json tsconfig.json /app/ && cd /app &&
+   if [ -x /src/node_modules/.bin/tsc ]; then ln -s /src/node_modules node_modules; else npm ci --no-audit --no-fund --silent; fi &&
+   npx tsc && exec node dist/server.js' >/dev/null
 
 # A fresh checkout (CI, a new worktree) has no node_modules yet.
 [ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund
 "$engine" run --rm --network none -v "$PWD":/app:Z -w /app "$node" npx tsc
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
+  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
   -e PORT=$port "$node" node dist/server.js >/dev/null
 until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
+until curl -sf "http://127.0.0.1:$webport/healthz" >/dev/null; do
+  [ "$("$engine" inspect -f '{{.State.Running}}' "$web")" = true ] || { "$engine" logs "$web"; echo "web (authorization server) exited"; exit 1; }
+  sleep 0.5
+done
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "${env_args[@]}" \
-  -e MCP_URL="http://127.0.0.1:$port/mcp" -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" "$node" node --test --test-concurrency=1 test/*.test.mjs
+  -e MCP_URL="http://127.0.0.1:$port/mcp" -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" \
+  -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
+  "$node" node --test --test-concurrency=1 test/*.test.mjs
 
 echo "== server log (must contain no tokens or file text)"
 # Not `tee /dev/stderr`: when stderr is a file (./test.sh logs) that reopens
@@ -47,3 +71,7 @@ echo "== server log (must contain no tokens or file text)"
 server_log=$("$engine" logs "$srv" 2>&1)
 printf '%s\n' "$server_log" >&2
 grep -E 'rlq_|800 EUR|Hermes|Falcon' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
+# OAuth: no personal token, access or refresh token, or code in either app's log.
+web_log=$("$engine" logs "$web" 2>&1)
+grep -E 'rl[qorc]_[0-9a-f]' <<< "$server_log
+$web_log" && { echo "LEAK: a token or code in a server log"; exit 1; } || echo "clean (oauth)"
