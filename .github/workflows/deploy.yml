@@ -8,7 +8,9 @@
 # settings fails, naming what's missing (names only, never values).
 #
 #   stage   repository secrets (Settings > Secrets and variables > Actions)
-#   db      SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF
+#   db      secret SUPABASE_DB_PASSWORD; repository variables
+#           SUPABASE_PROJECT_REF and SUPABASE_POOLER_HOST (not secret). No
+#           Supabase access token: db push goes straight to the session pooler
 #   hooks   VERCEL_DEPLOY_HOOK_WEB, VERCEL_DEPLOY_HOOK_MCP
 #   smoke   repository variables WEB_URL, MCP_URL (origins, e.g.
 #           https://app.example.com); secret KEEPALIVE_TOKEN if the MCP
@@ -65,9 +67,9 @@ jobs:
       - name: Which stages are configured
         id: cfg
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_POOLER_HOST: ${{ vars.SUPABASE_POOLER_HOST }}
           VERCEL_DEPLOY_HOOK_WEB: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
           VERCEL_DEPLOY_HOOK_MCP: ${{ secrets.VERCEL_DEPLOY_HOOK_MCP }}
           WEB_URL: ${{ vars.WEB_URL }}
@@ -101,7 +103,7 @@ jobs:
               return 1
             fi
           }
-          stage db SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF
+          stage db SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF SUPABASE_POOLER_HOST
           stage hooks VERCEL_DEPLOY_HOOK_WEB VERCEL_DEPLOY_HOOK_MCP
           stage smoke WEB_URL MCP_URL
 
@@ -116,27 +118,25 @@ jobs:
         with:
           version: 2.117.0
 
-      - name: Link the Supabase project
+      - name: Database URL (session pooler; masked)
         if: steps.cfg.outputs.db == 'true'
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+          REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          HOST: ${{ vars.SUPABASE_POOLER_HOST }}
+        run: |
+          pw=$(jq -rn --arg v "$SUPABASE_DB_PASSWORD" '$v|@uri')
+          url="postgresql://postgres.$REF:$pw@$HOST:5432/postgres"
+          echo "::add-mask::$url"
+          echo "DB_URL=$url" >> "$GITHUB_ENV"
 
       - name: Migrations, dry run
         if: steps.cfg.outputs.db == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: supabase db push --linked --dry-run
+        run: supabase db push --db-url "$DB_URL" --dry-run
 
       - name: Migrations
         if: steps.cfg.outputs.db == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: supabase db push --linked --yes
+        run: supabase db push --db-url "$DB_URL" --yes
 
       - name: Vercel Deploy Hooks (web, mcp)
         if: steps.cfg.outputs.hooks == 'true'
