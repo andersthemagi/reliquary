@@ -50,7 +50,7 @@ test("proposal: title and status, then the decision, then the diff, reason, appr
   const h = await page(`${C}/proposals/${C_REVISED}`);
   const head = at(h, '<div class="page-head">');
   const title = at(h, "Create canon/figures.md</h1>");
-  const status = at(h, '<span class="state open">Open</span>');
+  const status = at(h, '<span class="badge state open">Open</span>');
   const form = at(h, `action="${C}/proposals/${C_REVISED}/decide"`);
   const diff = at(h, 'class="diff');
   const reason = at(h, "Agent’s stated reason (unverified)");
@@ -92,10 +92,10 @@ test("proposal: snooze is a secondary control at the top, before the diff", asyn
 
 test("proposal: closed or viewer pages show status at the top and no controls", async () => {
   const closed = await page(`/v/${THREAD_VAULT}/proposals/${TW_CLOSED}`);
-  assert.ok(at(closed, '<span class="state rejected">Rejected</span>') < at(closed, 'class="diff'));
+  assert.ok(at(closed, '<span class="badge state rejected">Rejected</span>') < at(closed, 'class="diff'));
   assert.doesNotMatch(closed, /\/decide"|\/snooze"|Latest requested changes/);
   const viewer = await page(`/v/${SHOP_VAULT}/proposals/${TW_VIEW}`);
-  assert.match(viewer, /<span class="state open">Open<\/span>/);
+  assert.match(viewer, /<span class="badge state open">Open<\/span>/);
   assert.doesNotMatch(viewer, /\/decide"|\/snooze"/);
 });
 

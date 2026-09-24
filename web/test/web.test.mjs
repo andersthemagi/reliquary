@@ -199,7 +199,7 @@ test("rules: owner adds a rule, the checker explains it, and it can be removed",
   const token = await csrf(`${V}/rules`);
   await post(`${V}/rules`, { csrf: token, path: "clients/", policy: "canon", quorum: "2" });
   const checked = await page(`${V}/rules?check=clients%2Facme%2Fbrief.md`);
-  assert.match(checked, /is <span class="tag canon">canon<\/span> from the rule on <code>clients\/<\/code>, and changes need 2 approvals/);
+  assert.match(checked, /is <span class="badge policy canon">Canon<\/span> from the rule on <code>clients\/<\/code>, and changes need 2 approvals/);
   await post(`${V}/rules`, { csrf: token, path: "clients/", policy: "" });
   assert.match(await page(`${V}/rules?check=clients%2Facme%2Fbrief.md`), /by the vault default/);
 });
