@@ -14,6 +14,22 @@ transaction as the caller. Access is decided by the database (see
 ./dev.sh revoke "Hermes"       # revoke by name
 ```
 
+### Claude Code (desktop app or CLI)
+
+Add this to `~/.claude.json` under `mcpServers` (user scope, every project),
+then restart the Code session or run `/reload-plugins`:
+
+```json
+"reliquary": {
+  "type": "http",
+  "url": "http://127.0.0.1:8787/mcp",
+  "headersHelper": "/home/<you>/Projects/reliquary/mcp/headers-helper.sh"
+}
+```
+
+`headers-helper.sh` reads `mcp/.tokens/Claude-Code-on-Linux.token` at connect
+time, so the token is never stored in any config file.
+
 Tokens are never printed, because terminal output can land in an agent's
 context (Claude Code's `!` commands, for one), and secrets must never reach a
 model. If one does get printed, revoke it and mint another.
