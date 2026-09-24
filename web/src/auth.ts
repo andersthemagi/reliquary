@@ -392,7 +392,19 @@ function part(s: string): any {
   return JSON.parse(Buffer.from(s, "base64url").toString("utf8"));
 }
 
+// Parsed keys, per JWK object and algorithm: building a KeyObject on every
+// request is the costliest step of a verification. A refetched JWKS is new
+// objects, so a rotated key is never served from here.
+const importedKeys = new WeakMap<Jwk, { alg: Alg; key: ReturnType<typeof parseKey> }>();
 function importKey(jwk: Jwk, alg: Alg) {
+  const hit = importedKeys.get(jwk);
+  if (hit && hit.alg === alg) return hit.key;
+  const key = parseKey(jwk, alg);
+  importedKeys.set(jwk, { alg, key });
+  return key;
+}
+
+function parseKey(jwk: Jwk, alg: Alg) {
   if (jwk.alg !== undefined && jwk.alg !== alg) return undefined;
   if (jwk.use !== undefined && jwk.use !== "sig") return undefined;
   try {
@@ -467,7 +479,16 @@ const JWKS_TTL_MS = 10 * 60_000;
 const JWKS_MIN_REFETCH_MS = 30_000;
 let jwks: { keys: Jwk[]; at: number } | undefined;
 
-async function fetchJwks(): Promise<Jwk[]> {
+// One fetch at a time: requests that find the cache stale together share it.
+let jwksInFlight: Promise<Jwk[]> | undefined;
+function fetchJwks(): Promise<Jwk[]> {
+  jwksInFlight ??= fetchJwksOnce().finally(() => {
+    jwksInFlight = undefined;
+  });
+  return jwksInFlight;
+}
+
+async function fetchJwksOnce(): Promise<Jwk[]> {
   const c = conf();
   let res: Response;
   try {

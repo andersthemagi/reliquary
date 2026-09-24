@@ -56,9 +56,10 @@ export const pool = new pg.Pool(poolConfig());
 export async function asPerson<T>(userId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
+    // Two round trips before the work: begin, then the role and the claims
+    // in one statement (set_config('role', ..., true) is SET LOCAL ROLE).
     await client.query("begin");
-    await client.query("set local role authenticated");
-    await client.query("select set_config('request.jwt.claims', $1, true)", [
+    await client.query("select set_config('role', 'authenticated', true), set_config('request.jwt.claims', $1, true)", [
       JSON.stringify({ sub: userId, role: "authenticated" }),
     ]);
     const result = await fn(client);

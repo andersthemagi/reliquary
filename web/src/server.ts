@@ -36,7 +36,7 @@ import { envApi } from "./envapi.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Reply } from "./pages.js";
 import { configureVariables } from "./secrets.js";
-import { signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
+import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8790);
@@ -91,13 +91,22 @@ for (const rel of ["style.css", "favicon.svg", ...fonts]) {
 }
 const style = STATIC.get("/style.css");
 const commit = /^[0-9a-f]{10,}$/.test(process.env.VERCEL_GIT_COMMIT_SHA ?? "") ? process.env.VERCEL_GIT_COMMIT_SHA! : "";
-setStyleVersion(
-  style
-    ? createHash("sha256").update(style.body).digest("hex").slice(0, 10)
-    : commit
-      ? commit.slice(0, 10)
-      : randomBytes(5).toString("hex"),
-);
+const STYLE_VERSION = style
+  ? createHash("sha256").update(style.body).digest("hex").slice(0, 10)
+  : commit
+    ? commit.slice(0, 10)
+    : randomBytes(5).toString("hex");
+setStyleVersion(STYLE_VERSION);
+
+// Pages link /style.css?v=<its hash>, and fonts never change under a name, so
+// both can be cached for a year: a changed stylesheet is a new URL. Anything
+// else (the icon, an unversioned stylesheet request) for five minutes.
+const IMMUTABLE = "public, max-age=31536000, immutable";
+function staticCache(url: URL): string {
+  if (url.pathname.startsWith("/fonts/")) return IMMUTABLE;
+  if (url.pathname === "/style.css" && url.searchParams.get("v") === STYLE_VERSION) return IMMUTABLE;
+  return "public, max-age=300";
+}
 
 const cookie = readCookie;
 
@@ -167,7 +176,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const file = req.method === "GET" ? STATIC.get(url.pathname) : undefined;
     if (file) {
-      res.writeHead(200, { "content-type": file.type, "cache-control": "max-age=300", "x-content-type-options": "nosniff" }).end(file.body);
+      res.writeHead(200, { "content-type": file.type, "cache-control": staticCache(url), "x-content-type-options": "nosniff" }).end(file.body);
       return;
     }
     const themeCookie = cookie(req, THEME_COOKIE);
@@ -251,11 +260,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/theme") {
       const choice = form.get("theme");
-      const back = form.get("back") ?? "/";
       const next: Theme = choice === "light" || choice === "dark" ? choice : "auto";
       send(
         res,
-        { redirect: back.startsWith("/") && !back.startsWith("//") ? back : "/" },
+        // A local path only: never //host or /\host (browsers read that as //host).
+        { redirect: safeNext(form.get("back")) },
         { "set-cookie": `${THEME_COOKIE}=${next}; SameSite=Strict; Path=/; Max-Age=31536000${COOKIE_SECURE}` },
         auth.cookies,
       );

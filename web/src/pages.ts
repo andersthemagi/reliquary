@@ -48,6 +48,11 @@ export function message(err: unknown): string {
     const m = e.message ?? "Not allowed";
     return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
   }
+  // A size ceiling or a path or name the database won't store
+  // (20260925110000_hardening.sql). Never echoes what was sent.
+  if (e.code === "23514" || e.code === "22001") {
+    return "That’s too long (text up to 1 MB, reasons and notes up to 4000 characters), or a path or name has control characters in it.";
+  }
   throw err;
 }
 
@@ -95,7 +100,9 @@ export const notFound = (ctx: Ctx): Reply => ({
     "Not found",
     html`<h1>Not found</h1><p class="lede">There’s no such vault, file or proposal, or it isn’t shared with you.</p>
       <p><a href="/">Back to your vaults</a></p>`,
-    { user: ctx.userId, theme: ctx.theme, csrf: ctx.csrf, path: "/", reviewCount: ctx.reviewCount },
+    // The flash too: a refused write of a new path lands here, and its
+    // message must not be dropped.
+    { user: ctx.userId, flash: ctx.flash, theme: ctx.theme, csrf: ctx.csrf, path: "/", reviewCount: ctx.reviewCount },
   ),
 });
 
@@ -172,25 +179,25 @@ type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: stri
 export type Section = "files" | "proposals" | "activity" | "rules" | "search" | "variables";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
-  const files = (
-    await c.query(
-      `select path, (private.rule_for(vault_id, path)).policy from public.files
-        where vault_id = $1 and deleted_at is null order by path`,
-      [v.id],
-    )
-  ).rows as { path: string; policy: string }[];
+  const paths = (
+    await c.query(`select path from public.files where vault_id = $1 and deleted_at is null order by path`, [v.id])
+  ).rows.map((r) => r.path as string);
   const dirs = new Set<string>();
-  for (const f of files) {
-    const parts = f.path.split("/");
+  for (const p of paths) {
+    const parts = p.split("/");
     for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join("/") + "/");
   }
-  const dirPolicy = new Map<string, string>(
-    dirs.size
-      ? (await c.query(`select d, (private.rule_for($1, d)).policy from unnest($2::text[]) d`, [v.id, [...dirs]])).rows.map(
-          (r) => [r.d, r.policy],
+  // Every file's and folder's rule in one set-based call (one membership
+  // check), not one rule_for() per row.
+  const policy = new Map<string, string>(
+    paths.length
+      ? (await c.query(`select path, policy from private.rules_for($1, $2::text[])`, [v.id, [...paths, ...dirs]])).rows.map(
+          (r) => [r.path, r.policy],
         )
       : [],
   );
+  const files = paths.map((path) => ({ path, policy: policy.get(path) ?? "open" }));
+  const dirPolicy = new Map<string, string>([...dirs].map((d) => [d, policy.get(d) ?? "open"]));
   const open = (await c.query(`select count(*)::int as n from public.proposals where vault_id = $1 and status = 'open'`, [v.id]))
     .rows[0].n as number;
 
@@ -439,10 +446,16 @@ async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Reply> {
     if (!v) return null;
     const children = (
       await c.query(
-        `select f.path, (private.rule_for(f.vault_id, f.path)).policy, f.updated_at, fv.body
-           from public.files f left join public.file_versions fv on fv.id = f.current_version_id
-          where f.vault_id = $1 and f.deleted_at is null and starts_with(f.path, $2)
-          order by f.path`,
+        // Every file under the folder, but only the README's text: the rest
+        // is listing, and a folder of large files shouldn't be read whole.
+        `with here as (
+           select f.path, f.updated_at,
+                  case when lower(f.path) = lower($2 || 'readme.md') then fv.body end as body
+             from public.files f left join public.file_versions fv on fv.id = f.current_version_id
+            where f.vault_id = $1 and f.deleted_at is null and starts_with(f.path, $2))
+         select here.path, r.policy, here.updated_at, here.body
+           from here join private.rules_for($1, array(select path from here)) r using (path)
+          order by here.path`,
         [id, dir],
       )
     ).rows;
@@ -1355,9 +1368,11 @@ async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
 // ---------------------------------------------------------------------------
 
 export async function routes(ctx: Ctx): Promise<Reply> {
-  ctx.reviewCount = await reviewCount(ctx.userId);
   const p = ctx.url.pathname;
   const get = ctx.method === "GET";
+  // The Review badge is only drawn on pages: a POST almost always redirects,
+  // so it doesn't pay for the count (one transaction saved per form post).
+  if (get) ctx.reviewCount = await reviewCount(ctx.userId);
   if (get && p === "/") return home(ctx);
   if (get && p === "/review") return review(ctx);
   if (get && p === "/activity") return allActivity(ctx);
