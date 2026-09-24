@@ -29,7 +29,15 @@ case $app in
     if [[ ! -s $secret ]]; then
       (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$secret")
     fi
+    # The variables encryption key (docs/variables.md). Generated once into a
+    # gitignored file; keep a copy in a password manager too: Vercel can't
+    # show a Sensitive value again, and losing the key loses every value.
+    vkey=supabase/.variables-secret
+    if [[ ! -s $vkey ]]; then
+      (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$vkey")
+    fi
     cat <<EOF
+VARIABLES_KEY=$(cat "$vkey")
 DATABASE_URL=postgres://reliquary_web.$ref:$(pw web | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 PUBLIC_URL=$web
