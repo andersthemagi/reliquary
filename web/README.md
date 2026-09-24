@@ -56,3 +56,56 @@ page.
 ```bash
 ./test.sh    # real Postgres + this server; sign-in, escaping, CSRF, approve, threads, snooze, tokens, contrast; log leak check
 ```
+
+`test.sh` also starts a second server as hosted (`PUBLIC_URL=https://...`,
+no `public/`) for `test/hosting.test.mjs`.
+
+## Deploy (Vercel)
+
+Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
+project, `reliquary-web`, Root Directory `web`. Vercel's zero-config Node
+server runs `src/server.ts`; `vercel.json` sets region `fra1`, Fluid
+compute, `maxDuration` 30 s, bundles `supabase-ca.crt` into the function, and
+turns off automatic deploys from `main` (the deploy workflow applies
+migrations first). `public/` is served by Vercel's CDN.
+
+What the server does differently when hosted:
+
+- **`VERCEL` set**: listens on the platform's `PORT` without binding a host,
+  and refuses to start unless `DATABASE_CA_FILE` is set.
+- **`PUBLIC_URL`** (e.g. `https://app.example.com`): every POST must carry
+  exactly that `Origin`; any other, `null` or none gets 403. With `https`,
+  cookies are `__Host-rlq_session` / `__Host-rlq_theme`, `Secure`, `Path=/`,
+  no `Domain`. Unset (dev.sh, tests), the old rule applies: `http://<Host>`,
+  absent Origin allowed, unprefixed cookies.
+- **No `public/`**: the static map stays empty and the stylesheet version
+  comes from `VERCEL_GIT_COMMIT_SHA`.
+- **Database**: `DATABASE_URL` is the Supavisor transaction pooler (port
+  6543, user `reliquary_web.<project-ref>`) with no `sslmode` in it;
+  `DATABASE_CA_FILE=supabase-ca.crt` turns on TLS verified against
+  Supabase's root CA. Pool `max` is `DB_POOL_MAX`, default 3.
+
+Env vars: see `/.env.example`. Mark `DATABASE_URL` (and later
+`SESSION_SECRET`) Sensitive.
+
+**Not deployable yet:** the local sign-in stand-in (`LOCAL_USER_ID`, a login
+file) stays until chunk B (Supabase Auth) replaces it; its login file can't
+be written on Vercel's read-only filesystem.
+
+### The Supabase CA
+
+`supabase-ca.crt` (same file as `mcp/supabase-ca.crt`) is "Supabase Root
+2021 CA", valid 2021-04-28 to 2031-04-26, fetched on 2026-09-24 from
+<https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt>,
+the file behind the dashboard's Database Settings, SSL Configuration,
+"Download certificate" (named `prod-ca-2021.crt` in
+<https://supabase.com/docs/guides/platform/ssl-enforcement>).
+
+```
+sha256 (file)        700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7
+sha256 (certificate) 80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA
+```
+
+Before the first deploy, download the certificate from the project's
+dashboard and check it matches (`openssl x509 -noout -fingerprint -sha256
+-in prod-ca-2021.crt`). If Supabase rotates its CA, replace both copies.

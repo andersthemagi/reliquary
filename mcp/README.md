@@ -81,5 +81,29 @@ nonce none of the response's texts contains.
 ./test.sh    # real Postgres + server + the official MCP client; checks logs for leaks
 ```
 
-Not yet: OAuth (needed for ChatGPT connectors), protected resource metadata,
-and hosting.
+## Deploy (Vercel)
+
+Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
+project, `reliquary-mcp`, Root Directory `mcp`. Vercel's zero-config Node
+server runs `src/server.ts`; `vercel.json` sets region `fra1`, Fluid
+compute, `maxDuration` 60 s, bundles `supabase-ca.crt` into the function, and
+turns off automatic deploys from `main` (the deploy workflow applies
+migrations first). Answers are plain JSON, so nothing streams.
+
+- **`VERCEL` set**: listens on the platform's `PORT` without binding a host,
+  and refuses to start unless `DATABASE_CA_FILE` is set.
+- **Database**: `DATABASE_URL` is the Supavisor transaction pooler (port
+  6543, user `reliquary_mcp.<project-ref>`) with no `sslmode` in it;
+  `DATABASE_CA_FILE=supabase-ca.crt` turns on TLS verified against
+  Supabase's root CA (provenance and fingerprint: `web/README.md`, "The
+  Supabase CA"; the two copies are identical). Pool `max` is `DB_POOL_MAX`,
+  default 5. Every call is one transaction with `set local`, which is safe in
+  transaction mode; never pass `name` to a query (no named prepared
+  statements) and never a session-level `SET`.
+
+Env vars: see `/.env.example`. Mark `DATABASE_URL` Sensitive. Production
+needs the custom domain: Deployment Protection puts a Vercel login in front
+of `*.vercel.app`, which MCP clients can't pass.
+
+Not yet: OAuth (needed for ChatGPT connectors) and protected resource
+metadata.

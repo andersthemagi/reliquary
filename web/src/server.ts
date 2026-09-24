@@ -7,9 +7,15 @@
 //
 // Every POST needs the session's CSRF token and, when the browser sends one, a
 // same-origin Origin header. Responses carry a CSP that forbids all scripts.
+//
+// Hosted (docs/research/hosting.md), PUBLIC_URL names the site, e.g.
+// https://app.example.com. Then every POST must carry exactly that Origin
+// (a missing one is refused too), and with https the cookies are Secure and
+// __Host- prefixed. Unset, as under dev.sh and the tests, the Origin is
+// compared with http://<Host header>, and absent is allowed.
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,13 +30,34 @@ const MAX_BODY = 2 * 1024 * 1024;
 const SESSION_HOURS = 12;
 const MCP_URL = process.env.MCP_PUBLIC_URL ?? "http://127.0.0.1:8787/mcp";
 
+let PUBLIC_ORIGIN = "";
+if (process.env.PUBLIC_URL) {
+  try {
+    const u = new URL(process.env.PUBLIC_URL);
+    if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error();
+    PUBLIC_ORIGIN = u.origin;
+  } catch {
+    console.error("PUBLIC_URL must be an http(s) URL");
+    process.exit(1);
+  }
+}
+const SECURE = PUBLIC_ORIGIN.startsWith("https://");
+// __Host- cookies must be Secure, Path=/ and carry no Domain: bound to this
+// exact host, over https only.
+const COOKIE_PREFIX = SECURE ? "__Host-" : "";
+const SESSION_COOKIE = `${COOKIE_PREFIX}rlq_session`;
+const THEME_COOKIE = `${COOKIE_PREFIX}rlq_theme`;
+const COOKIE_SECURE = SECURE ? "; Secure" : "";
+
 if (!/^[0-9a-f-]{36}$/.test(USER)) {
   console.error("LOCAL_USER_ID must be a UUID");
   process.exit(1);
 }
 
 // Static files: a fixed map built at start, so no request path ever touches
-// the filesystem.
+// the filesystem. On Vercel, public/ is served by the CDN and may be missing
+// from the function bundle: then the map stays empty and the stylesheet
+// version comes from the deployed commit.
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
@@ -39,11 +66,20 @@ const TYPES: Record<string, string> = {
   txt: "text/plain; charset=utf-8",
 };
 const STATIC = new Map<string, { type: string; body: Buffer }>();
-for (const rel of ["style.css", "favicon.svg", ...readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`)]) {
+const fonts = existsSync(join(PUBLIC, "fonts")) ? readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`) : [];
+for (const rel of ["style.css", "favicon.svg", ...fonts]) {
   const type = TYPES[rel.split(".").pop() ?? ""];
-  if (type) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
+  if (type && existsSync(join(PUBLIC, rel))) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
 }
-setStyleVersion(createHash("sha256").update(STATIC.get("/style.css")!.body).digest("hex").slice(0, 10));
+const style = STATIC.get("/style.css");
+const commit = /^[0-9a-f]{10,}$/.test(process.env.VERCEL_GIT_COMMIT_SHA ?? "") ? process.env.VERCEL_GIT_COMMIT_SHA! : "";
+setStyleVersion(
+  style
+    ? createHash("sha256").update(style.body).digest("hex").slice(0, 10)
+    : commit
+      ? commit.slice(0, 10)
+      : randomBytes(5).toString("hex"),
+);
 
 type Session = { userId: string; csrf: string; expires: number; flash?: string };
 const sessions = new Map<string, Session>();
@@ -114,7 +150,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": file.type, "cache-control": "max-age=300", "x-content-type-options": "nosniff" }).end(file.body);
       return;
     }
-    const themeCookie = cookie(req, "rlq_theme");
+    const themeCookie = cookie(req, THEME_COOKIE);
     const theme: Theme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : "auto";
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
@@ -134,12 +170,12 @@ const server = http.createServer(async (req, res) => {
         expires: Date.now() + SESSION_HOURS * 3600_000,
       });
       send(res, { redirect: "/" }, {
-        "set-cookie": `rlq_session=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_HOURS * 3600}`,
+        "set-cookie": `${SESSION_COOKIE}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_HOURS * 3600}${COOKIE_SECURE}`,
       });
       return;
     }
 
-    const sid = cookie(req, "rlq_session");
+    const sid = cookie(req, SESSION_COOKIE);
     const session = sid ? sessions.get(sid) : undefined;
     if (!session || session.expires < Date.now()) {
       if (sid) sessions.delete(sid);
@@ -150,9 +186,10 @@ const server = http.createServer(async (req, res) => {
     let form = new URLSearchParams();
     if (req.method === "POST") {
       const origin = req.headers.origin;
-      if (origin && origin !== `http://${req.headers.host}`) {
+      const allowed = PUBLIC_ORIGIN ? origin === PUBLIC_ORIGIN : !origin || origin === `http://${req.headers.host}`;
+      if (!allowed) {
         send(res, { status: 403, html: notice("Request refused", "This form didn’t come from Reliquary’s own page. If you sent it yourself, reload the page and try again.", theme) });
-        console.info(`POST ${url.pathname} 403 origin=${origin === "null" ? "null" : "other"}`);
+        console.info(`POST ${url.pathname} 403 origin=${origin === undefined ? "none" : origin === "null" ? "null" : "other"}`);
         return;
       }
       form = await readForm(req);
@@ -170,7 +207,7 @@ const server = http.createServer(async (req, res) => {
       const back = form.get("back") ?? "/";
       const next: Theme = choice === "light" || choice === "dark" ? choice : "auto";
       send(res, { redirect: back.startsWith("/") && !back.startsWith("//") ? back : "/" }, {
-        "set-cookie": `rlq_theme=${next}; SameSite=Strict; Path=/; Max-Age=31536000`,
+        "set-cookie": `${THEME_COOKIE}=${next}; SameSite=Strict; Path=/; Max-Age=31536000${COOKIE_SECURE}`,
       });
       return;
     }
@@ -200,4 +237,9 @@ const server = http.createServer(async (req, res) => {
 });
 
 rotateLoginCode();
-server.listen(PORT, HOST, () => console.info(`reliquary web on http://${HOST}:${PORT}`));
+// On Vercel (zero-config Node server) the platform supplies PORT and owns the
+// socket, so bind no host; locally stay on loopback.
+const onVercel = !!process.env.VERCEL;
+server.listen(PORT, onVercel ? undefined : HOST, () =>
+  console.info(onVercel ? `reliquary web listening on port ${PORT}` : `reliquary web on http://${HOST}:${PORT}`),
+);

@@ -71,6 +71,13 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 | F31 | Design system | Every token pair meets WCAG AA in light and dark; the explicit dark theme matches the automatic one; the theme switch sets a cookie and refuses off-site returns; fonts, icon and stylesheet are local; copy has no em dashes or straight apostrophes | `web/test/contrast.test.mjs#contrast:`, `web/test/web.test.mjs#theme:`, `web/test/web.test.mjs#assets:`, `web/test/web.test.mjs#copy:`, `web/test/threads.test.mjs#copy:`, `web/test/diff_activity.test.mjs#copy:` |
 | F32 | Web routes contract | Every page the UI links to renders with the shell; unknown paths and malformed ids are 404 | `web/test/routes.test.mjs#route:` |
 
+## Hosting
+
+| ID | Feature | Acceptance criteria | Tests |
+|---|---|---|---|
+| F33 | Web as hosted (PUBLIC_URL, no public/) | With `PUBLIC_URL=https://...` a POST passes only with exactly that Origin (any other, `null` or none gets 403); session and theme cookies are `__Host-` prefixed, Secure, Path=/, no Domain; the server starts and renders pages without `public/` | `web/test/hosting.test.mjs#hosted:` |
+| F34 | Database TLS and pool for serverless | On Vercel, `DATABASE_URL` without `DATABASE_CA_FILE` is refused at start; with it, TLS is verified against the bundled Supabase CA; TLS parameters in the URL are refused next to a CA; refusals never contain the URL; pools default small (web 3, mcp 5); local runs unchanged | `web/test/db_tls.test.mjs#db tls:`, `web/test/db_tls.test.mjs#db pool:`, `mcp/test/db_tls.test.mjs#db tls:`, `mcp/test/db_tls.test.mjs#db pool:` |
+
 ## Not built yet (no rows until they ship)
 
 OAuth for MCP, Supabase Auth in the web UI, plain export, environment

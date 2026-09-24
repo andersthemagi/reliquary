@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["fra1"],
+  "fluid": true,
+  "functions": {
+    "src/server.ts": { "maxDuration": 60, "includeFiles": "supabase-ca.crt" }
+  },
+  "git": { "deploymentEnabled": { "main": false } }
+}
