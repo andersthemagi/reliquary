@@ -120,9 +120,12 @@ test("list: an expired token says so and has nothing to revoke", async () => {
   assert.doesNotMatch(tr, /Revoke/);
 });
 
-test("list: a vault the person has left is counted, not named", async () => {
+test("list: a vault the person has left drops out of the token's scope", async () => {
+  // Leaving narrows the token for good (20260925180000_member_tokens.sql),
+  // so the vault is neither named nor counted.
   const tr = row(await page("/tokens"), "Seeded left");
-  assert.match(tr, /Team, and 1 you no longer belong to/);
+  assert.match(tr, /Team/);
+  assert.doesNotMatch(tr, /no longer belong/);
   assert.doesNotMatch(tr, /Dee private/);
 });
 
