@@ -39,7 +39,16 @@ Done so far:
   true by `mcp/test/parity.test.mjs`): New vault in the web UI, and
   `create_vault` over MCP for all-vaults read-write tokens
   (`20260924230000_agent_create_vault.sql`), `delete_file` over MCP, Revise
-  for your own proposal in the web UI.
+  for your own proposal in the web UI;
+- vault administration, owners in person only (agents refused in the
+  database): rename and default policy, export (a streamed `.tar.gz` with a
+  manifest, never variable values), immediate vault deletion (the one
+  sanctioned path around the append-only triggers), and erasing a file from
+  the web UI, each behind a confirm step, on the vault's Settings page
+  (`20260925120000_vault_admin.sql`, `web/src/vaultadmin.ts`,
+  `web/src/export.ts`, with hostile tests in
+  `supabase/tests/vault_admin_test.sql`). The model is in the design's
+  "Deleting a vault".
 
 Milestone 2: **environment variables**. Done so far (phase 1, the core;
 interface and phase 2's work in [docs/variables.md](docs/variables.md)):
@@ -84,7 +93,11 @@ milestone work.
   values, managing members, and deleting or exporting a vault. Those need the
   person present in the UI.
 - **Append-only means append-only.** `log`, `env_access_log` and
-  `routine_runs` history are never updated or deleted in place.
+  `routine_runs` history are never updated or deleted in place. The one
+  sanctioned exception is `delete_vault` (an owner, in person, typed name):
+  it removes a whole vault for erasure and leaves a record in
+  `private.vault_deletions`. Any new append-only table must let that path
+  through, and nothing else.
 - **Nothing becomes canon without a person.** Agents and routines write notes
   or proposals; people approve or write canon.
 - **A run is only `ok` with an artifact.** A run that reports nothing it

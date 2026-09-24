@@ -34,7 +34,7 @@ import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sam
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
 import { envApi } from "./envapi.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
-import { routes, type Ctx, type Reply } from "./pages.js";
+import { routes, type Ctx, type Download, type Reply } from "./pages.js";
 import { configureVariables } from "./secrets.js";
 import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
@@ -157,6 +157,27 @@ function send(res: http.ServerResponse, reply: Reply, extra: Record<string, stri
     return;
   }
   res.writeHead(reply.status ?? 200, { "content-type": "text/html; charset=utf-8", ...headers }).end(reply.html ?? "");
+}
+
+// A file streamed as the response (a vault export): an attachment, never
+// cached, with the page's security headers. The filename is built by us from
+// [a-z0-9-] and a date. If writing fails part-way the connection is cut, so
+// the browser reports a failed download instead of saving a short file.
+async function sendDownload(res: http.ServerResponse, d: Download, cookies: string[]): Promise<void> {
+  const headers: Record<string, string | string[]> = {
+    ...SECURITY_HEADERS,
+    "content-type": d.type,
+    "content-disposition": `attachment; filename="${d.filename.replace(/[^A-Za-z0-9._-]/g, "_")}"`,
+    "cache-control": cookies.length ? "private, no-store" : "no-store",
+  };
+  if (cookies.length) headers["set-cookie"] = cookies;
+  res.writeHead(200, headers);
+  try {
+    await d.write(res);
+  } catch (err) {
+    console.error("download failed", (err as { code?: string }).code ?? (err as Error).name);
+    res.destroy();
+  }
 }
 
 // The same-origin rule for every POST (see the top of this file).
@@ -290,6 +311,11 @@ const server = http.createServer(async (req, res) => {
       setFlash: (m) => session.setFlash(m),
     };
     const reply = await routes(ctx);
+    if (reply.download) {
+      await sendDownload(res, reply.download, auth.cookies);
+      console.info(`${req.method} ${url.pathname} ${res.destroyed && !res.writableFinished ? "aborted" : 200}`);
+      return;
+    }
     send(res, reply, {}, auth.cookies);
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
   } catch (err) {
