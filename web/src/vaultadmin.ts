@@ -13,6 +13,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
+import { membersRoutes } from "./members.js";
 import { csrfField, html, pageHeader, type Raw } from "./html.js";
 import { message, notFound, render, UUID, vault, vaultPath, vaultShell, type Ctx, type Reply, type Vault } from "./pages.js";
 
@@ -66,6 +67,8 @@ async function settings(ctx: Ctx, id: string): Promise<Reply> {
             <div class="actions"><button class="primary">Save</button></div>
           </form>`
         : html`<p>Everything is ${policyBadge(v.default_policy)} unless a rule says otherwise. <span class="muted">Only owners rename a vault or change its default.</span></p>`}
+      <h2>Members</h2>
+      <p>${owner ? "Invite people, change their roles, and see their agent connections." : "Who is in this vault, and their roles."} <a href="${settingsPath(id, "/members")}">Members</a></p>
       <h2>Rules</h2>
       <p>Which folders and files are canon, and how many approvals their changes need. <a href="${vaultPath(id, "/rules")}">Rules</a></p>
       <h2>Export</h2>
@@ -307,6 +310,7 @@ export async function adminRoutes(ctx: Ctx, id: string, rest: string): Promise<R
   if (!UUID.test(id)) return notFound(ctx);
   const get = ctx.method === "GET";
   if (rest === "/config") return get ? settings(ctx, id) : saveSettings(ctx, id);
+  if (rest === "/config/members" || rest.startsWith("/config/members/")) return membersRoutes(ctx, id, rest);
   if (rest === "/config/export") return get ? exportPage(ctx, id) : exportDownload(ctx, id);
   if (rest === "/config/delete") return get ? deletePage(ctx, id) : deleteVault(ctx, id);
   if (rest === "/erase") return get ? erasePage(ctx, id) : eraseFile(ctx, id);

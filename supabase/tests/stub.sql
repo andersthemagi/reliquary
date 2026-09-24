@@ -23,3 +23,14 @@ create extension if not exists pgcrypto with schema extensions;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+-- Supabase Auth's users table, as much of it as the migrations read (the
+-- email, for members and invites). API roles get nothing on it, as in
+-- Supabase. Tests insert the rows they need.
+create schema if not exists auth;
+create table if not exists auth.users (
+  id    uuid primary key,
+  email varchar(255)
+);
+revoke all on schema auth from public;
+revoke all on auth.users from public, anon, authenticated;

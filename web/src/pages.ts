@@ -13,6 +13,7 @@ import { renderMarkdown } from "./markdown.js";
 import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
 import { adminRoutes } from "./vaultadmin.js";
+import { inviteRoutes } from "./members.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -337,7 +338,8 @@ async function home(ctx: Ctx): Promise<Reply> {
     ${vaults.length === 0
       ? html`<div class="empty first-vault"><strong>Create your first vault.</strong>
           <p>A vault holds the files you and your agents share: notes, briefs, decisions. You choose which of them are canon, so an agent can only propose changes and you approve them.</p>
-          <p><a class="button" href="/vaults/new">Create your first vault</a></p></div>`
+          <p><a class="button" href="/vaults/new">Create your first vault</a></p>
+          <p class="small">Joining someone else’s vault? Open the invite link they sent you. It works once you’re signed in with the address it was sent to.</p></div>`
       : html`<ul class="rows">${vaults.map(
           (v) => html`<li>
             <span><a class="name" href="${vaultPath(v.id)}">${v.name}</a>
@@ -1419,6 +1421,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   let m = /^\/tokens\/([^/]+)\/revoke$/.exec(p);
   if (!get && m) return revokeToken(ctx, m[1]);
   if (p === "/oauth/authorize") return authorize(ctx);
+  if (p === "/invite") return inviteRoutes(ctx);
 
   m = /^\/v\/([^/]+)(\/.*)?$/.exec(p);
   if (!m) return notFound(ctx);

@@ -345,9 +345,23 @@ export type SigninResult = { ok: true; cookies: string[] } | { ok: false; unavai
 // Step 1: ask Supabase to email a code and link. Never tells the caller
 // whether the address has an account: any 4xx (no such user, signups off,
 // rate limited) is the same as success. Only an outage is reported.
-export async function sendSigninEmail(email: string): Promise<{ unavailable: boolean }> {
+//
+// createUser: only for the address a live invite was sent to (signin.ts
+// checks that with the database first). Supabase then makes the account if
+// there is none, provided the project allows sign-ups; if it doesn't,
+// `signupsOff` says so, so the invitee gets a clear answer. That tells the
+// holder of the invite link whether its address has an account, and nobody
+// else anything.
+export async function sendSigninEmail(email: string, createUser = false): Promise<{ unavailable: boolean; signupsOff?: boolean }> {
   try {
-    await gotrue("/otp", { email, create_user: false });
+    const r = await gotrue("/otp", { email, create_user: createUser });
+    if (createUser && r.status === 422) {
+      const code = String(r.json?.error_code ?? "");
+      const msg = String(r.json?.msg ?? r.json?.message ?? "");
+      if (code === "otp_disabled" || code === "signup_disabled" || /signups? not allowed/i.test(msg)) {
+        return { unavailable: false, signupsOff: true };
+      }
+    }
     return { unavailable: false };
   } catch (err) {
     if (err instanceof Unavailable) return { unavailable: true };

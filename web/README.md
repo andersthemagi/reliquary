@@ -211,8 +211,19 @@ value. It never uses a Supabase key that bypasses RLS.
 
 ### Supabase dashboard (the owner, once)
 
-- **Authentication, Sign In / Providers**: Email enabled; **Allow new users
-  to sign up** off. Email OTP expiration: 600 seconds. Email OTP length: 6.
+- **Authentication, Sign In / Providers**: Email enabled. Email OTP
+  expiration: 600 seconds. Email OTP length: 6. **Allow new users to sign
+  up**: decides how invited people who have no account get one (members and
+  invites, `src/members.ts`):
+  - **on**: an invitee signs up by opening their invite link and signing in
+    with the invited address; the app asks Supabase to create an account
+    only for that address. But Supabase then also accepts sign-ups sent to
+    its API directly, by anyone; such an account sees no vault until
+    someone invites it (it can create its own vaults).
+  - **off** (the default so far): the invitee is told there's no account
+    for their address yet. Add them under **Authentication, Users, Add
+    user** (their address, auto-confirmed), then they open the link again.
+  Either way, only the account whose email is the invite's can accept it.
 - **Authentication, URL Configuration**: Site URL = `PUBLIC_URL` (e.g.
   `https://app.<domain>`); Redirect URLs: that origin only.
 - **Authentication, Emails, Templates, Magic link** (the template Supabase
@@ -227,14 +238,21 @@ value. It never uses a Supabase key that bypasses RLS.
 
   Not `{{ .ConfirmationURL }}`: that goes through Supabase's own verify
   endpoint and returns tokens in a URL fragment, which a server can't read.
+  With sign-ups on, a new invitee's first email uses the **Confirm signup**
+  template instead: give it the same code and link (`type=email` verifies
+  both).
 - **Authentication, Emails, SMTP Settings**: custom SMTP (the built-in
   sender reaches only the project team, 2 emails an hour); turn off link
   tracking at the provider, which would rewrite the link.
 - **Project Settings, JWT Keys**: the current signing key must be
   asymmetric (ES256 or RS256); set `JWT_ALG` to match. Rotating keys is
   safe: new key ids are fetched on first sight.
-- **Authentication, Users**: invite or add each person; their user id is
-  the `sub` their vault memberships use.
+- **Authentication, Users**: with sign-ups off, add each invited person
+  here before they accept (see above). Their user id is the `sub` their
+  vault memberships use; the Members page shows their email from here.
+- **Email for invites**: none yet. An owner copies the invite link from the
+  Members page and sends it themself; `deliverInvite` in `src/invites.ts`
+  is where a sender goes once the product domain has SMTP.
 
 ### Tests
 

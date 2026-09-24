@@ -50,7 +50,11 @@ and, for the agent, its token's vaults and access.
 | Revoke a token | POST `/tokens/:id/revoke` | none | person | **Ceiling**: revoking is grant management. `revoke_access_token` is `require_human` (`20260925110000_hardening.sql`), so no token, OAuth client or CLI grant can revoke; an OAuth client still ends its own grant through the token endpoint (RFC 7009) |
 | Approve an OAuth client (consent) | `/oauth/authorize` | none | person | **Ceiling**: consent is a grant, and must be a person |
 | Connect an agent (setup help) | `/connect` | none | person | Not an action; there is nothing to do over MCP |
-| Manage members | none | none | person (owner) | Web: **gap** (`set_member` exists in the database; only seeds and `./mcp/dev.sh` use it). MCP: **ceiling** |
+| See a vault's members (by email) | `/v/:v/config/members` | none | person (any member) | **Ceiling**, on purpose: `list_members` is `require_human`, so members' addresses never reach a model (`20260925140000_invites.sql`) |
+| Invite someone (email and role), list or revoke invites | `/v/:v/config/members` (POST `/invite`, `/invites/:id/revoke`) | none | person (owner) | **Ceiling** (managing members). `create_invite`, `list_invites` and `revoke_invite` are `require_human`, owners only |
+| Accept an invite | `/invite?token=` (POST `/invite`) | none | person (the invited address) | **Ceiling**: joining is the person's own act. `accept_invite` is `require_human` and checks the signed-in account's email against the invite's |
+| Change a member's role, remove a member | `/v/:v/config/members` (POST `/role`; `/remove` confirms, then POST) | none | person (owner) | **Ceiling** (managing members). `set_member` is `require_human`; a vault always keeps an owner |
+| See and cut members' agent connections to a vault | `/v/:v/config/members` (POST `/connections/:id/revoke`) | none | person (owner) | **Ceiling** (managing grants). `member_connections` and `revoke_member_connection` are `require_human`; cutting one narrows it to the member's other vaults |
 | Erase a file (blank every version) | the file page's More menu, `/v/:v/erase?path=` (GET confirms: type the path; POST erases) | none | person (owner) | **Ceiling** (irreversible): `erase_file` is `require_human` |
 | Rename a vault, change its default policy | `/v/:v/config` (POST, then a confirm page) | none | person (owner) | **Ceiling**: the default is policy, like rules, and a name is what every member navigates by. `rename_vault` and `set_default_policy` are `require_human` (`20260925120000_vault_admin.sql`) |
 | Export a vault | `/v/:v/config/export` (GET explains; POST downloads a `.tar.gz`) | none | person (owner) | **Ceiling** (design: exporting needs the person present). `export_vault` and `export_files` are `require_human` and owners-only; logged as `vault.export`. Variable values are never exported, only names |
@@ -97,9 +101,21 @@ and, for the agent, its token's vaults and access.
   now `require_human`, a ceiling like creating one, with hostile tests in
   `supabase/tests/hardening_test.sql`.
 
+## Closed since (members and invites)
+
+- **Manage members** (2026-09-25, `20260925140000_invites.sql`,
+  `web/src/members.ts`): a Members page in Settings lists members by email
+  (read from Supabase Auth for co-members in person only), and owners
+  invite by email with a single-use, hashed, 7-day link, change roles,
+  remove people (a vault always keeps an owner) and cut members' agent
+  connections off from the vault. There is no email sender yet: the owner
+  copies the link and sends it (`deliverInvite` in `web/src/invites.ts` is
+  where a sender plugs in). All of it stays off MCP: managing members is in
+  the ceiling. Hostile tests: `supabase/tests/invites_test.sql`.
+
 ## Gaps left
 
 | Gap | Side | Why it's not in this change |
 |---|---|---|
-| Manage members (invite, change role, remove) | web | Needs a way to name a person who isn't in the vault (email lookup through Supabase Auth, or invitations), which is a design decision, not a form |
+| Members' names over MCP (`list_members`) | MCP | An agent could use co-members' names to address them, but emails are personal data a model doesn't need; no tool until there are display names that aren't addresses |
 | Unsnooze | MCP | Allowed by the database, pointless for an agent; left out |

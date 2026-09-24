@@ -13,6 +13,14 @@
 //   POST /_mint                   a JWT signed with the real key, claims and header overridden
 //   GET  /_stats                  call counts and the last /otp body's create_user
 //   GET  /_jwks                   the JWKS without the apikey
+//   POST /_signups                { on: true|false }: whether /otp with create_user: true
+//                                 makes an account for an unknown address (off at start,
+//                                 as in the hosted project)
+//   GET  /_user?email=...         { id } of that account, or null
+//
+// /otp with create_user: true (sent only for an invited address) signs in an
+// existing account, or with sign-ups on makes one; otherwise it refuses as
+// Supabase does with sign-ups off.
 //
 // Env: FAKE_AUTH_PORT, FAKE_AUTH_URL (its own base URL: the issuer is
 // FAKE_AUTH_URL/auth/v1), FAKE_AUTH_APIKEY (required as `apikey` on every
@@ -50,6 +58,7 @@ const refreshTokens = new Map(); // token -> { sessionId, sub, email, used }
 const revoked = new Set(); // session ids
 const stats = { otp: 0, verify: 0, refresh: 0, logout: 0, jwks: 0, lastCreateUser: undefined };
 const TTL = 3600;
+const signups = { on: false };
 
 function accessToken(sub, email, sessionId) {
   const now = Math.floor(Date.now() / 1000);
@@ -86,6 +95,14 @@ http
     if (p === "/_last_email") return json(res, 200, lastEmail.get(url.searchParams.get("email")) ?? null);
     if (p === "/_stats") return json(res, 200, stats);
     if (p === "/_jwks") return json(res, 200, { keys: [JWK] });
+    if (p === "/_signups" && req.method === "POST") {
+      signups.on = (await readJson(req)).on === true;
+      return json(res, 200, signups);
+    }
+    if (p === "/_user") {
+      const id = USERS.get(String(url.searchParams.get("email") ?? "").toLowerCase());
+      return json(res, 200, id ? { id } : null);
+    }
     if (p === "/_mint" && req.method === "POST") {
       const { header = {}, claims = {}, sub, session_id } = await readJson(req);
       const now = Math.floor(Date.now() / 1000);
@@ -107,6 +124,14 @@ http
       stats.otp++;
       stats.lastCreateUser = body.create_user;
       const email = String(body.email ?? "").toLowerCase();
+      if (body.create_user === true && (USERS.has(email) || signups.on)) {
+        if (!USERS.has(email)) USERS.set(email, randomUUID());
+        const code = String(100000 + (randomBytes(4).readUInt32BE() % 900000));
+        const hash = randomBytes(28).toString("hex");
+        pending.push({ email, code, hash, used: false });
+        lastEmail.set(email, { code, token_hash: hash });
+        return json(res, 200, {});
+      }
       if (body.create_user !== false || !USERS.has(email)) {
         // What Supabase says with signups off: the web server must not let
         // this difference show.
