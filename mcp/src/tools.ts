@@ -140,7 +140,7 @@ export function registerTools(server: McpServer, id: Identity): void {
       run(async (c) => {
         const v = await vaultId(c, vault);
         const { rows } = await c.query(
-          `select f.path, (private.policy_for(f.vault_id, f.path)).policy, f.updated_at
+          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, f.updated_at
              from public.files f
             where f.vault_id = $1 and f.deleted_at is null
               and ($2::text is null or starts_with(f.path, $2))
@@ -165,7 +165,7 @@ export function registerTools(server: McpServer, id: Identity): void {
       run(async (c) => {
         const v = await vaultId(c, vault);
         const { rows } = await c.query(
-          `select f.path, (private.policy_for(f.vault_id, f.path)).policy, fv.body,
+          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.body,
                   fv.author, fv.agent, f.updated_at
              from public.files f
              join public.file_versions fv on fv.id = f.current_version_id
@@ -266,7 +266,7 @@ export function registerTools(server: McpServer, id: Identity): void {
           `select p.id, p.kind, p.path, p.reason, p.agent, p.created_at, p.revision,
                   (select count(*) from public.approvals a
                     where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision) as approvals,
-                  (private.policy_for(p.vault_id, p.path)).quorum as quorum,
+                  (private.rule_for(p.vault_id, p.path)).quorum as quorum,
                   coalesce((select json_agg(json_build_object('kind', n.kind, 'body', n.body, 'revision', n.revision) order by n.at)
                               from public.proposal_notes n
                              where n.proposal_id = p.id and n.body is not null
@@ -367,7 +367,7 @@ export function registerTools(server: McpServer, id: Identity): void {
     async ({ proposal_id }) =>
       run(async (c) => {
         const { rows } = await c.query(
-          `select p.*, v.name as vault_name, (private.policy_for(p.vault_id, p.path)).quorum,
+          `select p.*, v.name as vault_name, (private.rule_for(p.vault_id, p.path)).quorum,
                   (select count(*) from public.approvals a where a.proposal_id = p.id
                      and a.decision = 'approve' and a.revision = p.revision)::int as approvals
              from public.proposals p join public.vaults v on v.id = p.vault_id

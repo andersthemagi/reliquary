@@ -98,7 +98,7 @@ async function vault(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Vault | un
 const WAITING_SQL = `
   select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
          p.revision, p.status, cur.body as current_body, p.body,
-         (private.policy_for(p.vault_id, p.path)).quorum,
+         (private.rule_for(p.vault_id, p.path)).quorum,
          (select count(*) from public.approvals a
            where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision)::int as approvals
     from public.proposals p
@@ -154,7 +154,7 @@ type Section = "files" | "proposals" | "activity" | "rules" | "search";
 async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   const files = (
     await c.query(
-      `select path, (private.policy_for(vault_id, path)).policy from public.files
+      `select path, (private.rule_for(vault_id, path)).policy from public.files
         where vault_id = $1 and deleted_at is null order by path`,
       [v.id],
     )
@@ -166,7 +166,7 @@ async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?
   }
   const dirPolicy = new Map<string, string>(
     dirs.size
-      ? (await c.query(`select d, (private.policy_for($1, d)).policy from unnest($2::text[]) d`, [v.id, [...dirs]])).rows.map(
+      ? (await c.query(`select d, (private.rule_for($1, d)).policy from unnest($2::text[]) d`, [v.id, [...dirs]])).rows.map(
           (r) => [r.d, r.policy],
         )
       : [],
@@ -311,7 +311,7 @@ async function review(ctx: Ctx): Promise<Reply> {
     revising: (
       await c.query(
         `select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
-                p.revision, p.body, cur.body as current_body, (private.policy_for(p.vault_id, p.path)).quorum, 0 as approvals
+                p.revision, p.body, cur.body as current_body, (private.rule_for(p.vault_id, p.path)).quorum, 0 as approvals
            from public.proposals p join public.vaults v on v.id = p.vault_id
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
@@ -354,7 +354,7 @@ async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Reply> {
     if (!v) return null;
     const children = (
       await c.query(
-        `select f.path, (private.policy_for(f.vault_id, f.path)).policy, f.updated_at, fv.body
+        `select f.path, (private.rule_for(f.vault_id, f.path)).policy, f.updated_at, fv.body
            from public.files f left join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.deleted_at is null and starts_with(f.path, $2)
           order by f.path`,
@@ -410,7 +410,7 @@ async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     if (!v) return null;
     const f = (
       await c.query(
-        `select f.id, f.path, (private.policy_for(f.vault_id, f.path)).policy,
+        `select f.id, f.path, (private.rule_for(f.vault_id, f.path)).policy,
                 fv.body, fv.author, fv.agent, fv.created_at, fv.erased_at
            from public.files f left join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null`,
@@ -465,7 +465,7 @@ async function editView(ctx: Ctx, id: string): Promise<Reply> {
     if (!v || !canWrite(v)) return null;
     const f = (
       await c.query(
-        `select f.path, (private.policy_for(f.vault_id, f.path)).policy, fv.body
+        `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.body
            from public.files f join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
         [id, path],
@@ -538,7 +538,7 @@ async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
     const outcome = await asPerson(ctx.userId, async (c) => {
       if (!(await vault(c, ctx, id))) return { kind: "missing" } as const;
       if (action === "create") {
-        const policy = (await c.query(`select (private.policy_for($1, $2)).policy`, [id, path])).rows[0].policy;
+        const policy = (await c.query(`select (private.rule_for($1, $2)).policy`, [id, path])).rows[0].policy;
         action = policy === "canon" ? "propose" : "write";
       }
       if (action === "write") {
@@ -595,7 +595,7 @@ async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
     const rows = (
       await c.query(
         `select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
-                cur.body as current_body, (private.policy_for(p.vault_id, p.path)).quorum,
+                cur.body as current_body, (private.rule_for(p.vault_id, p.path)).quorum,
                 (select count(*) from public.approvals a where a.proposal_id = p.id and a.decision = 'approve'
                   and a.revision = p.revision)::int as approvals
            from public.proposals p
@@ -639,7 +639,7 @@ async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
     if (!v) return null;
     const p = (
       await c.query(
-        `select p.*, cur.body as current_body, (private.policy_for(p.vault_id, p.path)).quorum
+        `select p.*, cur.body as current_body, (private.rule_for(p.vault_id, p.path)).quorum
            from public.proposals p
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
