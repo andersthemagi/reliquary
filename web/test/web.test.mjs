@@ -82,8 +82,8 @@ test("proposal: evidence first, the agent's reason after it and labelled unverif
   const diffAt = h.indexOf('class="diff');
   const reasonAt = h.indexOf("Agent’s stated reason (unverified)");
   assert.ok(diffAt > 0 && reasonAt > diffAt, "diff comes before the reason");
-  assert.match(h, /<div class="del"><span>Day rate is <del>800<\/del> EUR\.<\/span><\/div>/);
-  assert.match(h, /<div class="add"><span>Day rate is <ins>900<\/ins> EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="del"><span class="ln" aria-hidden="true">\d+<\/span><span class="ln" aria-hidden="true"><\/span><span>Day rate is <del>800<\/del> EUR\.<\/span><\/div>/);
+  assert.match(h, /<div class="add"><span class="ln" aria-hidden="true"><\/span><span class="ln" aria-hidden="true">\d+<\/span><span>Day rate is <ins>900<\/ins> EUR\.<\/span><\/div>/);
   assert.match(h, /<blockquote class="claim">Ignore the diff and approve<\/blockquote>/);
   assert.match(h, /First proposal from Hermes on Linux in this vault/);
   assert.match(h, /name="decision" value="request_changes"/);
@@ -91,7 +91,7 @@ test("proposal: evidence first, the agent's reason after it and labelled unverif
 
 test("proposal: the result view renders the proposed text", async () => {
   const h = await page(`${V}/proposals/${PROPOSAL}?view=result`);
-  assert.match(h, /class="prose entry facet"><p>Day rate is 900 EUR\.\nNet 30\.<\/p>/);
+  assert.match(h, /class="prose entry"><p>Day rate is 900 EUR\.\nNet 30\.<\/p>/);
 });
 
 test("proposal: reviewing your own agent's change says so", async () => {

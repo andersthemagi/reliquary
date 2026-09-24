@@ -124,7 +124,7 @@ test("proposal: unified is the default view, with word highlights, before the re
 test("proposal: split view shows current and proposed side by side, in its own scroll box", async () => {
   const h = await page(`${T}/proposals/${PROPOSAL}?diff=split`);
   assert.match(h, /aria-current="page">Split<\/a>/);
-  assert.match(h, /<div class="split-scroll"><div class="diff split facet"/);
+  assert.match(h, /<div class="split-scroll"><div class="diff split"/);
   assert.match(h, /<span>Current<\/span><span><\/span><span>Proposed<\/span>/);
   assert.match(h, /<span class="del">Day rate is <del>800<\/del> EUR\.<\/span>/);
   assert.match(h, /<span class="add">Day rate is <ins>900<\/ins> EUR\.<\/span>/);
