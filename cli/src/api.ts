@@ -14,6 +14,13 @@ const ENVIRONMENT = /^[a-z][a-z0-9_-]{0,31}$/;
 // case a server ever sends one, since `run` puts every variable into a process.
 export const safeName = (n: string) => isVariableName(n) && !startsPrograms(n);
 
+// Text from the server that the CLI prints (a vault's name, a role): no
+// control characters (a terminal would act on escape sequences) and no
+// bidirectional overrides (they reorder what is shown). The database
+// refuses control characters in vault names already; this is the CLI not
+// trusting that.
+export const shown = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g, "\ufffd");
+
 // One call to the env API, refreshing the access token once if it's refused.
 async function request(server: Server, path: string, init: { method?: string; body?: string } = {}): Promise<{ status: number; body: unknown }> {
   const url = `${server.issuer}/api/env${path}`;
@@ -60,7 +67,12 @@ export async function listVaults(server: Server): Promise<Vault[]> {
   if (!Array.isArray(vaults)) throw new CliError("The server sent an unexpected answer for your vaults.");
   return vaults
     .filter((v): v is Vault => !!v && typeof v.id === "string" && UUID.test(v.id) && typeof v.name === "string" && typeof v.role === "string" && Array.isArray(v.environments))
-    .map((v) => ({ id: v.id, name: v.name, role: v.role, environments: v.environments.filter((e) => typeof e === "string") }));
+    .map((v) => ({
+      id: v.id,
+      name: shown(v.name),
+      role: shown(v.role),
+      environments: v.environments.filter((e): e is string => typeof e === "string" && ENVIRONMENT.test(e)),
+    }));
 }
 
 // A vault by id or name, among those this sign-in reaches.
@@ -97,6 +109,9 @@ export async function readEnvironment(server: Server, vault: Vault, environment:
   for (const [name, value] of Object.entries(b.variables as Record<string, unknown>)) {
     if (typeof value !== "string") throw new CliError(`The server sent an unexpected answer for ${what}.`);
     if (!safeName(name)) throw new CliError(`The server sent a variable whose name isn't allowed (it changes how programs start, or isn't a shell name); refusing all of ${what}.`);
+    // The server refuses NUL in values; an environment variable can't hold
+    // one, and a .env would carry it raw. Not trusting that either.
+    if (value.includes("\u0000")) throw new CliError(`The server sent ${name} with a NUL character, which no environment variable can hold; refusing all of ${what}.`);
     out.set(name, value);
   }
   return new Map([...out].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
@@ -138,13 +153,18 @@ export async function pushEnvironment(
   });
   if (status !== 201) pushFail(status, body, what);
   const b = body as { import?: unknown; names?: unknown; overwrites?: unknown; expires_at?: unknown; url?: unknown };
-  if (typeof b?.import !== "string" || !UUID.test(b.import) || !Array.isArray(b.names) || typeof b.url !== "string" || !b.url.startsWith(`${server.issuer}/`)) {
+  // The link is printed: plain printable ASCII on this server only.
+  if (
+    typeof b?.import !== "string" || !UUID.test(b.import) || !Array.isArray(b.names) || typeof b.url !== "string" ||
+    !b.url.startsWith(`${server.issuer}/`) || !/^[\x21-\x7e]+$/.test(b.url)
+  ) {
     throw new CliError(`The server sent an unexpected answer for ${what}.`);
   }
+  const names = (xs: unknown[]) => xs.filter((n): n is string => typeof n === "string" && isVariableName(n));
   return {
     id: b.import,
-    names: b.names.filter((n): n is string => typeof n === "string"),
-    overwrites: Array.isArray(b.overwrites) ? b.overwrites.filter((n): n is string => typeof n === "string") : [],
+    names: names(b.names),
+    overwrites: Array.isArray(b.overwrites) ? names(b.overwrites) : [],
     expiresAt: typeof b.expires_at === "string" ? b.expires_at : "",
     url: b.url,
   };

@@ -250,7 +250,9 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
       else if ("read" in out.result) {
         // Decrypted after the transaction has committed (the read is logged).
         const { vaultId, environment, read } = out.result;
-        const variables: Record<string, string> = {};
+        // No prototype: a variable named __proto__ (a valid name) is a key
+        // like any other, not a setter that drops it.
+        const variables: Record<string, string> = Object.create(null);
         try {
           for (const v of read.variables) variables[v.name] = open(fromDb(v), { vaultId, environment, name: v.name });
           send(res, 200, { vault: vaultId, environment, variables });

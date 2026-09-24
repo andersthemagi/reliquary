@@ -11,10 +11,13 @@ const FORWARD: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT", "SI
 
 export function runWith(command: string[], variables: Map<string, string>, say: (line: string) => void): Promise<number> {
   const [file, ...args] = command;
-  const env: NodeJS.ProcessEnv = { ...process.env };
+  // No prototype: every name is a plain key (`__proto__` would otherwise be
+  // a setter that drops the variable), and only own keys are inherited ones
+  // (`toString` isn't "in" the environment unless someone set it).
+  const env: NodeJS.ProcessEnv = Object.assign(Object.create(null), process.env);
   const overridden: string[] = [];
   for (const [name, value] of variables) {
-    if (name in process.env) overridden.push(name);
+    if (Object.prototype.hasOwnProperty.call(process.env, name)) overridden.push(name);
     env[name] = value;
   }
   if (overridden.length) say(`overriding ${overridden.join(", ")} from your environment`);

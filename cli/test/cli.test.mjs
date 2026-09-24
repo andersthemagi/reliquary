@@ -12,7 +12,7 @@
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync, chmodSync } from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -584,4 +584,71 @@ test("env pull: a forbidden environment writes nothing", async () => {
   assert.equal(r.code, 1);
   assert.match(r.stderr, /Your role can't read production/);
   assert.equal(existsSync(path.join(dir, ".env")), false);
+});
+
+// ---------------------------------------------------------------------------
+// What the server sends, not trusted (defence in depth). The web app refuses
+// such values itself; here they go straight into the database, sealed as the
+// web app seals (docs/variables.md), to see the CLI hold.
+
+// AES-256-GCM under VARIABLES_KEY (key id k1), additional data naming the slot.
+function sealRaw(vaultId, environment, name, text) {
+  const key = Buffer.from(process.env.VARIABLES_KEY, "base64url");
+  const nonce = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", key, nonce, { authTagLength: 16 });
+  c.setAAD(Buffer.from(JSON.stringify(["reliquary.variable.v1", vaultId, environment, name]), "utf8"));
+  return { nonce, ciphertext: Buffer.concat([c.update(Buffer.from(text, "utf8")), c.final(), c.getAuthTag()]) };
+}
+async function setRaw(vaultId, name, text, environment = "development") {
+  const s = sealRaw(vaultId, environment, name, text);
+  await as(CARA, "select public.set_variable($1, $2, $3, 'k1', $4, $5)", [vaultId, name, environment, s.nonce, s.ciphertext]);
+}
+
+test("server answers: a value with a NUL character is refused, naming the variable; run doesn't start and pull writes nothing", async () => {
+  const [{ id }] = await as(CARA, "select public.create_vault('CLI Nul') as id");
+  await setRaw(id, "FINE", value("fine"));
+  await setRaw(id, "HAS_NUL", `${value("nul")}\u0000tail`);
+  const run = await cli(["run", "--vault", "CLI Nul", "--", process.execPath, "-e", "console.log('RAN')"], { config: main });
+  assert.equal(run.code, 1);
+  assert.match(run.stderr, /The server sent HAS_NUL with a NUL character, which no environment variable can hold; refusing all of development in CLI Nul\./);
+  assert.doesNotMatch(run.stdout, /RAN/);
+  const dir = repo(".env\n");
+  const pull = await cli(["env", "pull", "--vault", "CLI Nul"], { config: main, cwd: dir });
+  assert.equal(pull.code, 1);
+  assert.equal(existsSync(path.join(dir, ".env")), false);
+});
+
+test("server answers: variables named __proto__ or toString reach the command and the file like any other, and aren't taken for inherited ones", async () => {
+  const [{ id }] = await as(CARA, "select public.create_vault('CLI Proto') as id");
+  const proto = value("proto");
+  const str = value("tostring");
+  await setRaw(id, "__proto__", proto);
+  await setRaw(id, "toString", str);
+  const hashes = `for n in __proto__ toString; do printf %s "$(printenv "$n")" | sha256sum | cut -c1-64; done`;
+  const r = await cli(["run", "--vault", "CLI Proto", "--", "sh", "-c", hashes], { config: main });
+  assert.equal(r.code, 0, r.stderr);
+  assert.deepEqual(r.stdout.trim().split("\n"), [sha(proto), sha(str)]);
+  assert.match(r.stderr, /2 variables from CLI Proto/);
+  assert.doesNotMatch(r.stderr, /overriding/, "neither is inherited");
+  const dir = repo(".env\n");
+  const pull = await cli(["env", "pull", "--vault", "CLI Proto"], { config: main, cwd: dir });
+  assert.equal(pull.code, 0, pull.stderr);
+  const text = readFileSync(path.join(dir, ".env"), "utf8");
+  assert.ok(text.includes(`__proto__="${proto}"`) && text.includes(`toString="${str}"`), "both are in the file");
+});
+
+test("server answers: text the CLI prints loses control characters (C0, DEL, C1) and bidirectional overrides, and keeps the rest", async () => {
+  const { shown } = await import(pathToFileURL(path.resolve("dist/api.js")).href);
+  assert.equal(shown("a\u0000b\u001b[2Jc\u007fd\u009be\u202ef\u2066g\u200fh"), "a\ufffdb\ufffd[2Jc\ufffdd\ufffde\ufffdf\ufffdg\ufffdh");
+  assert.equal(shown("\u00c9quipe \u6771\u4eac (owner)"), "\u00c9quipe \u6771\u4eac (owner)");
+});
+
+test("server answers: a vault name with bidirectional overrides is printed with them replaced", async () => {
+  const [{ id }] = await as(CARA, "select public.create_vault($1) as id", ["CLI \u202eBidi\u2066"]);
+  const r = await cli(["vaults"], { config: main });
+  assert.equal(r.code, 0, r.stderr);
+  const line = r.stdout.split("\n").find((l) => l.startsWith(id));
+  assert.ok(line, "the vault is listed");
+  assert.doesNotMatch(line, /[\u202a-\u202e\u2066-\u2069]/);
+  assert.match(line, /CLI \ufffdBidi\ufffd \(owner\)/);
 });
