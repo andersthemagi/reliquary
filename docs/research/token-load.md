@@ -94,3 +94,23 @@ instruction). Safety over bytes.
   a reviewer-facing tool; add `max_bytes` if long proposals show up.
 - **Titles**: kept. Clients show them to people; most don't send them to
   the model.
+
+## Second pass (server load)
+
+2026-09-25, with docs/research/server-load.md's second pass. No response
+changed: the server-side work behind `search`, `list_variables` and
+`list_proposals` got cheaper (stored words, one query instead of three, one
+`rules_for()` per page), and `mcp/test/token_load.test.mjs` passes with
+every budget as it was. Today's numbers: `tools/list` 7,212 bytes (budget
+7,300; it grew with `list_variables`'s push instructions since the table
+above), `list_variables` 126, `search` "workshop" 3,548, "retainer" 1,032,
+`list_proposals` 974, the whole pass 26,044.
+
+Still to do, from the token side:
+
+- **`tools/list` is 88 bytes under its budget.** The next tool or longer
+  description will need the budget raised on purpose, or a trim first
+  (`list_variables`'s description, 447 characters, is the longest).
+- **`search` could send less from the database, not to the agent**: see
+  server-load.md, "Still to do", item 4. The agent already gets three lines
+  a file.
