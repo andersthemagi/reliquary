@@ -23,13 +23,15 @@ The research behind this draft is in `docs/research/`
 8. [Routines](#routines)
 9. [Environment variables](#environment-variables)
 10. [Continuity](#continuity)
-11. [Git mirror and export](#git-mirror-and-export)
-12. [Architecture](#architecture)
-13. [Data model](#data-model)
-14. [Hostile tests](#hostile-tests)
-15. [Build order](#build-order)
-16. [Open decisions](#open-decisions)
-17. [Out of scope](#out-of-scope)
+11. [Client engagements](#client-engagements)
+12. [Git mirror and export](#git-mirror-and-export)
+13. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
+14. [Architecture](#architecture)
+15. [Data model](#data-model)
+16. [Hostile tests](#hostile-tests)
+17. [Build order](#build-order)
+18. [Open decisions](#open-decisions)
+19. [Out of scope](#out-of-scope)
 
 ## What changed from v2
 
@@ -64,7 +66,7 @@ into one repo. v3 separates the two.
                                                       └──▶ optional git mirror
 ```
 
-Three jobs:
+Four jobs:
 
 1. **Share context across people and whatever agent each one uses.** A
    ChatGPT user and a Claude Code user read and propose to the same
@@ -75,6 +77,9 @@ Three jobs:
 3. **Build with the same accounts, and survive losing a person.** Shared
    variables, access logs, and emergency access mean the team and their
    agents can carry on.
+4. **Run client engagements without email.** A client hands over context and
+   credentials into a vault instead of an inbox, and gets it all back, or
+   gone, when the work ends.
 
 ## Principles
 
@@ -336,6 +341,33 @@ accounts.
   context never depends on the hosted service existing. Variables export
   encrypted to the owners' keys.
 
+## Client engagements
+
+Today a client emails passwords, API keys and project context. v3 replaces
+that with a vault per engagement:
+
+- **Invite, no setup.** The client gets an email invite to the engagement
+  vault as an `editor` or `viewer`. Their whole product is the web UI (on a
+  phone too) and, if they use an AI tool, the MCP URL.
+- **Credential requests.** The consultant asks for named variables ("Stripe
+  secret key, production"). The client fills a form that writes straight
+  into the environment. Values never travel by email or chat. The request,
+  the fill and every later use are in the access log the client can see.
+- **Write-only by default.** Whoever *requests* a variable can use it
+  through `run` or `pull` without being able to reveal it in the UI, unless
+  the client grants reveal. The client decides.
+- **Context intake.** A "tell us about the project" box and document
+  uploads arrive as proposals the consultant reviews, so the client never
+  has to learn the difference between notes and canon.
+- **Offboarding.** Closing an engagement:
+  - revokes every consultant grant and agent connection;
+  - lists which credentials were used, so the client knows what to rotate;
+  - exports the vault to the client;
+  - then deletes it on a set schedule ([erasure](#privacy-erasure-and-compliance)).
+- **The trust model in the client's words:** the invite page says who can
+  see what, that Reliquary's operator can technically decrypt values, and
+  where the data is hosted (EU).
+
 ## Git mirror and export
 
 - **Export:** the whole vault's context as markdown files plus a log file,
@@ -349,6 +381,51 @@ accounts.
     never as direct writes.
 - **AIS-OS** consumes a vault the way v2 intended: a mirror or
   `reliquary feed pull` into a mapped folder, and proposals back up.
+
+## Privacy, erasure and compliance
+
+**Target:** GDPR-ready from milestone 1, and a SOC 2 Type II report when
+paying clients ask for it. Until an auditor has signed a report, the product
+never says "SOC 2 compliant". It lists the controls it actually has.
+
+**Erasure without breaking append-only.** The log and entry history are
+never edited, but people have a right to be forgotten. So:
+
+- every entry's text (and every note's) is encrypted with its own key;
+- erasure deletes the key and writes a tombstone event;
+- the history keeps its shape, but the content is unrecoverable, including
+  in backups once they age out.
+
+Closing a vault crypto-shreds everything in it after the export window.
+
+**GDPR, from the start:**
+
+- **Hosting:** EU region (Supabase `eu-central-1`) for the hosted instance.
+- **Roles:** Reliquary is a processor; the vault owner is the controller.
+  A standard data processing agreement (DPA) is published.
+- **Sub-processor list:** Supabase and the web host. Model providers are
+  chosen and keyed by the vault owner, so they process under the owner's
+  own agreement with them. The UI shows which provider each routine sends
+  data to.
+- **Rights:** export (portability) and crypto-shred erasure; retention per
+  vault; notes expire by default.
+- **Operations:** a breach runbook with 72-hour notification, a record of
+  processing activities, and a plain privacy policy.
+
+**Built now so SOC 2 is cheaper later.** Most of what auditors ask for is
+already a design principle:
+
+- access enforced in the database;
+- least privilege and the delegation ceiling;
+- append-only audit logs for context, variables and routines;
+- encryption at rest;
+- hostile tests on every push, as evidence that controls work;
+- change management through reviewed commits.
+
+What's missing is organisational: written policies, vendor reviews, access
+reviews, backups with tested restores, incident drills, and an auditor. Do
+that work when a client requires it, with a compliance platform; in the
+meantime inherit the sub-processors' own SOC 2 reports.
 
 ## Architecture
 
@@ -414,6 +491,11 @@ New in v3:
   revealing a value.
 - **Emergency access:** granted only after the wait, and cancelled by any
   owner's decline.
+- **Client engagements:** a requester revealing a variable the client
+  didn't grant reveal on; a closed engagement's consultant or agent reading
+  anything.
+- **Erasure:** after crypto-shredding, no query, export, feed, or log read
+  returns the content, while the log keeps its sequence.
 - **Git mirror:** a push to a one-way mirror changing nothing; on a two-way
   mirror, a push only ever producing a proposal.
 
@@ -426,7 +508,7 @@ previous check has held for a week of real use.
 |---|---|---|
 | 1 | **Core, MCP and UI.** Vaults, entries, notes, proposals, log, gate, remote MCP with OAuth, web UI for review | Andrés uses one vault from ChatGPT, Claude Code and Hermes for a week. Each sees the same context; proposals are approved in the browser; hostile tests green |
 | 2 | **Routines.** Declarative runs on the vault's key, watchdog, run log | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
-| 3 | **Second person and environment variables** | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; the access log shows all of it; emergency access tested end to end |
+| 3 | **Second person, environment variables, client engagements** | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; a real client fills a credential request instead of emailing it; the access log shows all of it; emergency access and engagement close tested end to end |
 | 4 | **Export and git mirror** | A vault round-trips through export, and a one-way mirror stays in sync for a week |
 | 5 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
 
