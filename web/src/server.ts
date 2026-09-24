@@ -32,6 +32,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
+import { oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Reply } from "./pages.js";
 import { signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
@@ -126,8 +127,14 @@ const SECURITY_HEADERS = {
 
 // `cookies`: auth Set-Cookie values (a sign-in, a refreshed or cleared
 // session, a flash). A response that carries them is also marked private.
+// `reply.formAction`: an extra form-action origin (the OAuth consent page
+// posts, then redirects to the client).
 function send(res: http.ServerResponse, reply: Reply, extra: Record<string, string> = {}, cookies: string[] = []): void {
   const headers: Record<string, string | string[]> = { ...SECURITY_HEADERS, ...extra };
+  if (reply.formAction) {
+    headers["content-security-policy"] = SECURITY_HEADERS["content-security-policy"].replace(
+      "form-action 'self'", `form-action 'self' ${reply.formAction}`);
+  }
   if (cookies.length) {
     headers["set-cookie"] = extra["set-cookie"] ? [...cookies, extra["set-cookie"]] : cookies;
     headers["cache-control"] = "private, no-store";
@@ -165,6 +172,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
       return;
     }
+    // OAuth endpoints a client calls without a session (oauth.ts).
+    if (await oauthPublic(req, res, url)) return;
     if (MODE === "local" && url.pathname === "/login" && req.method === "GET") {
       const setCookie = localLogin(url.searchParams.get("code") ?? "");
       if (!setCookie) {

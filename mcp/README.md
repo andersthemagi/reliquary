@@ -55,8 +55,10 @@ notes show as `(erased)`.
 
 ## How a call is authorised
 
-1. The bearer token is hashed and resolved by `private.resolve_access_token`,
-   which only the server's role (`reliquary_mcp`) can call.
+1. The bearer token is hashed and resolved by `private.resolve_access_token`
+   (personal tokens, `rlq_`) or `private.resolve_oauth_token` (OAuth access
+   tokens, `rlo_`, only for this server's `MCP_RESOURCE`), which only the
+   server's role (`reliquary_mcp`) can call.
 2. The call runs in one transaction as `authenticated`, with the person as
    `sub` and the token as `act`. The act claim means every token call gets the
    delegation ceiling.
@@ -75,11 +77,36 @@ a fresh random value each response, so a file can't fake its own end. Review
 notes and thread comments are fenced the same way (`NOTE-<nonce>`), with a
 nonce none of the response's texts contains.
 
+## OAuth
+
+Clients that sign in (Claude, ChatGPT, Claude Code) find where through this
+server (plan: `docs/research/hosting.md`, section 4):
+
+- A request without a valid token gets 401 with
+  `WWW-Authenticate: Bearer realm="reliquary", resource_metadata="<origin>/.well-known/oauth-protected-resource/mcp"`
+  (plus `error="invalid_token"` when a token was sent).
+- `GET /.well-known/oauth-protected-resource/mcp` (and without `/mcp`)
+  serves RFC 9728 metadata: `resource` is `MCP_RESOURCE` exactly,
+  `authorization_servers` is `[AUTH_ISSUER]`, the web app.
+- The web app issues `rlo_` access tokens bound to that resource. An OAuth
+  grant is an `access_tokens` row, so from here on it is a token like any
+  other: `act.tok` is the grant, scope and the ceiling apply, revoking it on
+  the Tokens page stops it on the next request. A token for another
+  resource, a refresh token or a code is refused; no token is passed on.
+
+`MCP_RESOURCE` defaults to `http://HOST:PORT/mcp` and `AUTH_ISSUER` to
+`http://127.0.0.1:8790` (dev.sh's web app); on Vercel both are required.
+
 ## Test
 
 ```bash
 ./test.sh    # real Postgres + server + the official MCP client; checks logs for leaks
 ```
+
+`test.sh` also builds and starts the web app (from a copy of `web/`, signed
+in as Ben) as the authorization server for `test/oauth.test.mjs`: a client
+goes from a 401 to `tools/list` through discovery, consent and the token
+endpoint.
 
 ## Deploy (Vercel)
 
@@ -105,5 +132,7 @@ Env vars: see `/.env.example`. Mark `DATABASE_URL` Sensitive. Production
 needs the custom domain: Deployment Protection puts a Vercel login in front
 of `*.vercel.app`, which MCP clients can't pass.
 
-Not yet: OAuth (needed for ChatGPT connectors) and protected resource
-metadata.
+OAuth needs `MCP_RESOURCE` (e.g. `https://mcp.example.com/mcp`, the URL
+people paste, byte for byte the web app's `MCP_RESOURCE`) and `AUTH_ISSUER`
+(the web app's `PUBLIC_URL`); the server refuses to start on Vercel without
+them.

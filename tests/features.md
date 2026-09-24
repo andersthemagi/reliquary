@@ -84,9 +84,17 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 | F39 | Sign-in configuration refusals | `AUTH_MODE=local` (explicit or default) refuses to start when `VERCEL` is set; `AUTH_MODE=supabase` refuses to start without `SUPABASE_URL` (https, bare), `SUPABASE_PUBLISHABLE_KEY`, `JWT_ALG` (ES256 or RS256) or a 32-character `SESSION_SECRET`, or on Vercel without an https `PUBLIC_URL`; messages name the variable, never a value | `web/test/auth.test.mjs#config:` |
 | F40 | Pinned search_path | Every function in `public` and `private` sets its own `search_path`, so a caller's search_path can never redirect a name (Supabase advisor 0011) | `supabase/tests/search_path_test.sql#search_path:` |
 
+## MCP OAuth
+
+| ID | Feature | Acceptance criteria | Tests |
+|---|---|---|---|
+| F41 | OAuth authorization server (web) | AS metadata advertises S256, `none`, client metadata documents and `iss`; consent is a signed-in person's form (CSRF, same origin, never an agent) showing the client, the redirect host, the resource and a loopback warning, with `form-action` opened to the redirect origin only; deny and allow come back with `state` and `iss`; a wrong or missing resource is refused at authorize and at token; a reused code (revoking its grant), a wrong verifier, plain PKCE or an unregistered redirect (loopback: any port) are refused; refresh tokens rotate and a reused one revokes the grant; RFC 7009 revocation; errors echo nothing; no code, token, client or state in the log | `web/test/oauth.test.mjs#metadata:`, `web/test/oauth.test.mjs#authorize:`, `web/test/oauth.test.mjs#consent:`, `web/test/oauth.test.mjs#token:`, `web/test/oauth.test.mjs#refresh:`, `web/test/oauth.test.mjs#revoke:`, `web/test/oauth.test.mjs#log:`, `supabase/tests/oauth_test.sql#consent:`, `supabase/tests/oauth_test.sql#redeem:`, `supabase/tests/oauth_test.sql#refresh:` |
+| F42 | Client ID Metadata Documents, fenced | The client id is an https URL with a path, taken exactly; names resolving (or literals) to private, loopback, link-local, CGNAT, mapped or NAT64 addresses are refused, checked in the socket's own lookup; no redirects, 5 s, 5 KB, JSON only; the document's `client_id` must equal the URL; public clients only; loopback allowed only under `CIMD_ALLOW_LOOPBACK` (refused on Vercel); redirect URIs match exactly, loopback on any port | `web/test/cimd.test.mjs#ssrf:`, `web/test/cimd.test.mjs#client id:`, `web/test/cimd.test.mjs#fetch:`, `web/test/cimd.test.mjs#redirect:`, `web/test/oauth.test.mjs#authorize: a client whose metadata` |
+| F43 | MCP endpoint as OAuth resource | A 401 carries `resource_metadata`; both well-known paths serve `resource` equal to `MCP_RESOURCE` byte for byte; a client goes from a 401 to `tools/list` with a code; an OAuth grant is an `access_tokens` row, so the ceiling and the vaults and access chosen at consent apply through `role_in`; a token bound to another resource, a refresh token or a code is refused; only the MCP role resolves; revoking on the Tokens page cuts the client off on its next request | `mcp/test/oauth.test.mjs#resource metadata:`, `mcp/test/oauth.test.mjs#flow:`, `mcp/test/oauth.test.mjs#scope:`, `mcp/test/oauth.test.mjs#audience:`, `mcp/test/oauth.test.mjs#revoke:`, `supabase/tests/oauth_test.sql#resolve:`, `supabase/tests/oauth_test.sql#ceiling:`, `supabase/tests/oauth_test.sql#revoke:`, `supabase/tests/oauth_test.sql#pat:` |
+
 ## Not built yet (no rows until they ship)
 
-OAuth for MCP, plain export, environment
+Plain export, environment
 variables, connections, routines. Each lands with its row and tests.
 
 ## Known gaps

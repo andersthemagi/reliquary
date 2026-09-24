@@ -58,6 +58,57 @@ page.
 ./test.sh    # real Postgres + this server; sign-in, escaping, CSRF, approve, threads, snooze, tokens, contrast; log leak check
 ```
 
+## OAuth for MCP clients
+
+This app is the OAuth 2.1 authorization server for the MCP endpoint
+(`src/oauth.ts`; plan in `docs/research/hosting.md`, section 4). Claude,
+ChatGPT and Claude Code add Reliquary by its MCP URL: the MCP server's 401
+points them at its protected resource metadata, which names this app.
+
+| Endpoint | Does |
+|---|---|
+| `GET /.well-known/oauth-authorization-server` | Metadata: S256 only, public clients only (`none`), Client ID Metadata Documents, `iss` in the response |
+| `GET /oauth/authorize` | Checks the client (`src/cimd.ts`), its redirect URI and `resource` = `MCP_RESOURCE`, then shows the consent page (signed in only) |
+| `POST /oauth/authorize` | Allow or deny, with the CSRF token and same-origin check of every form; 303 back with `code` (60 s, single use) or `error`, plus `state` and `iss` |
+| `POST /oauth/token` | `authorization_code` (PKCE verifier, same redirect and resource) and `refresh_token` (rotated; a reused one revokes the grant). Access tokens `rlo_` last 1 h; refresh tokens `rlr_` 30 days, sliding, at most a year from consent |
+| `POST /oauth/revoke` | RFC 7009: revokes the whole grant |
+
+- **Clients** are identified by the URL of their metadata document, fetched
+  with SSRF fences: https only, public addresses only (checked in the
+  socket's own DNS lookup), no redirects, 5 s, 5 KB, and the document's
+  `client_id` must equal the URL. Cached an hour per instance. Redirect URIs
+  must match exactly, except loopback ones (native apps), which match on any
+  port. No dynamic client registration.
+- **Consent** is the person's: it shows the client's self-chosen name, where
+  it sends you back (the redirect host, with a warning for loopback
+  clients), where the client is published, and the MCP URL, then the same
+  vault and read / read-write choice as the Tokens page. The page's CSP opens
+  `form-action` to the redirect origin only, since browsers apply it to the
+  303 after the form.
+- **A grant is an `access_tokens` row** (`kind = 'oauth'`), so it's on the
+  Tokens page next to personal tokens, with its scope and "from <redirect
+  host>", and revoking it there stops the client on its next request. The
+  database does the rest (`supabase/migrations/20260924220000_oauth.sql`):
+  only a person consents, only this app's role redeems and refreshes, only
+  the MCP role resolves, and only for the resource the grant was made for.
+- Nothing secret is logged: token endpoint lines are method, path, status
+  and an OAuth error code. Errors never echo request values.
+
+Config: the issuer is `PUBLIC_URL` (locally `http://HOST:PORT`);
+`MCP_RESOURCE` (else `MCP_PUBLIC_URL`) is the one resource accepted and must
+be byte for byte the MCP app's `MCP_RESOURCE`. On Vercel both are required.
+`CIMD_ALLOW_LOOPBACK=1` lets tests serve client metadata on loopback; the
+server refuses to start with it on Vercel.
+
+Not signed in, `/oauth/authorize` currently shows the sign-in notice; with
+Supabase Auth (chunk B) it should send the person to sign in and back to the
+same authorize URL. The session cookie must be `SameSite=Lax` for that: the
+consent page is reached by a top-level redirect from the client's site.
+
+Tests: `test/oauth.test.mjs` (starts its own server, signed in as Ben, with
+a metadata fixture on loopback) and `test/cimd.test.mjs` (the SSRF fence);
+the MCP side end to end in `mcp/test/oauth.test.mjs`.
+
 `test.sh` also starts a second server as hosted (`PUBLIC_URL=https://...`,
 no `public/`) for `test/hosting.test.mjs`.
 

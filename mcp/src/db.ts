@@ -12,7 +12,7 @@ import pg from "pg";
 export type Identity = {
   userId: string;
   tokenId: string;
-  agent: string; // the token's name, e.g. "Claude Code on MacBook"
+  agent: string; // the token's name, e.g. "Claude Code on MacBook", or the OAuth client's
 };
 
 // Pool settings from the environment. Hosted (Vercel sets VERCEL), the
@@ -70,6 +70,24 @@ export async function resolveToken(token: string): Promise<Identity | null> {
   const { rows } = await pool.query(
     "select token_id, user_id, name from private.resolve_access_token($1)",
     [hashOf(token)],
+  );
+  if (rows.length !== 1) return null;
+  return { tokenId: rows[0].token_id, userId: rows[0].user_id, agent: rows[0].name };
+}
+
+// An OAuth access token (`rlo_`, issued by the web app's authorization
+// server) resolves to its grant, which is an access_tokens row: the same
+// identity as a personal token, so scope and the ceiling apply unchanged.
+// The database only resolves it for the resource the grant was made for, and
+// this server asks for its own MCP_RESOURCE, so a token issued for another
+// resource is refused (RFC 8707 audience binding).
+const OAUTH_SHAPE = /^rlo_[0-9a-f]{64}$/;
+
+export async function resolveOAuthToken(token: string, resource: string): Promise<Identity | null> {
+  if (!OAUTH_SHAPE.test(token)) return null;
+  const { rows } = await pool.query(
+    "select token_id, user_id, name from private.resolve_oauth_token($1, $2)",
+    [hashOf(token), resource],
   );
   if (rows.length !== 1) return null;
   return { tokenId: rows[0].token_id, userId: rows[0].user_id, agent: rows[0].name };
