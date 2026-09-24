@@ -103,10 +103,19 @@ server), **web** `./web/test.sh` (HTTP against the server). All three:
 | F48 | Parity table stays true | Every MCP tool is named in docs/parity.md's MCP column, and the column names no tool that doesn't exist | `mcp/test/parity.test.mjs#parity:` |
 | F49 | Connect by sign-in | The Connect page leads with `claude mcp add` plus `/mcp` Authenticate for Claude Code and the connector steps for Claude.ai and ChatGPT, before any token setup; the local headersHelper sits under Local development | `web/test/connect.test.mjs#connect:` |
 
+## Environment variables (milestone 2, docs/variables.md)
+
+| ID | Feature | Acceptance criteria | Tests |
+|---|---|---|---|
+| F50 | Set, rotate and delete variables | Every vault has development, preview and production (production owners-only); people in person set and rotate values (owners everywhere, editors outside production, viewers never) and delete them the same way; agents, MCP tokens, OAuth grants, CLI grants, outsiders and anonymous are refused; names are shell-style and names that change how programs start (LD_*, NODE_OPTIONS, PATH, ...) are refused; nobody writes the tables directly; the variable goes with its last value | `supabase/tests/variables_test.sql#environments:`, `supabase/tests/variables_test.sql#set:`, `supabase/tests/variables_test.sql#delete:` |
+| F51 | Names for members and agents, values for nobody by SQL | Members and their agents (within token scope) list names, environments and who set them; outsiders and CLI grants see none; no API role can select ciphertext or a nonce, and no callable function returns it except reveal and read | `supabase/tests/variables_test.sql#names:`, `supabase/tests/variables_test.sql#ciphertext:` |
+| F52 | Reveal and read, logged | A person in person reveals one value within their role, logged as reveal; a live CLI grant reads a whole environment within its person's role and vaults, logged as read with names, grant and client; every agent (no token, MCP token, OAuth grant), a session logged in as the MCP role, a viewer, an editor on production, a scoped, revoked, expired or borrowed grant is refused and the refusal logged | `supabase/tests/variables_test.sql#reveal:`, `supabase/tests/variables_test.sql#read:`, `supabase/tests/variables_test.sql#vaults:` |
+| F53 | CLI grants | Consent is a person's, for our own CLI client at the env API's origin, on loopback; the grant is read-only kind `cli`; its tokens resolve only for the env API and only for the web app's role, never at MCP, and MCP tokens never resolve at the env API; an MCP grant can't be for the env API; a CLI grant sees no vault, file or feed and writes, proposes, deletes, creates, mints and revokes nothing | `supabase/tests/variables_test.sql#cli grant:` |
+| F54 | env_access_log | Append-only (no update, delete or truncate, even by the owner; no direct insert); records set, rotate, delete, read, reveal and refused; owners and editors read their vault's, viewers, outsiders and read-only agents don't; no row of it or the feed holds a value; the feed records set, rotate and delete with name and environment | `supabase/tests/variables_test.sql#log:` |
+
 ## Not built yet (no rows until they ship)
 
-Plain export, environment
-variables, connections, routines. Each lands with its row and tests.
+Plain export, connections, routines. Each lands with its row and tests.
 
 ## Known gaps
 
