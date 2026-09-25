@@ -1,49 +1,72 @@
-# Deploys main: migrations to Supabase, then both Vercel projects, then smoke
-# checks. Runs by hand (Actions > deploy > Run workflow, on main), and after
-# the test workflow passes on a push to main. Plan: docs/research/hosting.md,
-# sections 8 and 10D.
+# Deploys one release: migrations to Supabase, then both Vercel projects
+# built from exactly the tagged commit, then smoke checks that production's
+# /version is that release. "Live" always equals a release: pushes to main
+# only test (test.yml); release.yml turns merged release pull requests into
+# tags. Plan: docs/research/hosting.md, sections 8 and 10D; how to release,
+# redeploy and roll back: docs/ops/runbook.md, "Deploy".
 #
-# Each stage skips with a notice until its settings exist, so main stays
-# green before the hosted projects are set up. A stage with only some of its
-# settings fails, naming what's missing (names only, never values).
+# Runs when:
+#   - a product release (tag vX.Y.Z, not cli-v...) is published: by
+#     release-please with RELEASE_PLEASE_TOKEN, or by a person;
+#   - release.yml starts it (without RELEASE_PLEASE_TOKEN, a release made
+#     with GITHUB_TOKEN triggers no workflow), or a person does: Actions >
+#     deploy > Run workflow on main, with the tag. That is also how to
+#     redeploy a release, or roll back to an older one.
 #
-#   stage   repository secrets (Settings > Secrets and variables > Actions)
-#   db      secret SUPABASE_DB_PASSWORD; repository variables
-#           SUPABASE_PROJECT_REF and SUPABASE_POOLER_HOST (not secret). No
-#           Supabase access token: db push goes straight to the session pooler
-#   hooks   VERCEL_DEPLOY_HOOK_WEB, VERCEL_DEPLOY_HOOK_MCP
-#   smoke   repository variables WEB_URL, MCP_URL (origins, e.g.
-#           https://app.example.com); secret KEEPALIVE_TOKEN if the MCP
-#           project has one; variable CHECK_OAUTH=1 once MCP OAuth ships
+# Rolling back: migrations are forward-only, so deploying a tag older than
+# the newest release skips migrations and deploys that tag's app code on
+# today's schema. Fix forward with a new migration if the schema is the
+# problem.
 #
-# Turn off Vercel's own production deploys from Git for both projects, so
-# code never goes live before its migration: this workflow is the only path.
-# Deploy Hooks build the latest commit on main, not a pinned SHA.
+# Each stage skips with a notice until its settings exist. A stage with only
+# some of its settings fails, naming what's missing (names only, never
+# values).
+#
+#   stage   repository secrets and variables (Settings > Secrets and variables > Actions)
+#   db      secret SUPABASE_DB_PASSWORD; variables SUPABASE_PROJECT_REF and
+#           SUPABASE_POOLER_HOST (not secret). No Supabase access token: db
+#           push goes straight to the session pooler
+#   vercel  secret VERCEL_TOKEN (a Vercel access token scoped to the team);
+#           optional variables VERCEL_TEAM_ID (unset for a personal account),
+#           VERCEL_PROJECT_WEB and VERCEL_PROJECT_MCP (default reliquary-web
+#           and reliquary-mcp). Deploys the tagged commit through the API
+#           (scripts/vercel-deploy.sh) and waits for both builds
+#   hooks   fallback while VERCEL_TOKEN is unset: secrets
+#           VERCEL_DEPLOY_HOOK_WEB, VERCEL_DEPLOY_HOOK_MCP. Hooks build the
+#           latest commit on main, not the tag, so the smoke checks fail if
+#           main has moved on since the tag (live would not be the release)
+#   smoke   variables WEB_URL, MCP_URL (origins, e.g. https://app.example.com);
+#           secret KEEPALIVE_TOKEN if the MCP project has one; variable
+#           CHECK_OAUTH=1 once MCP OAuth ships
+#
+# Turn off Vercel's own production deploys from Git for both projects
+# (vercel.json: git.deploymentEnabled.main false), so code never goes live
+# before its migration or outside a release: this workflow is the only path.
 #
 # First push (manual, once; hosting.md section 8, open question): before it,
 # run this in the Supabase SQL editor as `postgres`:
 #   begin; create role rq_probe nologin; grant authenticated to rq_probe; rollback;
 # If it succeeds, the grants in 20260924130000 and 20260924140000 will too.
-# Then run this workflow by hand and read the dry run, and afterwards set the
-# role passwords (owner step 5). If the probe is refused (PG 16+ needs ADMIN
-# OPTION on `authenticated`, and `postgres` is not superuser), a later
-# migration can't help: `db push` stops at the first failing file, and the
-# grant is inside shipped ones. Then it's a design decision, not a patch:
-# ask Supabase support to grant it, or have the apps become a role of our own
-# instead of `authenticated` (policies and grants move with it).
+# If the probe is refused (PG 16+ needs ADMIN OPTION on `authenticated`, and
+# `postgres` is not superuser), a later migration can't help: `db push`
+# stops at the first failing file, and the grant is inside shipped ones.
+# Then it's a design decision, not a patch: ask Supabase support to grant
+# it, or have the apps become a role of our own instead of `authenticated`.
 name: deploy
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
+      tag:
+        description: Release tag to deploy (vX.Y.Z). An older tag rolls back app code only; migrations never go backwards
+        required: true
+        type: string
       check_oauth:
         description: Also check that the MCP 401 names resource_metadata
         type: boolean
         default: false
-  workflow_run:
-    workflows: [test]
-    types: [completed]
-    branches: [main]
 
 permissions:
   contents: read
@@ -57,19 +80,29 @@ jobs:
   deploy:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v'))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
+      - name: Which release
+        id: tag
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          if ! [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::not a product release tag: '$TAG' (want vX.Y.Z)"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
       - name: Which stages are configured
         id: cfg
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           SUPABASE_POOLER_HOST: ${{ vars.SUPABASE_POOLER_HOST }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_DEPLOY_HOOK_WEB: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
           VERCEL_DEPLOY_HOOK_MCP: ${{ secrets.VERCEL_DEPLOY_HOOK_MCP }}
           WEB_URL: ${{ vars.WEB_URL }}
@@ -104,22 +137,49 @@ jobs:
             fi
           }
           stage db SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF SUPABASE_POOLER_HOST
-          stage hooks VERCEL_DEPLOY_HOOK_WEB VERCEL_DEPLOY_HOOK_MCP
+          stage vercel VERCEL_TOKEN
+          if [ -n "$VERCEL_TOKEN" ]; then
+            echo "hooks=false" >> "$GITHUB_OUTPUT"
+          else
+            stage hooks VERCEL_DEPLOY_HOOK_WEB VERCEL_DEPLOY_HOOK_MCP
+          fi
           stage smoke WEB_URL MCP_URL
 
       - uses: actions/checkout@v7
         with:
-          # After the test workflow: exactly the commit it tested.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+          fetch-depth: 0 # every tag, to tell a rollback from the newest release
           persist-credentials: false
 
+      - name: The tag is a release of this version
+        id: rel
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          have=$(tr -d '[:space:]' < version.txt)
+          if [ "$have" != "$VERSION" ]; then
+            echo "::error::$TAG, but its version.txt says $have"
+            exit 1
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          newest=$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+          if [ "$TAG" = "$newest" ]; then
+            echo "rollback=false" >> "$GITHUB_OUTPUT"
+            echo "- $TAG ($(git rev-parse --short HEAD)), the newest release" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "rollback=true" >> "$GITHUB_OUTPUT"
+            echo "::warning title=rollback::$TAG is older than $newest: deploying its app code only, on the current schema (migrations are forward-only)"
+            echo "- $TAG ($(git rev-parse --short HEAD)): rollback from $newest, migrations skipped" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: supabase/setup-cli@v3
-        if: steps.cfg.outputs.db == 'true'
+        if: steps.cfg.outputs.db == 'true' && steps.rel.outputs.rollback == 'false'
         with:
           version: 2.117.0
 
       - name: Database URL (session pooler; masked)
-        if: steps.cfg.outputs.db == 'true'
+        if: steps.cfg.outputs.db == 'true' && steps.rel.outputs.rollback == 'false'
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           REF: ${{ vars.SUPABASE_PROJECT_REF }}
@@ -131,19 +191,30 @@ jobs:
           echo "DB_URL=$url" >> "$GITHUB_ENV"
 
       - name: Migrations, dry run
-        if: steps.cfg.outputs.db == 'true'
+        if: steps.cfg.outputs.db == 'true' && steps.rel.outputs.rollback == 'false'
         run: supabase db push --db-url "$DB_URL" --dry-run
 
       - name: Migrations
-        if: steps.cfg.outputs.db == 'true'
+        if: steps.cfg.outputs.db == 'true' && steps.rel.outputs.rollback == 'false'
         run: supabase db push --db-url "$DB_URL" --yes
 
-      - name: Vercel Deploy Hooks (web, mcp)
+      - name: Vercel production deploys of the tagged commit (web, mcp)
+        if: steps.cfg.outputs.vercel == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          WEB_PROJECT: ${{ vars.VERCEL_PROJECT_WEB || 'reliquary-web' }}
+          MCP_PROJECT: ${{ vars.VERCEL_PROJECT_MCP || 'reliquary-mcp' }}
+          SHA: ${{ steps.rel.outputs.sha }}
+        run: ./scripts/vercel-deploy.sh "$SHA" "$WEB_PROJECT" "$MCP_PROJECT"
+
+      - name: Vercel Deploy Hooks (fallback; builds main, not the tag)
         if: steps.cfg.outputs.hooks == 'true'
         env:
           HOOK_WEB: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
           HOOK_MCP: ${{ secrets.VERCEL_DEPLOY_HOOK_MCP }}
         run: |
+          echo "::warning title=deploy hooks::Deploy Hooks build the latest main, not the tag; set VERCEL_TOKEN to deploy exactly the release"
           for app in web mcp; do
             hook_var="HOOK_${app^^}"
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -X POST "${!hook_var}") || code=000
@@ -151,19 +222,21 @@ jobs:
             case $code in 2??) ;; *) echo "::error::$app deploy hook failed (HTTP $code)"; exit 1 ;; esac
           done
 
-      - name: Wait for the builds
+      - name: Wait for the hook builds
         if: steps.cfg.outputs.hooks == 'true' && steps.cfg.outputs.smoke == 'true'
         env:
           SETTLE: ${{ vars.DEPLOY_SETTLE_SECONDS || '120' }}
-        # Deploy Hooks return before the build; without a Vercel API token we
-        # can't watch it, so give it time before checking production.
+        # Deploy Hooks return before the build and can't be watched, so give
+        # it time before checking production.
         run: sleep "$SETTLE"
 
-      - name: Smoke checks
+      - name: Smoke checks (live /version is this release)
         if: steps.cfg.outputs.smoke == 'true'
         env:
           WEB_URL: ${{ vars.WEB_URL }}
           MCP_URL: ${{ vars.MCP_URL }}
           KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
           CHECK_OAUTH: ${{ (inputs.check_oauth || vars.CHECK_OAUTH == '1') && '1' || '' }}
+          EXPECT_VERSION: ${{ steps.tag.outputs.version }}
+          EXPECT_COMMIT: ${{ steps.rel.outputs.sha }}
         run: ./scripts/deploy-check.sh

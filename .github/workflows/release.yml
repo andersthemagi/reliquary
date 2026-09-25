@@ -1,0 +1,103 @@
+# Releases (docs/ops/runbook.md, "Deploy"). On every push to main,
+# release-please (release-please-config.json, .release-please-manifest.json)
+# keeps one pull request open per component, collecting the changelog from
+# conventional commits:
+#
+#   "Release vX.Y.Z"      the product (web, MCP, database): version.txt,
+#                         CHANGELOG.md, web/ and mcp/ package versions
+#   "Release cli vX.Y.Z"  the CLI (cli/): cli/package.json, cli/CHANGELOG.md
+#
+# Merging one makes release-please tag it (vX.Y.Z or cli-vX.Y.Z) and publish
+# its GitHub Release (a prerelease while the version is 0.x: pre-alpha). Then:
+#   - a product release gets its migrations, roadmap items and a deploy note
+#     appended to its notes (scripts/release-notes.sh), and deploy.yml
+#     deploys exactly that tag;
+#   - a CLI release runs publish-cli.yml for that tag.
+#
+# Tokens. With only GITHUB_TOKEN, what release-please creates triggers no
+# other workflow (GitHub's rule against loops): no `test` run on the release
+# pull request, no `release: published` for deploy.yml, no tag push for
+# publish-cli.yml. So without RELEASE_PLEASE_TOKEN this workflow starts the
+# deploy and the CLI publish itself (workflow_dispatch is exempt from that
+# rule). With RELEASE_PLEASE_TOKEN (a fine-grained token or GitHub App token
+# with contents and pull requests read and write on this repository), the
+# events fire as usual and this workflow starts nothing itself.
+#
+# Repository setting (Settings > Actions > General > Workflow permissions):
+# "Allow GitHub Actions to create and approve pull requests" must be on.
+#
+# The first release, v0.1.0, is cut by hand (runbook); until a v* tag exists
+# this workflow skips, so release-please doesn't propose a version for the
+# whole history.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # tags, releases, the release branch
+  pull-requests: write # the release pull requests
+  issues: write # labels on them
+  actions: write # gh workflow run (deploy, publish-cli)
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HAS_RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tags, and the migrations between two of them
+
+      - name: Has the first release been cut
+        id: cut
+        run: |
+          if git tag -l 'v[0-9]*' | grep -q .; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=release skipped::no v* tag yet: cut v0.1.0 by hand first (docs/ops/runbook.md, Deploy)"
+          fi
+
+      - uses: googleapis/release-please-action@v5
+        id: rp
+        if: steps.cut.outputs.ok == 'true'
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Release notes (pre-alpha, migrations, roadmap, deploy)
+        if: steps.rp.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rp.outputs.tag_name }}
+        run: |
+          git fetch --tags --force --quiet origin # the tag release-please just made
+          ./scripts/release-notes.sh --apply "$TAG"
+
+      - name: Start the deploy
+        if: steps.rp.outputs.release_created == 'true' && env.HAS_RELEASE_TOKEN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rp.outputs.tag_name }}
+        run: |
+          gh workflow run deploy.yml -R "$GITHUB_REPOSITORY" --ref main -f tag="$TAG"
+          echo "Deploy of $TAG started: Actions > deploy" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Start the CLI publish
+        if: steps.rp.outputs['cli--release_created'] == 'true' && env.HAS_RELEASE_TOKEN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rp.outputs['cli--tag_name'] }}
+        run: |
+          gh workflow run publish-cli.yml -R "$GITHUB_REPOSITORY" --ref "$TAG"
+          echo "CLI publish of $TAG started: Actions > publish-cli" >> "$GITHUB_STEP_SUMMARY"

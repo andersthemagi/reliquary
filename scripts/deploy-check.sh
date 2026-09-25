@@ -14,9 +14,13 @@
 #   CHECK_OAUTH=1      also check that the MCP 401 names resource_metadata
 #                      (after the OAuth chunk ships)
 #   DEPLOY_WAIT        seconds to keep retrying each check (default 300)
+#   EXPECT_VERSION     the release deployed (e.g. 0.2.0): both apps' /version
+#                      must answer it (needs jq)
+#   EXPECT_COMMIT      its commit: /version's commit must be it, or "unknown"
+#                      (a build that wasn't told its commit)
 #
-# Prints only check names and HTTP status codes: never bodies, headers or
-# the token. Exits non-zero if any check never passes.
+# Prints only check names, HTTP status codes and /version's fields: never
+# other bodies, headers or the token. Exits non-zero if any check never passes.
 set -euo pipefail
 
 : "${WEB_URL:?WEB_URL is required}"
@@ -60,6 +64,17 @@ oauth_401() {
   [ "$code" = 401 ] && grep -qi '^www-authenticate:.*resource_metadata=' "$tmp/headers"
 }
 
+# version <origin>: /version names the release (and commit) just deployed.
+version() {
+  local code v c
+  code=$(fetch "$1/version")
+  v=$(jq -r '.version // empty' "$tmp/body" 2>/dev/null || true)
+  c=$(jq -r '.commit // empty' "$tmp/body" 2>/dev/null || true)
+  last="HTTP $code, version ${v:-none}, commit ${c:-none}"
+  [ "$code" = 200 ] && [ "$v" = "$EXPECT_VERSION" ] &&
+    { [ -z "${EXPECT_COMMIT:-}" ] || [ "$c" = "$EXPECT_COMMIT" ] || [ "$c" = unknown ]; }
+}
+
 status=0
 check() { # <name> <function> [args...]
   local name=$1 deadline=$((SECONDS + wait_s)) last=""
@@ -78,6 +93,12 @@ check() { # <name> <function> [args...]
 check "web /healthz" healthz "$web/healthz"
 check "mcp /healthz" healthz "$mcp/healthz"
 check "mcp /healthz?db=1" keepalive
+if [ -n "${EXPECT_VERSION:-}" ]; then
+  check "web /version is $EXPECT_VERSION" version "$web"
+  check "mcp /version is $EXPECT_VERSION" version "$mcp"
+else
+  echo "SKIP  /version (set EXPECT_VERSION to the release deployed)"
+fi
 if [ "${CHECK_OAUTH:-}" = 1 ]; then
   check "mcp 401 names resource_metadata" oauth_401
 else
