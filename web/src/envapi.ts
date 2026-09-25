@@ -326,8 +326,15 @@ async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: 
       ).rows[0].r;
     });
   } catch (err) {
+    const e = err as { code?: string; message?: string };
     // 22023: the database refused the input (a name, the shape).
-    if ((err as { code?: string }).code === "22023") throw new BadRequest(400, "invalid_request");
+    if (e.code === "22023") throw new BadRequest(400, "invalid_request");
+    // RLP01: the vault's storage limit (20260925230000_plans.sql). The
+    // message names the vault and the sizes, never a value.
+    if (e.code === "RLP01") {
+      send(res, 507, { error: "storage_limit", message: e.message ?? "" });
+      return "storage_limit";
+    }
     throw err;
   }
   if (!r.ok) {

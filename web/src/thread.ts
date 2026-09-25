@@ -22,7 +22,7 @@ export const NOT_SNOOZED_SQL = `
 // Errors from our own migrations are safe to show; others aren't.
 function message(err: unknown): string {
   const e = err as { code?: string; message?: string };
-  if (["42501", "P0002", "22023", "23505", "55000"].includes(e.code ?? "")) {
+  if (["42501", "P0002", "22023", "23505", "55000", "RLP01"].includes(e.code ?? "")) {
     const m = e.message ?? "Not allowed";
     return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
   }

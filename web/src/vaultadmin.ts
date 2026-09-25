@@ -16,6 +16,7 @@ import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
 import { csrfField, html, pageHeader, type Raw } from "./html.js";
 import { message, notFound, render, UUID, vault, vaultPath, vaultShell, type Ctx, type Reply, type Vault } from "./pages.js";
+import { usageSection, vaultUsages } from "./plans.js";
 
 const q = encodeURIComponent;
 const settingsPath = (id: string, rest = "") => vaultPath(id, `/config${rest}`);
@@ -51,6 +52,7 @@ async function settings(ctx: Ctx, id: string): Promise<Reply> {
     const owners = (await c.query(`select count(*)::int as n from public.vault_members where vault_id = $1 and role = 'owner'`, [id]))
       .rows[0].n as number;
     const soleOwner = owner && owners <= 1;
+    const usage = (await vaultUsages(c, [id])).get(id);
     return html`
       ${pageHeader({ crumb: crumb(id, v), title: "Settings" })}
       <h2>General</h2>
@@ -72,6 +74,7 @@ async function settings(ctx: Ctx, id: string): Promise<Reply> {
         : html`<p>Everything is ${policyBadge(v.default_policy)} unless a rule says otherwise. <span class="muted">Only owners rename a vault or change its default.</span></p>`}
       <h2>Members</h2>
       <p>${owner ? "Invite people, change their roles, and see their agent connections." : "Who is in this vault, and their roles."} <a href="${settingsPath(id, "/members")}">Members</a></p>
+      ${usage ? usageSection(usage) : ""}
       <h2>Rules</h2>
       <p>Which folders and files are canon, and how many approvals their changes need. <a href="${vaultPath(id, "/rules")}">Rules</a></p>
       <h2>Export</h2>

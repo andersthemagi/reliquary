@@ -231,7 +231,7 @@ export type EnvImport = {
 };
 export type DecideResult =
   | { ok: true; applied?: number; names?: string[]; environments?: string[] }
-  | { ok: false; error: "unauthorized" | "forbidden" | "not_found" | "expired" | "applied" | "rejected" };
+  | { ok: false; error: "unauthorized" | "forbidden" | "not_found" | "expired" | "applied" | "rejected" | "storage_limit"; message?: string };
 
 // Every value in every environment, sealed for its slot, as create_env_import
 // takes them. Throws SecretsError (no key, or a value over 64 KiB).

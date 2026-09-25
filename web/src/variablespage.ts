@@ -533,6 +533,10 @@ async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: boolean
     return { redirect: base(v.id) };
   }
   if (r.error === "not_found") return notFound(ctx);
+  if (r.error === "storage_limit" && r.message) {
+    ctx.setFlash(`${r.message.charAt(0).toUpperCase()}${r.message.slice(1)}${r.message.endsWith(".") ? "" : "."}`);
+    return { redirect: importPath(v.id, importId) };
+  }
   const why: Record<string, string> = {
     forbidden: "Your role can’t set values in every environment of this import.",
     expired: "This import expired; its values are gone. Import the file again.",

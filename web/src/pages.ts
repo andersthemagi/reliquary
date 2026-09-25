@@ -16,6 +16,7 @@ import { pendingPushes } from "./variables.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
+import { accountPage, myPlan, planLine } from "./plans.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -51,10 +52,12 @@ export type Reply = { status?: number; html?: string; redirect?: string; formAct
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export type Vault = { id: string; name: string; role: string };
 
-// Errors from our own migrations are safe to show; others aren't.
+// Errors from our own migrations are safe to show; others aren't. RLP01 is
+// a plan limit (20260925230000_plans.sql): its message names the vault, the
+// limit, the plan or tier and the usage, and says how to make room.
 export function message(err: unknown): string {
   const e = err as { code?: string; message?: string };
-  if (["42501", "P0002", "22023", "23505", "55000"].includes(e.code ?? "")) {
+  if (["42501", "P0002", "22023", "23505", "55000", "RLP01"].includes(e.code ?? "")) {
     const m = e.message ?? "Not allowed";
     return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
   }
@@ -328,7 +331,8 @@ function crumbs(id: string, v: Vault, path: string, isDir: boolean): Raw {
 // Home and Review
 
 async function home(ctx: Ctx): Promise<Reply> {
-  const { vaults, waiting } = await asPerson(ctx.userId, async (c) => ({
+  const { vaults, waiting, plan } = await asPerson(ctx.userId, async (c) => ({
+    plan: await myPlan(c),
     vaults: (
       await c.query(
         `select v.id, v.name, m.role,
@@ -362,6 +366,7 @@ async function home(ctx: Ctx): Promise<Reply> {
         ${(ctx.reviewCount ?? 0) > waiting.length ? html`<p class="small"><a href="/review">All ${ctx.reviewCount} waiting</a></p>` : ""}`
       : html`<div class="empty">Nothing is waiting on you.</div>`}`}
     <h2>Your vaults</h2>
+    <p class="small muted plan-line"><a href="/account">${planLine(plan)}</a></p>
     ${vaults.length === 0
       ? html`<div class="empty first-vault"><strong>Create your first vault.</strong>
           <p>A vault holds the files you and your agents share: notes, briefs, decisions. You choose which of them are canon, so an agent can only propose changes and you approve them.</p>
@@ -384,6 +389,8 @@ async function home(ctx: Ctx): Promise<Reply> {
 // person. They become its owner.
 
 async function newVault(ctx: Ctx): Promise<Reply> {
+  const plan = await asPerson(ctx.userId, myPlan);
+  const full = plan.vaultsOwned >= plan.maxVaults;
   return render(
     ctx,
     "New vault",
@@ -394,6 +401,9 @@ async function newVault(ctx: Ctx): Promise<Reply> {
         <button class="primary" form="new-vault">Create vault</button>`,
     })}
     <p class="lede">A vault holds the files you and your agents share. You’ll be its owner: you add members and set its rules.</p>
+    ${full
+      ? html`<p class="callout attention" role="status">You own ${plan.vaultsOwned} of the ${plan.maxVaults} vaults the ${plan.planName} plan allows, so a new one can’t be created. Delete a vault you no longer need first. <a href="/account">Plan and usage</a></p>`
+      : html`<p class="small muted plan-line">${planLine(plan)}. <a href="/account">Plan and usage</a></p>`}
     <form method="post" action="/vaults/new" class="panel choice-form" id="new-vault">
       ${csrfField(ctx.csrf)}
       <label for="vn">Name</label>
@@ -1466,6 +1476,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && p === "/activity") return allActivity(ctx);
   if (get && p === "/connect") return connect(ctx);
   if (get && p === "/tokens") return tokens(ctx);
+  if (get && p === "/account") return accountPage(ctx);
   if (get && p === "/vaults/new") return newVault(ctx);
   if (!get && p === "/vaults/new") return createVault(ctx);
   if (!get && p === "/tokens/new") return createToken(ctx);

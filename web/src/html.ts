@@ -122,6 +122,7 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
     <summary class="button quiet">Account</summary>
     <div class="menu">
       <p class="menu-meta">Signed in as <strong>${personRef(opts.user)}</strong>${accountMode === "local" ? " (local)" : ""}</p>
+      <p class="menu-links"><a href="/account">Plan and usage</a></p>
       <p class="menu-links"><a href="${siteHref("/docs")}">Docs</a><a href="${siteHref("/roadmap")}">Roadmap</a></p>
       <p class="menu-meta">${PRE_ALPHA}</p>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
