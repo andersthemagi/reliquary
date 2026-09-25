@@ -283,6 +283,7 @@ git). All four: `./test.sh`.
 | F213 | Applying is atomic | A template that fails after its files are written leaves no vault and no membership | `web/test/templates.test.mjs#templates: applying is atomic` | `docs/public/concepts/templates.md` |
 | F214 | Agents can't apply rules through a template | Run as an agent through an all-vaults read-write token, every template with rules is refused (42501, from `set_policy`'s `require_human`) and creates no vault; the same token still creates a Blank vault | `web/test/templates.test.mjs#templates: an agent can't` | `docs/public/concepts/templates.md` |
 | F220 | Start-up variable names refused (Windows, trust, npm) | `COMSPEC`, `PATHEXT`, `SYSTEMROOT`, `WINDIR`, `PSMODULEPATH`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `SSL_CERT_DIR` and any `NPM_CONFIG_*` are refused in the database and by the web app's and CLI's shared parser; ordinary names like `NPM_TOKEN` pass | `supabase/tests/variable_names_test.sql#variable names:`, `cli/test/names.test.mjs#names:` | `docs/public/concepts/variables.md` |
+| F221 | CLI explains rate limits | When the env API answers 429 `rate_limited`, the CLI says to try again in the Retry-After seconds (or later) instead of a bare error; other 429s keep their own messages | `cli/test/rate_limited.test.mjs#rate limited:` | `docs/public/reference/limits.md` |
 
 ## Not built yet (no rows until they ship)
 

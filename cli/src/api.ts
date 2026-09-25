@@ -45,7 +45,18 @@ async function request(server: Server, path: string, init: { method?: string; bo
       throw new NotSignedIn(server.issuer, "The server no longer accepts your sign-in");
     }
   }
+  const limited = rateLimited(r.status, r.body, r.headers.get("retry-after"));
+  if (limited) throw new CliError(limited);
   return r;
+}
+
+// The env API's rate limit (429 {"error":"rate_limited"} with Retry-After):
+// the message to show, or null for any other answer.
+export function rateLimited(status: number, body: unknown, retryAfter: string | null): string | null {
+  if (status !== 429 || (body as { error?: unknown } | null)?.error !== "rate_limited") return null;
+  const secs = /^\d{1,5}$/.test(retryAfter ?? "") ? Number(retryAfter) : NaN;
+  const wait = secs > 0 && secs < 86_400 ? `in ${secs} second${secs === 1 ? "" : "s"}` : "later";
+  return `Too many requests from this sign-in; the server asks to try again ${wait}.`;
 }
 const get = (server: Server, path: string) => request(server, path);
 
