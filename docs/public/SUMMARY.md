@@ -12,6 +12,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 ## Concepts
 
 - [Vaults, files and folders](concepts/vaults-and-files.md)
+- [Vault templates](concepts/templates.md)
 - [Canon, open and rules](concepts/canon-and-rules.md)
 - [Proposals and review](concepts/proposals-and-review.md)
 - [Agents and the ceiling](concepts/agents.md)

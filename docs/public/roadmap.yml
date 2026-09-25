@@ -112,6 +112,12 @@
   status: shipped
   docs: index
 
+- title: Onboarding templates
+  summary: Start a vault as a client engagement, personal projects or a product team, with folders, rules and a README for agents.
+  status: shipped
+  milestone: M1
+  docs: concepts/templates
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
@@ -201,10 +207,6 @@
 
 - title: Public status page
   summary: Uptime of the web app, the MCP endpoint and the database, in public.
-  status: considering
-
-- title: Onboarding templates
-  summary: A client engagement vault template and a first-run checklist.
   status: considering
 
 - title: Rate limits on sign-in and MCP

@@ -15,6 +15,7 @@ import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inviteRoutes } from "./members.js";
+import { applyTemplate, templateById, templateChoices } from "./templates.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -362,6 +363,7 @@ async function home(ctx: Ctx): Promise<Reply> {
     ${vaults.length === 0
       ? html`<div class="empty first-vault"><strong>Create your first vault.</strong>
           <p>A vault holds the files you and your agents share: notes, briefs, decisions. You choose which of them are canon, so an agent can only propose changes and you approve them.</p>
+          <p>Start blank, or from a template: a client engagement, personal projects or a product team, with folders, rules and a README that tells agents how to work there.</p>
           <p><a class="button" href="/vaults/new">Create your first vault</a></p>
           <p class="small">Joining someone else’s vault? Open the invite link they sent you. It works once you’re signed in with the address it was sent to.</p></div>`
       : html`<ul class="rows">${vaults.map(
@@ -394,6 +396,7 @@ async function newVault(ctx: Ctx): Promise<Reply> {
       ${csrfField(ctx.csrf)}
       <label for="vn">Name</label>
       <input id="vn" type="text" name="name" placeholder="Client work" required maxlength="100">
+      ${templateChoices()}
       <fieldset>
         <legend>Default policy</legend>
         <label class="choice"><input type="radio" name="default_policy" value="open" checked>
@@ -413,12 +416,20 @@ async function createVault(ctx: Ctx): Promise<Reply> {
   const name = (ctx.form.get("name") ?? "").trim();
   // Anything but canon is the ordinary default, open.
   const policy = ctx.form.get("default_policy") === "canon" ? "canon" : "open";
+  // No template field is Blank, as before templates.
+  const template = templateById(ctx.form.get("template") || "blank");
+  if (!template) {
+    ctx.setFlash("Choose one of the templates on the form.");
+    return { redirect: "/vaults/new" };
+  }
   try {
-    const id = await asPerson(
-      ctx.userId,
-      async (c) => (await c.query(`select public.create_vault($1, $2) as id`, [name, policy])).rows[0].id as string,
+    // One transaction: a template that fails partway leaves no vault.
+    const id = await asPerson(ctx.userId, (c) => applyTemplate(c, name, policy, template));
+    ctx.setFlash(
+      template.files.length
+        ? `Created ${name} from the ${template.name} template. You’re its owner. Start with README.md.`
+        : `Created ${name}. You’re its owner. Add files, or connect an agent to it.`,
     );
-    ctx.setFlash(`Created ${name}. You’re its owner. Add files, or connect an agent to it.`);
     return { redirect: vaultPath(id) };
   } catch (err) {
     ctx.setFlash(message(err));

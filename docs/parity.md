@@ -28,6 +28,7 @@ and, for the agent, its token's vaults and access.
 |---|---|---|---|---|
 | List vaults | `/` (Your vaults) | `list_vaults` | both | |
 | Create a vault | `/vaults/new` (POST) | `create_vault` | both | An agent needs a token that reaches all its person's vaults with read-write access; a scoped or read-only token is refused (`20260924230000_agent_create_vault.sql`) |
+| Create a vault from a template | `/vaults/new` (POST with `template`) | none; `create_vault` makes a blank vault, and `write_file` can add a README | person | **Ceiling**: every template but Blank sets rules, and rules are policy. The web app applies a template as the person through `create_vault`, `write_file`, `set_policy` and `set_default_policy` in one transaction, so an agent that tried would be refused by `set_policy`'s `require_human` and leave nothing (`web/src/templates.ts`). MCP's `create_vault` takes no template: the one without rules is Blank, which it already is |
 | List files | `/v/:v`, `/v/:v/tree?path=` | `list_files` | both | |
 | Read a file | `/v/:v/file?path=` | `read_file` | both | |
 | Search a vault | `/v/:v/search?q=` | `search` | both | |
