@@ -9,7 +9,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | Action | Web app | MCP tool | Who may |
 |---|---|---|---|
 | List vaults | Home | `list_vaults` | both |
-| Create a vault | Home, **New vault** | `create_vault` | both; an agent needs a read-write connection to all its person's vaults |
+| Create a vault | Home, **New vault** | `create_vault` | both, once the account is [admitted](../concepts/plans-and-limits.md#invite-only); an agent needs a read-write connection to all its person's vaults |
 | List, read and search files | a vault's pages, **Search** | `list_files`, `read_file`, `search` | both |
 | Write or delete an open file | the file's **Edit** page | `write_file`, `delete_file` | both, owners and editors |
 | Propose a write or a delete | the file's page, or saving a canon file | `propose` | both, owners and editors |

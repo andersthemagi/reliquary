@@ -8,9 +8,15 @@
 #   scripts/plan.sh user <email> <plan>           put a person on a plan (free, alpha_tester)
 #   scripts/plan.sh vault <vault-id> <tier>       give a vault a tier (pro), or standard to undo
 #   scripts/plan.sh usage [<email>|<vault-id>]    people and storage per vault, largest first
+#   scripts/plan.sh admit <email>                 let an account create vaults while invite-only
+#   scripts/plan.sh revoke-admission <email>      take that back (they keep their vaults)
+#   scripts/plan.sh invite-only on|off            whether accounts need admitting (on in the alpha)
+#   scripts/plan.sh check                         storage counters that drifted, accounts gone from Auth
+#   scripts/plan.sh recount <vault-id>            set a vault's storage counter to a full scan
 #
 # Nothing is deleted when a plan or tier is smaller: a vault over a limit
-# takes nothing new until it is under.
+# takes nothing new until it is under. Admission and the checks are
+# supabase/migrations/20260925240000_admission.sql and 20260925240400_storage_drift.sql.
 #
 # Runs psql as postgres against the hosted database, with
 # supabase/.db-password read inside the container (never printed). Prints
@@ -25,7 +31,7 @@ ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
 host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 
-usage() { sed -n '6,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '6,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
 UUID='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 NAME='^[a-z][a-z0-9_]{0,31}$'
@@ -93,6 +99,11 @@ select p.name as plan, o.n || ' of ' || p.max_vaults as "vaults owned",
   cross join private.plan_of(u.id) p
   cross join lateral (select count(*) as n from public.vaults v where v.created_by = u.id) o
   left join private.account_plans a on a.user_id = u.id;
+select case when not private.invite_only() then 'yes (invite-only is off)'
+            when d.user_id is null then 'no: they can''t create a vault until they accept an invite or are admitted'
+            else 'yes (' || d.via || ', ' || to_char(d.admitted_at, 'YYYY-MM-DD') || ')' end as admitted
+  from (select private.user_by_email(:'arg') as id) u
+  left join private.admissions d on d.user_id = u.id;
 SQL
       echo "$USAGE_SQL"; } | run -v kind=email -v arg="$2"
     ;;
@@ -122,6 +133,43 @@ SQL
       need "an email address or a vault id" "$2" "$EMAIL"
       echo "$USAGE_SQL" | run -v kind=email -v arg="$2"
     fi
+    ;;
+  admit)
+    [ $# -eq 2 ] || usage
+    need "an email address" "$2" "$EMAIL"
+    run -v arg="$2" <<'SQL'
+select private.admit_account(private.user_by_email(:'arg')) as done;
+SQL
+    ;;
+  revoke-admission)
+    [ $# -eq 2 ] || usage
+    need "an email address" "$2" "$EMAIL"
+    run -v arg="$2" <<'SQL'
+select private.revoke_admission(private.user_by_email(:'arg')) as done;
+SQL
+    ;;
+  invite-only)
+    [ $# -eq 2 ] && [[ $2 == on || $2 == off ]] || usage
+    run -v on="$([ "$2" = on ] && echo true || echo false)" <<'SQL'
+select private.set_invite_only(:'on'::boolean) as done;
+SQL
+    ;;
+  check)
+    [ $# -eq 1 ] || usage
+    run <<'SQL'
+select vault_id as vault, vault_name as name, private.size_text(coalesce(counted, 0)) as counted,
+       private.size_text(scanned) as scanned, drift as "drift (bytes)"
+  from private.storage_drift();
+select kind, vault_id as vault, vault_name as name, user_id as account, coalesce(role, '') as role
+  from private.accounts_gone();
+SQL
+    ;;
+  recount)
+    [ $# -eq 2 ] || usage
+    need "a vault id" "$2" "$UUID"
+    run -v arg="$2" <<'SQL'
+select private.recount_storage(:'arg'::uuid) as done;
+SQL
     ;;
   *) usage ;;
 esac

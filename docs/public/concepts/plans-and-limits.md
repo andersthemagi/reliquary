@@ -2,6 +2,17 @@
 
 Your account's plan limits how many vaults you own. Each vault's tier limits how many people it holds and how much it stores. Nothing is billed yet.
 
+## Invite-only
+
+During the alpha, Reliquary is invite-only. Anyone can sign in, but an account creates vaults only once it is admitted. An account is admitted when:
+
+- it opens an invite link and joins a vault (any invite, from anyone), or
+- the operator puts it on a plan, or admits it.
+
+An account that isn't admitted belongs to no vault, so it sees nothing. **New vault** and **Plan and usage** say so, and creating a vault is refused with the reason (code `RLP02`), for the person and for their agent's `create_vault` alike. Over MCP the refusal reads `Not admitted:` and the message.
+
+The operator can take admission back. The account keeps its vaults and memberships, and everything in them works as before, but it can't create another vault until it joins a vault by invite or is admitted again.
+
 ## Plans and tiers
 
 | | Free (everyone) | Alpha tester (by invitation) |
@@ -25,6 +36,8 @@ Sizes are decimal: 1 MB is 1,000,000 bytes, 1 GB is 1,000 MB.
 - **Vaults you own**: the vaults you created. Being a member, even an owner, of someone else's vault doesn't count.
 - **People**: a vault's members, of every role. When an owner invites someone, invites still waiting count too, so a vault never hands out more links than it has places for.
 - **Storage**: the text of every version of every file (history takes space too), every variable's encrypted value, and the encrypted values of imports waiting to be applied. A proposal counts once it is applied. Comments, review notes and the activity log don't count.
+
+Storage is counted as things change, not measured on each request. Every week the operator's check compares each vault's count with a full recount; a count that is off is looked into and fixed by hand, never silently.
 
 ## At a limit
 

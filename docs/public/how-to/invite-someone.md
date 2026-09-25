@@ -14,7 +14,7 @@ Only an owner can invite, in the web app.
 3. Choose **Create invite link**. The page shows the link once.
 4. Copy the link and send it to them yourself. Reliquary doesn't email invites yet.
 
-The link works once, for 7 days, and only for someone signed in with that email address. If they have no account yet, the sign-in page tells them what to do.
+The link works once, for 7 days, and only for someone signed in with that email address. If they have no account yet, the sign-in page tells them what to do. Joining by invite also lets a new account create vaults of its own while Reliquary is [invite-only](../concepts/plans-and-limits.md#invite-only).
 
 ## After they join
 

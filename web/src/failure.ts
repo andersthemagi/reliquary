@@ -166,6 +166,7 @@ const CLASSES: Record<string, string> = {
 const OWN_CODES: Record<string, string> = {
   RLV01: "no such vault for you",
   RLP01: "plan limit reached",
+  RLP02: "account not admitted",
 };
 
 export function sqlstateName(code: string, message = ""): string {
@@ -184,6 +185,9 @@ export function sqlstateStatus(code: string): number {
   if (code === "P0002" || code === "RLV01") return 404;
   // A plan limit (20260925230000_plans.sql): allowed, but not with room.
   if (code === "RLP01") return 403;
+  // An account not admitted while Reliquary is invite-only
+  // (20260925240000_admission.sql): signed in, but not let in.
+  if (code === "RLP02") return 403;
   if (code === "57014" || code === "55P03") return 504;
   if (code === "40001" || code === "40P01") return 503;
   if (code === "25006") return 503;

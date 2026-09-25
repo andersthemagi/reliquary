@@ -34,3 +34,13 @@ language sql set search_path = '' as $$
    where id = 'free'
 $$;
 revoke all on function test_support.roomy_free() from public, anon, authenticated;
+
+-- Admission (20260925240000_admission): the suites predate it and
+-- create vaults as people nobody admitted (most with no account in
+-- auth.users at all), so every test database starts open (invite-only off,
+-- as after the alpha). Admission is tested with it on, by the tests that
+-- turn it on themselves: supabase/tests/admission_test.sql (a database of
+-- its own), web/test/admission.test.mjs and mcp/test/admission.test.mjs
+-- (their suites run one file at a time; each turns it on in before() and
+-- off again in after()).
+update private.settings set invite_only = false;

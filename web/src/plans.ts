@@ -2,7 +2,10 @@
 // the account's plan on Home and /account, a vault's tier and usage in its
 // Settings. The database decides and counts (20260925230000_plans.sql:
 // public.my_plan, public.vault_usage); refusals arrive as SQLSTATE RLP01,
-// whose message pages.ts's message() shows where they happen.
+// whose message pages.ts's message() shows where they happen. Admission
+// (20260925240000_admission.sql: public.my_admission): while
+// Reliquary is invite-only, an account creates vaults only once admitted;
+// create_vault refuses others with SQLSTATE RLP02.
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
@@ -37,6 +40,17 @@ export async function myPlan(c: pg.PoolClient): Promise<Plan> {
   const r = (await c.query(`select plan, plan_name, vaults_owned, max_vaults from public.my_plan()`)).rows[0];
   return { plan: r.plan, planName: r.plan_name, vaultsOwned: r.vaults_owned, maxVaults: r.max_vaults };
 }
+
+export type Admission = { admitted: boolean; inviteOnly: boolean };
+
+export async function myAdmission(c: pg.PoolClient): Promise<Admission> {
+  const r = (await c.query(`select admitted, invite_only from public.my_admission()`)).rows[0];
+  return { admitted: r.admitted, inviteOnly: r.invite_only };
+}
+
+// For an account that can't create vaults yet: why, and the way in.
+export const notAdmittedNote = (): Raw =>
+  html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account. <a href="/docs/concepts/plans-and-limits#invite-only">Invite-only</a></p>`;
 
 // Usage for the vaults in `ids` the person belongs to, in one query.
 export async function vaultUsages(c: pg.PoolClient, ids: string[]): Promise<Map<string, VaultUsage>> {
@@ -113,13 +127,14 @@ export function usageSection(u: VaultUsage): Raw {
 
 // /account: the plan, and the vaults this person created.
 export async function accountPage(ctx: Ctx): Promise<Reply> {
-  const { plan, vaults } = await asPerson(ctx.userId, async (c) => {
+  const { plan, admission, vaults } = await asPerson(ctx.userId, async (c) => {
     const plan = await myPlan(c);
+    const admission = await myAdmission(c);
     const owned = (
       await c.query(`select id, name from public.vaults where created_by = $1 order by name, id`, [ctx.userId])
     ).rows as { id: string; name: string }[];
     const usage = await vaultUsages(c, owned.map((v) => v.id));
-    return { plan, vaults: owned.map((v) => ({ ...v, usage: usage.get(v.id)! })).filter((v) => v.usage) };
+    return { plan, admission, vaults: owned.map((v) => ({ ...v, usage: usage.get(v.id)! })).filter((v) => v.usage) };
   });
   const full = plan.vaultsOwned >= plan.maxVaults;
   return render(
@@ -127,6 +142,7 @@ export async function accountPage(ctx: Ctx): Promise<Reply> {
     "Plan and usage",
     html`${pageHeader({ title: "Plan and usage" })}
     <p class="lede usage-line">${planLine(plan)}</p>
+    ${admission.admitted ? "" : notAdmittedNote()}
     ${full
       ? html`<p class="callout attention" role="status">You own ${plan.vaultsOwned} ${plan.vaultsOwned === 1 ? "vault" : "vaults"}, and the ${plan.planName} plan allows ${plan.maxVaults}: delete one you no longer need before creating another. Nothing is deleted for you.</p>`
       : ""}

@@ -140,6 +140,11 @@
   status: shipped
   docs: concepts/plans-and-limits
 
+- title: Invite-only accounts
+  summary: During the alpha an account creates vaults once it joins a vault by invite or the operator admits it.
+  status: shipped
+  docs: concepts/plans-and-limits
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
