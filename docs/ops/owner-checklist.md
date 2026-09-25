@@ -32,7 +32,7 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
    - GitHub, Settings > Actions > General > Workflow permissions: turn on
      "Allow GitHub Actions to create and approve pull requests", or
      release-please can't open the release pull request.
-   - Secret `VERCEL_TOKEN`: a Vercel access token (Account Settings >
+   - Secret `VERCEL_TOKEN` (deferred during pre-alpha by the owner's decision; releases are deployed by hand, then verified with the deploy workflow's tag input): a Vercel access token (Account Settings >
      Tokens) scoped to the team that owns `reliquary-web` and
      `reliquary-mcp`, so a release deploys exactly its tagged commit. If the
      projects are under a team, also the variable `VERCEL_TEAM_ID`
