@@ -1,7 +1,9 @@
 -- Hostile tests for invite-only admission (20260925240000_admission:
--- SQLSTATE RLP02, and the operator's controls over it) and emails compared
--- in one Unicode form (20260925240300_email_nfc, "emails:"). The races are
--- in web/test/races.test.mjs: they need several connections at once.
+-- SQLSTATE RLP02, and the operator's controls over it), emails compared in
+-- one Unicode form (20260925240300_email_nfc, "emails:") and the storage
+-- counter's drift check (20260925240400_storage_drift, "drift:", "gone:").
+-- The races are in web/test/races.test.mjs: they need several connections
+-- at once.
 --
 -- supabase/tests/support.sql starts this database open (invite-only off);
 -- this file turns it on. Ana owns a vault and is admitted by the operator;
@@ -237,3 +239,36 @@ select t.expect('emails: inviting a member again in the other form is refused as
   '23505 that address already belongs to a member of this vault');
 select t.expect('emails: invites are stored in the one form',
   (select count(*)::text from private.vault_invites where email is distinct from private.email_key(email)), '0');
+
+-- ---------------------------------------------------------------------------
+-- Counter drift, and accounts gone from Auth
+
+select t.expect('drift: with every counter kept by the triggers, nothing has drifted',
+  t.ops('select count(*)::text from private.storage_drift()'), '0');
+update private.vault_storage set bytes = bytes + 7 where vault_id = t.id('club');
+select t.expect('drift: a counter off from a full scan is found, by how much',
+  t.ops(format($q$select concat_ws(' ', vault_name, drift) from private.storage_drift() where vault_id = %L$q$, t.id('club'))),
+  'Club -7');
+select t.expect('drift: the weekly check records it and fixes nothing',
+  private.log_storage_drift()::text || ' '
+  || t.q(format('select count(*)::text from private.storage_drift_log where vault_id = %L', t.id('club'))) || ' '
+  || t.ops('select count(*)::text from private.storage_drift()'),
+  '1 1 1');
+select t.expect('drift: the operator recounts a vault on purpose, and it no longer drifts',
+  (t.ops(format($q$select private.recount_storage(%L)$q$, t.id('club'))) ~ '^counted \d+, scanned \d+: the counter is now ')::text
+  || ' ' || t.ops('select count(*)::text from private.storage_drift()'),
+  'true 0');
+select t.expect('drift: people, agents and the app roles can''t check, recount or read the log',
+  concat_ws(' ',
+    t.run('ana', 'select count(*)::text from private.storage_drift()'),
+    t.run('ana', format($q$select private.recount_storage(%L)$q$, t.id('club'))),
+    t.run('ana', 'select count(*)::text from private.storage_drift_log', 'Claude Code'),
+    t.run_role('reliquary_web', 'select private.log_storage_drift()::text'),
+    t.run_role('reliquary_mcp', format($q$select private.recount_storage(%L)$q$, t.id('club'))),
+    t.ops('select count(*)::text from private.storage_drift_log')),
+  'ERR 42501 ERR 42501 ERR 42501 ERR 42501 ERR 42501 ERR 42501');
+select t.expect('gone: members whose account was deleted in Auth are listed for the operator',
+  t.q(format($q$delete from auth.users where id = %L returning 'gone'$q$, t.id('jo'))) || ' / '
+  || t.ops(format($q$select concat_ws(' ', kind, vault_name, role) from private.accounts_gone() where user_id = %L$q$, t.id('jo')))
+  || ' / ' || t.run('ana', 'select count(*)::text from private.accounts_gone()'),
+  'gone / member Club editor / ERR 42501');

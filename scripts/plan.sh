@@ -11,10 +11,12 @@
 #   scripts/plan.sh admit <email>                 let an account create vaults while invite-only
 #   scripts/plan.sh revoke-admission <email>      take that back (they keep their vaults)
 #   scripts/plan.sh invite-only on|off            whether accounts need admitting (on in the alpha)
+#   scripts/plan.sh check                         storage counters that drifted, accounts gone from Auth
+#   scripts/plan.sh recount <vault-id>            set a vault's storage counter to a full scan
 #
 # Nothing is deleted when a plan or tier is smaller: a vault over a limit
-# takes nothing new until it is under. Admission is
-# supabase/migrations/20260925240000_admission.sql.
+# takes nothing new until it is under. Admission and the checks are
+# supabase/migrations/20260925240000_admission.sql and 20260925240400_storage_drift.sql.
 #
 # Runs psql as postgres against the hosted database, with
 # supabase/.db-password read inside the container (never printed). Prints
@@ -29,7 +31,7 @@ ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
 host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 
-usage() { sed -n '6,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '6,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
 UUID='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 NAME='^[a-z][a-z0-9_]{0,31}$'
@@ -150,6 +152,23 @@ SQL
     [ $# -eq 2 ] && [[ $2 == on || $2 == off ]] || usage
     run -v on="$([ "$2" = on ] && echo true || echo false)" <<'SQL'
 select private.set_invite_only(:'on'::boolean) as done;
+SQL
+    ;;
+  check)
+    [ $# -eq 1 ] || usage
+    run <<'SQL'
+select vault_id as vault, vault_name as name, private.size_text(coalesce(counted, 0)) as counted,
+       private.size_text(scanned) as scanned, drift as "drift (bytes)"
+  from private.storage_drift();
+select kind, vault_id as vault, vault_name as name, user_id as account, coalesce(role, '') as role
+  from private.accounts_gone();
+SQL
+    ;;
+  recount)
+    [ $# -eq 2 ] || usage
+    need "a vault id" "$2" "$UUID"
+    run -v arg="$2" <<'SQL'
+select private.recount_storage(:'arg'::uuid) as done;
 SQL
     ;;
   *) usage ;;

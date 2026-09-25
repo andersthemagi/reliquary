@@ -37,6 +37,8 @@ Sizes are decimal: 1 MB is 1,000,000 bytes, 1 GB is 1,000 MB.
 - **People**: a vault's members, of every role. When an owner invites someone, invites still waiting count too, so a vault never hands out more links than it has places for.
 - **Storage**: the text of every version of every file (history takes space too), every variable's encrypted value, and the encrypted values of imports waiting to be applied. A proposal counts once it is applied. Comments, review notes and the activity log don't count.
 
+Storage is counted as things change, not measured on each request. Every week the operator's check compares each vault's count with a full recount; a count that is off is looked into and fixed by hand, never silently.
+
 ## At a limit
 
 A request that would pass a limit is refused, and nothing is changed. The message names the vault, the limit, the plan or tier and the usage, for example "Club is at its 10-person limit on the Free plan (8 members and 2 invites waiting): revoke an invite or remove someone first".
