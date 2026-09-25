@@ -1,0 +1,240 @@
+# Reliquary's public roadmap: the source of /roadmap and /docs/roadmap.
+#
+# One item per "- title:". Keys: title, summary (one line), status (shipped,
+# in-progress, planned or considering), and optionally milestone (M1 to M7,
+# docs/design.md's build order), issue (a number), docs (a docs page's slug,
+# like concepts/variables) and version (the release it shipped in).
+# Shipping a feature moves its item to shipped in the same change.
+# Quote a value that holds ": " or starts with a symbol. The build
+# (web/scripts/gen-docs.mjs) and web/test/docs.test.mjs check this file.
+
+# Shipped ------------------------------------------------------------------
+
+- title: Vaults, files and folders
+  summary: Shared vaults of versioned text files for people and their agents, with search.
+  status: shipped
+  milestone: M1
+  docs: concepts/vaults-and-files
+  version: 0.1.0
+
+- title: Canon and open files with rules and quorum
+  summary: Canon files change only when enough people approve; open files are written directly.
+  status: shipped
+  milestone: M1
+  docs: concepts/canon-and-rules
+  version: 0.1.0
+
+- title: Proposals and review
+  summary: Approve, request changes, reject or edit then approve, with diffs, threads and snooze.
+  status: shipped
+  milestone: M1
+  docs: concepts/proposals-and-review
+  version: 0.1.0
+
+- title: Remote MCP endpoint with OAuth
+  summary: One MCP URL for Claude Code, Claude.ai, ChatGPT, Cursor and any MCP client.
+  status: shipped
+  milestone: M1
+  docs: reference/mcp-tools
+  version: 0.1.0
+
+- title: Scoped, expiring access tokens
+  summary: Tokens and connections limited to chosen vaults, read-only or read-write, always expiring.
+  status: shipped
+  milestone: M1
+  docs: concepts/connections
+  version: 0.1.0
+
+- title: The agent ceiling, enforced in the database
+  summary: Agents act as their person but can never approve, manage members, reveal secrets or delete.
+  status: shipped
+  milestone: M1
+  docs: concepts/agents
+  version: 0.1.0
+
+- title: Activity and history
+  summary: An append-only log of every change, filterable, across vaults or per file.
+  status: shipped
+  milestone: M1
+  docs: concepts/activity
+  version: 0.1.0
+
+- title: Vault settings, export, delete and erase
+  summary: Rename a vault, export it as a tar.gz, delete it at once, or erase one file's text.
+  status: shipped
+  milestone: M1
+  docs: concepts/export-delete-erase
+  version: 0.1.0
+
+- title: Members and invites
+  summary: Invite by email with a role, change roles, remove members, leave a vault.
+  status: shipped
+  milestone: M1
+  docs: concepts/members
+  version: 0.1.0
+
+- title: Environment variables
+  summary: Encrypted variables per environment, revealed only to people and logged on every access.
+  status: shipped
+  milestone: M2
+  docs: concepts/variables
+  version: 0.1.0
+
+- title: The Reliquary CLI
+  summary: reliquary run and env pull deliver variables to a process or a gitignored .env.
+  status: shipped
+  milestone: M2
+  docs: reference/cli
+  version: 0.1.0
+
+- title: .env imports
+  summary: Paste a .env or push one from the CLI; a person applies it in the web app.
+  status: shipped
+  milestone: M2
+  docs: concepts/imports
+  version: 0.1.0
+
+- title: Key rotation and custom environments
+  summary: Rotate the encryption key without downtime; owners add their own environments.
+  status: shipped
+  milestone: M2
+  docs: concepts/variables
+  version: 0.1.0
+
+- title: Versioned releases
+  summary: Each release is tagged with a changelog; the footer and /version say which one is running.
+  status: shipped
+  docs: changelog
+  version: 0.1.0
+
+- title: Public docs and roadmap
+  summary: Docs for people and agents at /docs, with llms.txt and every page as Markdown.
+  status: shipped
+  docs: index
+
+# In progress --------------------------------------------------------------
+
+- title: A week of real use for the core
+  summary: One vault used from ChatGPT, Claude Code and Hermes for a week, canon approved in the browser.
+  status: in-progress
+  milestone: M1
+
+- title: A week of real use for variables
+  summary: Projects run with reliquary run and no local .env for a week.
+  status: in-progress
+  milestone: M2
+
+- title: Move to reliquary.redmage.cc
+  summary: The web app and MCP endpoint on their own domain; clients sign in again once.
+  status: in-progress
+
+- title: Email from the product domain
+  summary: Sign-in codes and invites sent by email from Reliquary's own domain.
+  status: in-progress
+
+# Planned ------------------------------------------------------------------
+
+- title: Publish the CLI to npm
+  summary: "@reliquary-ai/cli on npm, so npx works everywhere without a checkout."
+  status: planned
+
+- title: Shared connections
+  summary: A vault holds connections to remote MCP servers; agents use their tools and never see the key.
+  status: planned
+  milestone: M3
+
+- title: Tool grants per connection
+  summary: Each connection's tools allowed per role, with writes off until an owner turns them on.
+  status: planned
+  milestone: M3
+
+- title: Routines
+  summary: Declarative automations on a schedule or a change, running with nobody's machine on.
+  status: planned
+  milestone: M4
+
+- title: Routine watchdog
+  summary: Missed, failed and timed-out runs are recorded and their owner is told.
+  status: planned
+  milestone: M4
+
+- title: Per-member variable grants
+  summary: Choose which members may use which environments, beyond their role.
+  status: planned
+  milestone: M5
+
+- title: Credential requests
+  summary: Ask a client for named credentials; they fill a form instead of emailing them.
+  status: planned
+  milestone: M5
+
+- title: Emergency access
+  summary: A trusted member can request owner access, granted after a waiting period unless declined.
+  status: planned
+  milestone: M5
+
+- title: Git mirror
+  summary: Every canon change committed to a git remote you choose, one way by default.
+  status: planned
+  milestone: M6
+
+- title: Version history and restore
+  summary: Browse a file's earlier versions and restore one.
+  status: planned
+  milestone: M6
+
+- title: Fuller export
+  summary: Exports with the log, earlier versions and proposals, and reliquary export from the CLI.
+  status: planned
+  milestone: M6
+
+- title: Chat surfaces
+  summary: Use a vault from a group chat, starting with Telegram, showing only what everyone present may see.
+  status: planned
+  milestone: M7
+
+# Considering --------------------------------------------------------------
+
+- title: Billing and plans
+  summary: Paid plans with their limits enforced in the database, through a merchant of record.
+  status: considering
+
+- title: Public status page
+  summary: Uptime of the web app, the MCP endpoint and the database, in public.
+  status: considering
+
+- title: Onboarding templates
+  summary: A client engagement vault template and a first-run checklist.
+  status: considering
+
+- title: Rate limits on sign-in and MCP
+  summary: Per-person and per-token limits beyond the ones on invites, imports and exports.
+  status: considering
+
+- title: OS keychain for the CLI
+  summary: Keep CLI sign-ins in the macOS Keychain or libsecret instead of a file.
+  status: considering
+
+- title: Client-side encrypted variables
+  summary: Values only your members' keys can open, so the operator can't decrypt them.
+  status: considering
+
+- title: Semantic search
+  summary: Find files by meaning, not only by shared words.
+  status: considering
+
+- title: Approver groups
+  summary: Quorums like one approval from legal and one from engineering.
+  status: considering
+
+- title: Member names over MCP
+  summary: Let agents address co-members by display name, without learning email addresses.
+  status: considering
+
+- title: Service agents
+  summary: Headless agents with their own grants that belong to the vault, not a person.
+  status: considering
+
+- title: SSO
+  summary: Sign in through your company's identity provider.
+  status: considering

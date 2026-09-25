@@ -41,14 +41,15 @@ seed=$(psql -A -t < test/seed.sql | grep '=' )
 # The web app as the OAuth authorization server, signed in as Ben. It is
 # built inside its own container from a read-only view of web/, so it never
 # races web/test.sh over web/dist or web/node_modules. CIMD_ALLOW_LOOPBACK
-# lets the test serve client metadata on loopback.
+# lets the test serve client metadata on loopback. `npm run compile` is the
+# build without the docs (gen-docs reads the whole checkout; OAuth needs none).
 "$engine" run -d --name "$web" --network host -v "$PWD/../web":/src:ro,z -v "$PWD":/mcp:z -v "$PWD/../version.txt":/version.txt:ro,z \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000b -e LOGIN_FILE="/mcp/.login-oauth-$slot" \
   -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e PORT=$webport "$node" sh -c \
   'mkdir -p /app && cd /src && cp -r src public package.json package-lock.json tsconfig.json stamp-version.mjs /app/ && cd /app &&
    if [ -x /src/node_modules/.bin/tsc ]; then ln -s /src/node_modules node_modules; else npm ci --no-audit --no-fund --silent; fi &&
-   npm run -s build && exec node dist/server.js' >/dev/null
+   npm run -s compile && exec node dist/server.js' >/dev/null
 
 # A fresh checkout (CI, a new worktree) has no node_modules yet.
 [ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund

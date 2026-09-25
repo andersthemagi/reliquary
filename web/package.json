@@ -5,7 +5,9 @@
   "description": "Reliquary's web UI: browse, edit, and approve",
   "type": "module",
   "scripts": {
-    "build": "tsc && node stamp-version.mjs",
+    "build": "npm run -s docs && npm run -s compile",
+    "docs": "node scripts/gen-docs.mjs",
+    "compile": "tsc && node stamp-version.mjs",
     "start": "node dist/server.js"
   },
   "dependencies": {

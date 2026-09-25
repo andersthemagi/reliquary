@@ -58,6 +58,25 @@ page.
 ./test.sh    # real Postgres + this server; sign-in, escaping, CSRF, approve, threads, snooze, tokens, contrast; log leak check
 ```
 
+## Docs and roadmap
+
+`/docs` serves the public docs (`src/docs.ts`), public and indexable like the
+legal pages, in the public site's frame: a sidebar from
+`docs/public/SUMMARY.md`, on-page contents, previous and next. Every page is
+also Markdown at `/docs/<page>.md`, and `/llms.txt` and `/llms-full.txt` index
+and concatenate them for agents. `/roadmap` shows `docs/public/roadmap.yml` in
+four columns. Pages are rendered with the file-preview Markdown renderer
+(`src/markdown.ts`, raw HTML off), plus heading ids and resolved links.
+
+`scripts/gen-docs.mjs` (`npm run docs`) builds them into `docs-build/`
+(gitignored), first in `npm run build` (then `npm run compile`: `tsc` and the
+version stamp): it copies `docs/public` and fills in the generated parts (the
+MCP tools from `mcp/test/contract.snapshot.json`, the CLI's help,
+`CHANGELOG.md`, the roadmap). It reads outside `web/`, so it needs the whole
+checkout (Vercel builds from one); `vercel.json` bundles `docs-build/**` into
+the function. Only pages in the build's manifest are served; without
+`docs-build/`, `/docs` is a 404. Drift tests: `test/docs.test.mjs`.
+
 ## OAuth for MCP clients
 
 This app is the OAuth 2.1 authorization server for the MCP endpoint
@@ -124,7 +143,7 @@ no `public/`) for `test/hosting.test.mjs`.
 
 Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
 project, `reliquary-web`, Root Directory `web`. Vercel runs the app as one function, `api/index.js`, which hands every
-request to the handler `src/server.ts` exports (built by `npm run build`: `tsc` into `dist/`, then `stamp-version.mjs` writes `dist/version.json` from `../version.txt` for `GET /version`);
+request to the handler `src/server.ts` exports (built by `npm run build`: the docs into `docs-build/`, `tsc` into `dist/`, then `stamp-version.mjs` writes `dist/version.json` from `../version.txt` for `GET /version`);
 every path is rewritten to it after `public/` gets its turn on the CDN. The
 zero-config Node server detection only recognises Express-style apps, so it
 failed on this plain `node:http` server. `vercel.json` sets region `fra1`, Fluid

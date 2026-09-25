@@ -10,7 +10,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "{dist/**,supabase-ca.crt}"
+      "includeFiles": "{dist/**,docs-build/**,supabase-ca.crt}"
     }
   },
   "rewrites": [

@@ -299,10 +299,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" }).end(versionJson());
       return;
     }
-    // The public site's legal pages, robots.txt, sitemap.xml (legal.ts).
+    // The public site's legal pages, robots.txt, sitemap.xml, docs (legal.ts).
     const pub = req.method === "GET" ? publicRoute(url.pathname, theme) : undefined;
     if (pub) {
-      res.writeHead(200, { ...SECURITY_HEADERS, "content-type": pub.type }).end(pub.body);
+      res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type }).end(pub.body);
       return;
     }
     // OAuth endpoints a client calls without a session (oauth.ts).

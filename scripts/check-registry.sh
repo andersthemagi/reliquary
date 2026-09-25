@@ -2,7 +2,9 @@
 # Keeps tests/features.md honest (traceability from feature to test):
 #  1. every `file#prefix` it cites exists and has a test named with prefix;
 #  2. every plain `file` it cites exists;
-#  3. every test file in the repo is cited by at least one row.
+#  3. every test file in the repo is cited by at least one row;
+#  4. every feature row names its public docs page (`docs/public/<page>.md`,
+#     in the last column), and that page exists.
 # Needs only bash, grep and sed. Runs first in ./test.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -29,5 +31,17 @@ for t in supabase/tests/*_test.sql mcp/test/*.test.mjs web/test/*.test.mjs cli/t
   grep -qxF "$t" <<< "$(sed 's/#.*//' <<< "$refs")" || fail "$t is not in $registry; add it to a feature row"
 done
 
-[ $status = 0 ] && echo "registry: $(wc -l <<< "$refs") references ok, every test file mapped"
+rows=0
+while IFS= read -r row; do
+  rows=$((rows + 1))
+  id=$(cut -d'|' -f2 <<< "$row" | tr -d ' ')
+  # The last cell: after the final " | ", before the closing "|".
+  docs=$(sed -E 's/[[:space:]]*\|[[:space:]]*$//; s/.*\|//' <<< "$row" | grep -oE '`docs/public/[^`]+\.md`' | tr -d '`' || true)
+  if [ -z "$docs" ]; then fail "$id names no docs page (a \`docs/public/<page>.md\` in its last column)"; continue; fi
+  while IFS= read -r page; do
+    [ -f "$page" ] || fail "$id: $page doesn't exist"
+  done <<< "$docs"
+done < <(grep -E '^\| F[0-9]+ \|' "$registry")
+
+[ $status = 0 ] && echo "registry: $(wc -l <<< "$refs") references ok, every test file mapped, $rows feature rows with docs pages"
 exit $status

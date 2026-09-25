@@ -63,6 +63,15 @@ export const footerLinks = () =>
 export const versionLink = () =>
   BUILD.version === "unknown" ? "" : html`<a class="footer-version" href="/docs/changelog">v${BUILD.version}</a>`;
 
+// Reliquary's stage, said on every frame: a badge in the top bar (the app's
+// and the public site's) linking to the roadmap, and the sentence itself
+// where there is room (the landing page, the docs, the roadmap, the
+// Account menu).
+export const PRE_ALPHA = "Pre-alpha: things change and may break; data is backed up daily.";
+export const stageBadge = () => html`<a class="stage" href="/roadmap" title="${PRE_ALPHA}">Pre-alpha</a>`;
+export const preAlphaNote = () =>
+  html`<p class="prealpha-note"><strong>Pre-alpha:</strong> things change and may break; data is backed up daily. <a href="/roadmap">See the roadmap</a>.</p>`;
+
 export type Nav = "home" | "review" | "vaults" | "activity" | "connect" | "tokens";
 
 export type PageOpts = {
@@ -98,6 +107,7 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
 <header class="top">
   <div class="top-inner">
   <a class="wordmark" href="/"><span class="logo" aria-hidden="true"></span>Reliquary</a>
+  ${stageBadge()}
   ${opts.user
     ? html`<nav aria-label="Main">
     <a href="/"${current("home", "vaults")}>Vaults</a>
@@ -111,6 +121,8 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
     <summary class="button quiet">Account</summary>
     <div class="menu">
       <p class="menu-meta">Signed in as <strong>${personRef(opts.user)}</strong>${accountMode === "local" ? " (local)" : ""}</p>
+      <p class="menu-links"><a href="/docs">Docs</a><a href="/roadmap">Roadmap</a></p>
+      <p class="menu-meta">${PRE_ALPHA}</p>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
         ${csrfField(opts.csrf)}<input type="hidden" name="back" value="${opts.path ?? "/"}">
         <span class="menu-label">Theme</span>

@@ -7,7 +7,7 @@
 // filled) and PRICING (the tiers, easy to change or hide). A field left null
 // renders as a visible "[to be filled: ...]" mark, never as an invented fact.
 
-import { LEGAL_LINKS, esc, footerLinks, html, raw, styleHref, versionLink, type Raw, type Theme } from "./html.js";
+import { LEGAL_LINKS, esc, footerLinks, html, raw, stageBadge, styleHref, versionLink, type Raw, type Theme } from "./html.js";
 
 // Who runs Reliquary. null = not decided or not known yet: shown as a
 // placeholder on the page. Fill these in before the pages leave draft.
@@ -99,7 +99,7 @@ export const requestAccessHref = () =>
 
 // The site's own origin: PUBLIC_URL when set (server.ts refuses to start
 // on a malformed one), else the default.
-const siteOrigin = (() => {
+export const siteOrigin = (() => {
   try {
     return new URL(process.env.PUBLIC_URL ?? "").origin;
   } catch {
@@ -114,7 +114,8 @@ export const draftNote = () =>
 // The public page frame: its own header (no app nav, no account menu), the
 // meta a search engine and a link preview need, and the footer with the
 // legal links. Indexable, unlike the app's pages.
-export function sitePage(o: { title: string; description: string; path: string; body: Raw; theme: Theme; home?: boolean }): string {
+// `alternate`: the page as Markdown (docs pages), for agents.
+export function sitePage(o: { title: string; description: string; path: string; body: Raw; theme: Theme; home?: boolean; alternate?: string }): string {
   const url = siteOrigin + o.path;
   const fullTitle = o.home ? `${OPERATOR.brand}: ${o.title}` : `${o.title} · ${OPERATOR.brand}`;
   return html`<!doctype html>
@@ -126,6 +127,7 @@ export function sitePage(o: { title: string; description: string; path: string; 
 <title>${fullTitle}</title>
 <meta name="description" content="${o.description}">
 <link rel="canonical" href="${url}">
+${o.alternate ? html`<link rel="alternate" type="text/markdown" href="${o.alternate}">` : ""}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${OPERATOR.brand}">
 <meta property="og:title" content="${fullTitle}">
@@ -145,11 +147,14 @@ export function sitePage(o: { title: string; description: string; path: string; 
 <header class="top site-top">
   <div class="top-inner">
   <a class="wordmark" href="/" aria-label="Reliquary by Red Mage, home"><span class="logo" aria-hidden="true"></span>Reliquary<span class="wordmark-by" aria-hidden="true">by Red Mage</span></a>
+  ${stageBadge()}
   <nav aria-label="Site">
     <a href="/#how">How it works</a>
     ${PRICING.show ? html`<a href="/#pricing">Pricing</a>` : ""}
     <a href="/security"${o.path === "/security" ? raw(' aria-current="page"') : ""}>Security</a>
     <a href="/#faq">FAQ</a>
+    <a href="/docs"${o.path === "/docs" || o.path.startsWith("/docs/") ? raw(' aria-current="page"') : ""}>Docs</a>
+    <a href="/roadmap"${o.path === "/roadmap" ? raw(' aria-current="page"') : ""}>Roadmap</a>
   </nav>
   <a class="button site-signin" href="/signin">Sign in</a>
   </div>
@@ -175,8 +180,9 @@ export function robotsTxt(): string {
 
 export const PUBLIC_PAGES = ["/", ...LEGAL_LINKS.map(([href]) => href)];
 
-export function sitemapXml(): string {
-  const urls = PUBLIC_PAGES.map(
+// `extra`: more public paths, the docs pages (docs.ts), after these.
+export function sitemapXml(extra: readonly string[] = []): string {
+  const urls = [...PUBLIC_PAGES, ...extra].map(
     (p) => `  <url><loc>${esc(siteOrigin + p)}</loc><lastmod>${OPERATOR.lastUpdated}</lastmod></url>`,
   ).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;

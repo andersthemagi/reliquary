@@ -1,0 +1,50 @@
+# Proposals and review
+
+A proposal is a suggested change to a file, usually a canon one, that waits for people to approve, request changes or reject it.
+
+## What a proposal is
+
+Anyone who can write, and their agents, can propose: a new file, new text for a file, or deleting one. Each carries a reason for the reviewers. A proposal holds the full proposed text, and each revision replaces it.
+
+A proposal is one of:
+
+| Status | Means |
+|---|---|
+| Open | waiting for approvals |
+| Changes requested | a reviewer asked for changes; it can't be approved until the proposer revises it |
+| Applied | it reached its quorum and the file was written (or deleted) |
+| Rejected | a reviewer rejected it, with a note |
+| Stale | the file changed after it was proposed, so it can't apply; **Propose again** (or `propose` with the same text) starts a new one on the current file |
+
+## Reviewing
+
+**Review** in the top bar counts what waits on you, across all your vaults. A proposal's page puts the decision first:
+
+1. The status, and the latest request for changes if there is one.
+2. The decision: a note, then **Approve**, **Request changes**, **Reject**, or **Edit, then approve**.
+3. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted.
+4. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
+5. Approvals and the discussion.
+
+- **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it.
+- **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
+- **Edit, then approve** lets you fix the text yourself and approve your version. It is credited to you, and with a quorum above 1 it waits for another approval of the edit.
+
+Only people approve, request changes or reject, in the web app. An agent can't, over any tool. See [Agents and the ceiling](agents.md).
+
+## Revising
+
+Only the proposer revises: in the web app with **Revise**, or over MCP with `revise_proposal` (the person whose agent proposed counts as the proposer). A revision replaces the text, and approvals of earlier revisions stop counting.
+
+## Threads
+
+Every proposal has one timeline: comments, review notes and approvals, oldest first.
+
+- Owners, editors and their agents comment (agents with `comment_on_proposal`, as their person). Viewers read.
+- A comment is words only: it can't approve, reject or change anything.
+- Comments are 1 to 4000 characters, at most 200 per proposal, and can't be edited or deleted.
+- Agents get new comments and notes in `changes_since`, so they can answer a request for changes without polling.
+
+## Snooze
+
+From a proposal's page, or its row in Review, you can snooze it **for a day**, **for a week**, or **until it changes**. A snoozed proposal leaves your Review list until the time passes, someone else comments, or it gets a new revision. Snoozes are private to you and not logged. Agents can't snooze, so an agent can't hide its own proposal from you.

@@ -8,6 +8,7 @@
 // robots.txt, sitemap.xml and security.txt. The landing page at `/` is not
 // here: `/` is Home for a signed-in person, so server.ts decides.
 
+import { docsPaths, docsRoute } from "./docs.js";
 import { html, type Raw, type Theme } from "./html.js";
 import { OPERATOR, draftNote, fill, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
 
@@ -283,7 +284,8 @@ function security(theme: Theme): string {
 
 // Dispatch ---------------------------------------------------------------------
 
-export type PublicReply = { type: string; body: string };
+// status: 200 unless given (a docs page that doesn't exist is 404).
+export type PublicReply = { status?: number; type: string; body: string };
 
 const PAGES: Record<string, (t: Theme) => string> = {
   "/terms": terms,
@@ -297,7 +299,8 @@ export function publicRoute(path: string, theme: Theme): PublicReply | undefined
   const pageFor = PAGES[path];
   if (pageFor) return { type: "text/html; charset=utf-8", body: pageFor(theme) };
   if (path === "/robots.txt") return { type: "text/plain; charset=utf-8", body: robotsTxt() };
-  if (path === "/sitemap.xml") return { type: "application/xml; charset=utf-8", body: sitemapXml() };
+  if (path === "/sitemap.xml") return { type: "application/xml; charset=utf-8", body: sitemapXml(docsPaths()) };
   if (path === "/.well-known/security.txt") return { type: "text/plain; charset=utf-8", body: securityTxt() };
-  return undefined;
+  // The docs, the roadmap and llms.txt (docs.ts).
+  return docsRoute(path, theme);
 }

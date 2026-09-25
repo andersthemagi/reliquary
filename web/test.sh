@@ -58,9 +58,11 @@ seed=$(psql -A -t < test/seed.sql | grep '=')
 
 # A fresh checkout (CI, a new worktree) has no node_modules yet.
 [ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund
-# npm run build: tsc, then stamp-version.mjs writes dist/version.json from
-# ../version.txt (mounted where the build looks for it).
-"$engine" run --rm --network none -v "$PWD":/app:Z -v "$PWD/../version.txt":/version.txt:ro,z -w /app "$node" npm run -s build
+# npm run build: gen-docs.mjs writes docs-build/ (docs/public, the MCP
+# contract, the CLI's help, CHANGELOG.md), tsc, then stamp-version.mjs writes
+# dist/version.json from ../version.txt. The build reads outside web/, so the
+# whole checkout is mounted, read-only but for web/.
+"$engine" run --rm --network none -v "$PWD/..":/repo:ro,z -v "$PWD":/repo/web:z -w /repo/web "$node" npm run -s build
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/app/.login-test-$slot \
@@ -72,7 +74,7 @@ until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/src/.login-test-hosted-$slot \
   -e PUBLIC_URL="$hosted_url" -e PORT=$hosted_port "$node" sh -c \
-  'mkdir -p /app && cp -r /src/dist /src/package.json /app/ && ln -s /src/node_modules /app/node_modules && cd /app && exec node dist/server.js' >/dev/null
+  'mkdir -p /app && cp -r /src/dist /src/docs-build /src/package.json /app/ && ln -s /src/node_modules /app/node_modules && cd /app && exec node dist/server.js' >/dev/null
 until curl -sf "http://127.0.0.1:$hosted_port/healthz" >/dev/null; do
   [ "$("$engine" inspect -f '{{.State.Running}}' "$hosted")" = true ] || { "$engine" logs "$hosted"; echo "hosted server exited"; exit 1; }
   sleep 0.3
@@ -101,7 +103,7 @@ done
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
-"$engine" run --rm --network host -v "$PWD":/app:Z -w /app "${env_args[@]}" \
+"$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/..":/repo:ro,z -e REPO_DIR=/repo -w /app "${env_args[@]}" \
   -e WEB_URL="http://127.0.0.1:$port" -e LOGIN_FILE=/app/.login-test-$slot \
   -e TEST_DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e WEB_HOSTED_URL="http://127.0.0.1:$hosted_port" -e WEB_HOSTED_PUBLIC_URL="$hosted_url" \

@@ -233,7 +233,9 @@ test("site indexing: robots.txt allows the site and names the sitemap; the sitem
   const map = await fetchAs(A, "/sitemap.xml");
   assert.match(map.headers.get("content-type"), /^application\/xml/);
   const locs = [...(await map.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-  assert.deepEqual(locs, ["/", ...LEGAL].map((p) => ORIGIN + p));
+  // The public pages first, then the roadmap and the docs (docs.test.mjs).
+  assert.deepEqual(locs.slice(0, 1 + LEGAL.length), ["/", ...LEGAL].map((p) => ORIGIN + p));
+  assert.ok(locs.slice(1 + LEGAL.length).every((l) => l === `${ORIGIN}/roadmap` || l.startsWith(`${ORIGIN}/docs`)));
 });
 
 test("site indexing: security.txt names the contact and an expiry", async () => {

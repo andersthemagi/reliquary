@@ -1,0 +1,79 @@
+# Limits
+
+The sizes, counts, rates and lifetimes Reliquary enforces, most of them in the database.
+
+A request over a limit is refused with a message naming the limit, never echoing what you sent.
+
+## Vaults and files
+
+| What | Limit |
+|---|---|
+| Vault name | 1 to 100 characters, no control characters |
+| File path | up to 1024 characters, no control characters |
+| File or proposal text | 1 MiB |
+| A proposal's reason, a review note | 4000 characters |
+| A comment | 1 to 4000 characters, at most 200 per proposal |
+| Quorum (approvals a canon change needs) | 1 to 20 |
+| A web form | 2 MB; forms carrying a file's text 3 MiB + 64 KiB, so 1 MiB of any text fits |
+
+## MCP
+
+| What | Limit |
+|---|---|
+| Messages in one batch | 10 |
+| `read_file` | 100000 bytes by default, up to 1048576 with `max_bytes`; `from_line` and `to_line` pick lines |
+| `list_files` | 200 files by default, up to 1000; continue with `after` |
+| `search` | 10 files by default, up to 50; a query up to 500 characters; up to 3 matching lines per file |
+| `changes_since` | 100 events by default, up to 500 |
+
+Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
+
+## Tokens, connections and sign-in
+
+| What | Limit |
+|---|---|
+| Access token lifetime | 7, 30, 90 or 180 days, or 1 year |
+| OAuth and CLI access tokens | 1 hour, refreshed by the client |
+| OAuth and CLI refresh tokens | 30 days, renewed on each use, never beyond a year from consent |
+| An OAuth authorization code | one use, within 60 seconds |
+| Web sign-in code | 6 digits, from an email |
+| "Last used" on the Tokens page | updated at most once a minute |
+
+## Members
+
+| What | Limit |
+|---|---|
+| An invite | one use, 7 days, one email address |
+| Invites waiting per vault | 50 |
+| Invites a person creates | 20 an hour, across all their vaults |
+| A vault deletion notice | shown once to each other member, within 30 days |
+
+## Export
+
+| What | Limit |
+|---|---|
+| Exports | 10 an hour per vault |
+| Size | 100 MiB of file text |
+
+## Environment variables
+
+| What | Limit |
+|---|---|
+| Variable name | a letter or `_`, then letters, digits or `_`, up to 128 characters; names that change how programs start are refused |
+| Value | 64 KiB of UTF-8 text, no NUL characters |
+| Variables per vault | 1000 |
+| Environments per vault | 20; a name is lower case letters, digits, `-` and `_`, starting with a letter, up to 32 characters |
+| A pasted `.env` or pushed file | 512 KiB and 5000 lines; 200 variables are taken |
+| An import | 200 names and 4 MiB |
+| Imports waiting | 20 per person per vault |
+| Imports made | 60 an hour per person |
+| A pasted draft | 30 minutes |
+| A push | 24 hours |
+| A push request to the env API | 1 MiB |
+
+## Pages
+
+| What | Limit |
+|---|---|
+| Activity | 50 events a page |
+| Variables access log | 50 entries a page |

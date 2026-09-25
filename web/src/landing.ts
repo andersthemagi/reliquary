@@ -2,7 +2,7 @@
 // get Home). Copy from docs/research/positioning.md, section 6's outline,
 // kept to what is built today; later work is marked "coming".
 
-import { html, type Raw, type Theme } from "./html.js";
+import { html, preAlphaNote, type Raw, type Theme } from "./html.js";
 import { OPERATOR, PRICING, requestAccessHref, sitePage } from "./site.js";
 
 const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
@@ -101,6 +101,7 @@ export function landing(theme: Theme): string {
     <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use. Claude, ChatGPT, Cursor and Claude Code read the same approved context. Secrets stay out of the chat.</p>
     ${cta("Get started")}
     <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta.</p>
+    ${preAlphaNote()}
   </div>
   ${proposalCard}
 </section>
