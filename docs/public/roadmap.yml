@@ -124,6 +124,12 @@
   milestone: M2
   docs: reference/cli
 
+- title: The CLI on Windows and macOS
+  summary: reliquary run starts npm, npx and pnpm shims on Windows, and the CLI's tests run on Linux, macOS and Windows.
+  status: shipped
+  milestone: M2
+  docs: reference/cli
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core

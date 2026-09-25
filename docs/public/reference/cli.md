@@ -39,6 +39,13 @@ Fetches one environment's variables and starts the command directly (no shell), 
 
 Exit code: the command's own; 128 plus the signal number if a signal ended it; 127 if the command wasn't found.
 
+On Windows:
+
+- A bare command name is looked up on `PATH` with `PATHEXT`, like `cmd.exe` does, but not in the current directory; write `.\tool.exe` for one there.
+- `.exe` and `.com` files start directly. `.cmd` and `.bat` files, like the `npm`, `npx`, `pnpm` and `yarn` shims, start through `cmd.exe /d /v:off /s /c` with every argument in double quotes, so `&`, `|`, `<`, `>`, `^` and parentheses reach the command as text. An argument holding a double quote, a `%` or a line break can't be passed to a `.cmd` or `.bat` safely, so the CLI refuses it with exit code 2 and runs nothing; run the program the shim wraps directly (for example `node <script>`) instead. Other files (`.ps1`, `.js`) are refused: run them through their interpreter.
+- Variable names are case-insensitive: a variable replaces an inherited one whatever its case, and two variables whose names differ only in case are refused.
+- Ctrl+C reaches the command directly, and the CLI waits for it to finish; closing the console window ends the command and everything it started.
+
 ### reliquary env pull
 
 ```text
@@ -137,7 +144,7 @@ A sign-in made before the keychain, in `credentials.json`, keeps working. The ne
 |---|---|
 | 0 | done |
 | 1 | an error, in a plain sentence on stderr starting `reliquary:` |
-| 2 | a usage error (an unknown command or option, a missing value) |
+| 2 | a usage error (an unknown command or option, a missing value, an argument `run` can't pass to a `.cmd` on Windows) |
 | 3 | `env push --wait` ran out of time |
 | other | `run` passes on its command's exit code |
 

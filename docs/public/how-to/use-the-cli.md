@@ -24,6 +24,8 @@ reliquary run --vault "My project" --env development -- npm run dev
 
 Everything after `--` is the command. It starts directly (no shell) with your environment plus the vault's variables, and nothing is written to disk. It exits with the command's own exit code. If a variable replaces one already in your environment, the CLI says which, by name.
 
+On Windows, `npm`, `npx` and `pnpm` work as they are: the CLI starts `.cmd` shims through `cmd.exe` with each argument quoted. It refuses an argument with a double quote, a `%` or a line break for them, since `cmd.exe` would act on it; see [the reference](../reference/cli.md#reliquary-run).
+
 ## Write a .env file
 
 ```bash
