@@ -31,7 +31,7 @@ No MCP tool, log line, activity event, error message or email carries a value.
 
 On the vault's **Variables** page, **Add a variable**: a name, an environment and a value. **Rotate** replaces a value (its version goes up by one), and **Delete** removes it after a confirm step. To bring in many at once, paste a `.env` or push one from the CLI: see [Imports](imports.md).
 
-- Names are shell-style: a letter or `_`, then letters, digits or `_`, up to 128 characters. Names that change how programs start, like `PATH`, `NODE_OPTIONS` or anything starting `LD_`, are refused.
+- Names are shell-style: a letter or `_`, then letters, digits or `_`, up to 128 characters. Names that change how programs start, like `PATH`, `NODE_OPTIONS`, anything starting `LD_` or `NPM_CONFIG_`, Windows' `COMSPEC` and `PATHEXT`, or trust settings like `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE`, are refused. A variable that already has such a name stays readable but can't be set again.
 - A value is text up to 64 KiB, without NUL characters. A vault holds at most 1000 variables.
 
 ## The access log
