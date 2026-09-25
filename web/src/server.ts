@@ -43,6 +43,7 @@ import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
 import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
 import { pool } from "./db.js";
+import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { versionJson } from "./version.js";
 import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
@@ -91,6 +92,7 @@ try {
   MODE = configureAuth(process.env, { secure: SECURE, host: HOST, port: PORT });
   configureOAuth();
   configureVariables(process.env);
+  configureRateLimits(process.env);
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);
@@ -252,6 +254,7 @@ function send(res: http.ServerResponse, reply: Reply, extra: Record<string, stri
     headers["set-cookie"] = extra["set-cookie"] ? [...cookies, extra["set-cookie"]] : cookies;
     headers["cache-control"] = "private, no-store";
   }
+  if (reply.retryAfter) headers["retry-after"] = String(reply.retryAfter);
   if (reply.redirect) {
     res.writeHead(303, { location: reply.redirect, ...headers }).end();
     return;
@@ -366,6 +369,11 @@ const server = http.createServer(async (req, res) => {
       console.info(`${req.method} ${url.pathname} 503`);
       return;
     }
+    if (auth.limited) {
+      send(res, { status: 429, retryAfter: auth.limited, html: tooManyPage(auth.limited, theme, "Your session was renewed too many times in a short time") });
+      console.info(`${req.method} ${url.pathname} 429`);
+      return;
+    }
 
     // Sign-in pages (AUTH_MODE=supabase): reachable without a session.
     if (MODE === "supabase" && SIGNIN_PATHS.has(url.pathname)) {
@@ -379,7 +387,7 @@ const server = http.createServer(async (req, res) => {
         }
         signinForm = await readForm(req);
       }
-      const out = await signinRoutes({ req, method: req.method ?? "", url, form: signinForm, theme, session: auth.session });
+      const out = await signinRoutes({ req, method: req.method ?? "", url, form: signinForm, theme, session: auth.session, ip: clientIp(req) });
       if (out) {
         send(res, out.reply, {}, [...auth.cookies, ...out.cookies]);
         console.info(`${req.method} ${url.pathname} ${out.reply.redirect ? 303 : out.reply.status ?? 200}`);
@@ -434,6 +442,17 @@ const server = http.createServer(async (req, res) => {
         console.info(`POST ${url.pathname} 303 too long`);
         return;
       }
+      // Form posts per session (ratelimit.ts); the session's CSRF token is
+      // its key, so the key is per session and never the session itself.
+      const wait = await limit([
+        { name: "web_write_minute", kind: "session", value: session.csrf },
+        { name: "web_write_hour", kind: "session", value: session.csrf },
+      ]);
+      if (wait) {
+        send(res, { status: 429, retryAfter: wait, html: tooManyPage(wait, theme, "That was too many changes in a short time") }, {}, auth.cookies);
+        console.info(`POST ${url.pathname} 429`);
+        return;
+      }
     } else if (req.method !== "GET") {
       send(res, { status: 405, html: "" }, {}, auth.cookies);
       return;
@@ -469,6 +488,7 @@ const server = http.createServer(async (req, res) => {
       theme,
       mcpUrl: MCP_URL,
       setFlash: (m) => session.setFlash(m),
+      ip: clientIp(req),
     };
     const reply = await routes(ctx);
     if (reply.download) {

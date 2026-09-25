@@ -36,12 +36,16 @@ import {
 } from "./auth.js";
 import { html, notice, page, type Theme } from "./html.js";
 import { inviteTokenOf, maskEmail, peekInvite, type Peek } from "./invites.js";
+import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 
-// The live invite a sign-in is for, if `next` is an invite page.
-async function inviteFor(next: string): Promise<Peek | undefined> {
+// The live invite a sign-in is for, if `next` is an invite page. Looking
+// one up counts against the address's invite limit (ratelimit.ts), like
+// opening the invite page; over it, the page is plain sign-in.
+async function inviteFor(next: string, ip: string): Promise<Peek | undefined> {
   const token = inviteTokenOf(next);
   if (!token) return undefined;
+  if (await limit([{ name: "invite_ip", kind: "ip", value: ip }])) return undefined;
   try {
     const p = await peekInvite(token);
     return p?.state === "pending" ? p : undefined;
@@ -83,6 +87,7 @@ type In = {
   form: URLSearchParams;
   theme: Theme;
   session: Session | null;
+  ip: string; // the client's address, for rate limits only
 };
 type Out = { reply: Reply; cookies: string[] };
 
@@ -153,6 +158,17 @@ const unavailable = (theme: Theme): Reply => ({
   html: notice("Sign-in is unavailable", "Reliquary can’t reach its sign-in service right now. Try again in a minute.", theme),
 });
 
+// Sign-in's limits (ratelimit.ts) fail closed: with the counter out of
+// reach, sign-in is unavailable rather than open to guessing. The same
+// answer for every address, with an account or not.
+async function signinLimit(checks: Check[], theme: Theme): Promise<Reply | undefined> {
+  const wait = await limitStrict(checks);
+  if (wait === "unavailable") return unavailable(theme);
+  if (wait) return { status: 429, retryAfter: wait, html: tooManyPage(wait, theme, "That was too many sign-in attempts in a short time") };
+  return undefined;
+}
+const address = (email: string) => email.toLowerCase();
+
 export async function signinRoutes(i: In): Promise<Out | undefined> {
   const p = i.url.pathname;
   if (!SIGNIN_PATHS.has(p)) return undefined;
@@ -167,7 +183,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (i.method === "GET" && p === "/signin") {
     const next = safeNext(i.url.searchParams.get("next"));
     if (i.session) return out({ redirect: next });
-    return out({ html: emailForm(pre(), next, i.theme, undefined, await inviteFor(next)) });
+    return out({ html: emailForm(pre(), next, i.theme, undefined, await inviteFor(next, i.ip)) });
   }
 
   if (i.method === "GET" && p === "/auth/confirm") {
@@ -188,10 +204,15 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
 
   if (p === "/signin") {
     const email = (i.form.get("email") ?? "").trim();
-    const invite = await inviteFor(next);
+    const invite = await inviteFor(next, i.ip);
     if (!EMAIL.test(email) || email.length > 254) {
       return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.", invite) });
     }
+    const limited = await signinLimit([
+      { name: "signin_email_address", kind: "email", value: address(email) },
+      { name: "signin_email_ip", kind: "ip", value: i.ip },
+    ], i.theme);
+    if (limited) return out(limited);
     const r = await sendSigninEmail(email, invite !== undefined && email.toLowerCase() === invite.email);
     if (r.unavailable) return out(unavailable(i.theme));
     if (r.signupsOff) {
@@ -218,6 +239,13 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     if (!EMAIL.test(email)) return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.") });
     const bad = "That code didn’t work. It may have expired or been used already: check the latest email, or send a new code.";
     if (!CODE.test(code)) return out({ status: 400, html: codeForm(pre(), email, next, i.theme, bad) });
+    // Guessing protection: a few codes per address, then that address's
+    // codes are locked until the window ends (its emailed link still works).
+    const limited = await signinLimit([
+      { name: "signin_code_address", kind: "email", value: address(email) },
+      { name: "signin_code_ip", kind: "ip", value: i.ip },
+    ], i.theme);
+    if (limited) return out(limited);
     const r = await verifySignin({ email, code });
     if (!r.ok) return out(r.unavailable ? unavailable(i.theme) : { status: 400, html: codeForm(pre(), email, next, i.theme, bad) });
     cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT));
@@ -226,6 +254,8 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
 
   // POST /auth/confirm
   const tokenHash = i.form.get("token_hash") ?? "";
+  const limited = await signinLimit([{ name: "signin_code_ip", kind: "ip", value: i.ip }], i.theme);
+  if (limited) return out(limited);
   const r = TOKEN_HASH.test(tokenHash) ? await verifySignin({ tokenHash }) : ({ ok: false, unavailable: false } as const);
   if (!r.ok) {
     if (r.unavailable) return out(unavailable(i.theme));

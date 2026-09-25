@@ -28,6 +28,7 @@ Each rule has a test that tries to break it: a session for one vault reading ano
 - MCP clients and the CLI use OAuth 2.1 with PKCE (S256 only), and tokens bound to the one service they are for: an MCP token is refused by the env API and a CLI token by the MCP endpoint. Refresh tokens rotate, and a reused one revokes the whole grant.
 - Clients are identified by a metadata document at an https URL, fetched with guards against reaching private networks.
 - Access tokens are stored only as hashes, always expire (at most a year), and are revocable at once. See [Tokens, connections and sign-ins](connections.md).
+- Sign-in, OAuth, invites, the MCP endpoint, the env API and web forms are rate limited, with counters in the database shared by every server. Entering sign-in codes is limited per email address and per IP address, so a 6-digit code can't be guessed. Addresses are counted under a keyed hash, never stored. See [Limits](../reference/limits.md#rate-limits).
 
 ## The web app
 

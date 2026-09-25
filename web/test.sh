@@ -5,6 +5,11 @@
 # sharing one SESSION_SECRET, signing in against a fake Supabase Auth
 # (test/fake-auth.mjs). And a split instance: the app on PUBLIC_URL and the
 # public site on SITE_URL, told apart by the Host header (src/hosts.ts).
+# And a rate-limit instance (src/ratelimit.ts): AUTH_MODE=supabase with
+# small limits, trusting x-real-ip so tests can come from many addresses.
+# The other instances, and those test files start themselves, multiply
+# every limit by 1000 (RATE_LIMIT_SCALE): they count as in production, but
+# the suite never reaches a limit.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -33,12 +38,14 @@ auth_b_port=$((port + 3))
 fake_port=$((port + 4))
 # Off the 87xx range: every last digit there is taken by some suite and slot.
 split_port=$((18791 + 10 * slot))
+rl=reliquary-web-test-rl-$slot
+rl_port=$((18792 + 10 * slot))
 fake_url=http://127.0.0.1:$fake_port
 fake_key=sb_publishable_fake_$slot
 node=docker.io/library/node:22-slim
 
 cleanup() {
-  "$engine" rm -f "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" "$split" >/dev/null 2>&1 || true
+  "$engine" rm -f "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" "$split" "$rl" >/dev/null 2>&1 || true
   rm -f .login-test-$slot .login-test-hosted-$slot .auth-secrets-$slot
 }
 trap cleanup EXIT
@@ -58,6 +65,11 @@ cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/su
 # share a database with files that seal under keys of their own.
 psql -c "create database keys"
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql -d keys >/dev/null
+# A third for the rate-limit instance (test/rate_limits.test.mjs): counters
+# are shared by every instance on a database, and the other files sign in
+# as the same people from the same address.
+psql -c "create database ratelimits"
+cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql -d ratelimits >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
 # The operator's role, for test/variables_keys.test.mjs's re-encryption.
 echo "alter role reliquary_ops login password 'test';" | psql
@@ -73,14 +85,14 @@ seed=$(psql -A -t < test/seed.sql | grep '=')
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/app/.login-test-$slot \
-  -e PORT=$port "$node" node dist/server.js >/dev/null
+  -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
 until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
 # The hosted instance runs a copy of dist/ in /app, so /app/public doesn't
 # exist; node_modules is linked, not copied.
 "$engine" run -d --name "$hosted" --network host -v "$PWD":/src:Z \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/src/.login-test-hosted-$slot \
-  -e PUBLIC_URL="$hosted_url" -e PORT=$hosted_port "$node" sh -c \
+  -e PUBLIC_URL="$hosted_url" -e RATE_LIMIT_SCALE=1000 -e PORT=$hosted_port "$node" sh -c \
   'mkdir -p /app && cp -r /src/dist /src/docs-build /src/package.json /app/ && ln -s /src/node_modules /app/node_modules && cd /app && exec node dist/server.js' >/dev/null
 until curl -sf "http://127.0.0.1:$hosted_port/healthz" >/dev/null; do
   [ "$("$engine" inspect -f '{{.State.Running}}' "$hosted")" = true ] || { "$engine" logs "$hosted"; echo "hosted server exited"; exit 1; }
@@ -98,7 +110,7 @@ for inst in "$auth_a:$auth_a_port" "$auth_b:$auth_b_port"; do
   "$engine" run -d --name "${inst%%:*}" --network host -v "$PWD":/app:Z -w /app \
     -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
     -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
-    -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e PORT="${inst##*:}" "$node" node dist/server.js >/dev/null
+    -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e RATE_LIMIT_SCALE=1000 -e PORT="${inst##*:}" "$node" node dist/server.js >/dev/null
 done
 for p in $auth_a_port $auth_b_port; do
   until curl -sf "http://127.0.0.1:$p/healthz" >/dev/null; do
@@ -111,10 +123,26 @@ done
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
   -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$split_app_url" -e SITE_URL="$split_site_url" \
-  -e PORT=$split_port "$node" node dist/server.js >/dev/null
+  -e RATE_LIMIT_SCALE=1000 -e PORT=$split_port "$node" node dist/server.js >/dev/null
 # Asked as the app host: on the site host /healthz is a redirect.
 until curl -sf -H "Host: ${split_app_url#https://}" "http://127.0.0.1:$split_port/healthz" >/dev/null; do
   [ "$("$engine" inspect -f '{{.State.Running}}' "$split")" = true ] || { "$engine" logs "$split"; echo "split server exited"; exit 1; }
+  sleep 0.3
+done
+
+# The rate-limit instance: small limits (test/rate_limits.test.mjs), the
+# same fake Auth and session secret, client addresses from x-real-ip.
+rl_limits="signin_email_address=2/3600,signin_email_ip=3/3600,signin_code_address=2/900,signin_code_ip=3/900"
+rl_limits="$rl_limits,signin_refresh_session=2/3600,oauth_authorize_ip=2/600,oauth_token_ip=2/600,oauth_token_client=3/600"
+rl_limits="$rl_limits,oauth_revoke_ip=2/600,oauth_revoke_client=3/600,cimd_fetch_host=1/600,invite_ip=2/3600"
+rl_limits="$rl_limits,env_grant_minute=2/60,web_write_minute=3/60"
+"$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
+  -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/ratelimits" \
+  -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
+  -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e CIMD_ALLOW_LOOPBACK=1 \
+  -e TRUST_PROXY_IP=1 -e RATE_LIMITS="$rl_limits" -e PORT=$rl_port "$node" node dist/server.js >/dev/null
+until curl -sf "http://127.0.0.1:$rl_port/healthz" >/dev/null; do
+  [ "$("$engine" inspect -f '{{.State.Running}}' "$rl")" = true ] || { "$engine" logs "$rl"; echo "rate-limit server exited"; exit 1; }
   sleep 0.3
 done
 
@@ -128,6 +156,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   -e WEB_AUTH_A_URL="http://127.0.0.1:$auth_a_port" -e WEB_AUTH_B_URL="http://127.0.0.1:$auth_b_port" \
   -e WEB_AUTH_PUBLIC_URL="$hosted_url" -e FAKE_AUTH_URL=$fake_url -e AUTH_SECRETS_FILE=/app/.auth-secrets-$slot \
   -e WEB_SPLIT_URL="http://127.0.0.1:$split_port" -e WEB_SPLIT_APP_URL="$split_app_url" -e WEB_SPLIT_SITE_URL="$split_site_url" \
+  -e WEB_RL_URL="http://127.0.0.1:$rl_port" -e RATE_LIMIT_SCALE=1000 \
   -e EXPECT_VERSION="$(tr -d '[:space:]' < ../version.txt)" \
   "$node" node --test --test-concurrency=1 test/*.test.mjs
 
@@ -137,9 +166,11 @@ echo "== supabase-mode server logs (must contain no JWTs, refresh tokens, codes,
 # test/auth.test.mjs wrote every code, token hash and refresh token it saw
 # to .auth-secrets-<slot>; none may appear in a log.
 [ -s .auth-secrets-$slot ] || { echo "auth.test.mjs recorded no secrets to look for"; exit 1; }
-{ "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; "$engine" logs "$split"; } > .auth-logs-$slot 2>&1
+{ "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; "$engine" logs "$split"; "$engine" logs "$rl"; } > .auth-logs-$slot 2>&1
 leak=0
 grep -E 'eyJ|@|token_hash|rlq_|rli_|EUR|script' .auth-logs-$slot && leak=1
+# The addresses test/rate_limits.test.mjs sends from (documentation ranges).
+grep -E '203\.0\.113\.|198\.51\.100\.|2001:db8' .auth-logs-$slot && leak=1
 grep -F -f .auth-secrets-$slot .auth-logs-$slot && leak=1
 grep -qF "$session_secret" .auth-logs-$slot && { echo "(the session secret)"; leak=1; }
 rm -f .auth-logs-$slot

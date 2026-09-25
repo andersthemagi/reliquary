@@ -32,6 +32,8 @@ WWW-Authenticate: Bearer realm="reliquary", resource_metadata="<server>/.well-kn
 
 Every answer is JSON, `cache-control: no-store, private`, with no CORS headers.
 
+Each sign-in may make 60 requests a minute and 5000 a day ([Limits](limits.md#rate-limits)). Past that, any route answers `429 {"error": "rate_limited"}` with `Retry-After` in seconds; wait that long and try again.
+
 ### GET /api/env/vaults
 
 The vaults the sign-in reaches, each with the environments your role may read (empty for a viewer). Reads no values, and isn't in the access log.

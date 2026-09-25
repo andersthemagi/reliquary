@@ -71,6 +71,30 @@ Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
 | A push | 24 hours |
 | A push request to the env API | 1 MiB |
 
+## Rate limits
+
+How many requests Reliquary takes in a window of time. Counts are shared by every server, so they hold however requests are spread. A request over a limit is refused with status 429 and a `Retry-After` header giving the seconds to wait; a refused request doesn't count. Web pages say when to try again; the MCP endpoint answers with a JSON-RPC error that says how long to wait.
+
+| What | Limit |
+|---|---|
+| Asking for a sign-in code | 5 an hour per email address, 20 an hour per IP address |
+| Entering a sign-in code | 5 every 15 minutes per email address, then that address's codes are locked until the 15 minutes are up (the emailed link still works) |
+| Entering codes and opening sign-in links | 30 every 15 minutes per IP address |
+| Renewing a web session | 30 an hour per session |
+| Form posts in the web app | 60 a minute and 1000 an hour per session |
+| Opening or accepting invite links | 30 an hour per IP address |
+| OAuth consent page (`/oauth/authorize`) | 60 every 10 minutes per IP address, 600 per app |
+| OAuth token endpoint (`/oauth/token`) | 120 every 10 minutes per IP address, 1200 per app |
+| OAuth revocation (`/oauth/revoke`) | 60 every 10 minutes per IP address, 600 per app |
+| Fetching an app's client metadata | 20 every 10 minutes per app host |
+| MCP tool calls | 120 a minute and 10000 a day per token or connection; a batch counts each call; listing tools and starting a session don't count |
+| MCP requests without a valid token | 30 a minute per IP address |
+| The env API (the CLI) | 60 a minute and 5000 a day per CLI sign-in |
+
+"Per app" counts every person's use of one app together (one client id). "Per token or connection" counts a personal token, or an OAuth connection across its hourly access tokens.
+
+Addresses and emails are never stored: each is counted under a keyed hash that can't be turned back into the address. An IPv6 address counts by its /64. If the counters can't be reached, sign-in stops and says it is unavailable, so codes can't be guessed while they are down; everything else carries on without limits.
+
 ## Pages
 
 | What | Limit |

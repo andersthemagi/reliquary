@@ -19,6 +19,7 @@
 import { createHmac, createPublicKey, randomBytes, timingSafeEqual, verify as verifySignature } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import type http from "node:http";
+import { limit } from "./ratelimit.js";
 
 export type AuthMode = "local" | "supabase";
 export type Alg = "ES256" | "RS256";
@@ -152,8 +153,10 @@ export type Session = {
 // What a request carries. `cookies` are Set-Cookie values the response must
 // send (a refreshed session, cleared cookies, a flash): send them even when
 // there is no session. `unavailable`: Supabase couldn't be reached to check
-// or refresh the session; answer 503 and keep the cookies.
-export type Lookup = { session: Session | null; cookies: string[]; unavailable: boolean };
+// or refresh the session; answer 503 and keep the cookies. `limited`: the
+// session was refreshed too often (ratelimit.ts); answer 429 with this
+// Retry-After and keep the cookies.
+export type Lookup = { session: Session | null; cookies: string[]; unavailable: boolean; limited?: number };
 
 export async function getSession(req: http.IncomingMessage): Promise<Lookup> {
   return conf().mode === "local" ? localSession(req) : supabaseSession(req);
@@ -230,16 +233,26 @@ async function supabaseSession(req: http.IncomingMessage): Promise<Lookup> {
   try {
     let claims: Claims | undefined;
     let accessToken = at ?? "";
+    // The session an expired (but genuine) access token names, for the
+    // refresh limit.
+    let expiredSession: string | undefined;
     if (at) {
       const r = await verifyAccessToken(at);
       if (r.ok) claims = r.claims;
       else if (!r.expired) {
         console.info(`auth: access token refused (${r.reason})`);
         return none(true);
-      }
+      } else expiredSession = r.sessionId;
     }
     if (!claims) {
       if (!rt) return none(!!at);
+      // Refreshes per session; with no access token to name it, per
+      // refresh token (which Supabase rotates, so that only stops reuse).
+      // Fails open (ratelimit.ts).
+      const wait = await limit([
+        { name: "signin_refresh_session", kind: "session", value: expiredSession ?? `refresh:${rt}` },
+      ]);
+      if (wait) return { session: null, cookies, unavailable: false, limited: wait };
       // Expired or missing access token: refresh once. Supabase rotates the
       // refresh token; reusing an old one outside its 10 s window revokes
       // the session, which lands here as a failure: signed out.
@@ -396,7 +409,7 @@ export type Jwk = { kty?: string; crv?: string; x?: string; y?: string; n?: stri
 export type Claims = { sub: string; role: "authenticated"; session_id: string; exp: number; [k: string]: unknown };
 export type Verified =
   | { ok: true; claims: Claims }
-  | { ok: false; reason: string; expired?: boolean; unknownKey?: boolean };
+  | { ok: false; reason: string; expired?: boolean; unknownKey?: boolean; sessionId?: string };
 
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const LEEWAY_S = 60;
@@ -483,7 +496,8 @@ export function verifyJwt(
   if (typeof payload.exp !== "number") return fail("no expiry");
   if (payload.nbf !== undefined && (typeof payload.nbf !== "number" || payload.nbf > now + LEEWAY_S)) return fail("not yet valid");
   if (payload.iat !== undefined && (typeof payload.iat !== "number" || payload.iat > now + LEEWAY_S)) return fail("issued in the future");
-  if (payload.exp <= now) return fail("expired", { expired: true });
+  // Expired but otherwise genuine: its session id can be trusted.
+  if (payload.exp <= now) return { ok: false, reason: "expired", expired: true, sessionId: payload.session_id };
   return { ok: true, claims: payload as Claims };
 }
 

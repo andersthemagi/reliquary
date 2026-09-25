@@ -22,6 +22,7 @@ import { authMode } from "./auth.js";
 import { asPerson } from "./db.js";
 import { csrfField, html, pageHeader, raw, when, type Raw } from "./html.js";
 import { deliverInvite, INVITE_TOKEN, inviteLink, maskEmail, peekInvite, ROLE_TEXT, type Peek } from "./invites.js";
+import { limit, tooManyPage } from "./ratelimit.js";
 import { ago, message, notFound, render, UUID, vault, vaultPath, vaultShell, type Ctx, type Reply, type Vault } from "./pages.js";
 
 const ROLES = ["viewer", "editor", "owner"] as const;
@@ -400,6 +401,10 @@ async function myEmail(ctx: Ctx): Promise<string | null> {
 }
 
 export async function inviteRoutes(ctx: Ctx): Promise<Reply> {
+  // Guessing protection: invite links opened or accepted per address
+  // (ratelimit.ts), before any lookup. Fails open.
+  const wait = await limit([{ name: "invite_ip", kind: "ip", value: ctx.ip }]);
+  if (wait) return { status: 429, retryAfter: wait, html: tooManyPage(wait, ctx.theme, "That was too many invite links in a short time") };
   if (ctx.method === "GET") {
     const token = ctx.url.searchParams.get("token") ?? "";
     const p = await peekInvite(token);

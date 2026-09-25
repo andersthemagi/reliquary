@@ -27,6 +27,7 @@ import { asCliToken, pool, type Grant } from "./db.js";
 import { DOTENV_MAX_ENTRIES, DOTENV_MAX_VALUE_BYTES, isVariableName, startsPrograms } from "./dotenv.js";
 import { envResource, issuer } from "./oauth.js";
 import { fromDb, open, SecretsError, variablesConfigured } from "./secrets.js";
+import { limitToken } from "./ratelimit.js";
 import { precheckImport, sealItems, type ImportRefusal } from "./variables.js";
 
 const PRM_PATH = "/.well-known/oauth-protected-resource/api/env";
@@ -243,7 +244,15 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
   };
   try {
     const bearer = TOKEN.exec(req.headers.authorization ?? "");
-    if (method === "GET" && req.method === "GET") {
+    // Requests per CLI grant (ratelimit.ts): counted against the grant a
+    // live token belongs to, before any work; a token that isn't live
+    // counts nothing and is refused below. Fails open.
+    const wait = bearer ? await limitToken(hashOf(bearer[1]), [{ name: "env_grant_minute" }, { name: "env_grant_day" }]) : 0;
+    if (wait) {
+      req.resume();
+      send(res, 429, { error: "rate_limited" }, { "retry-after": String(wait) });
+      outcome = "rate_limited";
+    } else if (method === "GET" && req.method === "GET") {
       // One checkout: the token is resolved inside the route's transaction.
       const out = bearer ? await asCliToken(hashOf(bearer[1]), envResource(), (c) => getRoute(c, route, parts)) : null;
       if (!out) challenge();

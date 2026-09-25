@@ -520,10 +520,59 @@ isn't a member gets `RLV01`, answered Not found, as before.
 | Write, delete or propose: round trips | 4 | 3 |
 | New file (create): round trips | 5 | 3 |
 
+## Rate limits
+
+2026-09-25, `20260925200000_rate_limits.sql`, `web/src/ratelimit.ts`,
+`mcp/src/ratelimit.ts`. The limits themselves are in
+docs/public/reference/limits.md ("Rate limits").
+
+- **Where the counts live.** Serverless instances share nothing, so each
+  count is one upsert into `private.rate_limits` (fixed windows keyed by
+  bucket, key and window start; unlogged, since losing counts in a crash
+  only forgives some requests). A request's buckets (an email and an IP,
+  say) go in one statement. A refused request's increments are taken back
+  in the same transaction, while the upsert still holds the rows' locks.
+  pg_cron prunes ended windows every five minutes
+  (`reliquary-rate-limits`); without pg_cron about one hit in a hundred
+  prunes.
+- **Keys.** HMAC-SHA256 under a salt the migration made at random
+  (`private.rate_limit_salt()`, readable by the apps' roles only, fetched
+  once per instance), so no new secret has to be configured. A token counts
+  by its grant, looked up in the database (`private.rate_limit_token`), so
+  an OAuth client's hourly access tokens share one count; a token that
+  isn't live counts nothing. The table's check refuses any key that isn't
+  64 hex digits, so a raw address can't be stored even by mistake.
+- **Cost.** MCP: a request that calls tools makes the count on a second
+  pooled connection in parallel with the session's begin-and-resolve, so
+  no added latency (one more checkout; `DB_POOL_MAX` is 5). Requests that
+  call no tools make no count. A 401 costs one upsert, and an address over
+  its limit is remembered by the instance until its window ends, so a
+  flood without a token stops reaching the database. Web: one round trip
+  per form post and per sign-in step, OAuth call, invite page and env API
+  request (before the request's own work); pages that only read make none.
+  The salt is one more round trip per instance, once.
+- **Failing.** Sign-in (asking for a code, entering one, opening a link)
+  fails closed: 503, "Sign-in is unavailable", since guessing a 6-digit
+  code is what the limit is for. Everything else fails open with a log
+  line (`rate limit unavailable`), since it needs the same database
+  anyway.
+- **Client IP.** On Vercel, `x-real-ip` (else the first `x-forwarded-for`
+  entry): Vercel's edge sets both and overwrites what the client sent.
+  That holds only while nothing sits in front of Vercel; a CDN or proxy in
+  front would make every request its address, and the IP limits would
+  need its header instead. IPv6 counts by /64.
+- **Per client id.** The OAuth limits per client id count every person's
+  use of one app together (the CLI's client id is shared by every CLI).
+  They are ceilings for a misbehaving app, set well above what the per-IP
+  limits allow one address; an attacker could still spend one, which
+  would pause that app's sign-ins (not its connections) for up to 10
+  minutes.
+
 ## Still to do
 
-1. **Confirm the pg_cron job after the next `db push`** (`select jobname,
-   active from cron.job`), and that `cron.job_run_details` shows it
+1. **Confirm the pg_cron jobs after the next `db push`** (`select jobname,
+   active from cron.job`: `reliquary-expired-imports` and
+   `reliquary-rate-limits`), and that `cron.job_run_details` shows them
    succeeding.
 2. **Watch the pooler client count** in the week of real use (see
    `attachDatabasePool` above); act only if it climbs.

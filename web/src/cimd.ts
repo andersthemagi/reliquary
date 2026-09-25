@@ -39,6 +39,9 @@ export type Options = {
   maxBytes?: number;
   // For tests: resolve a name to addresses (default: the system resolver).
   resolve?: (host: string) => Promise<Resolved[]>;
+  // Called with the id's host before each fetch (a cache miss), to rate
+  // limit fetches per host; may throw to refuse (oauth.ts).
+  beforeFetch?: (host: string) => Promise<void>;
 };
 
 export const MAX_BYTES = 5 * 1024;
@@ -137,7 +140,7 @@ function clientUrl(clientId: string, allowLoopback: boolean): URL {
 const systemResolve = async (host: string): Promise<Resolved[]> =>
   (await dns.promises.lookup(host, { all: true, verbatim: true })).map((a) => ({ address: a.address, family: a.family }));
 
-function get(u: URL, opts: Required<Omit<Options, "resolve">> & Pick<Options, "resolve">): Promise<string> {
+function get(u: URL, opts: Required<Omit<Options, "resolve" | "beforeFetch">> & Pick<Options, "resolve">): Promise<string> {
   const resolve = opts.resolve ?? systemResolve;
   const bare = u.hostname.replace(/^\[|\]$/g, "");
   if (net.isIP(bare) && !addressAllowed(bare, opts.allowLoopback)) {
@@ -287,6 +290,15 @@ const TTL_MS = 3600_000;
 export async function clientMetadata(clientId: string, options: Options = {}): Promise<ClientMetadata> {
   const hit = cache.get(clientId);
   if (hit && hit.until > Date.now()) return hit.meta;
+  if (options.beforeFetch) {
+    let host: string;
+    try {
+      host = new URL(clientId).hostname;
+    } catch {
+      throw new CimdError("The app’s client id isn’t a URL.");
+    }
+    await options.beforeFetch(host);
+  }
   const meta = await fetchClientMetadata(clientId, options);
   cache.delete(clientId);
   if (cache.size >= 256) cache.delete(cache.keys().next().value!);

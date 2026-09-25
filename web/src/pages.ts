@@ -40,11 +40,13 @@ export type Ctx = {
   mcpUrl: string;
   reviewCount?: number;
   setFlash: (message: string) => void;
+  ip: string; // the client's address, for rate limits only (ratelimit.ts)
 };
 // formAction: one more origin the page's forms may submit (and redirect) to.
 // download: a file streamed as the response (no-store, as an attachment).
+// retryAfter: seconds, sent as Retry-After (a 429).
 export type Download = { filename: string; type: string; write: (out: Writable) => Promise<void> };
-export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string; download?: Download };
+export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string; download?: Download; retryAfter?: number };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export type Vault = { id: string; name: string; role: string };

@@ -32,6 +32,7 @@ import type http from "node:http";
 import { CimdError, clientMetadata, isLoopbackHost, redirectAllowed, type ClientMetadata } from "./cimd.js";
 import { asPerson, pool } from "./db.js";
 import { csrfField, html, page } from "./html.js";
+import { clientIp, limit, RateLimited, tooManyPage, type LimitName } from "./ratelimit.js";
 import type { Ctx, Reply } from "./pages.js";
 
 function config() {
@@ -147,6 +148,28 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
+// Per address and per client id (ratelimit.ts), before any database work
+// on the request. The client id is counted as sent: any string, hashed.
+// Fails open. Over a limit: 429, Retry-After, and an error body that says
+// to wait, never what was counted.
+async function limited(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  names: [LimitName, LimitName],
+  clientId: string,
+): Promise<boolean> {
+  const wait = await limit([
+    { name: names[0], kind: "ip", value: clientIp(req) },
+    { name: names[1], kind: "client", value: clientId },
+  ]);
+  if (!wait) return false;
+  json(res, 429, { error: "rate_limited", error_description: `Too many requests. Retry after ${wait} seconds.` }, {
+    "retry-after": String(wait),
+    "access-control-expose-headers": "retry-after",
+  });
+  return true;
+}
+
 // OAuth parameters must not repeat (RFC 6749, 3.1 and 3.2).
 function single(params: URLSearchParams): boolean {
   const seen = new Set<string>();
@@ -175,6 +198,7 @@ async function token(req: http.IncomingMessage, res: http.ServerResponse): Promi
   if (p.has("client_secret") || req.headers.authorization) return fail(401, "invalid_client");
   const clientId = p.get("client_id");
   if (!clientId) return fail(400, "invalid_request");
+  if (await limited(req, res, ["oauth_token_ip", "oauth_token_client"], clientId)) return "rate_limited";
   const resource = p.get("resource");
   if (!resource) return fail(400, "invalid_request");
   if (resource !== RESOURCE && resource !== ENV_RESOURCE) return fail(400, "invalid_target");
@@ -225,6 +249,7 @@ async function revoke(req: http.IncomingMessage, res: http.ServerResponse): Prom
     json(res, 400, { error: "invalid_request" });
     return "invalid_request";
   }
+  if (await limited(req, res, ["oauth_revoke_ip", "oauth_revoke_client"], clientId)) return "rate_limited";
   if (ACCESS.test(tok) || REFRESH.test(tok)) {
     await pool.query("select private.oauth_revoke($1, $2)", [sha256(tok), clientId]);
   }
@@ -317,9 +342,10 @@ async function check(ctx: Ctx, p: URLSearchParams): Promise<AuthRequest | Reply>
     client = { clientId, clientName: "Reliquary CLI", redirectUris: cliClient().redirect_uris };
   } else {
     try {
-      client = await clientMetadata(clientId, { allowLoopback: ALLOW_LOOPBACK });
+      client = await clientMetadata(clientId, { allowLoopback: ALLOW_LOOPBACK, beforeFetch: cimdLimit });
     } catch (err) {
       if (err instanceof CimdError) return refuse(ctx, `Reliquary couldn’t check the app. ${err.message}`);
+      if (err instanceof RateLimited) return tooMany(ctx, err.retryAfter);
       throw err;
     }
   }
@@ -340,7 +366,28 @@ async function check(ctx: Ctx, p: URLSearchParams): Promise<AuthRequest | Reply>
   return { client, redirectUri, challenge, state, resource, scope: p.get("scope") };
 }
 
+// Fetches of a client's metadata document per client host (cimd.ts calls
+// this on a cache miss only), so no one can make Reliquary fetch from one
+// site over and over. Fails open.
+async function cimdLimit(host: string): Promise<void> {
+  const wait = await limit([{ name: "cimd_fetch_host", kind: "host", value: host.toLowerCase() }]);
+  if (wait) throw new RateLimited(wait);
+}
+
+const tooMany = (ctx: Ctx, wait: number): Reply => ({
+  status: 429,
+  retryAfter: wait,
+  html: tooManyPage(wait, ctx.theme, "That was too many connection requests in a short time"),
+});
+
 export async function authorize(ctx: Ctx): Promise<Reply> {
+  // Per address and per client id (ratelimit.ts), before the client's
+  // metadata is fetched. Fails open.
+  const wait = await limit([
+    { name: "oauth_authorize_ip", kind: "ip", value: ctx.ip },
+    { name: "oauth_authorize_client", kind: "client", value: (ctx.method === "GET" ? ctx.url.searchParams : ctx.form).get("client_id") ?? "" },
+  ]);
+  if (wait) return tooMany(ctx, wait);
   if (ctx.method === "GET") {
     const r = await check(ctx, ctx.url.searchParams);
     return "client" in r ? consent(ctx, r) : r;

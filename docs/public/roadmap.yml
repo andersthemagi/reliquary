@@ -130,6 +130,11 @@
   milestone: M2
   docs: reference/cli
 
+- title: Rate limits on sign-in and MCP
+  summary: Limits per address, email, session, client, token and CLI sign-in on sign-in, OAuth, invites, MCP, the env API and forms.
+  status: shipped
+  docs: reference/limits
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
@@ -219,10 +224,6 @@
 
 - title: Public status page
   summary: Uptime of the web app, the MCP endpoint and the database, in public.
-  status: considering
-
-- title: Rate limits on sign-in and MCP
-  summary: Per-person and per-token limits beyond the ones on invites, imports and exports.
   status: considering
 
 - title: Client-side encrypted variables
