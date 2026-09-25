@@ -31,6 +31,11 @@ async function call(client, name, args = {}) {
   return { text: r.content.map((c) => c.text).join("\n"), isError: Boolean(r.isError) };
 }
 
+// An error's reference differs per call, and its details name the tool
+// (failure.ts); everything else must be the same as for a missing vault.
+const REF = /ref [0-9a-f]{8}/;
+const ANY_TOOL = /(Calling|MCP tool) [a-z_]+/g;
+
 // Ana's own view of her tokens, as the web UI sees it (person, no agent).
 async function asAna(sql, params = []) {
   const db = new pg.Client({ connectionString: PG_URL });
@@ -98,11 +103,11 @@ test("scoped: a token for Workshop cannot see Team at all", async () => {
   assert.doesNotMatch(vaults.text, /Team/);
   const missing = await call(c, "read_file", { vault: "00000000-0000-0000-0000-000000000000", path: "x" });
   for (const vault of ["Team", env.TEAM_VAULT]) {
-    assert.equal((await call(c, "read_file", { vault, path: "notes/standup.md" })).text, missing.text);
-    assert.equal((await call(c, "search", { vault, query: "standup" })).text, missing.text);
-    assert.equal((await call(c, "changes_since", { vault })).text, missing.text);
-    assert.equal((await call(c, "list_proposals", { vault })).text, missing.text);
-    assert.equal((await call(c, "write_file", { vault, path: "notes/ws.md", content: "x" })).text, missing.text);
+    assert.equal((await call(c, "read_file", { vault, path: "notes/standup.md" })).text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"), missing.text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"));
+    assert.equal((await call(c, "search", { vault, query: "standup" })).text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"), missing.text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"));
+    assert.equal((await call(c, "changes_since", { vault })).text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"), missing.text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"));
+    assert.equal((await call(c, "list_proposals", { vault })).text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"), missing.text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"));
+    assert.equal((await call(c, "write_file", { vault, path: "notes/ws.md", content: "x" })).text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"), missing.text.replace(ANY_TOOL, "$1 x").replace(REF, "ref"));
   }
   await c.close();
 });

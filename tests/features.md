@@ -285,6 +285,12 @@ git). All four: `./test.sh`.
 | F220 | Start-up variable names refused (Windows, trust, npm) | `COMSPEC`, `PATHEXT`, `SYSTEMROOT`, `WINDIR`, `PSMODULEPATH`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `SSL_CERT_DIR` and any `NPM_CONFIG_*` are refused in the database and by the web app's and CLI's shared parser; ordinary names like `NPM_TOKEN` pass | `supabase/tests/variable_names_test.sql#variable names:`, `cli/test/names.test.mjs#names:` | `docs/public/concepts/variables.md` |
 | F221 | CLI explains rate limits | When the env API answers 429 `rate_limited`, the CLI says to try again in the Retry-After seconds (or later) instead of a bare error; other 429s keep their own messages | `cli/test/rate_limited.test.mjs#rate limited:` | `docs/public/reference/limits.md` |
 
+## Errors (`mcp/src/failure.ts`, docs/public/reference/errors.md)
+
+| ID | Feature | Acceptance criteria | Tests | Docs |
+|---|---|---|---|---|
+| F235 | MCP tool errors | A failed tool call answers `isError` with a first line saying what failed and why (a refusal's own words first) and a second, `(what: Calling <tool>; where: MCP tool <tool>: <component>; [why: …;] ref …)`; a database error shows its SQLSTATE and function and never the row's values; a real lock timeout is `55P03 lock timeout`; a refused request body carries `message`, `where` and `ref`; no tool argument is echoed, so an outsider's answer differs from a missing vault's only by the reference | `mcp/test/errors.test.mjs#errors: a database error in a tool call`, `mcp/test/errors.test.mjs#errors: a timeout in the database`, `mcp/test/errors.test.mjs#errors: a refusal keeps`, `mcp/test/errors.test.mjs#errors: a request the server refuses`, `mcp/test/round_trips.test.mjs#round trips: no vault`, `mcp/test/e2e.test.mjs#outsider:`, `mcp/test/scope.test.mjs#scoped: a token for Workshop`, `mcp/test/threads.test.mjs#outsider:` | `docs/public/reference/errors.md` |
+
 ## Not built yet (no rows until they ship)
 
 Connections, routines, the git mirror. Each lands with its row and tests.

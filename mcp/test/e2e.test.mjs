@@ -23,6 +23,10 @@ async function call(client, name, args = {}) {
   return { text: r.content.map((c) => c.text).join("\n"), isError: Boolean(r.isError) };
 }
 
+// An error's reference differs per call, and its details name the tool
+// (failure.ts); everything else in an outsider's answer must be the same.
+const noRef = (t) => t.replace(/ref [0-9a-f]{8}/g, "ref").replace(/(Calling|MCP tool) [a-z_]+/g, "$1 tool");
+
 const post = (headers) =>
   fetch(URL_, {
     method: "POST",
@@ -118,10 +122,10 @@ test("outsider: someone else's vault is indistinguishable from a missing one", a
   const byName = await call(dee, "read_file", { vault: "Team", path: "canon/pricing.md" });
   const missing = await call(dee, "read_file", { vault: "00000000-0000-0000-0000-000000000000", path: "x" });
   assert.equal(byId.isError, true);
-  assert.equal(byId.text, missing.text);
-  assert.equal(byName.text, missing.text);
+  assert.equal(noRef(byId.text), noRef(missing.text));
+  assert.equal(noRef(byName.text), noRef(missing.text));
   const s = await call(dee, "search", { vault: env.TEAM_VAULT, query: "rate" });
-  assert.equal(s.text, missing.text);
+  assert.equal(noRef(s.text), noRef(missing.text));
   await dee.close();
 });
 

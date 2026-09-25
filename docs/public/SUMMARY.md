@@ -45,6 +45,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Env API](reference/env-api.md)
 - [Permissions](reference/permissions.md)
 - [Limits](reference/limits.md)
+- [Errors and reference IDs](reference/errors.md)
 - [Glossary](reference/glossary.md)
 
 ## Project

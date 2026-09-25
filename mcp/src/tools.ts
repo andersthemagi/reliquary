@@ -13,15 +13,17 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes } from "node:crypto";
 import type pg from "pg";
 import { z } from "zod";
 import { asIdentity, TokenGone, type Identity } from "./db.js";
+import { fail, failure, ownRaise, withRequest, type Failure } from "./failure.js";
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
 const ok = (text: string): ToolResult => ({ content: [{ type: "text", text }] });
-const fail = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
+const refuse = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
 
 const NO_VAULT = "No vault with that name or id is available to you. Use list_vaults to see yours.";
 
@@ -36,36 +38,67 @@ const TEXT = z.string().max(1_000_000);
 const REASON = z.string().max(4000);
 const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 
-// Turns database errors into messages the agent can act on. Messages come
-// from our own migrations, which don't echo free-form input; unexpected
-// errors are reported generically.
+// Turns errors into messages the agent can act on: a first line in words
+// (our own migrations' messages, which don't echo free-form input), then the
+// error model's fields in one compact line (failure.ts): what the call was
+// doing, where it broke, why, and the reference that finds the detail in
+// the server log.
 function explain(err: unknown): ToolResult {
-  if (err instanceof ToolError) return fail(err.message);
-  if (err instanceof TokenGone) return fail("This token was revoked or expired during the request. Reconnect.");
-  const e = err as { code?: string; message?: string };
-  switch (e.code) {
-    case "42501":
-      return fail(`Not allowed: ${e.message}`);
-    case "P0002":
-      return fail(`Not found: ${e.message}`);
-    case "22023":
-    case "23505":
-    case "55000":
-      return fail(e.message ?? "Invalid request");
-    case "23514":
-    case "22001":
-      return fail("Refused: too long, or a path or name with control characters in it.");
-    case "22P02":
-      return fail("Invalid id.");
-    case "RLV01":
-      return fail(NO_VAULT);
-    case "57014":
-      return fail("That took too long and was stopped. Narrow it (a prefix, a limit) and try again.");
-    default:
-      console.error("tool error", e.code ?? "unknown");
-      return fail("Something went wrong on Reliquary's side. Try again, or report it.");
+  const tool = toolName.getStore() ?? "unknown";
+  const where = `MCP tool ${tool}`;
+  let f: Failure;
+  let lead: string;
+  if (err instanceof ToolError) {
+    f = failure({ status: 400, where, why: err.message });
+    lead = err.message;
+  } else if (err instanceof TokenGone) {
+    f = failure({ status: 401, where: `${where}: token check`, why: "The token was revoked or expired during the request" });
+    lead = "This token was revoked or expired during the request. Reconnect.";
+  } else {
+    f = fail(err, { where });
+    const e = err as { code?: string; message?: string };
+    const own = ownRaise(err as never);
+    switch (e.code) {
+      case "42501":
+        lead = own ? `Not allowed: ${e.message}` : `Not allowed: ${f.why}`;
+        break;
+      case "P0002":
+        lead = `Not found: ${e.message}`;
+        break;
+      case "22023":
+      case "23505":
+      case "55000":
+        lead = own ? (e.message ?? f.why) : f.why;
+        break;
+      case "23514":
+      case "22001":
+        lead = "Refused: too long, or a path or name with control characters in it.";
+        break;
+      case "22P02":
+        lead = "Invalid id.";
+        break;
+      case "RLV01":
+        lead = NO_VAULT;
+        break;
+      case "57014":
+        lead = "That took too long and was stopped. Narrow it (a prefix, a limit) and try again.";
+        break;
+      default:
+        lead = `${f.what} failed: ${f.why}`;
+    }
   }
+  const said = lead.toLowerCase().includes(f.why.replace(/\.$/, "").toLowerCase());
+  return refuse(`${lead}\n(what: ${f.what}; where: ${f.where}${said ? "" : `; why: ${f.why.replace(/\.$/, "")}`}; ref ${f.ref})`);
 }
+
+// The tool a call is running, for its errors.
+const toolName = new AsyncLocalStorage<string>();
+
+// What a tool call is doing: the tool, never its arguments. The agent knows
+// what it sent; echoing a path or vault back would let text it passed read
+// as ours, and would make a vault it can't see answer differently from one
+// that doesn't exist (the outsider tests compare the whole answer).
+const callWhat = (name: string): string => `Calling ${name}`;
 
 // The vault a tool names, by id or by name, resolved inside the tool's own
 // query (private.vault_ref, 20260925150000_efficiency_3.sql): by id, a
@@ -269,6 +302,16 @@ export function registerTools(
     }
   };
 
+  // Each tool call is its own request for the error model (failure.ts): a
+  // reference of its own, and what it is doing (the log: the tool's name).
+  const register = server.registerTool.bind(server) as (...a: unknown[]) => unknown;
+  (server as unknown as { registerTool: (...a: unknown[]) => unknown }).registerTool = (name: unknown, config: unknown, handler: unknown) =>
+    register(name, config, (args: unknown, extra: unknown) =>
+      withRequest(callWhat(String(name)), `mcp tool ${String(name)}`, () =>
+        toolName.run(String(name), () => (handler as (a: unknown, e: unknown) => unknown)(args, extra)),
+      ),
+    );
+
   server.registerTool(
     "list_vaults",
     {
@@ -384,7 +427,7 @@ export function registerTools(
              join public.file_versions fv on fv.id = f.current_version_id`,
           [vault, path],
         );
-        if (rows.length === 0) return fail("No file at that path. Use list_files to see the vault's.");
+        if (rows.length === 0) return refuse("No file at that path. Use list_files to see the vault's.");
         return ok(fileBlock(rows[0], { from: from_line, to: to_line, maxBytes: max_bytes ?? READ_DEFAULT_BYTES }));
       }),
   );
@@ -698,7 +741,7 @@ export function registerTools(
           pushes: { environments: string[]; names: string[]; created_by: string; created_at: string; expires_at: string }[];
         };
         if (environment !== undefined && !envs.some((e) => e.name === environment)) {
-          return fail(`No environment named ${environment}. This vault has: ${envs.map((e) => e.name).join(", ")}.`);
+          return refuse(`No environment named ${environment}. This vault has: ${envs.map((e) => e.name).join(", ")}.`);
         }
         const head =
           `Environments: ${envs.map((e) => `${e.name}${e.owners_only ? " (owners only)" : ""}`).join(", ")}.\n` +
@@ -751,7 +794,7 @@ export function registerTools(
           [proposal_id],
         );
         const p = rows[0];
-        if (!p) return fail("No proposal with that id is available to you. Use list_proposals to see a vault's.");
+        if (!p) return refuse("No proposal with that id is available to you. Use list_proposals to see a vault's.");
         const entries = (p.entries as { kind: string; body: string | null; author: string; agent: string | null; revision: number; at: string; erased_at: string | null }[])
           .map((e) => ({ ...e, at: new Date(e.at) }));
         const nonce = freshNonce([p.reason, p.body, ...entries.map((e) => e.body)]);
