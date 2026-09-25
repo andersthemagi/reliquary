@@ -28,6 +28,15 @@ begin
   insert into private.account_plans (user_id, plan_id, set_by)
   values (new.id, 'self_hosted', 'self-hosted default')
   on conflict (user_id) do nothing;
+  -- Invite-only (20260925240000_admission.sql) holds here too, since Auth's
+  -- sign-up is open so invitees can make accounts. The instance's first
+  -- account (deploy/bin/owner.mjs) is admitted, so its owner can create
+  -- vaults; everyone after gets in by an invite or `plan.sh admit`.
+  if not exists (select 1 from private.admissions) then
+    insert into private.admissions (user_id, via, admitted_by)
+    values (new.id, 'operator', 'self-hosted first account')
+    on conflict (user_id) do nothing;
+  end if;
   return new;
 end $$;
 revoke all on function private.self_hosted_plan() from public;

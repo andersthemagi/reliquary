@@ -59,7 +59,7 @@ Everyone on a self-hosted instance has no plan limits: any number of vaults, peo
 
 6. Open your `PUBLIC_URL`, enter that address, and sign in with the code from the email.
 
-Reliquary is invite-only there too: add people from a vault's **Settings**, **Members**. See [Invite someone](invite-someone.md). To make an account without an invite, run the `owner` command again with their address.
+Reliquary is invite-only there too: add people from a vault's **Settings**, **Members**. See [Invite someone](invite-someone.md). The first account is admitted, so it can create vaults. An account made any other way (the `owner` command again, or signing up without an invite) can sign in and join vaults it's invited to, but can't create its own until someone invites it or you admit it with `scripts/plan.sh admit <email>`.
 
 ## Connect your agents
 
