@@ -48,51 +48,45 @@ export function fill(key: keyof typeof OPERATOR, what: string): Raw {
   return v ? html`${v}` : html`<mark class="placeholder">[to be filled: ${what}]</mark>`;
 }
 
-// Pricing. `show: false` hides the section and its nav link. The owner hasn't
-// decided prices: the page says early access is free while in beta.
+// Pricing. `show: false` hides the section and its nav link. The model
+// (docs/research/positioning.md, "Pricing"): an account plan limits the
+// vaults a person owns; each vault's tier limits its people and storage, and
+// one vault can be upgraded on its own. The limits are enforced
+// (20260925230000_plans.sql); nothing is billed during the beta.
 export const PRICING = {
   show: true,
   banner: "Early access: free while in beta",
-  note: "Prices below are what we expect to charge after the beta. Nothing is billed today, and you'll hear from us well before anything is.",
+  note: "Everyone is on Free while we build. Per-vault upgrades are coming; nothing is billed today, and you’ll hear from us well before anything is.",
   tiers: [
     {
       name: "Free",
       price: "$0",
       period: "",
       yearly: "",
-      for: "Trying it, solo builders",
-      features: ["Up to 3 people", "2 vaults", "25 variables per vault, 3 environments", "30 days of activity in the UI (all of it kept)"],
-      highlight: false,
+      for: "Everyone, during the beta",
+      features: ["5 vaults you own", "Up to 10 people in each vault", "100 MB in each vault", "Unlimited agents and AI tools"],
+      badge: "Now",
     },
     {
-      name: "Pro",
-      price: "$9",
-      period: "a month",
-      yearly: "or $90 a year",
-      for: "Solo builders who rely on it",
-      features: ["Up to 3 people", "Unlimited vaults and variables", "1 year of activity in the UI", "Email support"],
-      highlight: false,
+      name: "Pro vault",
+      price: "Coming",
+      period: "",
+      yearly: "per vault, when billing starts",
+      for: "One vault that needs more room",
+      features: ["Upgrade a single vault; the others stay as they are", "Up to 50 people", "5 GB"],
+      badge: "",
     },
     {
-      name: "Studio",
-      price: "$39",
-      period: "a month",
-      yearly: "or $390 a year",
-      for: "Agencies and small teams",
-      features: ["Up to 15 people, then $3 each", "Unlimited vaults, custom environments", "Client guests, free (coming)", "Signed DPA", "Email support, next business day"],
-      highlight: true,
-    },
-    {
-      name: "Business",
-      price: "From $199",
-      period: "a month",
-      yearly: "by quote",
-      for: "Teams that need IT checkboxes",
-      features: ["Any number of people", "Full activity history and log export", "SSO and custom retention (on request)", "Priority support, onboarding call"],
-      highlight: false,
+      name: "Alpha tester",
+      price: "By invitation",
+      period: "",
+      yearly: "",
+      for: "People testing Reliquary with us",
+      features: ["25 vaults you own", "Up to 25 people in each vault", "1 GB in each vault"],
+      badge: "",
     },
   ],
-  everyPlan: "Every plan: unlimited agents and AI tools, approvals and quorum, the agent ceiling enforced in the database, the activity log, and export.",
+  everyPlan: "Every plan: unlimited agents and AI tools, approvals and quorum, the agent ceiling enforced in the database, the activity log, and export. Storage counts every version of every file and your variables.",
 };
 
 export const requestAccessHref = () =>

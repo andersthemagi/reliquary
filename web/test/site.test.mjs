@@ -87,12 +87,16 @@ test("site landing: calls to action are Sign in and Request access by email with
   assert.match(h, /<a class="button[^"]*" href="\/signin">Sign in<\/a>/);
 });
 
-test("site landing: pricing shows the tiers, clearly marked free while in beta", async () => {
+test("site landing: pricing shows the plans and their limits, clearly marked free while in beta", async () => {
   const h = await text(A, "/");
   const pricing = /<section[^>]*id="pricing"[\s\S]*?<\/section>/.exec(h)[0];
   assert.match(pricing, /Early access: free while in beta/);
-  for (const tier of ["Free", "Pro", "Studio", "Business"]) assert.match(pricing, new RegExp(`<h3>${tier}\\b`), tier);
-  assert.match(pricing, /\$39/);
+  for (const tier of ["Free", "Pro vault", "Alpha tester"]) assert.match(pricing, new RegExp(`<h3>${tier}\\b`), tier);
+  for (const limit of ["5 vaults you own", "Up to 10 people in each vault", "100 MB in each vault", "Up to 50 people", "5 GB", "1 GB in each vault"]) {
+    assert.match(pricing, new RegExp(`<li>${limit}</li>`), limit);
+  }
+  assert.match(pricing, /<span class="amount">By invitation<\/span>/);
+  assert.match(pricing, /Per-vault upgrades are coming; nothing is billed today/);
 });
 
 test("site landing: a title, a description, Open Graph tags and the icon; indexable", async () => {

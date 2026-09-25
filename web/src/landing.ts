@@ -154,8 +154,8 @@ ${PRICING.show
   <p class="callout success beta-banner"><strong>${PRICING.banner}.</strong> ${PRICING.note}</p>
   <ul class="tiers">
     ${PRICING.tiers.map(
-      (t) => html`<li class="tier${t.highlight ? " tier-highlight" : ""}">
-      <h3>${t.name}${t.highlight ? html` <span class="badge">For client work</span>` : ""}</h3>
+      (t) => html`<li class="tier${t.badge ? " tier-highlight" : ""}">
+      <h3>${t.name}${t.badge ? html` <span class="badge">${t.badge}</span>` : ""}</h3>
       <p class="tier-for">${t.for}</p>
       <p class="tier-price"><span class="amount">${t.price}</span>${t.period ? html` <span class="per">${t.period}</span>` : ""}</p>
       <p class="tier-yearly">${t.yearly || " "}</p>

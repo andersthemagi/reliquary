@@ -59,6 +59,7 @@ ${operatorBlock()}
 
 <h2>Fees</h2>
 <p>Reliquary is free while in beta. Before any fee applies to you, we'll tell you the price and give you ${fill("feeNoticeDays", "notice period")} to decide; you can export and leave at any time.</p>
+<p>Your plan sets how many vaults you own, and each vault's tier how many people and how much storage it holds (<a href="/docs/concepts/plans-and-limits">Plans and limits</a>). If a plan gets smaller, nothing is deleted: a vault over a limit keeps everything and takes nothing new until it is under.</p>
 
 <h2>Leaving, suspension and deletion</h2>
 <ul>
