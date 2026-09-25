@@ -101,6 +101,11 @@ owns, each vault's tier its people and storage (a counter kept by
 triggers), refusals are SQLSTATE `RLP01`, and only the operator changes
 plans and tiers (`scripts/plan.sh`, runbook "Plans and testers"). Suites
 that share one database across files call `test_support.roomy_free()`.
+Invite-only admission (`20260925240000_admission.sql`, hostile tests in
+`supabase/tests/admission_test.sql`): while invite-only is on, an account
+creates vaults only once it accepts an invite or the operator admits it
+(`RLP02` otherwise); test databases start open (`supabase/tests/support.sql`),
+and the tests of admission turn it on for themselves.
 
 All of it needs podman or docker; nothing needs Node installed on the host.
 

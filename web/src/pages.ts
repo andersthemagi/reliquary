@@ -18,7 +18,7 @@ import { pendingPushes } from "./variables.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
-import { accountPage, myPlan, planLine } from "./plans.js";
+import { accountPage, myAdmission, myPlan, notAdmittedNote, planLine } from "./plans.js";
 import {
   latestFeedback,
   NOT_SNOOZED_SQL,
@@ -387,7 +387,7 @@ async function home(ctx: Ctx): Promise<Reply> {
 // person. They become its owner.
 
 async function newVault(ctx: Ctx): Promise<Reply> {
-  const plan = await asPerson(ctx.userId, myPlan);
+  const { plan, admission } = await asPerson(ctx.userId, async (c) => ({ plan: await myPlan(c), admission: await myAdmission(c) }));
   const full = plan.vaultsOwned >= plan.maxVaults;
   return render(
     ctx,
@@ -399,7 +399,9 @@ async function newVault(ctx: Ctx): Promise<Reply> {
         <button class="primary" form="new-vault">Create vault</button>`,
     })}
     <p class="lede">A vault holds the files you and your agents share. You’ll be its owner: you add members and set its rules.</p>
-    ${full
+    ${!admission.admitted
+      ? notAdmittedNote()
+      : full
       ? html`<p class="callout attention" role="status">You own ${plan.vaultsOwned} of the ${plan.maxVaults} vaults the ${plan.planName} plan allows, so a new one can’t be created. Delete a vault you no longer need first. <a href="/account">Plan and usage</a></p>`
       : html`<p class="small muted plan-line">${planLine(plan)}. <a href="/account">Plan and usage</a></p>`}
     <form method="post" action="/vaults/new" class="panel choice-form" id="new-vault">

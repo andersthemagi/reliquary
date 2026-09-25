@@ -2,6 +2,17 @@
 
 Your account's plan limits how many vaults you own. Each vault's tier limits how many people it holds and how much it stores. Nothing is billed yet.
 
+## Invite-only
+
+During the alpha, Reliquary is invite-only. Anyone can sign in, but an account creates vaults only once it is admitted. An account is admitted when:
+
+- it opens an invite link and joins a vault (any invite, from anyone), or
+- the operator puts it on a plan, or admits it.
+
+An account that isn't admitted belongs to no vault, so it sees nothing. **New vault** and **Plan and usage** say so, and creating a vault is refused with the reason (code `RLP02`), for the person and for their agent's `create_vault` alike. Over MCP the refusal reads `Not admitted:` and the message.
+
+The operator can take admission back. The account keeps its vaults and memberships, and everything in them works as before, but it can't create another vault until it joins a vault by invite or is admitted again.
+
 ## Plans and tiers
 
 | | Free (everyone) | Alpha tester (by invitation) |

@@ -31,7 +31,7 @@ A vault is named by the first 8 characters of its id. The web app shows a path y
 
 ## Why
 
-- **Refusals Reliquary makes on purpose** say so in words: "Only owners set rules.", "That address already belongs to a member of this vault." A plan limit is one of these (code `RLP01`, status 403; 507 `storage_limit` from the env API): its message names the vault, the limit, the plan or tier and the usage, and over MCP it starts `Limit reached:`. See [Plans and limits](../concepts/plans-and-limits.md).
+- **Refusals Reliquary makes on purpose** say so in words: "Only owners set rules.", "That address already belongs to a member of this vault." A plan limit is one of these (code `RLP01`, status 403; 507 `storage_limit` from the env API): its message names the vault, the limit, the plan or tier and the usage, and over MCP it starts `Limit reached:`. An account not yet admitted while Reliquary is invite-only is another (code `RLP02`, status 403): its message says how to get in, and over MCP it starts `Not admitted:`. See [Plans and limits](../concepts/plans-and-limits.md).
 - **Database errors** start with the SQLSTATE code and its name, then the constraint, table or function when Postgres names one:
 
 | Code | Name | Usually means |

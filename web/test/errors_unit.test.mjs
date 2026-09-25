@@ -48,6 +48,18 @@ test("errors: each SQLSTATE maps to the HTTP status a person or client can act o
   for (const [code, status] of Object.entries(cases)) assert.equal(f.sqlstateStatus(code), status, code);
 });
 
+test("errors: an account not admitted while invite-only (RLP02) is named, refused with 403, and shows the database's reason", () => {
+  assert.equal(f.sqlstateName("RLP02"), "RLP02 account not admitted");
+  assert.equal(f.sqlstateStatus("RLP02"), 403);
+  const k = f.classify(pgError({
+    code: "RLP02", message: "your account can't create vaults yet: Reliquary is invite-only during alpha. Open an invite link someone sent you and join their vault (that admits your account), or ask the operator to admit you",
+    routine: "exec_stmt_raise", where: "PL/pgSQL function private.admission_refusal() line 3 at RAISE\nSQL statement \"SELECT private.admission_refusal()\"\nPL/pgSQL function public.create_vault(text,text) line 14 at PERFORM",
+  }));
+  assert.equal(k.status, 403);
+  assert.equal(k.where, "database (function private.admission_refusal)");
+  assert.match(k.why, /^Your account can't create vaults yet: Reliquary is invite-only during alpha\. .* ask the operator to admit you\.$/);
+});
+
 test("errors: redaction drops every parenthesised value and quoted input", () => {
   assert.equal(f.redactParens("Key (email)=(ana@example.test) already exists."), "Key (…)=(…) already exists.");
   assert.equal(f.redactParens("Failing row contains (SEKRIT, (nested SEKRIT), 3)."), "Failing row contains (…).");

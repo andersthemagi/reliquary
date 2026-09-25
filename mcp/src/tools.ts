@@ -109,6 +109,11 @@ function explain(err: unknown): ToolResult {
       case "RLP01":
         lead = `Limit reached: ${e.message}`;
         break;
+      // Invite-only (20260925240000_admission.sql): the message
+      // says how the person gets their account admitted.
+      case "RLP02":
+        lead = `Not admitted: ${e.message}`;
+        break;
       case "57014":
         lead = "That took too long and was stopped. Narrow it (a prefix, a limit) and try again.";
         break;

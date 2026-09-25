@@ -206,6 +206,9 @@ names and counts only). The model and the numbers are in
 | Upgrade one vault (50 people, 5 GB) | `scripts/plan.sh vault <vault-id> pro` |
 | Take it back to its account's plan | `scripts/plan.sh vault <vault-id> standard` |
 | Usage, largest first (everyone, one person's vaults, or one vault) | `scripts/plan.sh usage [<email>\|<vault-id>]` |
+| Let an account create vaults while invite-only | `scripts/plan.sh admit <email>` |
+| Take that back (they keep their vaults and memberships) | `scripts/plan.sh revoke-admission <email>` |
+| Open sign-ups to everyone after the alpha, or close them again | `scripts/plan.sh invite-only off` / `on` |
 
 - The person needs an account first: they sign in once, then `user` finds
   them by email. A vault's id is in its URL (`/v/<id>`).
@@ -220,6 +223,16 @@ names and counts only). The model and the numbers are in
   in the commit or ticket that asked for it.
 - Only postgres and `reliquary_ops` can change plans: no person, agent or
   app role can (hostile tests in `supabase/tests/plans_test.sql`).
+- **Invite-only** (`supabase/migrations/20260925240000_admission.sql`):
+  Supabase sign-ups stay on so invitees can make accounts, so anyone can
+  get an account; while invite-only is on (the default) an account creates
+  vaults only once admitted, and is refused with SQLSTATE `RLP02`
+  otherwise. Accepting any invite admits it, and so does `user` (a plan);
+  `admit` is for a tester who has no invite. `show` says whether someone is
+  admitted. Admission is kept per account id: an account deleted in
+  Supabase and made again starts un-admitted. Only postgres and
+  `reliquary_ops` admit (hostile tests in
+  `supabase/tests/admission_test.sql`).
 - Try the script against a local database first: set
   `PLAN_DB_CONTAINER=<a local postgres container with the migrations>`
   (and `PLAN_DB_NAME`).

@@ -2,7 +2,7 @@
 
 Create a vault, connect Claude Code, approve your agent's first proposal, then run a command with your first environment variable.
 
-This takes about 15 minutes. You need a Reliquary account (the beta is invite-only), [Claude Code](https://claude.com/claude-code), and Node 20 or later for the CLI.
+This takes about 15 minutes. You need a Reliquary account that can create vaults (the alpha is [invite-only](../concepts/plans-and-limits.md#invite-only): open the invite link someone sent you first, or ask the operator to admit you), [Claude Code](https://claude.com/claude-code), and Node 20 or later for the CLI.
 
 ## 1. Sign in
 
