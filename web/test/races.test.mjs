@@ -1,6 +1,7 @@
 // Races on plans, limits and invites (supabase/migrations/
-// 20260925240100_lock_order.sql): real parallel connections, each its own
-// transaction as a person, against web/test.sh's database.
+// 20260925240100_lock_order.sql, 20260925240200_operator_waits.sql): real
+// parallel connections, each its own transaction as a person, against
+// web/test.sh's database.
 //
 // Two kinds of test:
 // - Crowds: N connections do the same thing at once where only some may
@@ -398,4 +399,58 @@ test("races, lock order: deleting a vault while a variable in it is being rotate
   }
   log("rotate vs delete_vault", outcomes);
   assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
+});
+
+// ---------------------------------------------------------------------------
+// The operator's changes wait for what they limit
+
+test("races, the operator waits: a plan downgrade waits for a write in flight, so nothing checked against the old plan commits after it", async () => {
+  const who = people[23];
+  const v = await newVault(who, "Races downgrade");
+  assert.ok((await as(db, who, "select public.write_file($1, 'base.md', $2)", [v, "b".repeat(900)])).ok);
+  // The write is counted (1100 bytes, fine on Races roomy), then stops in
+  // its log row before committing. The downgrade must wait for it.
+  const [wr, down, downState] = await interleave(
+    (c) => as(c, who, "select public.write_file($1, 'late.md', $2)::text", [v, "l".repeat(200)], "log"),
+    (c) => c.query("select private.set_account_plan($1, 'races_small') as s", [who]).then((r) => ({ ok: true, rows: r.rows })),
+  );
+  log("downgrade:", downState, down.rows?.[0]?.s);
+  assert.ok(wr.ok, wr.message);
+  assert.equal(downState, "blocked", "the downgrade didn't wait for the write in flight");
+  assert.equal(down.rows[0].s, "Races small plan: 1 of 3 vaults");
+  const after = await as(db, who, "select public.write_file($1, 'one.md', 'x')::text", [v]);
+  assert.equal(after.code, "RLP01");
+  const { counter, scan } = await counted(v);
+  assert.equal(Number(counter), 1100);
+  assert.equal(counter, scan);
+});
+
+test("races, the operator waits: a tier change during an acceptance waits for it, and its summary counts the new member", async () => {
+  const v = await newVault(OWNER, "Races tier accept");
+  await sql("select test_support.add_member($1, $2, 'viewer', $3), test_support.add_member($1, $4, 'viewer', $3)", [v, people[18], OWNER, people[19]]);
+  const who = people[17];
+  const token = await invite(OWNER, v, who);
+  // The acceptance checks the room (3 of 1000 on Races roomy), adds the
+  // member and stops before committing.
+  const [ac, tier, tierState] = await interleave(
+    (c) => as(c, who, "select public.accept_invite($1)::text", [token], "members"),
+    (c) => c.query("select private.set_vault_tier($1, 'races_three') as s", [v]).then((r) => ({ ok: true, rows: r.rows })),
+  );
+  assert.ok(ac.ok, ac.message);
+  assert.equal(tierState, "blocked", "the tier change didn't wait for the acceptance in flight");
+  assert.equal(tier.rows[0].s, "Races three: 4 of 3 people, 0 bytes of 1 MB (over: read-mostly until under)");
+});
+
+test("races, the operator waits: a tier change during a write waits for it, and its summary counts the write's bytes", async () => {
+  const v = await newVault(OWNER, "Races tier write");
+  assert.ok((await as(db, OWNER, "select public.write_file($1, 'base.md', $2)", [v, "b".repeat(100)])).ok);
+  // The write is counted (300 bytes), then stops in its log row before
+  // committing. The tier change must wait for it.
+  const [wr, tier, tierState] = await interleave(
+    (c) => as(c, OWNER, "select public.write_file($1, 'late.md', $2)::text", [v, "l".repeat(200)], "log"),
+    (c) => c.query("select private.set_vault_tier($1, 'races_tiny') as s", [v]).then((r) => ({ ok: true, rows: r.rows })),
+  );
+  assert.ok(wr.ok, wr.message);
+  assert.equal(tierState, "blocked", "the tier change didn't wait for the write in flight");
+  assert.equal(tier.rows[0].s, "Races tiny: 1 of 4 people, 300 bytes of 1 KB");
 });
