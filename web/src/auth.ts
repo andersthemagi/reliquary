@@ -73,12 +73,16 @@ export function configureAuth(
     if (env.VERCEL) {
       throw new Error("Refusing to start: AUTH_MODE is local (the dev.sh stand-in) but VERCEL is set. Hosted, use AUTH_MODE=supabase");
     }
+    if (env.SELF_HOSTED === "1") {
+      throw new Error("Refusing to start: AUTH_MODE is local (the dev.sh stand-in) but SELF_HOSTED is set. Self-hosted, use AUTH_MODE=supabase with AUTH_URL");
+    }
     const user = env.LOCAL_USER_ID ?? "";
     if (!/^[0-9a-f-]{36}$/.test(user)) throw new Error("LOCAL_USER_ID must be a UUID");
     cfg = { ...base, mode, localUser: user, loginFile: env.LOGIN_FILE ?? ".login", loginBase: `http://${site.host}:${site.port}` };
     return mode;
   }
   if (mode !== "supabase") throw new Error("AUTH_MODE must be local or supabase");
+  if (env.AUTH_URL !== undefined) return configureAuthUrl(env, site, base);
 
   let url: URL;
   try {
@@ -101,6 +105,45 @@ export function configureAuth(
   const supabaseUrl = url.origin;
   cfg = { ...base, mode, supabaseUrl, issuer: `${supabaseUrl}/auth/v1`, apiKey, alg, secret: Buffer.from(secret, "utf8") };
   return mode;
+}
+
+// Self-hosted Supabase Auth (deploy/compose): AUTH_URL is the Auth server's
+// own base URL (the standalone supabase/auth image serves /otp, /verify,
+// /token, /logout and /.well-known/jwks.json at its root, not under
+// /auth/v1), and it is also the `iss` its tokens carry (GOTRUE_JWT_ISSUER is
+// set to the same string). It may be plain http only on loopback or, with
+// SELF_HOSTED=1, on the private network the containers share: Auth is never
+// published there, and only this app talks to it. SUPABASE_PUBLISHABLE_KEY is
+// optional (standalone Auth ignores `apikey`). Everything else is as with
+// SUPABASE_URL: a pinned asymmetric JWT_ALG, keys only from the JWKS.
+function configureAuthUrl(
+  env: NodeJS.ProcessEnv,
+  site: { secure: boolean },
+  base: Omit<Config, "mode">,
+): AuthMode {
+  if (env.SUPABASE_URL) throw new Error("Set SUPABASE_URL (Supabase's hosted Auth) or AUTH_URL (a self-hosted Auth server), not both");
+  let url: URL;
+  try {
+    url = new URL(env.AUTH_URL ?? "");
+  } catch {
+    throw new Error("AUTH_URL must be the Auth server's URL, like http://auth:9999");
+  }
+  const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  const plainOk = !env.VERCEL && (loopback || env.SELF_HOSTED === "1");
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && plainOk)) {
+    throw new Error("AUTH_URL must be https (plain http only on loopback, or on a private network with SELF_HOSTED=1)");
+  }
+  if (url.search || url.hash || url.username || url.password) throw new Error("AUTH_URL must have no query, fragment or credentials");
+  const apiKey = env.SUPABASE_PUBLISHABLE_KEY || "self-hosted";
+  if (/[^\x21-\x7e]/.test(apiKey)) throw new Error("SUPABASE_PUBLISHABLE_KEY must be printable ASCII");
+  const alg = env.JWT_ALG;
+  if (alg !== "ES256" && alg !== "RS256") throw new Error("JWT_ALG must be ES256 or RS256, as the Auth server's JWKS says");
+  const secret = env.SESSION_SECRET ?? "";
+  if (secret.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters (32 random bytes, base64url)");
+  if (env.VERCEL && !site.secure) throw new Error("Refusing to start: on Vercel, PUBLIC_URL must be https");
+  const issuer = url.href.replace(/\/+$/, "");
+  cfg = { ...base, mode: "supabase", supabaseUrl: url.origin, issuer, apiKey, alg, secret: Buffer.from(secret, "utf8") };
+  return "supabase";
 }
 
 // ---------------------------------------------------------------------------

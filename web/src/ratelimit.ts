@@ -83,7 +83,7 @@ export function configureRateLimits(env: NodeJS.ProcessEnv): void {
     if (limit < 1 || window < 1 || window > 604800) throw new Error("RATE_LIMITS: a limit is at least 1, a window 1 s to 7 days");
     limits[m[1] as LimitName] = { limit, window };
   }
-  if (env.TRUST_PROXY_IP !== undefined && env.TRUST_PROXY_IP !== "1") throw new Error("TRUST_PROXY_IP must be 1 or unset");
+  if (env.TRUST_PROXY_IP !== undefined && env.TRUST_PROXY_IP !== "1" && env.TRUST_PROXY_IP !== "0") throw new Error("TRUST_PROXY_IP must be 1, 0 or unset");
   LIMITS = limits;
   TRUST_PROXY = !!env.VERCEL || env.TRUST_PROXY_IP === "1";
 }

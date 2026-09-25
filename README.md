@@ -31,6 +31,9 @@ the research behind it is in [docs/research/](docs/research/).
 
 - `docs/design.md`: the design (v3 draft).
 - `docs/research/`: landscape, SWOT, the gate analysis, pricing.
+- `deploy/`: self-hosting with Docker Compose (a preview; the server's license
+  is undecided, drafts in `docs/licensing/`). Guide:
+  `docs/public/how-to/self-host.md`; smoke test: `deploy/test.sh`.
 - `spikes/gate/`: the audience gate and session minting, with hostile tests.
 - `pilot/`: a Telegram bot on the gate. Research, not the product.
 

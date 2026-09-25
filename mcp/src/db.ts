@@ -23,6 +23,12 @@ export type Identity = {
 //  - sslmode and friends stay out of DATABASE_URL: node-postgres lets URL
 //    parameters override the `ssl` object built here.
 //  - a small pool per instance (Fluid compute shares it between requests).
+// Self-hosted (SELF_HOSTED=1, deploy/), the database is the operator's, so
+// TLS is their choice, but a choice must be made: DATABASE_CA_FILE as above,
+// DATABASE_TLS=system (verified against Node's built-in CAs), or
+// DATABASE_TLS=off (plain, for a database on the same private network, as
+// in deploy/compose). Neither, and the server refuses to start. `off` is
+// refused on Vercel.
 // Errors name the variable, never its value: DATABASE_URL holds a password.
 // Never pass `name` to a query (no named prepared statements in transaction
 // mode) and never a session-level SET.
@@ -41,6 +47,12 @@ export function poolConfig(env: NodeJS.ProcessEnv = process.env, appDir = APP_DI
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 5_000,
   };
+  const tls = env.DATABASE_TLS ?? "";
+  if (tls !== "" && tls !== "off" && tls !== "system") throw new Error("DATABASE_TLS must be off or system");
+  if (tls && env.DATABASE_CA_FILE) throw new Error("Set DATABASE_CA_FILE or DATABASE_TLS, not both");
+  if (tls && URL_TLS_PARAM.test(url)) {
+    throw new Error("DATABASE_URL must not carry sslmode or other TLS parameters when DATABASE_TLS is set");
+  }
   if (env.DATABASE_CA_FILE) {
     if (URL_TLS_PARAM.test(url)) {
       throw new Error("DATABASE_URL must not carry sslmode or other TLS parameters when DATABASE_CA_FILE is set");
@@ -53,8 +65,17 @@ export function poolConfig(env: NodeJS.ProcessEnv = process.env, appDir = APP_DI
     }
     if (!ca.includes("-----BEGIN CERTIFICATE-----")) throw new Error("DATABASE_CA_FILE holds no PEM certificate");
     config.ssl = { ca, rejectUnauthorized: true };
+  } else if (tls === "system") {
+    config.ssl = { rejectUnauthorized: true };
+  } else if (tls === "off") {
+    if (env.VERCEL) throw new Error("Refusing to start: DATABASE_TLS=off is for a database on the same private network, never on Vercel");
+    config.ssl = false;
   } else if (env.VERCEL) {
     throw new Error("Refusing to start: VERCEL is set but DATABASE_CA_FILE is not, so DATABASE_URL has no verified TLS");
+  } else if (env.SELF_HOSTED === "1") {
+    throw new Error(
+      "Refusing to start: SELF_HOSTED is set but neither DATABASE_CA_FILE nor DATABASE_TLS is. Set DATABASE_CA_FILE to verify the database's certificate against a CA, DATABASE_TLS=system to verify it against the system's CAs, or DATABASE_TLS=off for a database on the same private network",
+    );
   }
   return config;
 }

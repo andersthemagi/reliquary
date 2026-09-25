@@ -34,11 +34,12 @@ const MAX_BATCH = 10;
 // OAuth (docs/research/hosting.md, section 4). MCP_RESOURCE is this server's
 // canonical URL, byte for byte what the authorization server binds tokens to
 // (the web app reads the same value); AUTH_ISSUER is the web app. Both are
-// required on Vercel; locally they default to the dev.sh addresses.
+// required on Vercel and self-hosted (SELF_HOSTED=1); locally they default
+// to the dev.sh addresses.
 function oauthConfig() {
-  const onVercel = !!process.env.VERCEL;
-  if (onVercel && (!process.env.MCP_RESOURCE || !process.env.AUTH_ISSUER)) {
-    console.error("Refusing to start: VERCEL is set but MCP_RESOURCE or AUTH_ISSUER is not");
+  const strict = process.env.VERCEL ? "VERCEL" : process.env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
+  if (strict && (!process.env.MCP_RESOURCE || !process.env.AUTH_ISSUER)) {
+    console.error(`Refusing to start: ${strict} is set but MCP_RESOURCE or AUTH_ISSUER is not`);
     process.exit(1);
   }
   const resource = process.env.MCP_RESOURCE ?? `http://${HOST}:${PORT}/mcp`;

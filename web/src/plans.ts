@@ -68,11 +68,22 @@ const people = (n: number) => `${n} ${n === 1 ? "person" : "people"}`;
 export const peopleOver = (u: VaultUsage) => u.members + (u.invites ?? 0) >= u.maxMembers;
 export const storageOver = (u: VaultUsage) => u.bytes >= u.maxBytes;
 
-// "Free plan · 3 of 5 vaults"
-export const planLine = (p: Plan) => `${p.planName} plan · ${p.vaultsOwned} of ${p.maxVaults} ${p.maxVaults === 1 ? "vault" : "vaults"}`;
-// "Standard (Free) · 4 of 10 people · 12 MB of 100 MB"
+// Limits this large mean none: a self-hosted instance puts everyone on
+// `self_hosted`, whose limits are the largest the columns hold
+// (deploy/sql/10_self_hosted.sql). No hosted plan comes near.
+export const NO_LIMIT_COUNT = 1_000_000_000;
+export const NO_LIMIT_BYTES = 1e18;
+
+// "Free plan · 3 of 5 vaults"; with no limit, "Self-hosted plan · 3 vaults (no limit)"
+export const planLine = (p: Plan) =>
+  p.maxVaults >= NO_LIMIT_COUNT
+    ? `${p.planName} plan · ${p.vaultsOwned} ${p.vaultsOwned === 1 ? "vault" : "vaults"} (no limit)`
+    : `${p.planName} plan · ${p.vaultsOwned} of ${p.maxVaults} ${p.maxVaults === 1 ? "vault" : "vaults"}`;
+// "Standard (Free) · 4 of 10 people · 12 MB of 100 MB"; with no limits,
+// "Standard (Self-hosted) · 4 people · 12 MB"
 export const usageLine = (u: VaultUsage) =>
-  `${tierLabel(u)} · ${u.members} of ${people(u.maxMembers)} · ${formatBytes(u.bytes)} of ${formatBytes(u.maxBytes)}`;
+  `${tierLabel(u)} · ${u.maxMembers >= NO_LIMIT_COUNT ? people(u.members) : `${u.members} of ${people(u.maxMembers)}`} · ${
+    u.maxBytes >= NO_LIMIT_BYTES ? formatBytes(u.bytes) : `${formatBytes(u.bytes)} of ${formatBytes(u.maxBytes)}`}`;
 
 // What a vault at or over a limit can't do, and how to make room.
 function limitNotes(u: VaultUsage): Raw {
