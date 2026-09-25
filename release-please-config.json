@@ -102,6 +102,9 @@
           "path": "mcp/package-lock.json",
           "jsonpath": "$.packages[''].version"
         }
+      ],
+      "exclude-paths": [
+        "cli"
       ]
     },
     "cli": {

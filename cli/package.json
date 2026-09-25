@@ -9,23 +9,19 @@
     "secrets",
     "cli"
   ],
-  "homepage": "https://reliquary.redmage.cc",
+  "homepage": "https://reliquary.redmage.cc/docs/reference/cli",
   "bugs": {
     "url": "https://github.com/andersthemagi/reliquary/issues"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/andersthemagi/reliquary.git",
-    "directory": "cli"
-  },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "reliquary": "dist/cli.js"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
@@ -35,8 +31,7 @@
     "prepack": "tsc"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "devDependencies": {
     "@types/node": "^20.19.0",

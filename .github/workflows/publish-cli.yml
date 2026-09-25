@@ -6,8 +6,9 @@
 # that exists: Actions > publish-cli > Run workflow, "Use workflow from" the
 # tag (e.g. cli-v0.1.0). The tag must match cli/package.json's version
 # (release-please keeps them in step). The CLI's end-to-end tests run first;
-# the package is published with npm provenance (a signed statement that this
-# workflow, at this commit, built it).
+# the package is published without npm provenance, which needs a public
+# source repository (this one is private); add --provenance and the
+# id-token permission back if the repository goes public.
 #
 # Secret: NPM_TOKEN (Settings > Secrets and variables > Actions), an npm
 # granular access token that can publish @reliquary-ai/cli. Until it's set,
@@ -21,7 +22,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
 
 concurrency:
   group: publish-cli
@@ -79,4 +79,4 @@ jobs:
         run: |
           # The token goes to a user-level .npmrc, never the repository's.
           printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
-          npm publish --provenance --access public
+          npm publish --access public
