@@ -12,7 +12,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { type Server, getJson } from "./config.js";
 import { type Credential, getCredential, setCredential, withLock } from "./credentials.js";
-import { CliError, NotSignedIn } from "./errors.js";
+import { CliError, NotSignedIn, serverSays } from "./errors.js";
 
 const LOGIN_TIMEOUT_MS = 5 * 60_000;
 const EARLY_MS = 60_000; // refresh a minute before expiry
@@ -24,7 +24,7 @@ const b64url = (b: Buffer) => b.toString("base64url");
 // ---------------------------------------------------------------------------
 // The token endpoint
 
-type TokenResult = { ok: true; credential: Credential } | { ok: false; error: string; status: number };
+type TokenResult = { ok: true; credential: Credential } | { ok: false; error: string; status: number; says: string };
 
 async function tokenRequest(server: Server, fields: Record<string, string>): Promise<TokenResult> {
   const { status, body } = await getJson(server.tokenEndpoint, {
@@ -37,7 +37,7 @@ async function tokenRequest(server: Server, fields: Record<string, string>): Pro
     const expiresIn = typeof b.expires_in === "number" && b.expires_in > 0 ? b.expires_in : 3600;
     return { ok: true, credential: { accessToken: b.access_token, refreshToken: b.refresh_token, expiresAt: Date.now() + expiresIn * 1000 } };
   }
-  return { ok: false, status, error: typeof b.error === "string" && /^[a-z_]{1,40}$/.test(b.error) ? b.error : "unexpected_response" };
+  return { ok: false, status, says: serverSays(body), error: typeof b.error === "string" && /^[a-z_]{1,40}$/.test(b.error) ? b.error : `no error code, HTTP ${status}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ export async function login(server: Server, opts: LoginOptions): Promise<void> {
       code_verifier: verifier,
       resource: server.resource,
     });
-    if (!r.ok) throw new CliError(`The server refused the sign-in code (${r.error}). Run \`reliquary login\` again.`);
+    if (!r.ok) throw new CliError(`The server refused the sign-in code (${r.error}). Run \`reliquary login\` again.${r.says}`);
     const previous = await withLock(async () => {
       const old = getCredential(server.issuer);
       setCredential(server.issuer, r.credential);
@@ -240,7 +240,7 @@ export async function accessToken(server: Server, stale?: string): Promise<strin
       setCredential(server.issuer, null);
       throw new NotSignedIn(server.issuer, "Your sign-in was revoked or has expired");
     }
-    throw new CliError(`The server refused to refresh your sign-in (${r.error}). Try again, or run \`reliquary login\`.`);
+    throw new CliError(`Refreshing your sign-in failed: the server refused it (${r.error}).${r.says || " It sent no reason."} If it keeps failing, run \`reliquary login\`.`);
   });
 }
 

@@ -4,7 +4,7 @@
 import { accessToken, forget } from "./auth.js";
 import { type Server, getJson } from "./config.js";
 import { isVariableName, startsPrograms, type DotenvRefusal } from "./dotenv.js";
-import { CliError, NotSignedIn, UsageError } from "./errors.js";
+import { CliError, NotSignedIn, serverSays, UsageError } from "./errors.js";
 
 export type Vault = { id: string; name: string; role: string; environments: string[] };
 
@@ -56,26 +56,36 @@ export function rateLimited(status: number, body: unknown, retryAfter: string | 
   if (status !== 429 || (body as { error?: unknown } | null)?.error !== "rate_limited") return null;
   const secs = /^\d{1,5}$/.test(retryAfter ?? "") ? Number(retryAfter) : NaN;
   const wait = secs > 0 && secs < 86_400 ? `in ${secs} second${secs === 1 ? "" : "s"}` : "later";
-  return `Too many requests from this sign-in; the server asks to try again ${wait}.`;
+  return `Too many requests from this sign-in; the server asks to try again ${wait}.${serverSays(body)}`;
 }
 const get = (server: Server, path: string) => request(server, path);
 
-function fail(status: number, body: unknown, what: string): never {
+export { serverSays };
+
+// The message for an env API answer that isn't a success: what the CLI was
+// doing, the status and code, and the server's reason and reference.
+export function failureMessage(status: number, body: unknown, what: string, doing = "Reading"): string {
   const code = (body as { error?: unknown } | null)?.error;
-  if (status === 403) throw new CliError(`Your role can't read ${what}.`);
-  if (status === 404) throw new CliError(`No such vault or environment for this sign-in (${what}). \`reliquary vaults\` lists what you can reach.`);
-  if (status === 503) throw new CliError("The server has no key for variables (VARIABLES_KEY), so it can't deliver values. Tell whoever runs it.");
+  const says = serverSays(body);
+  if (status === 403) return `Your role can't read ${what}.${says}`;
+  if (status === 404) return `No such vault or environment for this sign-in (${what}). \`reliquary vaults\` lists what you can reach.${says}`;
+  if (status === 503 && code === "not_configured") return `The server has no key for variables (VARIABLES_KEY), so it can't deliver values. Tell whoever runs it.${says}`;
   if (status === 500 && code === "decrypt_failed") {
-    throw new CliError(`A value in ${what} can't be decrypted on the server; nothing was delivered. Ask an owner to set it again.`);
+    return `A value in ${what} can't be decrypted on the server; nothing was delivered. Ask an owner to set it again.${says}`;
   }
-  throw new CliError(`The server answered ${status}${typeof code === "string" && /^[a-z_]{1,40}$/.test(code) ? ` (${code})` : ""}. Try again later.`);
+  const named = typeof code === "string" && /^[a-z_]{1,40}$/.test(code) ? ` (${code})` : "";
+  return `${doing} ${what} failed: the server answered ${status}${named}.${says || " It sent no reason; it may not be a Reliquary server, or a proxy in front of it answered."}`;
+}
+
+function fail(status: number, body: unknown, what: string, doing = "Reading"): never {
+  throw new CliError(failureMessage(status, body, what, doing));
 }
 
 export async function listVaults(server: Server): Promise<Vault[]> {
   const { status, body } = await get(server, "/vaults");
   if (status !== 200) fail(status, body, "your vaults");
   const vaults = (body as { vaults?: unknown })?.vaults;
-  if (!Array.isArray(vaults)) throw new CliError("The server sent an unexpected answer for your vaults.");
+  if (!Array.isArray(vaults)) throw new CliError("The server answered 200 for your vaults but with no `vaults` list, so it isn't speaking the env API this CLI knows. Is the server address right, and are the CLI and server up to date?");
   return vaults
     .filter((v): v is Vault => !!v && typeof v.id === "string" && UUID.test(v.id) && typeof v.name === "string" && typeof v.role === "string" && Array.isArray(v.environments))
     .map((v) => ({
@@ -114,11 +124,11 @@ export async function readEnvironment(server: Server, vault: Vault, environment:
   if (status !== 200) fail(status, body, what);
   const b = body as { vault?: unknown; environment?: unknown; variables?: unknown };
   if (b?.vault !== vault.id || b.environment !== environment || typeof b.variables !== "object" || b.variables === null || Array.isArray(b.variables)) {
-    throw new CliError(`The server sent an unexpected answer for ${what}.`);
+    throw new CliError(`The server answered 200 for ${what} but not with this vault, this environment and a \`variables\` object, so nothing was used. Are the CLI and server up to date?`);
   }
   const out = new Map<string, string>();
   for (const [name, value] of Object.entries(b.variables as Record<string, unknown>)) {
-    if (typeof value !== "string") throw new CliError(`The server sent an unexpected answer for ${what}.`);
+    if (typeof value !== "string") throw new CliError(`The server sent a value in ${what} that isn't a string, so nothing was used. Are the CLI and server up to date?`);
     if (!safeName(name)) throw new CliError(`The server sent a variable whose name isn't allowed (it changes how programs start, or isn't a shell name); refusing all of ${what}.`);
     // The server refuses NUL in values; an environment variable can't hold
     // one, and a .env would carry it raw. Not trusting that either.
@@ -140,11 +150,11 @@ function pushFail(status: number, body: unknown, what: string): never {
   if (status === 403 && code === "push_not_allowed") {
     throw new CliError("This sign-in wasn't allowed to send values. Run `reliquary login` again and leave \"Also let it send .env files\" ticked.");
   }
-  if (status === 403) throw new CliError(`Your role can't set values in ${what}.`);
-  if (status === 413) throw new CliError("That's too much to send at once (the limit is 1 MiB). Split the file.");
-  if (status === 429) throw new CliError("Too many pushes are waiting. Apply or reject some on the Variables page, or try again in an hour.");
-  if (status === 400) throw new CliError("The server refused the file's contents (a name or a value it doesn't take). Nothing was sent for approval.");
-  fail(status, body, what);
+  if (status === 403) throw new CliError(`Your role can't set values in ${what}.${serverSays(body)}`);
+  if (status === 413) throw new CliError(`That's too much to send at once (the limit is 1 MiB). Split the file.${serverSays(body)}`);
+  if (status === 429) throw new CliError(`Too many pushes are waiting for approval in this vault. Apply or reject some on the Variables page; the limit counts the last hour.${serverSays(body)}`);
+  if (status === 400) throw new CliError(`The server refused the file's contents (a name or a value it doesn't take). Nothing was sent for approval.${serverSays(body)}`);
+  fail(status, body, what, "Sending values to");
 }
 
 // Sends values for approval. Returns the pending import.
@@ -169,7 +179,7 @@ export async function pushEnvironment(
     typeof b?.import !== "string" || !UUID.test(b.import) || !Array.isArray(b.names) || typeof b.url !== "string" ||
     !b.url.startsWith(`${server.issuer}/`) || !/^[\x21-\x7e]+$/.test(b.url)
   ) {
-    throw new CliError(`The server sent an unexpected answer for ${what}.`);
+    throw new CliError(`The server accepted the push for ${what} but its answer lacks an import id, names or a link on ${server.issuer}, so there is nothing to show. Check the Variables page in the web app.`);
   }
   const names = (xs: unknown[]) => xs.filter((n): n is string => typeof n === "string" && isVariableName(n));
   return {
@@ -186,6 +196,6 @@ export async function pushStatus(server: Server, id: string): Promise<PushStatus
   const { status, body } = await get(server, `/imports/${id}`);
   if (status !== 200) fail(status, body, "that push");
   const s = (body as { status?: unknown } | null)?.status;
-  if (s !== "pending" && s !== "applied" && s !== "rejected" && s !== "expired") throw new CliError("The server sent an unexpected answer for that push.");
+  if (s !== "pending" && s !== "applied" && s !== "rejected" && s !== "expired") throw new CliError(`The server answered with an unknown status for that push (not pending, applied, rejected or expired). Are the CLI and server up to date?`);
   return s;
 }

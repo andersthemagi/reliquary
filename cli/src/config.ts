@@ -71,13 +71,42 @@ export function serverOrigin(flag: string | undefined, project: ProjectConfig | 
   return u.origin;
 }
 
+// Why a request never got an answer, from the error or its cause: DNS, TLS,
+// a refused or reset connection, or no answer in time. Codes only, never a
+// message (which could carry what was sent).
+const NET: Record<string, string> = {
+  ENOTFOUND: "the DNS lookup found no such host (ENOTFOUND)",
+  EAI_AGAIN: "the DNS lookup failed for now (EAI_AGAIN)",
+  ECONNREFUSED: "the connection was refused (ECONNREFUSED): nothing is listening there",
+  ECONNRESET: "the connection was reset (ECONNRESET)",
+  ETIMEDOUT: "the connection timed out (ETIMEDOUT)",
+  EHOSTUNREACH: "the host is unreachable (EHOSTUNREACH)",
+  ENETUNREACH: "the network is unreachable (ENETUNREACH)",
+  EPIPE: "the connection closed while sending (EPIPE)",
+  UND_ERR_CONNECT_TIMEOUT: "the connection timed out (UND_ERR_CONNECT_TIMEOUT)",
+  UND_ERR_SOCKET: "the connection closed unexpectedly (UND_ERR_SOCKET)",
+  UND_ERR_HEADERS_TIMEOUT: "the server sent no answer in time (UND_ERR_HEADERS_TIMEOUT)",
+};
+const TLS = /^(CERT_|UNABLE_TO_|DEPTH_ZERO_|SELF_SIGNED_|ERR_TLS_|ERR_SSL_|HOSTNAME_MISMATCH)/;
+
+export function networkReason(err: unknown, timeoutMs = TIMEOUT_MS): string {
+  for (let e = err as { code?: unknown; cause?: unknown; name?: unknown } | undefined, i = 0; e && i < 4; e = e.cause as typeof e, i++) {
+    if (e.name === "TimeoutError") return `no answer within ${Math.round(timeoutMs / 1000)} seconds (timeout)`;
+    const code = typeof e.code === "string" ? e.code : "";
+    if (NET[code]) return NET[code];
+    if (TLS.test(code)) return `the TLS certificate check failed (${code})`;
+    if (code) return `the request failed (${code})`;
+  }
+  return `the request failed (${(err as Error)?.name ?? "error"}, no error code)`;
+}
+
 export async function getJson(url: string, init: RequestInit = {}): Promise<{ status: number; body: unknown; headers: Headers }> {
   let res: Response;
+  const u = new URL(url);
   try {
     res = await fetch(url, { ...init, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
   } catch (err) {
-    const why = (err as Error).name === "TimeoutError" ? "timed out" : "failed";
-    throw new CliError(`Couldn't reach ${new URL(url).origin} (the request ${why}). Check the server and your connection.`);
+    throw new CliError(`Couldn't reach ${u.host} (${init.method ?? "GET"} ${u.pathname}): ${networkReason(err)}. Check the server address and your connection.`);
   }
   let body: unknown = null;
   if ((res.headers.get("content-type") ?? "").includes("application/json")) {

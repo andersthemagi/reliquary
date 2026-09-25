@@ -290,6 +290,7 @@ git). All four: `./test.sh`.
 | ID | Feature | Acceptance criteria | Tests | Docs |
 |---|---|---|---|---|
 | F235 | MCP tool errors | A failed tool call answers `isError` with a first line saying what failed and why (a refusal's own words first) and a second, `(what: Calling <tool>; where: MCP tool <tool>: <component>; [why: …;] ref …)`; a database error shows its SQLSTATE and function and never the row's values; a real lock timeout is `55P03 lock timeout`; a refused request body carries `message`, `where` and `ref`; no tool argument is echoed, so an outsider's answer differs from a missing vault's only by the reference | `mcp/test/errors.test.mjs#errors: a database error in a tool call`, `mcp/test/errors.test.mjs#errors: a timeout in the database`, `mcp/test/errors.test.mjs#errors: a refusal keeps`, `mcp/test/errors.test.mjs#errors: a request the server refuses`, `mcp/test/round_trips.test.mjs#round trips: no vault`, `mcp/test/e2e.test.mjs#outsider:`, `mcp/test/scope.test.mjs#scoped: a token for Workshop`, `mcp/test/threads.test.mjs#outsider:` | `docs/public/reference/errors.md` |
+| F236 | CLI errors say why and where | The CLI prints what it was doing, the status and code, and the server's reason, where and reference (as plain text, capped, a malformed ref left out); an answer with no reason says so; a request with no answer names the host, the request and DNS, TLS, a refused or reset connection or a timeout, by error code | `cli/test/errors.test.mjs#errors:` | `docs/public/reference/errors.md` |
 
 ## Not built yet (no rows until they ship)
 
