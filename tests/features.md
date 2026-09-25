@@ -206,6 +206,15 @@ git). All four: `./test.sh`.
 | F154 | Web file saves in one query | A file form's write, delete, propose or create is one query in its transaction (the vault checked inside it by `private.vault_ref`; a new file follows its path's rule in the same query: open is written, canon proposed); someone who isn't a member gets Not found and nothing is written; an unknown action is a bad request without a query | `web/test/final_sweep.test.mjs#file saves:` |
 | F155 | The CLI doesn't trust what the server sends | A value with a NUL character refuses the whole environment, naming the variable (run doesn't start, pull writes nothing); variables named `__proto__` or `toString` reach the command and the file like any other and aren't reported as inherited (the env API sends them too); vault names and roles are printed without control characters (C0, DEL, C1) or bidirectional overrides | `cli/test/cli.test.mjs#server answers:` |
 
+## Releases and versions (docs/ops/runbook.md "Deploy", `release-please-config.json`)
+
+| ID | Feature | Acceptance criteria | Tests |
+|---|---|---|---|
+| F160 | GET /version | Both apps answer `GET /version` without a sign-in or token: JSON with exactly `version` (the release in `version.txt`) and `commit` (7 to 40 hex digits, or `unknown`), `cache-control: no-store`; `/healthz` is unchanged (plain `ok`), since uptime depends on it | `web/test/version.test.mjs#version: GET /version`, `web/test/version.test.mjs#version: /version has exactly`, `web/test/version.test.mjs#version: /healthz`, `mcp/test/version.test.mjs#version: GET /version`, `mcp/test/version.test.mjs#version: /healthz` |
+| F161 | The version in the footer | The app's footer and the public site's footer show `v<version>` linking to `/docs/changelog` | `web/test/version.test.mjs#version: the app footer`, `web/test/version.test.mjs#version: the public site's footer` |
+| F162 | MCP serverInfo.version | `initialize` answers `serverInfo` `{name: "reliquary", version: <release>}` | `mcp/test/version.test.mjs#version: initialize` |
+| F163 | The build stamp | `npm run build` (tsc, then `stamp-version.mjs`) writes `dist/version.json`: the version from `../version.txt`, else the app's `package.json` (a build that sees only its own directory); the two disagreeing fails the build and writes nothing; the commit from `VERCEL_GIT_COMMIT_SHA` or `GITHUB_SHA`, anything but hex is `unknown` | `web/test/version.test.mjs#version: the build stamp`, `web/test/version.test.mjs#version: without version.txt` |
+
 ## Not built yet (no rows until they ship)
 
 Connections, routines, the git mirror. Each lands with its row and tests.

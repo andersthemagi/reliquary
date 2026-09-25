@@ -42,17 +42,19 @@ seed=$(psql -A -t < test/seed.sql | grep '=' )
 # built inside its own container from a read-only view of web/, so it never
 # races web/test.sh over web/dist or web/node_modules. CIMD_ALLOW_LOOPBACK
 # lets the test serve client metadata on loopback.
-"$engine" run -d --name "$web" --network host -v "$PWD/../web":/src:ro,z -v "$PWD":/mcp:z \
+"$engine" run -d --name "$web" --network host -v "$PWD/../web":/src:ro,z -v "$PWD":/mcp:z -v "$PWD/../version.txt":/version.txt:ro,z \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000b -e LOGIN_FILE="/mcp/.login-oauth-$slot" \
   -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e PORT=$webport "$node" sh -c \
-  'mkdir -p /app && cd /src && cp -r src public package.json package-lock.json tsconfig.json /app/ && cd /app &&
+  'mkdir -p /app && cd /src && cp -r src public package.json package-lock.json tsconfig.json stamp-version.mjs /app/ && cd /app &&
    if [ -x /src/node_modules/.bin/tsc ]; then ln -s /src/node_modules node_modules; else npm ci --no-audit --no-fund --silent; fi &&
-   npx tsc && exec node dist/server.js' >/dev/null
+   npm run -s build && exec node dist/server.js' >/dev/null
 
 # A fresh checkout (CI, a new worktree) has no node_modules yet.
 [ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund
-"$engine" run --rm --network none -v "$PWD":/app:Z -w /app "$node" npx tsc
+# npm run build: tsc, then stamp-version.mjs writes dist/version.json from
+# ../version.txt (mounted where the build looks for it).
+"$engine" run --rm --network none -v "$PWD":/app:Z -v "$PWD/../version.txt":/version.txt:ro,z -w /app "$node" npm run -s build
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
@@ -71,6 +73,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
   -e TOKEN_LOAD_MEASURE_ONLY="${TOKEN_LOAD_MEASURE_ONLY:-}" \
+  -e EXPECT_VERSION="$(tr -d '[:space:]' < ../version.txt)" \
   "$node" node --test --test-concurrency=1 ${MCP_TESTS:-test/*.test.mjs}
 
 echo "== server log (must contain no tokens or file text)"

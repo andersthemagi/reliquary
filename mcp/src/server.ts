@@ -6,6 +6,7 @@
 //   GET  /.well-known/oauth-protected-resource[/mcp]  RFC 9728 metadata
 //   GET  /healthz  liveness
 //   GET  /healthz?db=1  keepalive: `select 1`, then `ok` or 503 `unavailable`
+//   GET  /version  {"version","commit"} of this build (the release it is)
 //
 // A 401 names the protected resource metadata (WWW-Authenticate:
 // resource_metadata=...), which is how an MCP client finds where to sign in.
@@ -19,6 +20,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
 import { registerTools } from "./tools.js";
+import { BUILD, versionJson } from "./version.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8787);
@@ -141,6 +143,10 @@ const httpServer = http.createServer(async (req, res) => {
     res.writeHead(up ? 200 : 503, plain).end(up ? "ok" : "unavailable");
     return;
   }
+  if (path === "/version" && req.method === "GET") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(versionJson());
+    return;
+  }
   if (path === OAUTH.prmPath || path === "/.well-known/oauth-protected-resource") {
     if (req.method !== "GET" && req.method !== "OPTIONS") {
       send(res, 405, { error: "method_not_allowed" }, { Allow: "GET" });
@@ -225,7 +231,7 @@ const httpServer = http.createServer(async (req, res) => {
     await recordClient(bearer[1], init.params.clientInfo.name);
   }
 
-  const mcp = new McpServer({ name: "reliquary", version: "0.1.0" });
+  const mcp = new McpServer({ name: "reliquary", version: BUILD.version });
   const runner = session;
   registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
   const transport = new StreamableHTTPServerTransport({

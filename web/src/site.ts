@@ -7,7 +7,7 @@
 // filled) and PRICING (the tiers, easy to change or hide). A field left null
 // renders as a visible "[to be filled: ...]" mark, never as an invented fact.
 
-import { LEGAL_LINKS, esc, footerLinks, html, raw, styleHref, type Raw, type Theme } from "./html.js";
+import { LEGAL_LINKS, esc, footerLinks, html, raw, styleHref, versionLink, type Raw, type Theme } from "./html.js";
 
 // Who runs Reliquary. null = not decided or not known yet: shown as a
 // placeholder on the page. Fill these in before the pages leave draft.
@@ -161,6 +161,7 @@ ${o.body}
   <div class="site-footer-brand"><span class="logo" aria-hidden="true"></span><span>${OPERATOR.brand}</span></div>
   ${footerLinks()}
   <a href="${requestAccessHref()}">Contact</a>
+  ${versionLink()}
 </footer>
 </body>
 </html>`.html;

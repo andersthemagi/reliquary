@@ -124,13 +124,14 @@ no `public/`) for `test/hosting.test.mjs`.
 
 Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
 project, `reliquary-web`, Root Directory `web`. Vercel runs the app as one function, `api/index.js`, which hands every
-request to the handler `src/server.ts` exports (built by `tsc` into `dist/`);
+request to the handler `src/server.ts` exports (built by `npm run build`: `tsc` into `dist/`, then `stamp-version.mjs` writes `dist/version.json` from `../version.txt` for `GET /version`);
 every path is rewritten to it after `public/` gets its turn on the CDN. The
 zero-config Node server detection only recognises Express-style apps, so it
 failed on this plain `node:http` server. `vercel.json` sets region `fra1`, Fluid
 compute, `maxDuration` 30 s, bundles `supabase-ca.crt` into the function, and
-turns off automatic deploys from `main` (the deploy workflow applies
-migrations first). `public/` is served by Vercel's CDN.
+turns off automatic deploys from `main`: only a published release deploys
+(the deploy workflow applies its migrations first, then deploys exactly the
+tagged commit; `docs/ops/runbook.md`, "Deploy"). `public/` is served by Vercel's CDN.
 
 What the server does differently when hosted:
 

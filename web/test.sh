@@ -58,7 +58,9 @@ seed=$(psql -A -t < test/seed.sql | grep '=')
 
 # A fresh checkout (CI, a new worktree) has no node_modules yet.
 [ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund
-"$engine" run --rm --network none -v "$PWD":/app:Z -w /app "$node" npx tsc
+# npm run build: tsc, then stamp-version.mjs writes dist/version.json from
+# ../version.txt (mounted where the build looks for it).
+"$engine" run --rm --network none -v "$PWD":/app:Z -v "$PWD/../version.txt":/version.txt:ro,z -w /app "$node" npm run -s build
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/app/.login-test-$slot \
@@ -106,6 +108,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   -e HOSTED_LOGIN_FILE=/app/.login-test-hosted-$slot \
   -e WEB_AUTH_A_URL="http://127.0.0.1:$auth_a_port" -e WEB_AUTH_B_URL="http://127.0.0.1:$auth_b_port" \
   -e WEB_AUTH_PUBLIC_URL="$hosted_url" -e FAKE_AUTH_URL=$fake_url -e AUTH_SECRETS_FILE=/app/.auth-secrets-$slot \
+  -e EXPECT_VERSION="$(tr -d '[:space:]' < ../version.txt)" \
   "$node" node --test --test-concurrency=1 test/*.test.mjs
 
 echo "== server log (must contain no tokens, codes or file text)"

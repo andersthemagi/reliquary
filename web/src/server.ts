@@ -39,6 +39,7 @@ import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
 import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
 import { pool } from "./db.js";
+import { versionJson } from "./version.js";
 import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -292,6 +293,10 @@ const server = http.createServer(async (req, res) => {
     const theme: Theme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : "auto";
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
+      return;
+    }
+    if (url.pathname === "/version" && req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" }).end(versionJson());
       return;
     }
     // The public site's legal pages, robots.txt, sitemap.xml (legal.ts).

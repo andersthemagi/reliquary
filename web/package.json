@@ -5,7 +5,7 @@
   "description": "Reliquary's web UI: browse, edit, and approve",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node stamp-version.mjs",
     "start": "node dist/server.js"
   },
   "dependencies": {

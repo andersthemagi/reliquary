@@ -5,7 +5,7 @@
   "description": "Reliquary's remote MCP endpoint",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node stamp-version.mjs",
     "start": "node dist/server.js"
   },
   "dependencies": {

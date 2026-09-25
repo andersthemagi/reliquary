@@ -874,6 +874,7 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
 .footer-links a, .site-footer > a { display: inline-block; padding: var(--space-1) 0; }
 footer a { color: var(--fg-muted); }
 footer a:hover { color: var(--link); }
+.footer-version { display: inline-block; padding: var(--space-1) 0; font-variant-numeric: tabular-nums; }
 
 /* Reading copy, not tables: proportional figures and punctuation. */
 body.site { font-variant-numeric: normal; }

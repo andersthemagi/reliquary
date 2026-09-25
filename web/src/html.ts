@@ -3,6 +3,7 @@
 // never rendered as markdown or HTML.
 
 import { personRef } from "./personref.js";
+import { BUILD } from "./version.js";
 
 export function esc(value: unknown): string {
   return String(value ?? "")
@@ -57,6 +58,10 @@ export const LEGAL_LINKS: ReadonlyArray<readonly [string, string]> = [
 ];
 export const footerLinks = () =>
   html`<nav class="footer-links" aria-label="Legal">${LEGAL_LINKS.map(([href, label]) => html`<a href="${href}">${label}</a>`)}</nav>`;
+
+// The release this is, in every footer, linking to what changed in it.
+export const versionLink = () =>
+  BUILD.version === "unknown" ? "" : html`<a class="footer-version" href="/docs/changelog">v${BUILD.version}</a>`;
 
 export type Nav = "home" | "review" | "vaults" | "activity" | "connect" | "tokens";
 
@@ -124,7 +129,7 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
 ${opts.flash ? html`<p class="callout info flash" role="status">${opts.flash}</p>` : ""}
 ${body}
 </main>
-<footer><span>Reliquary by Red Mage</span>${footerLinks()}</footer>
+<footer><span>Reliquary by Red Mage</span>${footerLinks()}${versionLink()}</footer>
 </body>
 </html>`.html;
 }
