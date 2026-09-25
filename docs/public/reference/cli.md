@@ -88,7 +88,7 @@ Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected o
 
 | Setting | First of |
 |---|---|
-| Server | `--server`, `RELIQUARY_URL`, `server` in `.reliquary.json`, `https://reliquary.redmage.cc` |
+| Server | `--server`, `RELIQUARY_URL`, `server` in `.reliquary.json`, `https://app.reliquary.redmage.cc` |
 | Vault | `--vault`, `vault` in `.reliquary.json`, the only vault the sign-in reaches |
 | Environment | `--env`, `environment` in `.reliquary.json`, `development` |
 
@@ -99,7 +99,7 @@ A vault name that two of your vaults share is an error listing their ids.
 A project file the CLI finds from the current directory upwards. Commit it; it holds ids and names, never values:
 
 ```json
-{ "server": "https://reliquary.redmage.cc", "vault": "<vault id>", "environment": "development" }
+{ "server": "https://app.reliquary.redmage.cc", "vault": "<vault id>", "environment": "development" }
 ```
 
 All three keys are optional.

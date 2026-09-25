@@ -56,7 +56,7 @@ Commit a `.reliquary.json` at the project's root so nobody needs `--vault` or `-
 
 - **Vault:** `--vault` takes a name or an id, else `vault` in `.reliquary.json`, else the only vault you can reach. A name two vaults share is an error that lists their ids.
 - **Environment:** `--env`, else `environment` in `.reliquary.json`, else `development`. Editors can't read owners-only environments like `production`; viewers read none.
-- **Server:** `--server`, else the `RELIQUARY_URL` environment variable, else `server` in `.reliquary.json`, else `https://reliquary.redmage.cc`.
+- **Server:** `--server`, else the `RELIQUARY_URL` environment variable, else `server` in `.reliquary.json`, else `https://app.reliquary.redmage.cc`.
 
 ## Sign out
 

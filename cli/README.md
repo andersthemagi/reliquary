@@ -43,11 +43,11 @@ nothing. A project may commit `.reliquary.json` (found from the current
 directory upwards) to set defaults; it holds ids and names, never values:
 
 ```json
-{ "server": "https://reliquary.redmage.cc", "vault": "<vault id>", "environment": "development" }
+{ "server": "https://app.reliquary.redmage.cc", "vault": "<vault id>", "environment": "development" }
 ```
 
 **The server** is `--server`, else `RELIQUARY_URL`, else `server` in
-`.reliquary.json`, else `https://reliquary.redmage.cc`. It must be
+`.reliquary.json`, else `https://app.reliquary.redmage.cc`. It must be
 https (plain http only for 127.0.0.1, [::1] or localhost). The CLI reads its
 `/.well-known/oauth-authorization-server`, requires the issuer to be that
 same origin and every endpoint on it, and derives its client id
