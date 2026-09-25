@@ -95,22 +95,46 @@ code grant with PKCE S256, a redirect to `http://127.0.0.1:<free port>/callback`
 (`rle_`) last an hour and are refreshed a minute before they expire, or once
 after a 401; refresh tokens (`rlr_`) rotate on every use.
 
-Tokens are kept per server in `credentials.json` in your config directory:
-`RELIQUARY_CONFIG_DIR`, else `%APPDATA%\reliquary` on Windows, else
-`$XDG_CONFIG_HOME/reliquary`, else `~/.config/reliquary`. The directory is
-0700 and the file 0600, written atomically. Refreshing happens under a lock
-file there, because two processes presenting the same refresh token would
-revoke the grant. No token is ever printed, logged, put in a URL, an argument
-or a child's environment.
+Tokens are kept per server in the OS keychain where there is one
+(`src/credentials.ts`, all behind one interface):
+
+- **macOS**: the login Keychain, generic passwords with service
+  `reliquary-cli` and the server's origin as the account, through
+  `/usr/bin/security`. Writing runs `security -i`, which reads its command
+  line, secret included, from standard input; reading prints it on standard
+  output.
+- **Linux**: the Secret Service (GNOME Keyring, KWallet) through
+  libsecret's `secret-tool`, when it's installed and a keyring answers (a
+  `lookup` that finds nothing is an answer; no D-Bus session is not).
+  `secret-tool store` reads the secret from standard input.
+- **Windows**: `credentials.dpapi` in the config directory, the whole store
+  encrypted with DPAPI (`ProtectedData`, current user) by a fixed Windows
+  PowerShell script that reads and writes base64 on standard input and
+  output. `cmdkey` is not used: it takes the secret as an argument.
+
+Otherwise (servers, containers, Linux without `secret-tool`) they are kept
+in `credentials.json` in your config directory: `RELIQUARY_CONFIG_DIR`, else
+`%APPDATA%\reliquary` on Windows, else `$XDG_CONFIG_HOME/reliquary`, else
+`~/.config/reliquary`. The directory is 0700 and the file 0600, written
+atomically. `RELIQUARY_CREDENTIALS=file` forces the file;
+`RELIQUARY_CREDENTIALS=keychain` forces the keychain and fails if none
+answers. `reliquary login` says where the sign-in went.
+
+A sign-in in `credentials.json` from before the keychain keeps working: a
+server the keychain doesn't have is read from the file, and the next write
+for it (a refresh, a login, a logout) puts it in the keychain and takes it
+out of the file.
+
+Refreshing happens under a lock file in the config directory, because two
+processes presenting the same refresh token would revoke the grant. No
+token is ever printed, logged, put in a URL, an argument (a keychain tool's
+included) or a child's environment, and nothing a keychain tool prints is
+shown, only its exit code.
 
 The sign-in shows on the web app's Tokens page as "Reliquary CLI"
 (Environment variables). Revoke it there or with `reliquary logout`; either
 way the next command says to run `reliquary login` and forgets the stored
 tokens. Every read is in the vault's access log.
-
-Not yet: the OS keychain (macOS Keychain, libsecret). docs/variables.md
-allows the file where there's no keychain; it's a known gap in
-tests/features.md.
 
 ## Errors
 
@@ -170,5 +194,5 @@ repository, symlink, modes, atomic and in-place), and `env push` (the
 approval link, the web UI applying and rejecting, `--wait` and its timeout, a
 sign-in without the push permission, an editor's production). Every value and
 token the tests see is recorded; none may appear in the CLI's output or
-either server's log. Registry rows F60 to F62, F67 and F70 in
+either server's log. Registry rows F60 to F62, F67, F70 and F190 to F193 in
 [tests/features.md](../tests/features.md).

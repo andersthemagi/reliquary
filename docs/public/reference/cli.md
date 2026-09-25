@@ -111,8 +111,25 @@ All three keys are optional.
 | `RELIQUARY_URL` | the server, when `--server` isn't given |
 | `RELIQUARY_CONFIG_DIR` | where sign-ins are kept, instead of the default config directory |
 | `RELIQUARY_NO_BROWSER` | when set, `login` prints the link without opening a browser |
+| `RELIQUARY_CREDENTIALS` | `file` or `keychain`: where sign-ins are kept, instead of choosing by itself |
 
-Sign-ins are kept per server in `credentials.json` in the config directory: `RELIQUARY_CONFIG_DIR`, else `%APPDATA%\reliquary` on Windows, else `$XDG_CONFIG_HOME/reliquary`, else `~/.config/reliquary`. The directory is mode 700 and the file 600.
+## Where sign-ins are kept
+
+One sign-in per server, in the operating system's keychain when there is one:
+
+| System | Where |
+|---|---|
+| macOS | the login Keychain, as `reliquary-cli` items, through `/usr/bin/security` |
+| Linux | your keyring through the Secret Service (GNOME Keyring, KWallet), with `secret-tool` from libsecret, when it's installed and a keyring answers |
+| Windows | `credentials.dpapi` in the config directory, encrypted with DPAPI so only your Windows account on this computer can read it |
+
+Without one (a server, a container, Linux without `secret-tool`), sign-ins are kept in `credentials.json` in the config directory, mode 600 in a mode 700 directory. `reliquary login` says which it used. The config directory is `RELIQUARY_CONFIG_DIR`, else `%APPDATA%\reliquary` on Windows, else `$XDG_CONFIG_HOME/reliquary`, else `~/.config/reliquary`; it also holds the lock file that keeps two commands from refreshing at once.
+
+`RELIQUARY_CREDENTIALS=file` always uses the file. `RELIQUARY_CREDENTIALS=keychain` always uses the keychain, and fails if none answers instead of falling back to the file.
+
+A token never goes into a command's arguments, where other programs could see it: the keychain tools get it on standard input.
+
+A sign-in made before the keychain, in `credentials.json`, keeps working. The next time it changes (a refresh within the hour, a new `login`, or `logout`), it moves into the keychain and out of the file.
 
 ## Exit codes and errors
 
@@ -124,4 +141,4 @@ Sign-ins are kept per server in `credentials.json` in the config directory: `REL
 | 3 | `env push --wait` ran out of time |
 | other | `run` passes on its command's exit code |
 
-Common errors: your sign-in was revoked or expired (run `reliquary login`); your role can't read that environment; no such vault or environment for this sign-in; the server has no key for variables. No error prints a value, a token or a server response.
+Common errors: your sign-in was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this sign-in; the server has no key for variables. No error prints a value, a token or a server response.

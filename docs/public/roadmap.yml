@@ -118,6 +118,12 @@
   milestone: M1
   docs: concepts/templates
 
+- title: OS keychain for the CLI
+  summary: CLI sign-ins in the macOS Keychain, the Secret Service on Linux or DPAPI on Windows, else a file.
+  status: shipped
+  milestone: M2
+  docs: reference/cli
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
@@ -211,10 +217,6 @@
 
 - title: Rate limits on sign-in and MCP
   summary: Per-person and per-token limits beyond the ones on invites, imports and exports.
-  status: considering
-
-- title: OS keychain for the CLI
-  summary: Keep CLI sign-ins in the macOS Keychain or libsecret instead of a file.
   status: considering
 
 - title: Client-side encrypted variables

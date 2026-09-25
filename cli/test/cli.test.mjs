@@ -652,3 +652,80 @@ test("server answers: a vault name with bidirectional overrides is printed with 
   assert.doesNotMatch(line, /[\u202a-\u202e\u2066-\u2069]/);
   assert.match(line, /CLI \ufffdBidi\ufffd \(owner\)/);
 });
+
+// ---------------------------------------------------------------------------
+// keychain: where no keychain answers (this container), the file; with a
+// Secret Service (a stand-in secret-tool on PATH), a sign-in from before
+// moves into it on its next refresh.
+
+// A stand-in for libsecret's secret-tool: one file per item, and a log of
+// its arguments.
+function fakeSecretTool() {
+  const dir = tmp("secret-tool");
+  writeFileSync(
+    path.join(dir, "secret-tool"),
+    `#!/bin/sh
+d=${JSON.stringify(dir)}
+printf '%s\\n' "$*" >> "$d/argv.log"
+cmd=$1; shift
+[ "$cmd" = store ] && shift
+key=$(printf '%s' "$*" | tr -c 'a-zA-Z0-9' _)
+case $cmd in
+  store) cat > "$d/item.$key" ;;
+  lookup) [ -f "$d/item.$key" ] || exit 1; cat "$d/item.$key" ;;
+  clear) rm -f "$d/item.$key" ;;
+esac
+`,
+  );
+  chmodSync(path.join(dir, "secret-tool"), 0o755);
+  const items = () => readdirSync(dir).filter((f) => f.startsWith("item.")).map((f) => readFileSync(path.join(dir, f), "utf8"));
+  return { env: { PATH: `${dir}:${process.env.PATH}` }, items, argv: () => readFileSync(path.join(dir, "argv.log"), "utf8") };
+}
+
+test("keychain choice: without a keychain, login keeps the sign-in in the file and says so", async () => {
+  const config = tmp("kc-file");
+  const r = await login(config);
+  assert.equal(r.code, 0, r.stderr);
+  assert.ok(r.stderr.includes(`The sign-in is kept in ${path.join(config, "credentials.json")}.`), r.stderr);
+});
+
+test("keychain choice: RELIQUARY_CREDENTIALS=keychain where none answers fails plainly; a value that isn't file or keychain is a usage error", async () => {
+  const r = await cli(["vaults"], { config: main, env: { RELIQUARY_CREDENTIALS: "keychain" } });
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /no OS keychain answers here/);
+  const bad = await cli(["vaults"], { config: main, env: { RELIQUARY_CREDENTIALS: "wallet" } });
+  assert.equal(bad.code, 2);
+  assert.match(bad.stderr, /RELIQUARY_CREDENTIALS must be file or keychain/);
+  assert.equal((await cli(["vaults"], { config: main, env: { RELIQUARY_CREDENTIALS: "file" } })).code, 0);
+});
+
+test("keychain migration: a sign-in in the file keeps working with a keychain, moves into it on refresh, and logout clears it; no token in secret-tool's arguments", async () => {
+  const config = tmp("kc-move");
+  assert.equal((await login(config)).code, 0);
+  const st = fakeSecretTool();
+  const before = credentials(config);
+  // Read from the file while the keychain doesn't have it.
+  assert.equal((await cli(["vaults"], { config, env: st.env })).code, 0);
+  assert.deepEqual(st.items(), []);
+  // Expire it: the refresh writes to the keychain and out of the file.
+  const f = path.join(config, "credentials.json");
+  const store = JSON.parse(readFileSync(f, "utf8"));
+  store.servers[WEB].expiresAt = 0;
+  writeFileSync(f, JSON.stringify(store));
+  const r = await cli(["vaults"], { config, env: st.env });
+  assert.equal(r.code, 0, r.stderr);
+  const [item] = st.items();
+  const m = /^v1:(rlr_[0-9a-f]{64}):(rle_[0-9a-f]{64}):\d+$/.exec(item ?? "");
+  assert.ok(m, "the refreshed sign-in is in the keychain");
+  record(m[1], m[2]);
+  assert.notEqual(m[1], before.refreshToken);
+  assert.equal(credentials(config), null, "and no longer in the file");
+  // It works from the keychain, and logout revokes and clears it.
+  assert.equal((await cli(["vaults"], { config, env: st.env })).code, 0);
+  const out = await cli(["logout"], { config, env: st.env });
+  assert.match(out.stderr, /the sign-in is revoked and forgotten/);
+  assert.deepEqual(st.items(), []);
+  const argv = st.argv();
+  for (const t of [before.refreshToken, before.accessToken, m[1], m[2]]) assert.ok(!argv.includes(t), "a token in secret-tool's arguments");
+  assert.match(argv, /^store --label=Reliquary CLI sign-in for http:\/\/127\.0\.0\.1:\d+ service reliquary-cli account http:\/\/127\.0\.0\.1:\d+$/m);
+});

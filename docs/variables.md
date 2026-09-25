@@ -579,7 +579,8 @@ module mounted with a line or two, using `web/src/variables.ts` only.
 ### CLI: `npx @reliquary-ai/cli` (binary `reliquary`)
 
 Built in `cli/` (see [cli/README.md](../cli/README.md)); credentials are in
-the file, not yet the keychain.
+the OS keychain (macOS Keychain, Secret Service via `secret-tool`, Windows
+DPAPI) where one answers, else the file.
 
 A small Node package, no native dependencies. It talks to exactly the
 endpoints above.

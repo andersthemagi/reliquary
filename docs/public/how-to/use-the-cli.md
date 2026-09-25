@@ -68,4 +68,6 @@ This revokes the sign-in on the server and forgets it. You can also revoke it on
 
 ## Where the sign-in is kept
 
-In `credentials.json` in your config directory (`~/.config/reliquary` on Linux and macOS, `%APPDATA%\reliquary` on Windows, or `RELIQUARY_CONFIG_DIR`), readable only by you. No command prints a token or a value.
+In your system's keychain: the macOS Keychain, your Linux keyring (through `secret-tool`), or on Windows a file encrypted to your Windows account. Where there's none, in `credentials.json` in your config directory (`~/.config/reliquary` on Linux and macOS, `%APPDATA%\reliquary` on Windows, or `RELIQUARY_CONFIG_DIR`), readable only by you. `reliquary login` says which. To choose, set `RELIQUARY_CREDENTIALS` to `file` or `keychain`; details in [the reference](../reference/cli.md#where-sign-ins-are-kept).
+
+A sign-in from before the keychain keeps working and moves into it the next time it's refreshed. No command prints a token or a value.

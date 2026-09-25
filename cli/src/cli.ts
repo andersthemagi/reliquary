@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { listVaults, pickVault, pushEnvironment, readEnvironment, type Vault } from "./api.js";
 import { login, logout } from "./auth.js";
 import { DEFAULT_SERVER, discover, projectConfig, serverOrigin, type ProjectConfig } from "./config.js";
-import { credentialsFile } from "./credentials.js";
+import { credentialStore, credentialsFile } from "./credentials.js";
 import { CliError, UsageError } from "./errors.js";
 import { checkTarget, formatDotenv, writePrivate } from "./pull.js";
 import { readDotenv, waitForDecision } from "./push.js";
@@ -45,7 +45,10 @@ Options:
   -h, --help       this help
   -v, --version    the version
 
-Values are never printed. Sign-ins are kept in ${credentialsFile()} (mode 600).`;
+Values are never printed. Sign-ins are kept in the OS keychain when there is
+one (macOS Keychain, Secret Service, Windows DPAPI), else in
+${credentialsFile()} (mode 600); RELIQUARY_CREDENTIALS=file or keychain
+chooses.`;
 
 type Spec = { values: string[]; flags: string[] };
 type Parsed = { opts: Record<string, string | true>; positionals: string[]; rest: string[] | null };
@@ -130,6 +133,7 @@ async function main(argv: string[]): Promise<number> {
       say(`Signed in to ${server.issuer}. This computer can read:`);
       if (!vaults.length) say("  no vaults yet");
       for (const v of vaults) say(`  ${describe(v)}`);
+      say(`The sign-in is kept in ${credentialStore().where}.`);
       say("Revoke it any time on the Tokens page, or with `reliquary logout`.");
       return 0;
     }
