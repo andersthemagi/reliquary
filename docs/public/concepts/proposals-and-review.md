@@ -6,6 +6,8 @@ A proposal is a suggested change to a file, usually a canon one, that waits for 
 
 Anyone who can write, and their agents, can propose: a new file, new text for a file, or deleting one. Each carries a reason for the reviewers. A proposal holds the full proposed text, and each revision replaces it.
 
+To delete a canon file, open it, choose **Propose a change**, then **Propose deleting this file**; an agent calls `propose` with `delete: true`. The file stays until the proposal is approved.
+
 A proposal is one of:
 
 | Status | Means |
