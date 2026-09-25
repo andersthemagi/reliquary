@@ -136,6 +136,21 @@ The sign-in shows on the web app's Tokens page as "Reliquary CLI"
 way the next command says to run `reliquary login` and forgets the stored
 tokens. Every read is in the vault's access log.
 
+## run on Windows
+
+Node can't start a `.cmd` or `.bat` without a shell (CVE-2024-27980), and
+`npm`, `npx`, `pnpm` and `yarn` are `.cmd` shims there. So on Windows `run`
+resolves a bare name on `PATH` with `PATHEXT` (not the current directory),
+starts `.exe` and `.com` files directly, and starts `.cmd` and `.bat` files
+through `cmd.exe /d /v:off /s /c "..."` with the file and every argument in
+double quotes (trailing backslashes doubled), where `& | < > ^ ( )` are
+plain text. An argument holding `"`, `%` or a line break is refused (exit 2,
+nothing run): cmd.exe, or a shim passing `%*` on, would act on it
+("BatBadBut"). Environment names are case-insensitive: a variable replaces
+an inherited one of any case, and two names differing only in case are
+refused. Ctrl+C reaches the whole console, so `run` waits for the command;
+closing the console ends the command's whole process tree (`taskkill /T`).
+
 ## Errors
 
 Plain sentences on stderr, prefixed `reliquary:`, never a value, a token or
@@ -181,7 +196,19 @@ ignores `.env`. `node cli/dist/cli.js logout` when done. Or `npm link` in
 
 ```bash
 ./cli/test.sh         # or ./test.sh cli; part of ./test.sh
+cd cli && npm test    # unit tests only: no containers, no servers
 ```
+
+`npm test` (`test/unit.mjs`) runs every `test/*.test.mjs` except the two
+end-to-end files: where sign-ins are kept (the keychain adapters with fakes,
+so no token is in any argument; a real `secret-tool` stand-in; the real
+Keychain and DPAPI on macOS and Windows), how `run` plans a Windows command
+(and, on Windows, real `.cmd` shims), the dotenv format and parser, and the
+default server. CI runs it on Linux, macOS and Windows with Node 20 and 22
+(job `cli-unit` in `.github/workflows/test.yml`) when `cli/` changes and on
+release pull requests.
+
+The end-to-end suite:
 
 Postgres with every migration, the web app (built from a read-only copy of
 `web/`, with a `VARIABLES_KEY` made for the run) and the MCP server, then
@@ -194,5 +221,5 @@ repository, symlink, modes, atomic and in-place), and `env push` (the
 approval link, the web UI applying and rejecting, `--wait` and its timeout, a
 sign-in without the push permission, an editor's production). Every value and
 token the tests see is recorded; none may appear in the CLI's output or
-either server's log. Registry rows F60 to F62, F67, F70 and F190 to F193 in
+either server's log. Registry rows F60 to F62, F67, F70 and F190 to F195 in
 [tests/features.md](../tests/features.md).

@@ -28,6 +28,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "tsc && node test/unit.mjs",
     "prepack": "tsc"
   },
   "publishConfig": {
