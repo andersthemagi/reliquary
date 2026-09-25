@@ -481,7 +481,15 @@ test("token: errors never echo what was sent", async () => {
   const c = await codeFor();
   const r = await tokenPost({ grant_type: "authorization_code", code: c.code, client_id: clientId, redirect_uri: REDIRECT, code_verifier: "x".repeat(43), resource: RESOURCE });
   const text = await r.text();
-  assert.equal(text, JSON.stringify({ error: "invalid_grant" }));
+  // The spec's code, a fixed reason and the error model's fields
+  // (failure.ts); nothing that was sent.
+  const body = JSON.parse(text);
+  assert.deepEqual(Object.keys(body).sort(), ["error", "error_description", "ref", "where"]);
+  assert.equal(body.error, "invalid_grant");
+  assert.equal(body.where, "OAuth");
+  assert.match(body.ref, /^[0-9a-f]{8}$/);
+  assert.match(body.error_description, /^[\x20-\x21\x23-\x5b\x5d-\x7e]+$/, "RFC 6749 5.2: printable ASCII, no quote or backslash");
+  for (const sent of [c.code, clientId, REDIRECT, RESOURCE, "x".repeat(43)]) assert.equal(text.includes(sent), false, sent);
 });
 
 // ---------------------------------------------------------------------------

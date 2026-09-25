@@ -10,6 +10,8 @@ import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
 import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
+import { errorPage, refusalText } from "./errorpage.js";
+import { failure } from "./failure.js";
 import { fillPeople, personRef } from "./people.js";
 import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
@@ -51,20 +53,9 @@ export type Reply = { status?: number; html?: string; redirect?: string; formAct
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export type Vault = { id: string; name: string; role: string };
 
-// Errors from our own migrations are safe to show; others aren't.
-export function message(err: unknown): string {
-  const e = err as { code?: string; message?: string };
-  if (["42501", "P0002", "22023", "23505", "55000"].includes(e.code ?? "")) {
-    const m = e.message ?? "Not allowed";
-    return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
-  }
-  // A size ceiling or a path or name the database won't store
-  // (20260925110000_hardening.sql). Never echoes what was sent.
-  if (e.code === "23514" || e.code === "22001") {
-    return "That’s too long (text up to 1 MB, reasons and notes up to 4000 characters), or a path or name has control characters in it.";
-  }
-  throw err;
-}
+// A refusal from the database, as the reason and a reference to show on the
+// page (errorpage.ts); anything else is thrown on to the error page.
+export const message = refusalText;
 
 // Who did something: "you", someone's email where the reader may see it
 // (people.ts), or "system".
@@ -106,17 +97,26 @@ export function render(ctx: Ctx, title: string, body: Raw, nav?: Nav): Reply {
   };
 }
 
-export const notFound = (ctx: Ctx): Reply => ({
-  status: 404,
-  html: page(
-    "Not found",
-    html`<h1>Not found</h1><p class="lede">There’s no such vault, file or proposal, or it isn’t shared with you.</p>
-      <p><a href="/">Back to your vaults</a></p>`,
-    // The flash too: a refused write of a new path lands here, and its
-    // message must not be dropped.
-    { user: ctx.userId, flash: ctx.flash, theme: ctx.theme, csrf: ctx.csrf, path: "/", reviewCount: ctx.reviewCount },
-  ),
-});
+// Not found, saying what was looked for. Someone else's vault, file or
+// proposal must look exactly like one that doesn't exist, so the reason
+// never says which (web/test/web.test.mjs, "isolation").
+export const notFound = (ctx: Ctx): Reply => {
+  const inVault = ctx.url.pathname.startsWith("/v/");
+  const f = failure({
+    status: 404,
+    where: inVault ? "database (only what’s shared with you is visible)" : "web app",
+    why: inVault ? "There’s no such vault, file or proposal, or it isn’t shared with you." : `There’s no page at ${ctx.url.pathname}.`,
+  });
+  return {
+    status: 404,
+    html: errorPage(f, {
+      title: "Not found",
+      // The flash too: a refused write of a new path lands here, and its
+      // message must not be dropped.
+      user: ctx.userId, flash: ctx.flash, theme: ctx.theme, csrf: ctx.csrf, path: "/", reviewCount: ctx.reviewCount,
+    }),
+  };
+};
 
 export async function vault(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Vault | undefined> {
   if (!UUID.test(id)) return undefined;
@@ -700,7 +700,12 @@ async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
   const content = (f.get("content") ?? "").replaceAll("\r\n", "\n");
   const reason = f.get("reason") ?? "";
   const action = f.get("action") ?? "";
-  if (!["create", "write", "delete", "propose", "propose-delete"].includes(action)) return { status: 400, html: "Bad request" };
+  if (!["create", "write", "delete", "propose", "propose-delete"].includes(action)) {
+    const f = failure({ status: 400, where: "web app (the file form)", why: "The form named no action (create, write, delete, propose or propose-delete), so nothing was changed." });
+    // No signed-in frame: it names the person, a lookup this refusal
+    // shouldn't cost (web/test/final_sweep.test.mjs).
+    return { status: 400, html: errorPage(f, { theme: ctx.theme, back: filePath(id, path) }) };
+  }
   try {
     // One query in the transaction: the vault is checked inside it
     // (private.vault_ref, under RLS: RLV01 when the person can't see it), as

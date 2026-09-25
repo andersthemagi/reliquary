@@ -282,7 +282,11 @@ test("rate limits: the env API per CLI grant: the third request in a minute is r
   assert.equal(limited.status, 429);
   const wait = Number(limited.headers.get("retry-after"));
   assert.ok(wait >= 1 && wait <= 60);
-  assert.deepEqual(await limited.json(), { error: "rate_limited" });
+  const body = await limited.json();
+  assert.equal(body.error, "rate_limited");
+  assert.equal(body.where, "rate limit");
+  assert.match(body.message, /retry after \d+ seconds/);
+  assert.match(body.ref, /^[0-9a-f]{8}$/);
   const dead = `rle_${randomBytes(32).toString("hex")}`;
   for (let i = 0; i < 4; i++) assert.equal((await api(dead)).status, 401);
 });

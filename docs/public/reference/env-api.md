@@ -32,6 +32,13 @@ WWW-Authenticate: Bearer realm="reliquary", resource_metadata="<server>/.well-kn
 
 Every answer is JSON, `cache-control: no-store, private`, with no CORS headers.
 
+Every error carries its code in `error` (the codes below), and beside it `message` (what failed and why), `where` (the part of Reliquary that failed) and `ref` (a reference ID to quote when you report it). The message never echoes what you sent. A failure of the server itself is `server_error` with the status that fits it: 500, 503 when the database is unreachable, 504 when it timed out. [Errors and reference IDs](errors.md) explains the fields.
+
+```json
+{ "error": "forbidden", "message": "Reading production in vault 3f2a9c1d failed: Your role can't use this environment's values (a viewer, or an editor in an owners-only environment such as production).",
+  "where": "database (your role)", "ref": "7f3a2c9e" }
+```
+
 Each sign-in may make 60 requests a minute and 5000 a day ([Limits](limits.md#rate-limits)). Past that, any route answers `429 {"error": "rate_limited"}` with `Retry-After` in seconds; wait that long and try again.
 
 ### GET /api/env/vaults

@@ -137,6 +137,17 @@ milestone work.
   member's machine staying on.
 - **Entry text is data.** MCP responses wrap it as quoted content with author
   and approval date; never let an entry read as an instruction.
+- **Never ship a generic error message.** No "something went wrong", "an
+  error occurred" or "try again later" alone: every failure a person or
+  agent sees says what was being done, where it broke, why, and a reference
+  that is in the server log with the detail. Every new failure path uses the
+  shared model (`web/src/failure.ts`, the same file as `mcp/src/failure.ts`;
+  `web/src/errorpage.ts` for pages; `serverSays` in `cli/src/errors.ts`):
+  throw a `Refusal` (status, where, why) or a database exception with a
+  message written for people, and let `fail()` / `failure()` build and log
+  the rest. Public reference: `docs/public/reference/errors.md`; finding a
+  ref: the runbook's "Finding an error by its ref".
+  `web/test/errors_unit.test.mjs` fails on the banned phrases.
 
 ## Testing
 

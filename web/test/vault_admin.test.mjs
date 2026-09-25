@@ -79,7 +79,8 @@ const post = async (path, fields, { csrf = true } = {}) =>
 const flashAfter = async (r) => {
   assert.equal(r.status, 303);
   const h = await page(r.headers.get("location"));
-  return /<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "";
+  // A refusal ends with its reference (failure.ts), different each time.
+  return (/<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
 };
 const vaultRow = async (id) => (await sql("select name, default_policy from public.vaults where id = $1", [id]))[0];
 const events = async (id, event) =>

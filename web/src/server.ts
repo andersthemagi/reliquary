@@ -35,6 +35,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
+import { describe, errorPage } from "./errorpage.js";
+import { doing, fail, failure, withRequest } from "./failure.js";
+import { signinUnavailablePage } from "./signin.js";
 import { envApi } from "./envapi.js";
 import { crossHost, hostKind, hostsConfigError, isSitePath } from "./hosts.js";
 import { landing } from "./landing.js";
@@ -278,7 +281,9 @@ async function sendDownload(res: http.ServerResponse, d: Download, cookies: stri
   try {
     await d.write(res);
   } catch (err) {
-    console.error("download failed", (err as { code?: string }).code ?? (err as Error).name);
+    // Headers are gone: the browser reports a failed download; the reason
+    // and the reference are in the log.
+    fail(err, { what: `Downloading ${d.filename.replace(/[^A-Za-z0-9._-]/g, "_")}` });
     res.destroy();
   }
 }
@@ -290,17 +295,33 @@ function originAllowed(req: http.IncomingMessage): { ok: boolean; origin: string
 }
 const refused = (theme: Theme): Reply => ({
   status: 403,
-  html: notice("Request refused", "This form didn’t come from Reliquary’s own page. If you sent it yourself, reload the page and try again.", theme),
+  html: errorPage(
+    failure({ status: 403, where: "web app (same-origin check on forms)", why: "This form didn’t come from Reliquary’s own page (its Origin header names another site, or none). If you sent it yourself, reload the page and try again." }),
+    { theme, title: "Request refused" },
+  ),
 });
 const logRefused = (path: string, origin: string | undefined) =>
   console.info(`POST ${path} 403 origin=${origin === undefined ? "none" : origin === "null" ? "null" : "other"}`);
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+// Every request runs with its own reference and a description of what it is
+// doing (failure.ts), so any failure in it can say so.
+const server = http.createServer((req, res) => {
+  let url: URL;
+  try {
+    url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  } catch {
+    url = new URL("http://localhost/");
+  }
+  const d = describe(req.method ?? "GET", url, new URLSearchParams());
+  return withRequest(d.what, d.log, () => serve(req, res, url));
+});
+
+async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<void> {
   // "single" unless SITE_URL splits the site from the app (hosts.ts).
   const host = hostKind(req.headers.host);
   // The app host is never indexed, whatever the response.
   if (host === "app") res.setHeader("x-robots-tag", "noindex");
+  let theme: Theme = "auto";
   try {
     const file = req.method === "GET" ? STATIC.get(url.pathname) : undefined;
     if (file) {
@@ -308,7 +329,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const themeCookie = cookie(req, THEME_COOKIE);
-    const theme: Theme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : "auto";
+    theme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : "auto";
     const readOnly = req.method === "GET" || req.method === "HEAD";
     if (host === "site") {
       // The public site's host: its pages only, and never a cookie set.
@@ -325,7 +346,10 @@ const server = http.createServer(async (req, res) => {
         ? { status: 200, type: "text/html; charset=utf-8", body: landing(theme) }
         : publicRoute(url.pathname, theme);
       if (pub) res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type }).end(pub.body);
-      else res.writeHead(404, { ...SECURITY_HEADERS, "content-type": "text/plain; charset=utf-8" }).end("Not found\n");
+      else {
+        const f = failure({ status: 404, where: "web app (public site)", why: `There’s no page at ${url.pathname}` });
+        res.writeHead(404, { ...SECURITY_HEADERS, "content-type": "text/plain; charset=utf-8" }).end(`Not found: ${f.why} (ref ${f.ref})\n`);
+      }
       return;
     }
     // On the app host, the public site's pages live on the site host.
@@ -365,7 +389,7 @@ const server = http.createServer(async (req, res) => {
 
     const auth = await getSession(req);
     if (auth.unavailable) {
-      send(res, { status: 503, html: notice("Sign-in is unavailable", "Reliquary can’t reach its sign-in service right now. Try again in a minute.", theme) });
+      send(res, { status: 503, html: signinUnavailablePage(theme) });
       console.info(`${req.method} ${url.pathname} 503`);
       return;
     }
@@ -425,12 +449,23 @@ const server = http.createServer(async (req, res) => {
         form = await readForm(req, bodyLimit(url.pathname));
       } catch {
         const cap = bodyLimit(url.pathname) === MAX_BODY ? "2 MB" : "3 MB";
-        send(res, { status: 413, html: notice("Too large", `That form is over ${cap}, so nothing was saved. Go back and send less.`, theme) }, { connection: "close" }, auth.cookies);
+        const f = failure({ status: 413, where: "web app (form size limit)", why: `That form is over ${cap}, so nothing was saved. Go back and send less.` });
+        send(res, { status: 413, html: errorPage(f, { theme, title: "Too large", back: formPage(req) }) }, { connection: "close" }, auth.cookies);
         console.info(`POST ${url.pathname} 413`);
         return;
       }
+      // Now what the form asks for is known ("Saving canon/pricing.md").
+      {
+        const d = describe(req.method, url, form);
+        doing(d.what, d.log);
+      }
       if (!sameSecret(form.get("csrf") ?? "", session.csrf)) {
-        send(res, { status: 403, html: notice("Form expired", "Go back, reload the page, and try again.", theme) }, {}, auth.cookies);
+        const f = failure({
+          status: 403,
+          where: "web app (form check)",
+          why: form.get("csrf") ? "The form’s security token isn’t this session’s: the page was opened before you signed in again. Go back, reload the page, and try again." : "The form carried no security token. Go back, reload the page, and try again.",
+        });
+        send(res, { status: 403, html: errorPage(f, { theme, title: "Form expired", back: formPage(req) }) }, {}, auth.cookies);
         return;
       }
       // An over-long field: back to the form's page with the reason, as a
@@ -454,7 +489,8 @@ const server = http.createServer(async (req, res) => {
         return;
       }
     } else if (req.method !== "GET") {
-      send(res, { status: 405, html: "" }, {}, auth.cookies);
+      const f = failure({ status: 405, where: "web app", why: `${req.method} isn’t accepted here: pages take GET and forms take POST.` });
+      send(res, { status: 405, html: errorPage(f, { theme, title: "Method not allowed" }) }, { allow: "GET, POST" }, auth.cookies);
       return;
     }
 
@@ -499,10 +535,14 @@ const server = http.createServer(async (req, res) => {
     send(res, reply, {}, auth.cookies);
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
   } catch (err) {
-    console.error("web error", (err as { code?: string }).code ?? (err as Error).name);
-    if (!res.headersSent) send(res, { status: 500, html: notice("Something went wrong", "Reliquary hit an error. Try again; if it keeps happening, check the server log.") });
+    // What was being done, where it broke, why, and the reference, which
+    // is also in the log with the detail (failure.ts).
+    const f = fail(err);
+    if (!res.headersSent) send(res, { status: f.status, html: errorPage(f, { theme, back: req.method === "POST" ? formPage(req) : undefined }) });
+    else res.destroy();
+    console.info(`${req.method} ${url.pathname} ${f.status} ref=${f.ref}`);
   }
-});
+}
 
 if (MODE === "local") rotateLoginCode();
 // On Vercel the app runs as one function (api/index.js) that hands every

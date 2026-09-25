@@ -34,6 +34,7 @@ import { asPerson, pool } from "./db.js";
 import { csrfField, html, page } from "./html.js";
 import { clientIp, limit, RateLimited, tooManyPage, type LimitName } from "./ratelimit.js";
 import type { Ctx, Reply } from "./pages.js";
+import { doing, fail, failure } from "./failure.js";
 
 function config() {
   const onVercel = !!process.env.VERCEL;
@@ -163,7 +164,8 @@ async function limited(
     { name: names[1], kind: "client", value: clientId },
   ]);
   if (!wait) return false;
-  json(res, 429, { error: "rate_limited", error_description: `Too many requests. Retry after ${wait} seconds.` }, {
+  const f = failure({ status: 429, where: "rate limit", why: `Too many requests from this address or client. Retry after ${wait} seconds`, code: "rate_limited" });
+  json(res, 429, { error: "rate_limited", error_description: `Too many requests. Retry after ${wait} seconds.`, where: f.where, ref: f.ref }, {
     "retry-after": String(wait),
     "access-control-expose-headers": "retry-after",
   });
@@ -184,11 +186,27 @@ const CODE = /^rlc_[0-9a-f]{64}$/;
 const REFRESH = /^rlr_[0-9a-f]{64}$/;
 const ACCESS = /^rl[oe]_[0-9a-f]{64}$/;
 
+// OAuth error answers (RFC 6749, 5.2): `error` from the spec's list, the
+// reason in `error_description` (printable ASCII without quotes or
+// backslashes, as 5.2 requires), and the error model's `where` and `ref`
+// beside them (failure.ts). Never an echo of what was sent.
+const DESCRIPTIONS: Record<string, string> = {
+  invalid_request: "the request is missing a parameter, repeats one, or is not a form post",
+  invalid_client: "public clients only: this request carried a client secret or an Authorization header",
+  invalid_grant:
+    "the code or refresh token is unknown, already used, expired (codes last 60 seconds), revoked, or was issued for another client, redirect URI, resource or PKCE verifier",
+  invalid_target: "the resource is not this server's MCP endpoint or env API, or the env API was asked for by a client other than the Reliquary CLI",
+  unsupported_grant_type: "grant_type must be authorization_code or refresh_token",
+};
+const ascii = (s: string) => s.replace(/[’‘]/g, "'").replace(/[“”"\\]/g, "").replace(/[^\x20-\x7e]/g, "");
+export function oauthError(res: http.ServerResponse, status: number, error: string, why = DESCRIPTIONS[error] ?? error, extra: Record<string, string> = {}): string {
+  const f = failure({ status, where: "OAuth", why, code: error });
+  json(res, status, { error, error_description: ascii(`${f.what} failed: ${f.why}`), where: f.where, ref: f.ref }, extra);
+  return error;
+}
+
 async function token(req: http.IncomingMessage, res: http.ServerResponse): Promise<string> {
-  const fail = (status: number, error: string) => {
-    json(res, status, { error });
-    return error;
-  };
+  const fail = (status: number, error: string, why?: string) => oauthError(res, status, error, why);
   if (!/^application\/x-www-form-urlencoded\s*(;|$)/i.test(req.headers["content-type"] ?? "")) {
     return fail(400, "invalid_request");
   }
@@ -209,6 +227,8 @@ async function token(req: http.IncomingMessage, res: http.ServerResponse): Promi
   const refresh = secret("rlr_");
   let outcome: string;
   const grantType = p.get("grant_type");
+  if (grantType === "authorization_code") doing("Exchanging a sign-in code for tokens");
+  else if (grantType === "refresh_token") doing("Refreshing a sign-in");
   if (grantType === "authorization_code") {
     const code = p.get("code") ?? "";
     const redirectUri = p.get("redirect_uri");
@@ -239,15 +259,13 @@ async function token(req: http.IncomingMessage, res: http.ServerResponse): Promi
 // RFC 7009: 200 whatever the token was, so it can't be used to probe.
 async function revoke(req: http.IncomingMessage, res: http.ServerResponse): Promise<string> {
   if (!/^application\/x-www-form-urlencoded\s*(;|$)/i.test(req.headers["content-type"] ?? "")) {
-    json(res, 400, { error: "invalid_request" });
-    return "invalid_request";
+    return oauthError(res, 400, "invalid_request", "a revocation must be a form post (application/x-www-form-urlencoded)");
   }
   const p = new URLSearchParams(await readBody(req));
   const tok = p.get("token") ?? "";
   const clientId = p.get("client_id");
   if (!single(p) || !tok || !clientId) {
-    json(res, 400, { error: "invalid_request" });
-    return "invalid_request";
+    return oauthError(res, 400, "invalid_request", "a revocation needs token and client_id, each once");
   }
   if (await limited(req, res, ["oauth_revoke_ip", "oauth_revoke_client"], clientId)) return "rate_limited";
   if (ACCESS.test(tok) || REFRESH.test(tok)) {
@@ -268,6 +286,11 @@ export async function oauthPublic(req: http.IncomingMessage, res: http.ServerRes
     return true;
   }
   let outcome: string;
+  // Fixed words and the endpoint's path only: never a client id or code.
+  doing(
+    path === TOKEN_ENDPOINT ? "Getting a token" : path === REVOKE_ENDPOINT ? "Revoking a token" : "Reading the OAuth metadata",
+    `oauth ${req.method} ${path}`,
+  );
   try {
     if (path === "/.well-known/oauth-authorization-server" && req.method === "GET") {
       json(res, 200, metadata(), { "cache-control": "public, max-age=300" });
@@ -280,13 +303,16 @@ export async function oauthPublic(req: http.IncomingMessage, res: http.ServerRes
     } else if (path === REVOKE_ENDPOINT && req.method === "POST") {
       outcome = await revoke(req, res);
     } else {
-      json(res, 405, { error: "invalid_request" }, { allow: path === TOKEN_ENDPOINT || path === REVOKE_ENDPOINT ? "POST" : "GET" });
+      const allow = path === TOKEN_ENDPOINT || path === REVOKE_ENDPOINT ? "POST" : "GET";
+      oauthError(res, 405, "invalid_request", `${req.method} is not accepted here; this endpoint takes ${allow}`, { allow });
       outcome = "method";
     }
   } catch (err) {
-    console.error("oauth error", (err as { code?: string }).code ?? (err as Error).name);
-    if (!res.headersSent) json(res, 500, { error: "server_error" });
-    outcome = "server_error";
+    // server_error is the spec's own code; the reason and the reference
+    // that finds the detail in the log go beside it (failure.ts).
+    const f = fail(err, { where: "OAuth" });
+    if (!res.headersSent) json(res, f.status >= 500 ? f.status : 500, { error: "server_error", error_description: ascii(`${f.what} failed: ${f.why}`), where: f.where, ref: f.ref });
+    outcome = `server_error ref=${f.ref}`;
   }
   // Path and outcome only: never a code, token, client id or redirect.
   console.info(`${req.method} ${path} ${res.statusCode} ${outcome}`);
@@ -314,14 +340,17 @@ const shell = (ctx: Ctx, title: string, body: ReturnType<typeof html>, status = 
 // Problems with the client or its redirect are shown here and never sent
 // back to the redirect URI: it isn't known to be the client's (RFC 6749,
 // 4.1.2.1).
-const refuse = (ctx: Ctx, why: string): Reply =>
-  shell(
+const refuse = (ctx: Ctx, why: string): Reply => {
+  const f = failure({ status: 400, where: "OAuth (the connecting app’s request)", why });
+  return shell(
     ctx,
     "Can’t connect",
     html`<h1>This connection can’t be set up</h1><p class="lede">${why}</p>
-      <p>Nothing was shared. Go back to the app you were connecting and try again, or <a href="/connect">connect another way</a>.</p>`,
+      <p>Nothing was shared. Go back to the app you were connecting and try again, or <a href="/connect">connect another way</a>.</p>
+      <p class="small muted">Where: ${f.where}. Reference: <code>ref ${f.ref}</code>.</p>`,
     400,
   );
+};
 
 function backTo(redirectUri: string, params: Record<string, string | null>): string {
   const u = new URL(redirectUri);

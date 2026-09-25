@@ -7,6 +7,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { refusalText } from "./errorpage.js";
 import { csrfField, html, when, type Raw } from "./html.js";
 import type { Ctx, Reply } from "./pages.js";
 import { personRef } from "./personref.js";
@@ -19,15 +20,8 @@ const proposalPath = (id: string, pid: string, rest = "") => `/v/${id}/proposals
 export const NOT_SNOOZED_SQL = `
      and not exists (select 1 from public.active_snoozes s where s.proposal_id = p.id and s.user_id = $1)`;
 
-// Errors from our own migrations are safe to show; others aren't.
-function message(err: unknown): string {
-  const e = err as { code?: string; message?: string };
-  if (["42501", "P0002", "22023", "23505", "55000"].includes(e.code ?? "")) {
-    const m = e.message ?? "Not allowed";
-    return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
-  }
-  throw err;
-}
+// A refusal from the database, as its reason and a reference (errorpage.ts).
+const message = refusalText;
 
 const who = (ctx: Ctx, id: string | null, agent: string | null) =>
   `${id === ctx.userId ? "you" : id ? personRef(id) : "system"}${agent ? ` via ${agent}` : ""}`;
