@@ -44,6 +44,9 @@ until "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q 2>/
 sleep 1
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
+# Many test files, the same few people: room past Free's limits (plans are
+# tested with plans of their own: web/test/plans.test.mjs).
+echo "select test_support.roomy_free();" | psql >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
 echo "alter role reliquary_mcp login password 'test';" | psql
 
