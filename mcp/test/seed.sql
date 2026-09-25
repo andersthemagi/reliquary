@@ -235,3 +235,20 @@ select public.create_access_token('Gus all rw', 30, null, 'write') as gus_rw \gs
 select pg_temp.reset();
 \o
 \echo GUS_RW=:gus_rw
+
+-- Plans and limits (test/plans.test.mjs). Pat exists only here, on a plan
+-- of this block's own ("MCP small": 1 vault, 2 people, 100 bytes a vault):
+-- his vault Pat full holds 90 of its 100 bytes.
+\set pat '00000000-0000-0000-0000-000000000012'
+\o /dev/null
+insert into private.plans (id, name, max_vaults, max_members, max_storage_bytes)
+values ('mcp_small', 'MCP small', 1, 2, 100) on conflict (id) do nothing;
+insert into auth.users (id, email) values (:'pat', 'pat@example.test') on conflict (id) do nothing;
+select private.set_account_plan(:'pat', 'mcp_small');
+select pg_temp.as_person(:'pat');
+select public.create_vault('Pat full', 'open') as pv \gset
+select public.write_file(:'pv', 'notes/n.md', repeat('n', 90));
+select public.create_access_token('Pat all rw', 30, null, 'write') as pat_rw \gset
+select pg_temp.reset();
+\o
+\echo PAT_RW=:pat_rw

@@ -36,6 +36,30 @@ const TEXT = z.string().max(1_000_000);
 const REASON = z.string().max(4000);
 const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 
+// Sizes as the database words them (private.size_text): decimal units.
+function size(n: number): string {
+  const trim = (x: number) => String(Math.round(x * 10) / 10);
+  if (n === 1) return "1 byte";
+  if (n < 1000) return `${n} bytes`;
+  if (n < 1e6) return `${trim(n / 1e3)} KB`;
+  if (n < 1e9) return `${trim(n / 1e6)} MB`;
+  return `${trim(n / 1e9)} GB`;
+}
+
+// A vault near or over a limit, in a few words for list_vaults; nothing
+// for one comfortably under (most of them).
+type Usage = { members: number; max_members: number; bytes: string | number; max_bytes: string | number };
+function limitNote(u: Usage): string {
+  const bytes = Number(u.bytes);
+  const max = Number(u.max_bytes);
+  const notes: string[] = [];
+  if (bytes >= 0.8 * max) notes.push(`storage ${size(bytes)} of ${size(max)}`);
+  if (u.members >= u.max_members) notes.push(`people ${u.members} of ${u.max_members}`);
+  if (!notes.length) return "";
+  const over = bytes > max || u.members > u.max_members;
+  return `; limits: ${notes.join(", ")}${over ? " (over: nothing that adds is taken until it is under)" : ""}`;
+}
+
 // Turns database errors into messages the agent can act on. Messages come
 // from our own migrations, which don't echo free-form input; unexpected
 // errors are reported generically.
@@ -59,6 +83,10 @@ function explain(err: unknown): ToolResult {
       return fail("Invalid id.");
     case "RLV01":
       return fail(NO_VAULT);
+    // A plan limit (20260925230000_plans.sql): the message names the vault,
+    // the limit, the plan or tier, the usage and how to make room.
+    case "RLP01":
+      return fail(`Limit reached: ${e.message}`);
     case "57014":
       return fail("That took too long and was stopped. Narrow it (a prefix, a limit) and try again.");
     default:
@@ -281,14 +309,17 @@ export function registerTools(
         // role_in is the role as limited by this token's scope and access.
         // Starting from the caller's memberships keeps RLS checks to their
         // own vaults.
+        // With each vault's usage (public.vault_usage), noted only when a
+        // vault is near or at a limit.
         const { rows } = await c.query(
-          `select v.id, v.name, private.role_in(v.id) as role
+          `select v.id, v.name, private.role_in(v.id) as role, u.members, u.max_members, u.bytes, u.max_bytes
              from public.vault_members m join public.vaults v on v.id = m.vault_id
+             cross join lateral public.vault_usage(v.id) u
             where m.user_id = private.uid()
             order by v.name`,
         );
         if (rows.length === 0) return ok("This token can't reach any vaults.");
-        return ok(rows.map((r) => `${r.name} (${r.role}) id=${r.id}`).join("\n"));
+        return ok(rows.map((r) => `${r.name} (${r.role}) id=${r.id}${limitNote(r)}`).join("\n"));
       }),
   );
 
