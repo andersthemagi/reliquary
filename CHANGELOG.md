@@ -6,6 +6,18 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.2.0](https://github.com/andersthemagi/reliquary/compare/v0.1.0...v0.2.0) (2026-09-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** a .reliquary.json or RELIQUARY_URL naming https://reliquary.redmage.cc must change to https://app.reliquary.redmage.cc, then run `reliquary login` again.
+
+### Features
+
+* **cli:** the default server is https://app.reliquary.redmage.cc ([2e0916b](https://github.com/andersthemagi/reliquary/commit/2e0916b5ed99bf0a6ec30c7df50f73cbabf4bf6b))
+* **web:** serve the public site and the app on separate hosts ([2c0eeef](https://github.com/andersthemagi/reliquary/commit/2c0eeef9156d78e8fe211f71af1fe170f0f807a3))
+
 ## 0.1.0 (2026-09-25)
 
 The first versioned release: everything live on 2026-09-25.
