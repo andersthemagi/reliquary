@@ -93,8 +93,14 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
   variables per vault, no NUL in values).
 Milestone 2 is built; next is its week of real use.
 
-Alongside: the public docs, roadmap and llms.txt (see Docs below), and a
-pre-alpha notice on every frame.
+Alongside: the public docs, roadmap and llms.txt (see Docs below), a
+pre-alpha notice on every frame, and plans and limits
+(`20260925230000_plans.sql`, hostile tests in
+`supabase/tests/plans_test.sql`): an account plan caps the vaults a person
+owns, each vault's tier its people and storage (a counter kept by
+triggers), refusals are SQLSTATE `RLP01`, and only the operator changes
+plans and tiers (`scripts/plan.sh`, runbook "Plans and testers"). Suites
+that share one database across files call `test_support.roomy_free()`.
 
 All of it needs podman or docker; nothing needs Node installed on the host.
 

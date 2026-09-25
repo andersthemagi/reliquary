@@ -271,7 +271,10 @@ select t.expect('isolation: an owner of another vault can''t list or revoke this
   || ' ' || t.run('dee', format($q$select 'ok' from public.revoke_invite(%L)$q$, t.id('hal_invite'))),
   'ERR 42501 ERR P0002');
 
--- Cap on waiting invites
+-- Cap on waiting invites. Waiting invites count toward a vault's people
+-- limit (20260925230000_plans), so this vault gets room for all of them.
+insert into private.vault_tiers (id, name, max_members) values ('roomy', 'Roomy', 1000) on conflict do nothing;
+select private.set_vault_tier(t.id('deev'), 'roomy');
 do $$ begin
   for n in 1..50 loop
     perform t.invite('dee', 'deev', 'cap' || n || '@example.test', 'viewer');

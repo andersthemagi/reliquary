@@ -82,6 +82,10 @@ select t.expect('invites only: set_member still removes a member',
 -- The invite rate: 20 an hour per person, across their vaults
 
 insert into t.ids select 'rate', t.run('ana', $q$select public.create_vault('Rate')$q$)::uuid;
+-- Waiting invites count toward a vault's people limit
+-- (20260925230000_plans): room for every invite this section makes.
+insert into private.vault_tiers (id, name, max_members) values ('roomy', 'Roomy', 1000) on conflict do nothing;
+select private.set_vault_tier(t.id('rate'), 'roomy');
 update private.vault_invites set created_at = created_at - interval '2 hours';
 do $$ begin
   for n in 1..20 loop

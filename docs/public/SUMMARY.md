@@ -22,6 +22,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Members and invites](concepts/members.md)
 - [Activity](concepts/activity.md)
 - [Export, delete and erase](concepts/export-delete-erase.md)
+- [Plans and limits](concepts/plans-and-limits.md)
 - [Security model](concepts/security.md)
 
 ## How-to guides

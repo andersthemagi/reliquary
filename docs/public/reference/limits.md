@@ -4,6 +4,16 @@ The sizes, counts, rates and lifetimes Reliquary enforces, most of them in the d
 
 A request over a limit is refused with a message naming the limit, never echoing what you sent.
 
+## Plans
+
+What your plan and a vault's tier allow. How they count, and what happens at a limit: [Plans and limits](../concepts/plans-and-limits.md).
+
+| What | Free | Alpha tester | A Pro vault |
+|---|---|---|---|
+| Vaults you own | 5 | 25 | |
+| People per vault, counting invites waiting | 10 | 25 | 50 |
+| Storage per vault: every file version, variable values and waiting imports | 100 MB | 1 GB | 5 GB |
+
 ## Vaults and files
 
 | What | Limit |

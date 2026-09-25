@@ -584,6 +584,13 @@ Carried from the spike and CommonThread, renamed where needed:
 - `environments`, `variables(name, vault_secret_id, environments[])`,
   `variable_grants`, `env_access_log` (append-only).
 - `git_mirrors(remote, direction, last_pushed_seq)`.
+- Plans and limits (built, `20260925230000_plans.sql`): `plans` (vaults per
+  account, people and storage per vault), `vault_tiers` (a per-vault
+  override, `standard` meaning the plan's), `account_plans`,
+  `vault_tier_overrides`, and `vault_storage` (bytes per vault, kept by
+  triggers: every file version, variable ciphertext and waiting import).
+  Only the operator changes them; a smaller plan never deletes, it makes an
+  over-limit vault read-mostly.
 
 ## Hostile tests
 
@@ -627,6 +634,9 @@ New in v3:
   returns the content, while the log keeps its sequence.
 - **Git mirror:** a push to a one-way mirror changing nothing; on a two-way
   mirror, a push only ever producing a proposal.
+- **Plans:** a person or their agent reading or changing a plan, tier or
+  counter; a write, variable, import, invite or vault past its limit; a
+  downgrade deleting anything.
 
 ## Build order
 

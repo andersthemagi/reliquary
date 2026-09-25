@@ -60,6 +60,9 @@ sleep 1
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
+# Many test files, the same few people: room past Free's limits (plans are
+# tested with plans of their own: web/test/plans.test.mjs).
+echo "select test_support.roomy_free();" | psql >/dev/null
 # A second database for test/variables_keys.test.mjs: key rotation moves
 # every stored value and the server checks every stored key id, so it can't
 # share a database with files that seal under keys of their own.

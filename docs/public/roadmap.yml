@@ -135,6 +135,11 @@
   status: shipped
   docs: reference/limits
 
+- title: Plans and limits
+  summary: Account plans limit the vaults you own; each vault's tier limits its people and storage, with usage in Account and Settings.
+  status: shipped
+  docs: concepts/plans-and-limits
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
@@ -219,7 +224,7 @@
 # Considering --------------------------------------------------------------
 
 - title: Billing and plans
-  summary: Paid plans with their limits enforced in the database, through a merchant of record.
+  summary: Paying for a bigger plan or a Pro vault through a merchant of record. Plans and limits exist; for now the operator grants them by hand.
   status: considering
 
 - title: Public status page

@@ -188,6 +188,42 @@ stops matching a release (the next deploy's `/version` check says so).
   role passwords (`set-role-passwords.sh`), then point both Vercel projects'
   `DATABASE_URL` at it.
 
+## Plans and testers
+
+There are no payments: the operator puts people on plans and vaults on
+tiers by hand, with `scripts/plan.sh` (psql as postgres, with
+`supabase/.db-password`, never printed; it prints plans, emails, vault
+names and counts only). The model and the numbers are in
+`supabase/migrations/20260925230000_plans.sql`; what people see is
+`docs/public/concepts/plans-and-limits.md`.
+
+| Do | Command |
+|---|---|
+| See the plans and tiers | `scripts/plan.sh plans` |
+| See someone's plan and their vaults | `scripts/plan.sh show <email>` |
+| Make someone an alpha tester (25 vaults, 25 people and 1 GB each) | `scripts/plan.sh user <email> alpha_tester` |
+| Put them back on Free | `scripts/plan.sh user <email> free` |
+| Upgrade one vault (50 people, 5 GB) | `scripts/plan.sh vault <vault-id> pro` |
+| Take it back to its account's plan | `scripts/plan.sh vault <vault-id> standard` |
+| Usage, largest first (everyone, one person's vaults, or one vault) | `scripts/plan.sh usage [<email>\|<vault-id>]` |
+
+- The person needs an account first: they sign in once, then `user` finds
+  them by email. A vault's id is in its URL (`/v/<id>`).
+- A change applies to the next request; nobody needs to sign in again.
+- Smaller never deletes: a person over their vault count keeps every vault
+  and can't create another; a vault over its people or storage keeps
+  everything, and takes nothing that adds until it is under (the `limit`
+  column says `over`). Tell them before you downgrade.
+- The numbers live in `private.plans` and `private.vault_tiers`; changing
+  them is an `update` as postgres (for example in the Supabase SQL editor),
+  no release needed. A new plan or tier is an `insert` there. Record why
+  in the commit or ticket that asked for it.
+- Only postgres and `reliquary_ops` can change plans: no person, agent or
+  app role can (hostile tests in `supabase/tests/plans_test.sql`).
+- Try the script against a local database first: set
+  `PLAN_DB_CONTAINER=<a local postgres container with the migrations>`
+  (and `PLAN_DB_NAME`).
+
 ## Rotating secrets
 
 | Secret | Where it lives | How to rotate | Effect |

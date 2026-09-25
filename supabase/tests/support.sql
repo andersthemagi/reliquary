@@ -21,3 +21,16 @@ begin
   values (p_vault, p_by, null, 'member.set', jsonb_build_object('user', p_user, 'role', p_role));
 end $$;
 revoke all on function test_support.add_member(uuid, uuid, text, uuid) from public, anon, authenticated;
+
+-- test_support.roomy_free gives the Free plan room for a whole suite
+-- (20260925230000_plans): web/test.sh and cli/test.sh run many test files
+-- as the same few people in one database, well past Free's 5 vaults. Plans
+-- themselves are tested with plans of their own (supabase/tests/plans_test.sql,
+-- web/test/plans.test.mjs), never through this.
+create or replace function test_support.roomy_free()
+returns void
+language sql set search_path = '' as $$
+  update private.plans set max_vaults = 1000, max_members = 1000, max_storage_bytes = 1000000000000
+   where id = 'free'
+$$;
+revoke all on function test_support.roomy_free() from public, anon, authenticated;
