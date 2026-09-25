@@ -8,18 +8,61 @@
   "include-v-in-tag": true,
   "tag-separator": "-",
   "changelog-sections": [
-    { "type": "feat", "section": "Features" },
-    { "type": "fix", "section": "Bug fixes" },
-    { "type": "security", "section": "Security" },
-    { "type": "perf", "section": "Performance" },
-    { "type": "revert", "section": "Reverts" },
-    { "type": "docs", "section": "Documentation", "hidden": true },
-    { "type": "refactor", "section": "Refactoring", "hidden": true },
-    { "type": "style", "section": "Style", "hidden": true },
-    { "type": "test", "section": "Tests", "hidden": true },
-    { "type": "build", "section": "Build", "hidden": true },
-    { "type": "ci", "section": "CI", "hidden": true },
-    { "type": "chore", "section": "Chores", "hidden": true }
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bug fixes"
+    },
+    {
+      "type": "security",
+      "section": "Security"
+    },
+    {
+      "type": "perf",
+      "section": "Performance"
+    },
+    {
+      "type": "revert",
+      "section": "Reverts"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation",
+      "hidden": true
+    },
+    {
+      "type": "refactor",
+      "section": "Refactoring",
+      "hidden": true
+    },
+    {
+      "type": "style",
+      "section": "Style",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "section": "Tests",
+      "hidden": true
+    },
+    {
+      "type": "build",
+      "section": "Build",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "CI",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Chores",
+      "hidden": true
+    }
   ],
   "packages": {
     ".": {
@@ -29,12 +72,36 @@
       "changelog-path": "CHANGELOG.md",
       "pull-request-header": "Merging this pull request tags this version, publishes its GitHub Release and deploys exactly this commit to production (migrations, both Vercel projects, smoke checks). Until then nothing below is live.",
       "extra-files": [
-        { "type": "json", "path": "web/package.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "web/package-lock.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "web/package-lock.json", "jsonpath": "$.packages[''].version" },
-        { "type": "json", "path": "mcp/package.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "mcp/package-lock.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "mcp/package-lock.json", "jsonpath": "$.packages[''].version" }
+        {
+          "type": "json",
+          "path": "web/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "web/package-lock.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "web/package-lock.json",
+          "jsonpath": "$.packages[''].version"
+        },
+        {
+          "type": "json",
+          "path": "mcp/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "mcp/package-lock.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "mcp/package-lock.json",
+          "jsonpath": "$.packages[''].version"
+        }
       ]
     },
     "cli": {
@@ -43,7 +110,8 @@
       "package-name": "@reliquary-ai/cli",
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md",
-      "pull-request-header": "Merging this pull request tags this CLI version (cli-v...), publishes its GitHub Release and publishes @reliquary-ai/cli to npm (once NPM_TOKEN is set). It deploys nothing."
+      "pull-request-header": "Merging this pull request tags this CLI version (cli-v...), publishes its GitHub Release and publishes @reliquary-ai/cli to npm (once NPM_TOKEN is set). It deploys nothing.",
+      "prerelease": true
     }
   }
 }
