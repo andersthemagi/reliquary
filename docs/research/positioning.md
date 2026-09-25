@@ -205,75 +205,104 @@ real cost of free users is support time and connection limits.
 | dotenvx Armor | $90 (Business, up to 10) |
 | Composio or Arcade | $25 to $29 plus usage |
 
-### Recommendation
+### The model (owner's decision, 2026-09-25; built)
 
-Charge per **workspace** (the account that owns vaults), flat, not per
-seat. Agents and client guests are always free. Never paywall the gate,
-approvals, the log, or "values never reach a model".
+Supabase-style: an **account plan** limits how many vaults a person owns,
+and each **vault has a tier** that limits its people and storage. A vault
+can be upgraded on its own, so an agency pays for the one busy client
+vault, not for every person. Agents, MCP clients and tokens are never
+counted. Never paywall the gate, approvals, the log, export or "values
+never reach a model".
 
-The earlier stance was free for 1 to 10 people. The trouble is that ICP 1,
-the best payer, is almost always 2 to 10 people, so a people-count free
-tier gives away the segment most likely to pay. Keep people free but gate
-on **client work and history**, which is what the agency buys:
+| | Free (default) | Alpha tester (by invitation) | Pro vault (an upgrade, coming) |
+|---|---|---|---|
+| Vaults owned | 5 | 25 | (per vault) |
+| People per vault (members plus invites waiting) | 10 | 25 | 50 |
+| Storage per vault | 100 MB | 1 GB | 5 GB |
+| Price | $0 | $0, granted by hand | suggested **$9 a month per vault** once billing exists |
 
-| | Free | Pro | Studio | Business |
-|---|---|---|---|---|
-| For | trying it, solo builders | solo builders who rely on it | agencies and small teams | teams that need IT checkboxes |
-| Price | $0 | **$9/mo** ($90/yr) | **$39/mo** ($390/yr) | from $199/mo, quote |
-| People | up to 3 | up to 3 | up to 15, then $3 each | any |
-| Agents, MCP clients, tokens | unlimited | unlimited | unlimited | unlimited |
-| Client guests (free, don't count as people) | no | no | unlimited | unlimited |
-| Vaults | 2 | unlimited | unlimited | unlimited |
-| Variables | 25 per vault, 3 environments | unlimited | unlimited, custom environments | same |
-| Approvals, quorum, ceiling, RLS, log | yes | yes | yes | yes |
-| Log history in the UI (all kept) | 30 days | 1 year | 1 year | unlimited, log export |
-| Export | yes | yes | yes | yes |
-| Shared connections (milestone 3) | 1 | 5 | unlimited | unlimited |
-| Routines (milestone 4) | no | 3 | 20 | custom |
-| Client engagement kit (milestone 5): credential requests, offboarding report, branded invite | no | no | yes | yes |
-| Signed DPA, sub-processor notices | standard terms | standard terms | yes | yes |
-| SSO, custom retention | no | no | no | yes |
-| Support | docs, community | email | email, 1 business day | priority, onboarding call |
+How it is built (`supabase/migrations/20260925230000_plans.sql`): the
+numbers are rows in `private.plans` and `private.vault_tiers`, so they
+change without a release; the operator grants plans and tiers with
+`scripts/plan.sh`; every limit is enforced in the database, and a smaller
+plan never deletes anything (an over-limit vault becomes read-mostly).
+Storage counts every file version (history takes the same space as the
+current text), variable ciphertext and imports waiting; erasing frees it,
+deleting doesn't.
 
-Why these numbers:
+Why vaults and storage, not seats: the earlier table charged per workspace
+with a people cap (Free up to 3 people), which gives away the segment most
+likely to pay only if they stay small. Counting vaults and storage instead
+keeps small teams free, puts the price where the cost is (a big vault is
+the only thing that costs us anything), and lets an agency upgrade the one
+client vault that grows. The Studio-style flat plan (people, client
+guests, a signed DPA, support) can still come later as an account plan;
+it doesn't need a new model.
 
-- **Free at 3 people** matches Doppler's free team size and Composio's free
-  seat cap, and clears Andrés's own bar. If he wants to keep "free to 10",
-  the alternative is Free up to 10 people with 2 vaults and no client
-  guests: vaults, not people, become the gate. Either works; test both in
-  discovery calls.
-- **$9 Pro** is under every per-seat competitor and near dotenvx Solo. It
-  exists so solo builders can pay a little; don't expect much revenue.
-- **$39 Studio** is under half of Basic Memory or Doppler for 5 people and
-  replaces both a memory tool and a secret manager. Flat pricing fits
-  agencies whose headcount changes per engagement.
-- **Business** exists to answer "do you have SSO?" with a price, not to be
-  sold before there is SSO.
-- Offer **50% off Studio for the first year** to the first 10 customers
-  in exchange for a weekly feedback call and a case study.
+### Economics
 
-### Break-even
+Prices checked 2026-09-25 unless marked; see Sources.
 
-Net per subscription after a merchant of record (5% + $0.50):
-
-| Plan | Price | Net |
+| Item | Price | Notes |
 |---|---|---|
-| Pro monthly | $9.00 | $8.05 |
-| Studio monthly | $39.00 | $36.55 |
-| Studio, founder 50% | $19.50 | $18.03 |
+| Supabase Pro | $25/month per organisation | includes $10 compute credit (one Micro) and **8 GB disk per project**; disk beyond that **$0.125 per GB-month** (gp3) ([disk docs](https://supabase.com/docs/guides/platform/manage-your-usage/disk-size)) |
+| Supabase egress | 250 GB included, then about $0.09/GB | *unverified today; from the 2026-09-24 check* |
+| Vercel Pro | $20/month per deploying seat, $20 usage credit | functions: 1M invocations included, then from $0.60 per million; Active CPU from $0.128 an hour ([pricing](https://vercel.com/pricing)) |
 
-| Target | Needs |
+What a vault costs in disk. Postgres keeps more than the counted bytes:
+each file version also stores its search words (`body_tsv`, about as large
+as the text), plus row and index overhead and dead rows until vacuum. Call
+it **about 3x** the counted bytes (*an estimate; measure it on the hosted
+database with `pg_total_relation_size` once there are real vaults*).
+
+| Vault | Counted | On disk (x3) | Monthly disk cost past the 8 GB included |
+|---|---|---|---|
+| Typical (a few hundred notes, some variables) | ~1 MB | ~3 MB | ~$0.0004 |
+| A full Free vault | 100 MB | ~300 MB | ~$0.04 |
+| A full Alpha tester vault | 1 GB | ~3 GB | ~$0.38 |
+| A full Pro vault | 5 GB | ~15 GB | ~$1.88 |
+
+The included 8 GB holds about 26 full Free vaults, or several thousand
+typical ones, before any overage. Compute is the larger risk than disk:
+a Micro (1 GB RAM) is fine for text vaults into the thousands, and the next
+size (Small) is about $15 a month more (*unverified*). Vercel functions are
+negligible: a tool call is one short invocation, and 1M invocations (about
+33,000 calls a day) are included in the seat, the next million at $0.60.
+Egress is text; 250 GB is far away.
+
+Break-even for a Pro vault at $9 a month: net after a merchant of record
+(5% + $0.50) is **$8.05**. A full Pro vault's worst-case disk is ~$1.90,
+so each one clears its own cost by ~$6 even full, and far more at typical
+use. Fixed costs are ~$60 to $80 a month (the costs table above), so
+**8 to 10 Pro vaults** cover the infrastructure; the rest is founder time.
+Free vaults cost cents; their real cost is support and connection limits,
+which the vault and people caps also bound.
+
+| Target | Needs (at $8.05 net per Pro vault) |
 |---|---|
-| Cover $60/mo fixed costs | 2 Studio, or 8 Pro, or 4 founder-discount Studio |
-| Cover $80/mo (Resend Pro) | 3 Studio |
-| Cover $180/mo (plus PITR) | 5 Studio |
-| $1,000 MRR (a meaningful side income) | ~25 Studio and ~15 Pro |
-| $5,000 MRR (a salary in much of the EU) | ~120 Studio and ~80 Pro, or a handful of Business |
+| Cover $60/mo fixed costs | 8 Pro vaults |
+| Cover $80/mo (Resend Pro) | 10 |
+| Cover $180/mo (plus PITR) | 23 |
+| $1,000 MRR | ~125, or fewer with a flat Studio-style plan on top |
 
-Infrastructure is covered almost immediately. The real target is founder
-time: count Red Mage services revenue attached to Reliquary setups (below)
-alongside subscriptions, because early on the setup offer will earn more
-than the subscriptions.
+Offer the first 10 agencies a Pro vault free for a year in exchange for a
+weekly feedback call and a case study; count Red Mage services revenue
+(section 6) alongside subscriptions, because early on the setup offer will
+earn more than the upgrades.
+
+### Licensing
+
+- **The CLI is MIT** (already published under it): people run it on their
+  machines and in CI, and should be able to read and vendor it.
+- **The server (web app, MCP endpoint, migrations) stays proprietary while
+  the repository is private.** There's nothing to license yet.
+- If the source is ever opened, consider the **Functional Source License**
+  (FSL: source-available, no competing hosted service, converting to
+  Apache 2.0 or MIT after two years) with a **commercial license** for
+  anyone who wants to run it as a service. It keeps "read the code that
+  guards your secrets" (a trust argument for this product) without handing
+  a host the business. *Not legal advice; decide with a lawyer before
+  opening anything.*
 
 ## 6. Go-to-market for a solo founder
 
@@ -285,7 +314,7 @@ than the subscriptions.
 | 1 | List 30 people from Andrés's network: past Red Mage clients, agency owners, AI Founding Table, Claude Community House attendees. Send a personal note, not a launch post | 15 calls booked |
 | 1 to 3 | 20-minute discovery calls: "how do clients send you credentials today?", "where does your project context live?", "who would approve?" Show the demo only if the pain is real. Test the price table | 5 design partners |
 | 2 to 4 | Onboard each partner by hand: create their first client vault with them, connect two of their AI tools, move one `.env` into `reliquary run` | activation, not signups |
-| 3 | **"Run your next client engagement on Reliquary"**: a Red Mage services offer. Fixed-price setup (e.g. a half day: vault structure, canon rules, connecting the team's agents, moving the client's credentials in) plus the first 3 months of Studio included | 2 to 3 paid setups |
+| 3 | **"Run your next client engagement on Reliquary"**: a Red Mage services offer. Fixed-price setup (e.g. a half day: vault structure, canon rules, connecting the team's agents, moving the client's credentials in) plus a Pro vault for the client, free for the first year | 2 to 3 paid setups |
 | 4 onward | Build in public weekly; ask each partner for one intro to another agency | 10 paying workspaces by week 8 |
 
 ### Channels, ranked for a solo founder
@@ -367,7 +396,7 @@ partnerships with the labs.
 | 1:45 | Activity log: the proposal, the approval, who and which agent | "Everything is logged, append-only." |
 | 2:00 | Terminal: `reliquary run -- npm run dev` starts with the Stripe key; ask the agent for the key's value; `list_variables` shows names only | "Secrets go into the process, never into the chat." |
 | 2:30 | Variables access log shows the read and the refused attempt | "And you can show the client exactly who used which key." |
-| 2:45 | Pricing and "Start free" | "Free for small teams. $39 a month for your whole studio." |
+| 2:45 | Pricing and "Start free" | "Free for small teams: 5 vaults, 10 people each. Upgrade the one client vault that grows." |
 
 ### Metrics
 
@@ -396,7 +425,7 @@ partnerships with the labs.
 | **Solo bandwidth**: support, on-call, sales and build at once | High | Limit the first cohort to 10. Studio support is next business day. A status page and uptime alerts. Say no to disqualified leads. Batch support on fixed days |
 | **Approval fatigue** makes canon stale | Medium | Default more folders to open; show queue age; batch approve in the inbox |
 | **Anthropic or OpenAI terms** change connector or subscription use | Medium | Bring-your-own-model and standard MCP only; no stored subscription credentials |
-| **Pricing too low** to matter | Medium | Services revenue carries the first year; raise Studio for new customers after 20 paying workspaces |
+| **Pricing too low** to matter | Medium | Services revenue carries the first year; raise the Pro vault price, or add a flat Studio-style plan, after 20 paying customers |
 | **Name and trademark** (npm `reliquary` taken; domains held by others) | Low to medium | Sell under "Reliquary by Red Mage" on `redmage.cc`; run a USPTO and EUIPO search before print or paid ads |
 
 ## 8. What to build or fix before selling
@@ -461,7 +490,9 @@ Governance:
 
 Costs and payments:
 
-- [Supabase pricing](https://supabase.com/pricing)
+- [Supabase pricing](https://supabase.com/pricing),
+  [disk size and overage](https://supabase.com/docs/guides/platform/manage-your-usage/disk-size)
+- [Functional Source License](https://fsl.software/)
 - [Vercel pricing](https://vercel.com/pricing),
   [Pro plan docs](https://vercel.com/docs/plans/pro-plan),
   [per-seat breakdown](https://flexprice.io/blog/vercel-pricing-breakdown) *(third party)*
