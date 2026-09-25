@@ -1,0 +1,15 @@
+# deploy/test.sh's additions to deploy/compose/compose.yml: a mail catcher
+# (Mailpit) that Supabase Auth sends sign-in emails to, with its API
+# published on loopback so the smoke test can read the code. Never used by a
+# real deployment.
+
+services:
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.29
+    restart: "no"
+    ports:
+      - 127.0.0.1:${T_MAILAPI:?}:8025
+  auth:
+    depends_on:
+      mailpit:
+        condition: service_started

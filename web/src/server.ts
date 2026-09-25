@@ -48,6 +48,7 @@ import { configureVariables, missingKeyIds, variablesConfigured } from "./secret
 import { pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { versionJson } from "./version.js";
+import { emailTemplate, selfHosted } from "./selfhost.js";
 import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -84,6 +85,11 @@ if (process.env.PUBLIC_URL) {
   }
 }
 const SECURE = PUBLIC_ORIGIN.startsWith("https://");
+// Self-hosted over plain http works (a trial on one machine, or TLS ended by
+// a proxy that forwards http), but cookies then can't be Secure: say so.
+if (selfHosted() && PUBLIC_ORIGIN && !SECURE) {
+  console.warn("PUBLIC_URL is http, so session cookies aren't Secure: use https (deploy/compose's caddy profile) for anything but a trial");
+}
 // __Host- cookies must be Secure, Path=/ and carry no Domain: bound to this
 // exact host, over https only.
 const COOKIE_PREFIX = SECURE ? "__Host-" : "";
@@ -361,6 +367,12 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     }
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
+      return;
+    }
+    // Self-hosted only: the email templates Supabase Auth fetches (selfhost.ts).
+    const template = req.method === "GET" ? emailTemplate(url.pathname) : undefined;
+    if (template) {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" }).end(template);
       return;
     }
     if (url.pathname === "/version" && req.method === "GET") {

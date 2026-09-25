@@ -1,0 +1,30 @@
+# HTTPS in front of the self-hosted apps (compose profile `caddy`). Caddy
+# gets and renews certificates itself: point each hostname's DNS at this
+# machine and open ports 80 and 443. The hostnames come from .env
+# (deploy/setup.sh derives them from PUBLIC_URL, MCP_RESOURCE and SITE_URL):
+#
+#   APP_HOST   the web app: sign-in, vaults, the OAuth issuer, the env API
+#   MCP_HOST   the MCP endpoint
+#   SITE_HOST  the public site (landing, docs), when SITE_URL gives it its
+#              own hostname; otherwise the app's hostname serves it too
+#
+# Both apps trust X-Real-IP only with TRUST_PROXY_IP=1, so each proxy block
+# overwrites it with the address Caddy saw: a client can't choose the
+# address its rate limits count against.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_HOST} {$SITE_HOST} {
+	encode zstd gzip
+	reverse_proxy web:8790 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+{$MCP_HOST} {
+	reverse_proxy mcp:8787 {
+		header_up X-Real-IP {remote_host}
+	}
+}

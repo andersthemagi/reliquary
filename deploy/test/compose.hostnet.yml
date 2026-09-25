@@ -1,0 +1,64 @@
+# deploy/test.sh on a host whose rootless podman has no user-mode networking
+# (neither pasta nor slirp4netns is installed), so containers can't share a
+# network of their own: every service joins the host's network instead,
+# listening on loopback on the test slot's ports, and the names db, auth and
+# web become 127.0.0.1:<port>. Everything else is compose.yml as shipped.
+# Used with compose.test.yml. CI (docker) runs the real, bridged network.
+
+services:
+  db:
+    network_mode: host
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1", "-c", "port=${T_PG:?}"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "${T_PG:?}", "-U", "postgres", "-q"]
+  db-init:
+    network_mode: host
+    environment:
+      PGHOST: 127.0.0.1
+      PGPORT: ${T_PG:?}
+  auth:
+    network_mode: host
+    environment:
+      GOTRUE_API_HOST: 127.0.0.1
+      PORT: ${T_AUTH:?}
+      API_EXTERNAL_URL: http://127.0.0.1:${T_AUTH:?}
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${AUTH_DB_PASSWORD}@127.0.0.1:${T_PG:?}/postgres?sslmode=disable
+      GOTRUE_JWT_ISSUER: http://127.0.0.1:${T_AUTH:?}
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://127.0.0.1:${T_WEB:?}/_selfhost/email/sign-in.html
+      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: http://127.0.0.1:${T_WEB:?}/_selfhost/email/confirm.html
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${T_AUTH:?}/health"]
+  migrate:
+    network_mode: host
+    environment:
+      PGHOST: 127.0.0.1
+      PGPORT: ${T_PG:?}
+  web:
+    network_mode: host
+    ports: !reset []
+    environment:
+      HOST: 127.0.0.1
+      PORT: ${T_WEB:?}
+      DATABASE_URL: postgres://reliquary_web:${WEB_DB_PASSWORD}@127.0.0.1:${T_PG:?}/postgres
+      AUTH_URL: http://127.0.0.1:${T_AUTH:?}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${T_WEB:?}/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+  mcp:
+    network_mode: host
+    ports: !reset []
+    environment:
+      HOST: 127.0.0.1
+      PORT: ${T_MCP:?}
+      DATABASE_URL: postgres://reliquary_mcp:${MCP_DB_PASSWORD}@127.0.0.1:${T_PG:?}/postgres
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${T_MCP:?}/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+  owner:
+    network_mode: host
+    environment:
+      AUTH_URL: http://127.0.0.1:${T_AUTH:?}
+  mailpit:
+    network_mode: host
+    ports: !reset []
+    environment:
+      MP_SMTP_BIND_ADDR: 127.0.0.1:${T_SMTP:?}
+      MP_UI_BIND_ADDR: 127.0.0.1:${T_MAILAPI:?}

@@ -160,6 +160,11 @@
   summary: Sign-in codes and invites sent by email from Reliquary's own domain.
   status: in-progress
 
+- title: Self-hosting (preview)
+  summary: Run Reliquary on your own server with Docker Compose, with no plan limits. The server's license is still being decided.
+  status: in-progress
+  docs: how-to/self-host
+
 # Planned ------------------------------------------------------------------
 
 - title: Publish the CLI to npm

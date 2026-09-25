@@ -1,0 +1,231 @@
+# Self-hosted Reliquary (preview): docs/public/how-to/self-host.md.
+#
+#   ../setup.sh              writes .env here (secrets generated, mode 600)
+#   docker compose up -d     start (or: podman compose, podman-compose)
+#   docker compose --profile caddy up -d      with automatic HTTPS
+#   docker compose run --rm owner you@example.com   make an account
+#
+# Services, in start order:
+#   db        Postgres 17, data in the db-data volume, never published
+#   db-init   one-shot: the roles and schemas Supabase would provide
+#             (deploy/sql/00_roles.sql), Auth's database password
+#   auth      Supabase Auth (email codes), on this network only; its tokens
+#             are signed with the ES256 key in GOTRUE_JWT_KEYS, which the web
+#             app verifies through its JWKS
+#   migrate   one-shot: Reliquary's migrations, the self-hosting overlay (no
+#             plan limits), the app roles' passwords
+#   web, mcp  the two apps, built from this checkout, read-only, unprivileged
+#   caddy     optional (profile caddy): HTTPS for the three hostnames
+#   owner     a tool (profile tools): makes an account, see above
+#
+# Every value comes from .env (.env.example lists them). Nothing here holds a
+# secret. Images are pinned; upgrading them is a deliberate change.
+
+name: reliquary
+
+x-db-env: &db-env
+  PGHOST: db
+  PGPORT: "5432"
+  PGDATABASE: postgres
+  PGUSER: postgres
+  PGPASSWORD: ${POSTGRES_PASSWORD:?run deploy/setup.sh first}
+
+services:
+  db:
+    image: docker.io/library/postgres:17.11
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run deploy/setup.sh first}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-q"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  db-init:
+    image: docker.io/library/postgres:17.11
+    restart: "no"
+    command: ["bash", "/deploy/bin/db-init.sh"]
+    environment:
+      <<: *db-env
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?run deploy/setup.sh first}
+    volumes:
+      - ..:/deploy:ro,z
+    depends_on:
+      db:
+        condition: service_healthy
+
+  auth:
+    image: docker.io/supabase/auth:v2.197.0
+    restart: unless-stopped
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: "9999"
+      API_EXTERNAL_URL: http://auth:9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${AUTH_DB_PASSWORD}@db:5432/postgres?sslmode=disable
+      GOTRUE_SITE_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+      GOTRUE_URI_ALLOW_LIST: ${PUBLIC_URL}
+      # Tokens: ES256, signed with the key deploy/setup.sh made. The secret
+      # is required by Auth but signs nothing here; keep it as secret as the
+      # key, since Auth also accepts admin tokens made with it.
+      GOTRUE_JWT_KEYS: ${GOTRUE_JWT_KEYS:?run deploy/setup.sh first}
+      GOTRUE_JWT_SECRET: ${GOTRUE_JWT_SECRET:?run deploy/setup.sh first}
+      GOTRUE_JWT_ISSUER: http://auth:9999
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_EXP: "3600"
+      # Email codes and links only. Accounts are made by the owner tool, or
+      # by an invite (the web app asks Auth to create one only for the
+      # invited address). Auth isn't reachable from outside this network.
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_MAILER_OTP_EXP: "600"
+      GOTRUE_MAILER_OTP_LENGTH: "6"
+      GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: Your Reliquary sign-in code
+      GOTRUE_MAILER_SUBJECTS_CONFIRMATION: Your Reliquary sign-in code
+      # The templates carry the code and a link to the web app's
+      # /auth/confirm (web/src/selfhost.ts).
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://web:8790/_selfhost/email/sign-in.html
+      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: http://web:8790/_selfhost/email/confirm.html
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in .env}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_SENDER:?set SMTP_SENDER in .env}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Reliquary}
+      GOTRUE_SMTP_MAX_FREQUENCY: ${SMTP_MAX_FREQUENCY:-60s}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9999/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    image: docker.io/library/postgres:17.11
+    restart: "no"
+    command: ["bash", "/deploy/bin/migrate.sh"]
+    environment:
+      <<: *db-env
+      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?run deploy/setup.sh first}
+      MCP_DB_PASSWORD: ${MCP_DB_PASSWORD:?run deploy/setup.sh first}
+    volumes:
+      - ..:/deploy:ro,z
+      - ../../supabase/migrations:/migrations:ro,z
+    depends_on:
+      auth:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../..
+      dockerfile: web/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: localhost/reliquary-web:${RELIQUARY_TAG:-local}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      DATABASE_URL: postgres://reliquary_web:${WEB_DB_PASSWORD}@db:5432/postgres
+      DATABASE_TLS: "off"
+      AUTH_MODE: supabase
+      AUTH_URL: http://auth:9999
+      JWT_ALG: ES256
+      SESSION_SECRET: ${SESSION_SECRET:?run deploy/setup.sh first}
+      VARIABLES_KEYS: ${VARIABLES_KEYS:?run deploy/setup.sh first}
+      PUBLIC_URL: ${PUBLIC_URL}
+      SITE_URL: ${SITE_URL:-}
+      MCP_RESOURCE: ${MCP_RESOURCE:?set MCP_RESOURCE in .env}
+      MCP_PUBLIC_URL: ${MCP_RESOURCE}
+      # Only true behind a proxy that overwrites X-Real-IP (caddy below does).
+      TRUST_PROXY_IP: ${TRUST_PROXY_IP:-0}
+    ports:
+      - ${WEB_BIND:-127.0.0.1:8790}:8790
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8790/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  mcp:
+    build:
+      context: ../..
+      dockerfile: mcp/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: localhost/reliquary-mcp:${RELIQUARY_TAG:-local}
+    restart: unless-stopped
+    read_only: true
+    environment:
+      DATABASE_URL: postgres://reliquary_mcp:${MCP_DB_PASSWORD}@db:5432/postgres
+      DATABASE_TLS: "off"
+      MCP_RESOURCE: ${MCP_RESOURCE}
+      AUTH_ISSUER: ${PUBLIC_URL}
+      TRUST_PROXY_IP: ${TRUST_PROXY_IP:-0}
+    ports:
+      - ${MCP_BIND:-127.0.0.1:8787}:8787
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  caddy:
+    image: docker.io/library/caddy:2.11.4-alpine
+    profiles: [caddy]
+    restart: unless-stopped
+    environment:
+      APP_HOST: ${APP_HOST:-}
+      MCP_HOST: ${MCP_HOST:-}
+      SITE_HOST: ${SITE_HOST:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      mcp:
+        condition: service_healthy
+
+  owner:
+    image: localhost/reliquary-web:${RELIQUARY_TAG:-local}
+    profiles: [tools]
+    restart: "no"
+    read_only: true
+    entrypoint: ["node", "/deploy/bin/owner.mjs"]
+    environment:
+      AUTH_URL: http://auth:9999
+      GOTRUE_JWT_KEYS: ${GOTRUE_JWT_KEYS}
+    volumes:
+      - ..:/deploy:ro,z
+    depends_on:
+      auth:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

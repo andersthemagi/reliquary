@@ -1,0 +1,29 @@
+# Build context for web/Dockerfile and mcp/Dockerfile (both built from the
+# repository root). An allowlist: only what the two builds read goes in, so
+# no token, password file, .env or local state can reach an image or a
+# builder's cache.
+*
+
+!version.txt
+!CHANGELOG.md
+!docs/public/
+!cli/src/cli.ts
+!cli/src/config.ts
+!mcp/test/contract.snapshot.json
+
+!web/package.json
+!web/package-lock.json
+!web/tsconfig.json
+!web/stamp-version.mjs
+!web/supabase-ca.crt
+!web/src/
+!web/public/
+!web/scripts/
+
+!mcp/package.json
+!mcp/package-lock.json
+!mcp/tsconfig.json
+!mcp/stamp-version.mjs
+!mcp/supabase-ca.crt
+!mcp/src/
+!mcp/public/

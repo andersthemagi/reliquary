@@ -53,6 +53,20 @@ jobs:
       - name: All suites (sql, mcp, web) in parallel
         run: ./test.sh
 
+  deploy:
+    # Self-hosting end to end (deploy/test.sh, not part of ./test.sh): builds
+    # the web and MCP images, brings deploy/compose up on its own network
+    # with a mail catcher, makes the first owner, signs in with the emailed
+    # code, creates a vault and a token, and writes a file over MCP.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CONTAINER_ENGINE: docker
+    steps:
+      - uses: actions/checkout@v7
+      - name: Self-hosting smoke test
+        run: ./deploy/test.sh
+
   cli-changes:
     # Whether cli-unit runs: only when the commits change cli/ (or this
     # file), and always on a release pull request (release-please's
