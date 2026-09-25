@@ -93,6 +93,9 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
   variables per vault, no NUL in values).
 Milestone 2 is built; next is its week of real use.
 
+Alongside: the public docs, roadmap and llms.txt (see Docs below), and a
+pre-alpha notice on every frame.
+
 All of it needs podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
@@ -160,6 +163,33 @@ Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-st
   ./mcp/test.sh` and commit the snapshot with a `Changes-behaviour` trailer.
 - New test files seed their own data or use unique paths; never depend on
   another file's side effects. Flaky means failing: fix, don't retry.
+
+## Docs
+
+The public docs are `docs/public/` (Markdown, Diátaxis: tutorials, concepts,
+how-to guides, reference; the sidebar is `docs/public/SUMMARY.md`), served by
+the web app at `/docs` (`web/src/docs.ts`), each page also as Markdown at
+`/docs/<page>.md`, with `/llms.txt`, `/llms-full.txt` and `/roadmap`. The rest
+of `docs/` is internal: never publish it, link it from `docs/public` or copy
+it there.
+
+- **Every feature lands with its docs updated in the same change:** the page
+  that explains it, and the Docs column of its row in
+  [tests/features.md](tests/features.md) (`scripts/check-registry.sh` fails on
+  a row without an existing page). Shipping a feature also moves its item in
+  `docs/public/roadmap.yml` to `shipped`, with its docs page.
+- **The docs are for people and agents.** Write plainly: short pages, sentence
+  case, no em dashes, the exact commands and button names. Never put a secret,
+  a token or real client data in them, not even as an example.
+- **Generated parts aren't edited by hand.** `web/scripts/gen-docs.mjs` (run by
+  `npm run build` and `web/test.sh`) writes the MCP tool reference from
+  `mcp/test/contract.snapshot.json` and `docs/public/reference/mcp-access.json`
+  (who may call each tool: a new tool needs an entry there or the build
+  fails), the CLI's help from `cli/src/cli.ts`, the changelog from
+  `CHANGELOG.md` and the roadmap from `docs/public/roadmap.yml`.
+- `web/test/docs.test.mjs` fails when the docs drift: an MCP tool, CLI command
+  or option left out or invented, a link or anchor that doesn't resolve, a page
+  missing from the sidebar, an invalid roadmap.
 
 ## Conventions
 
