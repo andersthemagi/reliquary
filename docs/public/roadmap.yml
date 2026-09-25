@@ -125,7 +125,7 @@
   milestone: M2
 
 - title: Move to reliquary.redmage.cc
-  summary: The web app and MCP endpoint on their own domain; clients sign in again once.
+  summary: The website and docs at reliquary.redmage.cc, the web app at app.reliquary.redmage.cc and MCP at mcp.reliquary.redmage.cc; clients sign in again once.
   status: in-progress
 
 - title: Email from the product domain

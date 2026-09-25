@@ -23,7 +23,8 @@ Each rule has a test that tries to break it: a session for one vault reading ano
 
 ## Connections and sign-in
 
-- Sign-in to the web app is by an emailed code or link. Sessions are HttpOnly, Secure, `__Host-` cookies.
+- Sign-in to the web app is by an emailed code or link. Sessions are HttpOnly, Secure, `__Host-` cookies, bound to the app's own host (`app.reliquary.redmage.cc`). The public site and docs (`reliquary.redmage.cc`) set no cookies at all.
+- The OAuth sign-in for MCP clients and the CLI runs on the app host: its issuer is `https://app.reliquary.redmage.cc`.
 - MCP clients and the CLI use OAuth 2.1 with PKCE (S256 only), and tokens bound to the one service they are for: an MCP token is refused by the env API and a CLI token by the MCP endpoint. Refresh tokens rotate, and a reused one revokes the whole grant.
 - Clients are identified by a metadata document at an https URL, fetched with guards against reaching private networks.
 - Access tokens are stored only as hashes, always expire (at most a year), and are revocable at once. See [Tokens, connections and sign-ins](connections.md).
@@ -31,7 +32,8 @@ Each rule has a test that tries to break it: a session for one vault reading ano
 ## The web app
 
 - No client-side script at all: the content security policy forbids scripts, and nothing loads from another site.
-- Every form carries a per-session token and must come from Reliquary's own pages.
+- Every form carries a per-session token and must come from the app's own pages.
+- The app's pages are never indexed by search engines. Moving between the public site and the app only ever redirects to one of Reliquary's own two web addresses.
 - Everything people and agents wrote is escaped; a file's Markdown is rendered with raw HTML off.
 
 ## Secret values

@@ -6,7 +6,7 @@ This takes about 15 minutes. You need a Reliquary account (the beta is invite-on
 
 ## 1. Sign in
 
-Open `https://reliquary.redmage.cc` and choose **Sign in**. Enter your email, then the 6-digit code from the email (or open its link on the same device).
+Open `https://app.reliquary.redmage.cc` (or choose **Sign in** on `https://reliquary.redmage.cc`). Enter your email, then the 6-digit code from the email (or open its link on the same device).
 
 ## 2. Create a vault
 

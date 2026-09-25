@@ -7,6 +7,7 @@
 // filled) and PRICING (the tiers, easy to change or hide). A field left null
 // renders as a visible "[to be filled: ...]" mark, never as an invented fact.
 
+import { appHref, publicSiteOrigin } from "./hosts.js";
 import { LEGAL_LINKS, esc, footerLinks, html, raw, stageBadge, styleHref, versionLink, type Raw, type Theme } from "./html.js";
 
 // Who runs Reliquary. null = not decided or not known yet: shown as a
@@ -18,8 +19,8 @@ export const OPERATOR = {
   person: "Andrés",
   contactEmail: "andres@redmage.cc",
   securityEmail: "andres@redmage.cc",
-  // Where the site lives when PUBLIC_URL isn't set (links in the sitemap,
-  // canonical and Open Graph URLs).
+  // Where the site lives when neither SITE_URL nor PUBLIC_URL is set
+  // (links in the sitemap, canonical and Open Graph URLs).
   defaultOrigin: "https://reliquary.redmage.cc",
   lastUpdated: "2026-09-24",
   legalName: null as string | null, // the legal entity or sole trader's full name
@@ -97,15 +98,10 @@ export const PRICING = {
 export const requestAccessHref = () =>
   `mailto:${OPERATOR.contactEmail}?subject=${encodeURIComponent("Reliquary early access")}`;
 
-// The site's own origin: PUBLIC_URL when set (server.ts refuses to start
-// on a malformed one), else the default.
-export const siteOrigin = (() => {
-  try {
-    return new URL(process.env.PUBLIC_URL ?? "").origin;
-  } catch {
-    return OPERATOR.defaultOrigin;
-  }
-})();
+// The site's own origin: SITE_URL when the public site has a host of its
+// own (hosts.ts), else PUBLIC_URL, else the default. server.ts refuses to
+// start on a malformed one.
+export const siteOrigin = publicSiteOrigin(OPERATOR.defaultOrigin);
 
 // Drafts: every legal page carries this until the owner has had it reviewed.
 export const draftNote = () =>
@@ -156,7 +152,7 @@ ${o.alternate ? html`<link rel="alternate" type="text/markdown" href="${o.altern
     <a href="/docs"${o.path === "/docs" || o.path.startsWith("/docs/") ? raw(' aria-current="page"') : ""}>Docs</a>
     <a href="/roadmap"${o.path === "/roadmap" ? raw(' aria-current="page"') : ""}>Roadmap</a>
   </nav>
-  <a class="button site-signin" href="/signin">Sign in</a>
+  <a class="button site-signin" href="${appHref("/signin")}">Sign in</a>
   </div>
 </header>
 <main id="main" class="site-main">

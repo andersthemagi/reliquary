@@ -3,7 +3,8 @@
 # server signed in as Ana, and node:test driving it over HTTP. Also: a hosted
 # instance (PUBLIC_URL, no public/), and two AUTH_MODE=supabase instances
 # sharing one SESSION_SECRET, signing in against a fake Supabase Auth
-# (test/fake-auth.mjs).
+# (test/fake-auth.mjs). And a split instance: the app on PUBLIC_URL and the
+# public site on SITE_URL, told apart by the Host header (src/hosts.ts).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -20,18 +21,24 @@ hosted_url=https://app.reliquary.test
 auth_a=reliquary-web-test-auth-a-$slot
 auth_b=reliquary-web-test-auth-b-$slot
 fake=reliquary-web-test-fake-auth-$slot
+# The split instance: AUTH_MODE=supabase against the same fake Auth.
+split=reliquary-web-test-split-$slot
+split_app_url=https://app.reliquary.test
+split_site_url=https://reliquary.test
 pgport=$((54332 + 10 * slot))
 port=$((8791 + 10 * slot))
 hosted_port=$((port + 1))
 auth_a_port=$((port + 2))
 auth_b_port=$((port + 3))
 fake_port=$((port + 4))
+# Off the 87xx range: every last digit there is taken by some suite and slot.
+split_port=$((18791 + 10 * slot))
 fake_url=http://127.0.0.1:$fake_port
 fake_key=sb_publishable_fake_$slot
 node=docker.io/library/node:22-slim
 
 cleanup() {
-  "$engine" rm -f "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" >/dev/null 2>&1 || true
+  "$engine" rm -f "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" "$split" >/dev/null 2>&1 || true
   rm -f .login-test-$slot .login-test-hosted-$slot .auth-secrets-$slot
 }
 trap cleanup EXIT
@@ -100,6 +107,16 @@ for p in $auth_a_port $auth_b_port; do
     sleep 0.3
   done
 done
+"$engine" run -d --name "$split" --network host -v "$PWD":/app:Z -w /app \
+  -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
+  -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
+  -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$split_app_url" -e SITE_URL="$split_site_url" \
+  -e PORT=$split_port "$node" node dist/server.js >/dev/null
+# Asked as the app host: on the site host /healthz is a redirect.
+until curl -sf -H "Host: ${split_app_url#https://}" "http://127.0.0.1:$split_port/healthz" >/dev/null; do
+  [ "$("$engine" inspect -f '{{.State.Running}}' "$split")" = true ] || { "$engine" logs "$split"; echo "split server exited"; exit 1; }
+  sleep 0.3
+done
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
@@ -110,6 +127,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   -e HOSTED_LOGIN_FILE=/app/.login-test-hosted-$slot \
   -e WEB_AUTH_A_URL="http://127.0.0.1:$auth_a_port" -e WEB_AUTH_B_URL="http://127.0.0.1:$auth_b_port" \
   -e WEB_AUTH_PUBLIC_URL="$hosted_url" -e FAKE_AUTH_URL=$fake_url -e AUTH_SECRETS_FILE=/app/.auth-secrets-$slot \
+  -e WEB_SPLIT_URL="http://127.0.0.1:$split_port" -e WEB_SPLIT_APP_URL="$split_app_url" -e WEB_SPLIT_SITE_URL="$split_site_url" \
   -e EXPECT_VERSION="$(tr -d '[:space:]' < ../version.txt)" \
   "$node" node --test --test-concurrency=1 test/*.test.mjs
 
@@ -119,7 +137,7 @@ echo "== supabase-mode server logs (must contain no JWTs, refresh tokens, codes,
 # test/auth.test.mjs wrote every code, token hash and refresh token it saw
 # to .auth-secrets-<slot>; none may appear in a log.
 [ -s .auth-secrets-$slot ] || { echo "auth.test.mjs recorded no secrets to look for"; exit 1; }
-{ "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; } > .auth-logs-$slot 2>&1
+{ "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; "$engine" logs "$split"; } > .auth-logs-$slot 2>&1
 leak=0
 grep -E 'eyJ|@|token_hash|rlq_|rli_|EUR|script' .auth-logs-$slot && leak=1
 grep -F -f .auth-secrets-$slot .auth-logs-$slot && leak=1

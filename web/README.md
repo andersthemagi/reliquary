@@ -137,7 +137,8 @@ a metadata fixture on loopback) and `test/cimd.test.mjs` (the SSRF fence);
 the MCP side end to end in `mcp/test/oauth.test.mjs`.
 
 `test.sh` also starts a second server as hosted (`PUBLIC_URL=https://...`,
-no `public/`) for `test/hosting.test.mjs`.
+no `public/`) for `test/hosting.test.mjs`, and a split one (`PUBLIC_URL` and
+`SITE_URL`, driven by the Host header) for `test/split_hosts.test.mjs`.
 
 ## Deploy (Vercel)
 
@@ -161,6 +162,14 @@ What the server does differently when hosted:
   cookies are `__Host-rlq_session` / `__Host-rlq_theme`, `Secure`, `Path=/`,
   no `Domain`. Unset (dev.sh, tests), the old rule applies: `http://<Host>`,
   absent Origin allowed, unprefixed cookies.
+- **`SITE_URL`** (optional, e.g. `https://example.com`): the public site
+  (landing, docs, roadmap, legal pages, robots.txt, sitemap.xml,
+  security.txt) on a host of its own, `PUBLIC_URL` staying the app's
+  (`src/hosts.ts`). The Host header picks the side: the site host serves only
+  those pages and sets no cookie, anything else is a 308 to the app host;
+  the app host sends them to the site host with a 308 and says `noindex` on
+  every answer; static files answer on both. Canonical and Open Graph URLs,
+  the sitemap and llms.txt use it. Unset, one host serves both.
 - **No `public/`**: the static map stays empty and the stylesheet version
   comes from `VERCEL_GIT_COMMIT_SHA`.
 - **Database**: `DATABASE_URL` is the Supavisor transaction pooler (port
@@ -224,7 +233,8 @@ never a JWT, refresh token, code, token hash or email (`test.sh` checks).
 | `JWT_ALG` | no | `ES256` or `RS256`: the `alg` of the current key in `/auth/v1/.well-known/jwks.json` |
 | `SESSION_SECRET` | **yes** | 32 random bytes, base64url; rotating it signs nobody out but voids open forms and flash notices |
 | `VARIABLES_KEY` | **yes** | 32 random bytes, base64url: encrypts environment variables (`src/secrets.ts`, docs/variables.md). Required on Vercel; keep a copy outside Vercel, since losing it loses every value. Never in the mcp project |
-| `PUBLIC_URL` | no | the site's https URL (required on Vercel) |
+| `PUBLIC_URL` | no | the app's https URL (required on Vercel) |
+| `SITE_URL` | no | optional: the public site's https origin, when it has its own host |
 
 The server refuses to start without these, naming the variable, never its
 value. It never uses a Supabase key that bypasses RLS.

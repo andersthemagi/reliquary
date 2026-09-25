@@ -2,6 +2,7 @@
 // is no other way to put text on a page. File text is shown as plain text,
 // never rendered as markdown or HTML.
 
+import { siteHref } from "./hosts.js";
 import { personRef } from "./personref.js";
 import { BUILD } from "./version.js";
 
@@ -57,20 +58,20 @@ export const LEGAL_LINKS: ReadonlyArray<readonly [string, string]> = [
   ["/security", "Security"],
 ];
 export const footerLinks = () =>
-  html`<nav class="footer-links" aria-label="Legal">${LEGAL_LINKS.map(([href, label]) => html`<a href="${href}">${label}</a>`)}</nav>`;
+  html`<nav class="footer-links" aria-label="Legal">${LEGAL_LINKS.map(([href, label]) => html`<a href="${siteHref(href)}">${label}</a>`)}</nav>`;
 
 // The release this is, in every footer, linking to what changed in it.
 export const versionLink = () =>
-  BUILD.version === "unknown" ? "" : html`<a class="footer-version" href="/docs/changelog">v${BUILD.version}</a>`;
+  BUILD.version === "unknown" ? "" : html`<a class="footer-version" href="${siteHref("/docs/changelog")}">v${BUILD.version}</a>`;
 
 // Reliquary's stage, said on every frame: a badge in the top bar (the app's
 // and the public site's) linking to the roadmap, and the sentence itself
 // where there is room (the landing page, the docs, the roadmap, the
 // Account menu).
 export const PRE_ALPHA = "Pre-alpha: things change and may break; data is backed up daily.";
-export const stageBadge = () => html`<a class="stage" href="/roadmap" title="${PRE_ALPHA}">Pre-alpha</a>`;
+export const stageBadge = () => html`<a class="stage" href="${siteHref("/roadmap")}" title="${PRE_ALPHA}">Pre-alpha</a>`;
 export const preAlphaNote = () =>
-  html`<p class="prealpha-note"><strong>Pre-alpha:</strong> things change and may break; data is backed up daily. <a href="/roadmap">See the roadmap</a>.</p>`;
+  html`<p class="prealpha-note"><strong>Pre-alpha:</strong> things change and may break; data is backed up daily. <a href="${siteHref("/roadmap")}">See the roadmap</a>.</p>`;
 
 export type Nav = "home" | "review" | "vaults" | "activity" | "connect" | "tokens";
 
@@ -121,7 +122,7 @@ export function page(title: string, body: Raw, opts: PageOpts = {}): string {
     <summary class="button quiet">Account</summary>
     <div class="menu">
       <p class="menu-meta">Signed in as <strong>${personRef(opts.user)}</strong>${accountMode === "local" ? " (local)" : ""}</p>
-      <p class="menu-links"><a href="/docs">Docs</a><a href="/roadmap">Roadmap</a></p>
+      <p class="menu-links"><a href="${siteHref("/docs")}">Docs</a><a href="${siteHref("/roadmap")}">Roadmap</a></p>
       <p class="menu-meta">${PRE_ALPHA}</p>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
         ${csrfField(opts.csrf)}<input type="hidden" name="back" value="${opts.path ?? "/"}">

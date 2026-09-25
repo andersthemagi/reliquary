@@ -14,6 +14,8 @@ Three kinds of credential let software act for you, and all of them are listed o
 | Lifetime | 1-hour access tokens, refreshed by the client; the grant lasts at most a year | 7 days to a year, fixed when made | 1-hour access tokens, refreshed by the CLI; at most a year |
 | Shown as | the client's name, "from" its site | the name you gave it | "Reliquary CLI" |
 
+OAuth connections and CLI sign-ins are made by the web app at `https://app.reliquary.redmage.cc`, the issuer your client checks. The CLI uses that server unless you name another with `--server`.
+
 All three act as you, minus the [ceiling](agents.md). A connection or token can never do more than your role allows in a vault.
 
 ## Prefer OAuth where the client supports it

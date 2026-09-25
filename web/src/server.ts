@@ -14,6 +14,9 @@
 // Every POST needs the session's CSRF token and, when the browser sends one, a
 // same-origin Origin header. Responses carry a CSP that forbids all scripts.
 //
+// SITE_URL (optional) puts the public site on a host of its own, PUBLIC_URL
+// staying the app's: see hosts.ts for which host serves what.
+//
 // Hosted (docs/research/hosting.md), PUBLIC_URL names the site, e.g.
 // https://app.example.com. Then every POST must carry exactly that Origin
 // (a missing one is refused too), and with https the cookies are Secure and
@@ -33,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
 import { envApi } from "./envapi.js";
+import { crossHost, hostKind, hostsConfigError, isSitePath } from "./hosts.js";
 import { landing } from "./landing.js";
 import { publicRoute } from "./legal.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
@@ -65,6 +69,13 @@ if (process.env.PUBLIC_URL) {
     PUBLIC_ORIGIN = u.origin;
   } catch {
     console.error("PUBLIC_URL must be an http(s) URL");
+    process.exit(1);
+  }
+}
+{
+  const err = hostsConfigError(process.env);
+  if (err) {
+    console.error(err);
     process.exit(1);
   }
 }
@@ -283,6 +294,10 @@ const logRefused = (path: string, origin: string | undefined) =>
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  // "single" unless SITE_URL splits the site from the app (hosts.ts).
+  const host = hostKind(req.headers.host);
+  // The app host is never indexed, whatever the response.
+  if (host === "app") res.setHeader("x-robots-tag", "noindex");
   try {
     const file = req.method === "GET" ? STATIC.get(url.pathname) : undefined;
     if (file) {
@@ -291,6 +306,32 @@ const server = http.createServer(async (req, res) => {
     }
     const themeCookie = cookie(req, THEME_COOKIE);
     const theme: Theme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : "auto";
+    const readOnly = req.method === "GET" || req.method === "HEAD";
+    if (host === "site") {
+      // The public site's host: its pages only, and never a cookie set.
+      if (!isSitePath(url.pathname)) {
+        res.writeHead(308, { location: crossHost("app", url.pathname, url.search), "cache-control": "no-store" }).end();
+        console.info(`${req.method} ${url.pathname} 308 site->app`);
+        return;
+      }
+      if (!readOnly) {
+        res.writeHead(405, { ...SECURITY_HEADERS, allow: "GET, HEAD" }).end();
+        return;
+      }
+      const pub = url.pathname === "/"
+        ? { status: 200, type: "text/html; charset=utf-8", body: landing(theme) }
+        : publicRoute(url.pathname, theme);
+      if (pub) res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type }).end(pub.body);
+      else res.writeHead(404, { ...SECURITY_HEADERS, "content-type": "text/plain; charset=utf-8" }).end("Not found\n");
+      return;
+    }
+    // On the app host, the public site's pages live on the site host.
+    // `/` stays: Home, or sign-in.
+    if (host === "app" && readOnly && url.pathname !== "/" && isSitePath(url.pathname)) {
+      res.writeHead(308, { location: crossHost("site", url.pathname, url.search), "cache-control": "no-store" }).end();
+      console.info(`${req.method} ${url.pathname} 308 app->site`);
+      return;
+    }
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
       return;
@@ -352,7 +393,9 @@ const server = http.createServer(async (req, res) => {
         // Signed out: a page sends you to sign in and back; a form post
         // can't be replayed after sign-in, so it just says so. `/` with no
         // session cookies at all is a visitor: the landing page (landing.ts).
-        if (req.method === "GET" && url.pathname === "/" && !auth.cookies.length) send(res, { html: landing(theme) });
+        // On the app host of a split site (hosts.ts), `/` is sign-in: the
+        // landing page lives on the site host.
+        if (req.method === "GET" && url.pathname === "/" && !auth.cookies.length && host !== "app") send(res, { html: landing(theme) });
         else if (req.method === "GET") send(res, { redirect: signinUrl(url.pathname + url.search) }, {}, auth.cookies);
         else send(res, { status: 401, html: notice("Signed out", html`Your session ended. <a href="/signin">Sign in</a> and try again.`, theme) }, {}, auth.cookies);
         console.info(`${req.method} ${url.pathname} ${res.statusCode}`);

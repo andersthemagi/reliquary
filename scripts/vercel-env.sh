@@ -6,8 +6,16 @@
 # file's path and the variable names, never a value, so it is safe to run
 # from anywhere, including a chat with a model.
 #
-#   scripts/vercel-env.sh web https://<web-host> https://<mcp-host>
-#   scripts/vercel-env.sh mcp https://<web-host> https://<mcp-host>
+#   scripts/vercel-env.sh web https://<app-host> https://<mcp-host> [https://<site-host>]
+#   scripts/vercel-env.sh mcp https://<app-host> https://<mcp-host>
+#
+# The app host is the web app's PUBLIC_URL (sign-in, the OAuth issuer, the
+# env API). The optional site host is its SITE_URL: the public site (landing,
+# docs, legal pages) on a host of its own (web/src/hosts.ts); without it one
+# host serves both. Production (docs/ops/runbook.md, "Hosts"):
+#
+#   scripts/vercel-env.sh web https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc
+#   scripts/vercel-env.sh mcp https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc
 #
 # The web app also needs SUPABASE_PUBLISHABLE_KEY, from the Supabase dashboard
 # (Project Settings -> API Keys); it is printed as a placeholder.
@@ -24,7 +32,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
 
-next="Next: scripts/vercel-env.sh web <web-origin> <mcp-origin>, then put VARIABLES_KEYS in the web Vercel project and redeploy (docs/ops/runbook.md)."
+next="Next: scripts/vercel-env.sh web <app-origin> <mcp-origin> [<site-origin>], then put VARIABLES_KEYS in the web Vercel project and redeploy (docs/ops/runbook.md)."
 case ${1:-} in
   new-variables-key)
     scripts/variables-keys.sh new
@@ -43,8 +51,13 @@ case ${1:-} in
 esac
 
 app=${1:?web or mcp}
-web=${2:?the web app origin, e.g. https://reliquary-web.vercel.app}
-mcp=${3:?the mcp app origin, e.g. https://reliquary-mcp.vercel.app}
+web=${2:?the web app origin, e.g. https://app.reliquary.redmage.cc}
+mcp=${3:?the mcp app origin, e.g. https://mcp.reliquary.redmage.cc}
+site=${4:-}
+site=${site%/}
+if [[ -n $site && ! $site =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+  echo "The site origin must be https://<host>, with no path"; exit 1
+fi
 ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
 host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
 web=${web%/}; mcp=${mcp%/}
@@ -70,7 +83,8 @@ VARIABLES_KEYS=$(paste -sd, supabase/.variables-keys-secret)
 DATABASE_URL=postgres://reliquary_web.$ref:$(pw web | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 PUBLIC_URL=$web
-MCP_PUBLIC_URL=$mcp/mcp
+${site:+SITE_URL=$site
+}MCP_PUBLIC_URL=$mcp/mcp
 MCP_RESOURCE=$mcp/mcp
 AUTH_MODE=supabase
 SUPABASE_URL=https://$ref.supabase.co

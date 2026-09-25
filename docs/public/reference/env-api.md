@@ -2,7 +2,7 @@
 
 The HTTP API the Reliquary CLI uses to read environment variables and send pushes, for anyone building their own client.
 
-The API lives on the web app, at `https://reliquary.redmage.cc/api/env`. It only accepts CLI sign-ins: an MCP token or connection is refused, and a CLI sign-in is refused at the MCP endpoint.
+The API lives on the web app, at `https://app.reliquary.redmage.cc/api/env`. It only accepts CLI sign-ins: an MCP token or connection is refused, and a CLI sign-in is refused at the MCP endpoint.
 
 ## Signing in
 

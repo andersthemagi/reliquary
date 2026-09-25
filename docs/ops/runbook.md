@@ -5,6 +5,44 @@ Where things live: Supabase project `reliquary` (ref `bigonndpibguxuwtysnx`,
 Frankfurt, Pro); Vercel projects `reliquary-web` and `reliquary-mcp` (functions
 in `fra1`); GitHub Actions for tests, deploys and uptime.
 
+## Hosts
+
+Three hostnames, two Vercel projects:
+
+| Host | Project | Serves |
+|---|---|---|
+| `reliquary.redmage.cc` | `reliquary-web` | the public site: landing, `/docs` (and `.md`, `/llms.txt`, `/llms-full.txt`), `/roadmap`, the legal and trust pages, `robots.txt`, `sitemap.xml`, `/.well-known/security.txt`, static files |
+| `app.reliquary.redmage.cc` | `reliquary-web` | the app: sign-in, Home and every signed-in page, the OAuth authorization server (issuer), the env API, `/cli/oauth-client.json`, `/version`, `/healthz`, static files |
+| `mcp.reliquary.redmage.cc` | `reliquary-mcp` | the MCP endpoint `/mcp` |
+
+The web project serves both of its hosts from one deployment, told apart by
+the Host header (`web/src/hosts.ts`), with `PUBLIC_URL` the app origin and
+`SITE_URL` the site origin. On the site host any app path is a 308 to the
+same path and query on the app host, and no cookie is ever set; on the app
+host the public pages are a 308 to the site host (`/` stays: Home or sign-in)
+and every answer carries `X-Robots-Tag: noindex`. A redirect only ever goes
+to one of those two origins. Without `SITE_URL` one host serves both, as in
+local development and most tests.
+
+Production values (`scripts/vercel-env.sh web https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc`):
+
+| Where | Variable | Value |
+|---|---|---|
+| `reliquary-web` | `PUBLIC_URL` | `https://app.reliquary.redmage.cc` |
+| `reliquary-web` | `SITE_URL` | `https://reliquary.redmage.cc` |
+| `reliquary-web` | `MCP_PUBLIC_URL` | `https://mcp.reliquary.redmage.cc/mcp` |
+| `reliquary-web` | `MCP_RESOURCE` | `https://mcp.reliquary.redmage.cc/mcp` |
+| `reliquary-mcp` | `MCP_RESOURCE` | `https://mcp.reliquary.redmage.cc/mcp` |
+| `reliquary-mcp` | `AUTH_ISSUER` | `https://app.reliquary.redmage.cc` |
+| Supabase Auth, URL Configuration | Site URL | `https://app.reliquary.redmage.cc` |
+| Supabase Auth, URL Configuration | Redirect URLs | `https://app.reliquary.redmage.cc/**` |
+| GitHub, repository variables | `WEB_URL` / `MCP_URL` | `https://app.reliquary.redmage.cc` / `https://mcp.reliquary.redmage.cc` |
+
+Both web hostnames are domains of `reliquary-web` in Vercel; DNS for all
+three is a CNAME to `cname.vercel-dns.com`. Changing `PUBLIC_URL` changes the
+OAuth issuer: every connector and the CLI signs in again once. Changing only
+`SITE_URL` signs nobody out. After changing any of them, redeploy (below).
+
 ## Rules that came from incidents
 
 - **Secrets never pass through a model.** Scripts that handle secrets write

@@ -2,12 +2,13 @@
 // get Home). Copy from docs/research/positioning.md, section 6's outline,
 // kept to what is built today; later work is marked "coming".
 
+import { appHref } from "./hosts.js";
 import { html, preAlphaNote, type Raw, type Theme } from "./html.js";
 import { OPERATOR, PRICING, requestAccessHref, sitePage } from "./site.js";
 
 const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
   <a class="button primary" href="${requestAccessHref()}">Request access</a>
-  <a class="button" href="/signin">Sign in</a>
+  <a class="button" href="${appHref("/signin")}">Sign in</a>
 </div>`;
 
 // A static picture of the product's core loop, drawn in HTML: an agent's

@@ -5,13 +5,28 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
 
 ## Do next
 
-1. **DNS in Squarespace** (redmage.cc): CNAME `reliquary` and
-   `mcp.reliquary` to `cname.vercel-dns.com`. Both domains are already on the
-   Vercel projects. Then ask for the switch: `PUBLIC_URL`, `MCP_RESOURCE`,
-   `AUTH_ISSUER`, the Supabase Site URL and redirect URLs move to
-   `reliquary.redmage.cc`; connectors (Claude Code, Claude.ai, ChatGPT) and
-   the CLI sign in again once. Until then the CLI needs
-   `--server https://reliquary-context.vercel.app`.
+1. **Three hosts** (`docs/ops/runbook.md`, "Hosts"):
+   - DNS in Squarespace (redmage.cc): CNAME `reliquary`, `app.reliquary` and
+     `mcp.reliquary` to `cname.vercel-dns.com`.
+   - Vercel: `reliquary.redmage.cc` and `app.reliquary.redmage.cc` on
+     `reliquary-web`, `mcp.reliquary.redmage.cc` on `reliquary-mcp`.
+   - Environment: `scripts/vercel-env.sh web https://app.reliquary.redmage.cc
+     https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc` and
+     `scripts/vercel-env.sh mcp https://app.reliquary.redmage.cc
+     https://mcp.reliquary.redmage.cc`, pasted into each project (`PUBLIC_URL`,
+     `SITE_URL`, `MCP_PUBLIC_URL`, `MCP_RESOURCE`, `AUTH_ISSUER`), then a
+     redeploy of the live release.
+   - Supabase Auth, URL Configuration: Site URL
+     `https://app.reliquary.redmage.cc`, redirect URL
+     `https://app.reliquary.redmage.cc/**`.
+   - GitHub repository variables `WEB_URL=https://app.reliquary.redmage.cc`
+     and `MCP_URL=https://mcp.reliquary.redmage.cc` (uptime and deploy
+     checks).
+   - Connectors (Claude Code, Claude.ai, ChatGPT) and the CLI sign in again
+     once. The CLI's default server is now `https://app.reliquary.redmage.cc`;
+     a `.reliquary.json` naming `https://reliquary.redmage.cc` must change to
+     it. Until the switch, the CLI needs
+     `--server https://reliquary-context.vercel.app`.
 2. **Releases** (only a published release deploys; `docs/ops/runbook.md`,
    "Deploy"):
    - GitHub, Settings > Actions > General > Workflow permissions: turn on
