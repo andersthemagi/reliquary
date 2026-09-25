@@ -2,7 +2,9 @@
 # End-to-end test: Postgres with every migration, the MCP server, and the
 # official MCP client, all in containers on the host network (127.0.0.1).
 # For OAuth (test/oauth.test.mjs) the web app runs too, as the authorization
-# server.
+# server. A second MCP server has small rate limits and trusts x-real-ip
+# (test/rate_limits.test.mjs); the others multiply every limit by 1000
+# (RATE_LIMIT_SCALE), so they count as in production but never reach one.
 #
 #   MCP_TESTS="test/token_load.test.mjs" ./mcp/test.sh   only these test files
 #   TOKEN_LOAD_MEASURE_ONLY=1                            print token load, don't fail on budgets
@@ -16,12 +18,15 @@ slot=${TEST_SLOT:-0}
 pg=reliquary-mcp-test-pg-$slot
 srv=reliquary-mcp-test-server-$slot
 web=reliquary-mcp-test-web-$slot
+rl=reliquary-mcp-test-rl-$slot
 pgport=$((54330 + 10 * slot))
 port=$((8788 + 10 * slot))
 webport=$((port + 1))
+# Off the 87xx range, where every last digit is taken by some suite and slot.
+rlport=$((18788 + 10 * slot))
 node=docker.io/library/node:22-slim
 
-cleanup() { "$engine" rm -f "$pg" "$srv" "$web" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot"; }
+cleanup() { "$engine" rm -f "$pg" "$srv" "$web" "$rl" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot"; }
 trap cleanup EXIT
 cleanup
 
@@ -46,7 +51,7 @@ seed=$(psql -A -t < test/seed.sql | grep '=' )
 "$engine" run -d --name "$web" --network host -v "$PWD/../web":/src:ro,z -v "$PWD":/mcp:z -v "$PWD/../version.txt":/version.txt:ro,z \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000b -e LOGIN_FILE="/mcp/.login-oauth-$slot" \
-  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e PORT=$webport "$node" sh -c \
+  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e RATE_LIMIT_SCALE=1000 -e PORT=$webport "$node" sh -c \
   'mkdir -p /app && cd /src && cp -r src public package.json package-lock.json tsconfig.json stamp-version.mjs /app/ && cd /app &&
    if [ -x /src/node_modules/.bin/tsc ]; then ln -s /src/node_modules node_modules; else npm ci --no-audit --no-fund --silent; fi &&
    npm run -s compile && exec node dist/server.js' >/dev/null
@@ -59,8 +64,19 @@ seed=$(psql -A -t < test/seed.sql | grep '=' )
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
-  -e PORT=$port "$node" node dist/server.js >/dev/null
+  -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
 until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
+# Tool calls: 3 per 2-second window (so a test can wait one out) and 5 a
+# day per token; 3 401s a minute per address.
+"$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
+  -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
+  -e MCP_RESOURCE="http://127.0.0.1:$rlport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
+  -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60" \
+  -e PORT=$rlport "$node" node dist/server.js >/dev/null
+until curl -sf "http://127.0.0.1:$rlport/healthz" >/dev/null; do
+  [ "$("$engine" inspect -f '{{.State.Running}}' "$rl")" = true ] || { "$engine" logs "$rl"; echo "rate-limit server exited"; exit 1; }
+  sleep 0.3
+done
 until curl -sf "http://127.0.0.1:$webport/healthz" >/dev/null; do
   [ "$("$engine" inspect -f '{{.State.Running}}' "$web")" = true ] || { "$engine" logs "$web"; echo "web (authorization server) exited"; exit 1; }
   sleep 0.5
@@ -71,6 +87,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 # docs/ read-only, for test/parity.test.mjs (every tool is in docs/parity.md).
 "$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" \
   -e MCP_URL="http://127.0.0.1:$port/mcp" -e TEST_DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
+  -e MCP_RL_URL="http://127.0.0.1:$rlport/mcp" -e TEST_SUPER_URL="postgres://postgres:test@127.0.0.1:$pgport/postgres" \
   -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
   -e TOKEN_LOAD_MEASURE_ONLY="${TOKEN_LOAD_MEASURE_ONLY:-}" \
@@ -80,9 +97,11 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 echo "== server log (must contain no tokens or file text)"
 # Not `tee /dev/stderr`: when stderr is a file (./test.sh logs) that reopens
 # and truncates it, losing the test output.
-server_log=$("$engine" logs "$srv" 2>&1)
+server_log=$("$engine" logs "$srv" 2>&1; "$engine" logs "$rl" 2>&1)
 printf '%s\n' "$server_log" >&2
 grep -E 'rlq_|800 EUR|Hermes|Falcon|CIPHERTEXT-MARKER' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
+# The addresses test/rate_limits.test.mjs sends from.
+grep -E '198\.51\.100\.|2001:db8' <<< "$server_log" && { echo "LEAK: a client address in the server log"; exit 1; } || echo "clean (addresses)"
 # OAuth: no personal token, access (MCP or CLI) or refresh token, or code in either app's log.
 web_log=$("$engine" logs "$web" 2>&1)
 grep -E 'rl[qorce]_[0-9a-f]' <<< "$server_log

@@ -19,6 +19,7 @@ import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
+import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnauthorized, rateLimitedBody } from "./ratelimit.js";
 import { registerTools } from "./tools.js";
 import { BUILD, versionJson } from "./version.js";
 
@@ -55,6 +56,14 @@ function oauthConfig() {
   return { resource, issuer, prmPath, prmUrl: r.origin + prmPath };
 }
 const OAUTH = oauthConfig();
+
+// Rate limits (ratelimit.ts): tool calls per token, 401s per address.
+try {
+  configureRateLimits(process.env);
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
 
 // The key that decrypts variable values belongs to the web app alone
 // (docs/variables.md). This app never decrypts anything, so holding it could
@@ -167,7 +176,17 @@ const httpServer = http.createServer(async (req, res) => {
 
   const bearer = /^Bearer (\S+)$/.exec(req.headers.authorization ?? "");
   const ref = bearer ? tokenRef(bearer[1], OAUTH.resource) : null;
-  const unauthorized = () => {
+  const ip = clientIp(req);
+  const tooMany = (wait: number, id: unknown = null) =>
+    send(res, 429, rateLimitedBody(wait, id), { "Retry-After": String(wait), "cache-control": "no-store" });
+  const unauthorized = async () => {
+    // Per address (ratelimit.ts): past its limit, a 429 instead of the 401.
+    const wait = (await knownBlocked(ip)) || (await limitUnauthorized(ip));
+    if (wait) {
+      tooMany(wait);
+      console.info("mcp 429 unauthorized");
+      return;
+    }
     // RFC 6750: no error code when no credentials were sent.
     const challenge = `Bearer realm="reliquary", resource_metadata="${OAUTH.prmUrl}"${bearer ? ', error="invalid_token"' : ""}`;
     send(res, 401, { error: "invalid_token" }, { "WWW-Authenticate": challenge });
@@ -177,11 +196,11 @@ const httpServer = http.createServer(async (req, res) => {
   // token first, as before, then its own error.
   const knownOr401 = async () => {
     const id = ref ? await identify(bearer![1]).catch(() => null) : null;
-    if (!id) unauthorized();
+    if (!id) await unauthorized();
     return id;
   };
   if (!ref) {
-    unauthorized();
+    await unauthorized();
     return;
   }
 
@@ -211,17 +230,25 @@ const httpServer = http.createServer(async (req, res) => {
   // Anything else (initialize, tools/list, notifications) needs no
   // transaction: one autocommit resolve, as before.
   const messages = Array.isArray(body) ? body : [body];
-  const callsTools = messages.some((m) => (m as { method?: unknown } | null)?.method === "tools/call");
+  const calls = messages.filter((m) => (m as { method?: unknown } | null)?.method === "tools/call").length;
   let session: Session | null = null;
   let identity: Identity | null;
-  if (callsTools) {
+  // Tool calls per token (ratelimit.ts), counted while the token resolves.
+  let wait = 0;
+  if (calls) {
     session = new Session(ref);
-    identity = await session.open().catch(() => null);
+    [identity, wait] = await Promise.all([session.open().catch(() => null), limitToolCalls(ref.hash, calls)]);
   } else {
     identity = await identify(bearer![1]).catch(() => null);
   }
   if (!identity) {
-    unauthorized();
+    await unauthorized();
+    return;
+  }
+  if (wait) {
+    await session?.close();
+    tooMany(wait, Array.isArray(body) ? null : (body as { id?: unknown } | null)?.id);
+    console.info(`mcp 429 user=${identity.userId.slice(0, 8)}`);
     return;
   }
 
