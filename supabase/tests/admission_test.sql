@@ -1,5 +1,7 @@
 -- Hostile tests for invite-only admission (20260925240000_admission:
--- SQLSTATE RLP02, and the operator's controls over it).
+-- SQLSTATE RLP02, and the operator's controls over it) and emails compared
+-- in one Unicode form (20260925240300_email_nfc, "emails:"). The races are
+-- in web/test/races.test.mjs: they need several connections at once.
 --
 -- supabase/tests/support.sql starts this database open (invite-only off);
 -- this file turns it on. Ana owns a vault and is admitted by the operator;
@@ -215,3 +217,23 @@ select t.expect('operator: an unknown account, or neither on nor off, is refused
   'ERR P0002 ERR P0002 ERR 22023');
 select t.expect('operator: nothing was changed by the refused calls',
   t.admission('kim2') || ' ' || t.via('kim2'), 'false true none');
+
+-- ---------------------------------------------------------------------------
+-- Emails in one form
+
+-- José, as Auth might store it: e and a combining accent (NFD).
+insert into t.ids values ('jo', '00000000-0000-0000-0000-0000000000f4');
+insert into auth.users (id, email) values (t.id('jo'), U&'Jose\0301@Example.test');
+
+select t.expect('emails: an invite typed with é as one character is accepted by the account Auth stored with a combining accent',
+  (select t.accept('jo', tok) = t.id('club')::text from (select t.invite('ana', 'club', U&'jos\00e9@example.test') tok) x)::text,
+  'true');
+select t.expect('emails: the operator finds that account by either form, any case',
+  (t.ops(format($q$select private.user_by_email(%L)::text$q$, U&'JOS\00C9@example.test')) = t.id('jo')::text)::text || ' '
+  || (t.ops(format($q$select private.user_by_email(%L)::text$q$, U&'jose\0301@example.test')) = t.id('jo')::text)::text,
+  'true true');
+select t.expect('emails: inviting a member again in the other form is refused as already a member',
+  t.invite('ana', 'club', U&'jose\0301@EXAMPLE.test'),
+  '23505 that address already belongs to a member of this vault');
+select t.expect('emails: invites are stored in the one form',
+  (select count(*)::text from private.vault_invites where email is distinct from private.email_key(email)), '0');
