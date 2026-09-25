@@ -163,7 +163,33 @@ Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-st
 
 ## Conventions
 
-- Conventional commits (`feat(feed): ...`, `fix(rls): ...`).
+- Conventional commits (`feat(feed): ...`, `fix(rls): ...`). Trailers
+  (`Changes-behaviour:`, `Test-refactor:`, `Co-Authored-By:`) go together in
+  the last paragraph, no blank line between them.
+- **Commit types write the changelog.** Pushes to `main` only test; a bot
+  (release-please, `.github/workflows/release.yml`) keeps a "Release vX.Y.Z"
+  pull request whose `CHANGELOG.md` is built from commit subjects, and only
+  merging it tags a release and deploys it (`docs/ops/runbook.md`,
+  "Deploy"). So:
+  - every user-visible change needs a `feat`, `fix`, `perf` or `security`
+    commit whose subject a person reading the changelog understands
+    ("feat(web): export a vault as .tar.gz", not "feat: wip"); `feat` bumps
+    the minor, the others the patch;
+  - `chore`, `test`, `ci`, `refactor`, `docs` and merge commits are left out
+    of the changelog and release nothing on their own;
+  - a breaking change to an MCP tool, the CLI, the env API or anything else
+    people or their agents depend on is `feat!:` / `fix!:` or carries a
+    `BREAKING CHANGE: <what to do>` footer;
+  - commits touching `cli/` go to the CLI's own release (`cli/CHANGELOG.md`,
+    tags `cli-vX.Y.Z`).
+- **0.x is pre-alpha.** Any release may change or remove anything; while
+  below 1.0 a breaking change bumps the minor, not the major, and GitHub
+  Releases are marked prereleases. 1.0 is a deliberate owner decision (a
+  `Release-As: 1.0.0` footer when they make it), never a side effect.
+- Never edit `version.txt`, `.release-please-manifest.json`, the package
+  versions or a released `CHANGELOG.md` entry by hand; the release pull
+  request does. Never tag or publish a release: people merge the release
+  pull request.
 - Migrations are numbered SQL files in `supabase/migrations/`, never edited
   after they ship; fix forward.
 - No real client data in fixtures, seeds or tests.

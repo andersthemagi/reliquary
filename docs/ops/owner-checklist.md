@@ -12,9 +12,25 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
    `reliquary.redmage.cc`; connectors (Claude Code, Claude.ai, ChatGPT) and
    the CLI sign in again once. Until then the CLI needs
    `--server https://reliquary-context.vercel.app`.
-2. **Vercel deploy hooks**: in each project, Settings, Git, Deploy Hooks
-   (branch `main`); save as GitHub secrets `VERCEL_DEPLOY_HOOK_WEB` and
-   `VERCEL_DEPLOY_HOOK_MCP`. Then every green push deploys itself.
+2. **Releases** (only a published release deploys; `docs/ops/runbook.md`,
+   "Deploy"):
+   - GitHub, Settings > Actions > General > Workflow permissions: turn on
+     "Allow GitHub Actions to create and approve pull requests", or
+     release-please can't open the release pull request.
+   - Secret `VERCEL_TOKEN`: a Vercel access token (Account Settings >
+     Tokens) scoped to the team that owns `reliquary-web` and
+     `reliquary-mcp`, so a release deploys exactly its tagged commit. If the
+     projects are under a team, also the variable `VERCEL_TEAM_ID`
+     (`team_...`; not secret); if they were renamed, `VERCEL_PROJECT_WEB`
+     and `VERCEL_PROJECT_MCP`. Until it's set, the deploy falls back to the
+     Deploy Hook secrets `VERCEL_DEPLOY_HOOK_WEB` / `_MCP` (if they exist),
+     which build `main`, not the tag.
+   - Optional, recommended: secret `RELEASE_PLEASE_TOKEN`, a fine-grained
+     token (or GitHub App token) with Contents and Pull requests read and
+     write on this repository only. With it, the release pull request gets
+     its `test` checks and releases trigger `deploy` and `publish-cli`
+     directly; without it the `release` workflow starts them itself.
+   - Cut v0.1.0 once, by hand (runbook, "The first release").
 3. **`reliquary login` again**, ticking "also let it send .env files", so
    `reliquary env push` works.
 
@@ -22,7 +38,9 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
 
 4. **CLI licence** (`cli/package.json` says `UNLICENSED`, which makes a
    public package unusable), then publish: create the `@reliquary-ai` npm
-   scope, add the `NPM_TOKEN` secret, push tag `cli-v0.1.0`. If the repo
+   scope, add the `NPM_TOKEN` secret, then Actions > publish-cli > Run
+   workflow from tag `cli-v0.1.0` (cut with v0.1.0). Later CLI versions
+   publish when their "Release cli vX.Y.Z" pull request is merged. If the repo
    stays private, drop provenance (see `cli/README.md`).
 5. **Pricing**: keep "free for 1 to 10 people" or adopt
    `docs/research/positioning.md` section 5. The landing page reads its
@@ -44,6 +62,9 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
 - `scripts/set-role-passwords.sh ops`, then follow `docs/ops/runbook.md`.
 
 ## Keep an eye on
+
+- The open "Release vX.Y.Z" pull request: merging it is what ships.
+  Versions stay 0.x (pre-alpha) until you decide on 1.0.
 
 - The `uptime` workflow's "Production is down" issue.
 - Backups: `scripts/backup.sh` then `scripts/restore-test.sh`, weekly.

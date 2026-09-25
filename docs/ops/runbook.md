@@ -19,16 +19,103 @@ in `fra1`); GitHub Actions for tests, deploys and uptime.
 
 ## Deploy
 
-1. Push to `main`. The `test` workflow runs all four suites.
-2. On green, the `deploy` workflow applies migrations (`supabase db push` to
-   the session pooler, dry run first), triggers the Vercel deploy hooks (once
-   `VERCEL_DEPLOY_HOOK_WEB` and `VERCEL_DEPLOY_HOOK_MCP` exist), then smoke
-   checks both apps.
-3. Until the hooks exist, deploy from the Vercel dashboard or the Vercel
-   connector, after the migrations have run.
+Production is always a release: a tag `vX.Y.Z` with a GitHub Release. What
+is live answers `GET /version` on both apps (`{"version","commit"}`), and the
+web footer shows it. 0.x is **pre-alpha**: any release may change or remove
+anything, including MCP tools and CLI commands, and its GitHub Release is
+marked a prerelease. 1.0 is a deliberate decision by the owner, not a number
+the tooling reaches on its own (with `bump-minor-pre-major`, even a breaking
+change only bumps the minor while below 1.0).
 
-By hand: `scripts/db-push.sh` (dry run), then `scripts/db-push.sh --apply`.
+### How a release goes live
+
+1. **Push to `main`** (or merge a pull request). The `test` workflow runs
+   all four suites. Nothing deploys.
+2. **The release pull request.** The `release` workflow (release-please)
+   keeps a pull request "Release vX.Y.Z" open and updates it on every push:
+   `CHANGELOG.md` from the conventional commits since the last release,
+   `version.txt`, the web and MCP package versions. `feat` bumps the minor,
+   `fix`/`perf`/`security` the patch; `chore`, `test`, `ci`, `docs` and
+   `refactor` don't release on their own. Commits touching `cli/` go to a
+   separate "Release cli vX.Y.Z" pull request instead.
+3. **Cut the release: merge that pull request** when you want what it lists
+   live. release-please tags the merge `vX.Y.Z` and publishes the GitHub
+   Release; the `release` workflow adds the pre-alpha line, the database
+   migrations in this release, roadmap items for this version
+   (`docs/public/roadmap.yml`) and a deploy note to it.
+4. **The deploy** (`deploy` workflow, for that tag): migrations (dry run,
+   then `supabase db push` to the session pooler), then a production
+   deployment of exactly the tagged commit in both Vercel projects through
+   the API (`VERCEL_TOKEN`; `scripts/vercel-deploy.sh` waits for both
+   builds), then smoke checks (`scripts/deploy-check.sh`) including that both
+   apps' `/version` answers the release and its commit. A failing check fails
+   the run: read it, then fix forward or roll back.
+
+Without `RELEASE_PLEASE_TOKEN`, the release pull request shows no `test`
+checks (GitHub doesn't run workflows for what `GITHUB_TOKEN` creates): close
+and reopen it just before merging to run them. The `release` workflow then
+starts the deploy itself.
+
+The CLI: merging "Release cli vX.Y.Z" tags `cli-vX.Y.Z` and runs
+`publish-cli` (skipped until `NPM_TOKEN` exists). It deploys nothing.
+
+### The first release (v0.1.0, once)
+
+The `release` workflow skips until a `v*` tag exists, so release-please
+doesn't propose a version for the whole history. After the versioning
+change is on `main`, cut v0.1.0 by hand at that commit:
+
+```bash
+git switch main && git pull --ff-only
+sha=$(git rev-parse HEAD); git show -s --oneline "$sha"   # the versioning commit
+git tag -a v0.1.0 -m v0.1.0 "$sha"
+git tag -a cli-v0.1.0 -m cli-v0.1.0 "$sha"
+git push origin v0.1.0 cli-v0.1.0
+section() { awk '/^## 0\.1\.0/{p=1;next} /^## /{p=0} p' "$1"; }
+gh release create v0.1.0 --verify-tag --prerelease --title v0.1.0 --notes "$(section CHANGELOG.md)"
+scripts/release-notes.sh --apply v0.1.0    # pre-alpha line, migrations, deploy note
+gh release create cli-v0.1.0 --verify-tag --prerelease --title cli-v0.1.0 --notes "$(section cli/CHANGELOG.md)"
+gh workflow run release.yml --ref main
+```
+
+Publishing v0.1.0 (by you, so it triggers workflows) runs `deploy` for it;
+pushing `cli-v0.1.0` runs `publish-cli`, which skips until `NPM_TOKEN` is
+set (then re-run it: Actions > publish-cli > Run workflow from tag
+`cli-v0.1.0`). The last line lets release-please start the next release
+pull request.
+
+### Redeploy or roll back
+
+Actions > deploy > Run workflow, on `main`, with the tag (`vX.Y.Z`).
+
+- **The newest release**: a redeploy (migrations are a no-op if applied).
+  This is the "redeploy" after changing a Vercel environment variable (key
+  rotation, secrets): it rebuilds the live release with the new values.
+- **An older release**: a rollback. Migrations are forward-only, so the
+  workflow skips them and deploys only that tag's app code, on today's
+  schema. That is safe only if the older code works with the newer schema
+  (additive migrations are; a dropped or renamed column isn't): read the
+  "Database migrations in this release" lists of the releases you step back
+  over. If it isn't safe, fix forward instead.
+- Instant alternative for app code only: promote the previous production
+  deployment in Vercel. The next release deploys over it as usual.
+
+### Hotfix
+
+There are no release branches: fix forward on `main`.
+
+1. Land the fix on `main` as `fix(...): ...` (with its test).
+2. The release pull request now lists it (and anything else merged since the
+   last release). If something unready is also in it, revert that on `main`
+   first (`revert: ...`), or roll back while you fix.
+3. Merge the release pull request: a patch release (`vX.Y.Z+1`) deploys.
+
+### By hand
+
+`scripts/db-push.sh` (dry run), then `scripts/db-push.sh --apply`.
 Migrations must be applied in timestamp order; never edit one that shipped.
+Deploy only releases: never deploy `main` from the Vercel dashboard, or live
+stops matching a release (the next deploy's `/version` check says so).
 
 ## Checks
 
@@ -40,6 +127,7 @@ Migrations must be applied in timestamp order; never edit one that shipped.
 
   ```bash
   curl -s https://rq-mcp.vercel.app/healthz?db=1
+  curl -s https://rq-mcp.vercel.app/version     # which release is live
   ```
 
 - **Logs:** Vercel project, Logs; or the Vercel connector's runtime logs.
@@ -128,7 +216,9 @@ already decrypted.
 
 1. Check the uptime issue and the last `deploy` run.
 2. Read the runtime logs for the failing app.
-3. A bad deploy: promote the previous deployment in Vercel (instant
-   rollback). Migrations are forward-only: fix forward with a new migration.
+3. A bad release: roll back (Actions > deploy with the previous tag, or
+   promote the previous deployment in Vercel; [Redeploy or roll
+   back](#redeploy-or-roll-back)). Migrations are forward-only: fix forward
+   with a new migration.
 4. A leaked secret: rotate it (table above), then check the access logs
    (`env_access_log` via the Variables page's log, tokens' last use).
