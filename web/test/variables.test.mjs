@@ -17,6 +17,15 @@ import net from "node:net";
 import { after, before, test } from "node:test";
 import pg from "pg";
 
+// An env API error (failure.ts): its code, and the reason, component and
+// reference beside it.
+const assertApiError = (body, code) => {
+  assert.equal(body.error, code);
+  assert.equal(typeof body.message, "string");
+  assert.equal(typeof body.where, "string");
+  assert.match(body.ref, /^[0-9a-f]{8}$/);
+};
+
 const WEB = new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791");
 // web/test.sh puts Postgres at 54332 + 10 * slot and the server at 8791 + 10 * slot.
 const PG_PORT = 54332 + (Number(WEB.port) - 8791);
@@ -496,7 +505,7 @@ test("env api: an editor's CLI gets development and preview, not production", as
   assert.equal((await api(`/${team}/preview`, token)).status, 200);
   const r = await api(`/${team}/production`, token);
   assert.equal(r.status, 403);
-  assert.deepEqual(await r.json(), { error: "forbidden" });
+  assertApiError(await r.json(), "forbidden");
   assert.deepEqual((await (await api("/vaults", token)).json()).vaults.map((v) => [v.name, v.environments]), [["Env Team", ["development", "preview"]]]);
 });
 
@@ -596,7 +605,7 @@ test("env api: a ciphertext swapped between rows fails to decrypt, and nothing i
   const r = await api(`/${side}/preview`, token);
   assert.equal(r.status, 500);
   const text = await r.text();
-  assert.deepEqual(JSON.parse(text), { error: "decrypt_failed" });
+  assertApiError(JSON.parse(text), "decrypt_failed");
   assert.equal(text.includes("SEKRIT"), false);
   assert.deepEqual(await vars.revealVariable(OLIVE, side, "SWAP_A", "preview"), { ok: false, error: "decrypt_failed" });
   await vars.deleteVariable(OLIVE, side, "SWAP_A", "preview");
@@ -616,7 +625,7 @@ test("env api: without VARIABLES_KEY, values are 503 and the vault list still wo
   assert.equal((await api("/vaults", token, bare)).status, 200);
   const r = await api(`/${team}/development`, token, bare);
   assert.equal(r.status, 503);
-  assert.deepEqual(await r.json(), { error: "not_configured" });
+  assertApiError(await r.json(), "not_configured");
 });
 
 // ---------------------------------------------------------------------------

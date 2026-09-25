@@ -167,8 +167,8 @@ test("plans: Settings shows every member the vault's tier, people and storage; o
 
 test("limits: an invite past the vault's people limit is refused with the database's reason, and nothing is stored", async () => {
   const r = await post("pia", `/v/${V.one}/config/members/invite`, { email: "someone@example.test", role: "viewer" });
-  assert.equal(await flashAfter("pia", r),
-    "Plans One is at its 2-person limit on the Web small plan (2 members and 0 invites waiting): revoke an invite or remove someone first.");
+  assert.match(await flashAfter("pia", r),
+    /^Plans One is at its 2-person limit on the Web small plan \(2 members and 0 invites waiting\): revoke an invite or remove someone first\. \(ref [0-9a-f]{8}\)$/);
   const [{ n }] = await sql("select count(*)::int as n from private.vault_invites where vault_id = $1", [V.one]);
   assert.equal(n, 0);
 });
@@ -177,8 +177,8 @@ test("limits: a save that fits is counted; one past the storage limit is refused
   assert.equal((await post("pia", `/v/${V.one}/file`, { action: "create", path: "notes/a.md", content: "a".repeat(300) })).status, 303);
   assert.equal(await bytes(V.one), 300);
   const r = await post("pia", `/v/${V.one}/file`, { action: "create", path: "notes/b.md", content: "b".repeat(200) });
-  assert.equal(await flashAfter("pia", r),
-    "Plans One has 300 bytes of its 400 bytes storage limit on the Web small plan, and this needs 200 bytes more. Erase files you no longer need (deleting a file keeps its history) or delete variables, then try again.");
+  assert.match(await flashAfter("pia", r),
+    /^Plans One has 300 bytes of its 400 bytes storage limit on the Web small plan, and this needs 200 bytes more\. Erase files you no longer need \(deleting a file keeps its history\) or delete variables, then try again\. \(ref [0-9a-f]{8}\)$/);
   const [{ n }] = await sql("select count(*)::int as n from public.files where vault_id = $1 and path = 'notes/b.md'", [V.one]);
   assert.equal(n, 0);
   assert.match(await page("pia", `/v/${V.one}/config`), /Standard \(Web small\) · 2 of 2 people · 300 bytes of 400 bytes/);
@@ -208,7 +208,7 @@ test("limits: an import can't be applied in a vault already over its storage lim
   await sql("update private.plans set max_storage_bytes = 310 where id = 'web_small'");
   try {
     const flash = await flashAfter("pia", await post("pia", `${location}/apply`, {}));
-    assert.match(flash, /^Plans One has \d+ bytes of its 310 bytes storage limit on the Web small plan, and this needs \d+ bytes more\./);
+    assert.match(flash, /^Plans One has \d+ bytes of its 310 bytes storage limit on the Web small plan, and this needs \d+ bytes more\..* \(ref [0-9a-f]{8}\)$/);
     const [{ status }] = await sql("select status from public.env_imports where vault_id = $1", [V.one]);
     assert.equal(status, "pending");
     assert.equal(await bytes(V.one), 320);
@@ -240,7 +240,8 @@ test("limits: a push to the env API past the storage limit answers 507 storage_l
   assert.equal(r.status, 507);
   const body = await r.json();
   assert.equal(body.error, "storage_limit");
-  assert.match(body.message, /^Plans One has \d+ bytes of its 400 bytes storage limit on the Web small plan, and this needs 216 bytes more\./);
+  assert.match(body.message, /Plans One has \d+ bytes of its 400 bytes storage limit on the Web small plan, and this needs 216 bytes more\./);
+  assert.match(body.ref, /^[0-9a-f]{8}$/);
   assert.doesNotMatch(JSON.stringify(body) + log, /p{200}/, "the value is never echoed");
   const after = await sql("select count(*)::int as n from public.env_imports where vault_id = $1", [V.one]);
   assert.equal(after[0].n, before[0].n);
@@ -253,7 +254,7 @@ test("limits: New vault says when the plan is full, and creating one is refused 
   const full = await page("pia", "/vaults/new");
   assert.match(full, /You own 2 of the 2 vaults the Web small plan allows, so a new one can’t be created\./);
   const flash = await flashAfter("pia", await post("pia", "/vaults/new", { name: "Plans Three", default_policy: "open" }));
-  assert.equal(flash, "You're at your 2-vault limit on the Web small plan (you own 2): delete a vault you no longer need, or ask for a bigger plan.");
+  assert.match(flash, /^You're at your 2-vault limit on the Web small plan \(you own 2\): delete a vault you no longer need, or ask for a bigger plan\. \(ref [0-9a-f]{8}\)$/);
   const [{ n }] = await sql("select count(*)::int as n from public.vaults where created_by = $1", [PIA]);
   assert.equal(n, 2);
   assert.match(await page("pia", "/account"), /You own 2 vaults, and the Web small plan allows 2/);

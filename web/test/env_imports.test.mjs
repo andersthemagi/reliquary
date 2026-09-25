@@ -15,6 +15,15 @@ import net from "node:net";
 import { after, before, test } from "node:test";
 import pg from "pg";
 
+// An env API error (failure.ts): its code, and the reason, component and
+// reference beside it.
+const assertApiError = (body, code) => {
+  assert.equal(body.error, code);
+  assert.equal(typeof body.message, "string");
+  assert.equal(typeof body.where, "string");
+  assert.match(body.ref, /^[0-9a-f]{8}$/);
+};
+
 const WEB = new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791");
 const PG_PORT = 54332 + (Number(WEB.port) - 8791);
 const SUPER = `postgres://postgres:test@127.0.0.1:${PG_PORT}/postgres`;
@@ -391,12 +400,12 @@ test("env push: refused without the push permission, for an editor's production,
   const nopush = await cliToken(RUTH, ruth.origin, false);
   const r1 = await pushTo(V.push, "development", nopush, { variables: { A: value("a") } });
   assert.equal(r1.status, 403);
-  assert.deepEqual(await r1.json(), { error: "push_not_allowed" });
+  assertApiError(await r1.json(), "push_not_allowed");
 
   const samToken = await cliToken(SAM, ruth.origin, true);
   const r2 = await pushTo(V.own, "production", samToken, { variables: { A: value("a") } });
   assert.equal(r2.status, 403);
-  assert.deepEqual(await r2.json(), { error: "forbidden" });
+  assertApiError(await r2.json(), "forbidden");
   assert.equal((await pushTo(V.own, "development", samToken, { variables: { SAM_DEV: value("sd") } })).status, 201);
 
   const token = await cliToken(RUTH, ruth.origin, true);
@@ -407,7 +416,7 @@ test("env push: refused without the push permission, for an editor's production,
     assert.equal(r.status, 400, JSON.stringify(body));
     const t = await r.text();
     noValues(t);
-    assert.deepEqual(JSON.parse(t), { error: "invalid_request" });
+    assertApiError(JSON.parse(t), "invalid_request");
   }
   assert.equal((await pushTo(V.push, "development", token, "A=1", { "content-type": "text/plain" })).status, 415);
   const big = await pushTo(V.push, "development", token, { variables: { A: "x".repeat(1100 * 1024) } });

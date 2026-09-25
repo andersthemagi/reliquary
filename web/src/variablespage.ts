@@ -15,6 +15,7 @@ import { asPerson } from "./db.js";
 import { csrfField, html, page, pageHeader, raw, when, type Raw } from "./html.js";
 import { ago, message, notFound, UUID, vault, vaultPath, vaultShell, who, type Ctx, type Reply, type Vault } from "./pages.js";
 import { SecretsError, variablesConfigured } from "./secrets.js";
+import { failure } from "./failure.js";
 import { dotenvTooBig, parseDotenv, DOTENV_MAX_ENTRIES } from "./dotenv.js";
 import {
   accessLog,
@@ -534,7 +535,9 @@ async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: boolean
   }
   if (r.error === "not_found") return notFound(ctx);
   if (r.error === "storage_limit" && r.message) {
-    ctx.setFlash(`${r.message.charAt(0).toUpperCase()}${r.message.slice(1)}${r.message.endsWith(".") ? "" : "."}`);
+    // The database's own words (20260925230000_plans.sql), with a reference.
+    const f = failure({ status: 403, where: "database (plan limits)", why: `${r.message.charAt(0).toUpperCase()}${r.message.slice(1)}` });
+    ctx.setFlash(`${f.why} (ref ${f.ref})`);
     return { redirect: importPath(v.id, importId) };
   }
   const why: Record<string, string> = {

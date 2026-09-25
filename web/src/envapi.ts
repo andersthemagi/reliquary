@@ -29,6 +29,10 @@ import { envResource, issuer } from "./oauth.js";
 import { fromDb, open, SecretsError, variablesConfigured } from "./secrets.js";
 import { limitToken } from "./ratelimit.js";
 import { precheckImport, sealItems, type ImportRefusal } from "./variables.js";
+import { apiBody, classify, doing, fail, failure } from "./failure.js";
+
+// An own raise's reason, for a 400 (classify: our messages are for people).
+const refusalWhy = (err: unknown) => classify(err).why.replace(/\.$/, "");
 
 const PRM_PATH = "/.well-known/oauth-protected-resource/api/env";
 const TOKEN = /^Bearer (rle_[0-9a-f]{64})$/;
@@ -49,6 +53,28 @@ const HEADERS = {
 
 function send(res: http.ServerResponse, status: number, body: object, extra: Record<string, string> = {}): void {
   res.writeHead(status, { ...HEADERS, ...extra }).end(JSON.stringify(body));
+}
+
+// Every error answer (failure.ts): {"error": <code>, "message", "where",
+// "ref"}. The codes are the API's own, unchanged; the message says what was
+// being done and why, and never echoes the request.
+const REASONS: Record<string, [string, string]> = {
+  invalid_token: ["env API (sign-in)", "No live sign-in: the access token is missing, expired or revoked. Sign in again with `reliquary login`"],
+  forbidden: ["database (your role)", "Your role can’t use this environment’s values (a viewer, or an editor in an owners-only environment such as production)"],
+  not_found: ["database (only what’s shared with you is visible)", "There’s no such vault, environment or push for this sign-in"],
+  push_not_allowed: ["env API (sign-in)", "This sign-in wasn’t allowed to send values: “Also let it send .env files” wasn’t ticked when it was approved"],
+  rate_limited: ["rate limit", "Too many requests from this sign-in in a short time"],
+  not_configured: ["encryption", "This server has no key for variables (VARIABLES_KEY), so it can’t deliver or seal values"],
+  method_not_allowed: ["env API", "That method isn’t accepted on this path"],
+  unsupported_media_type: ["env API", "A push must be sent as application/json"],
+  too_large: ["env API", `A push is at most ${MAX_PUSH_BYTES / 1024 / 1024} MiB`],
+  invalid_request: ["env API", "The request’s body isn’t a push this API takes (variables: names that are allowed, non-empty string values)"],
+  storage_limit: ["database (plan limits)", "This vault is at its storage limit"],
+};
+function sendError(res: http.ServerResponse, status: number, code: string, extra: Record<string, string> = {}, why?: string): void {
+  const [where, reason] = REASONS[code] ?? ["env API", code];
+  const f = failure({ status, where, why: why ?? reason, code });
+  send(res, status, apiBody(f, code), extra);
 }
 
 const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -93,6 +119,7 @@ class BadRequest extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    readonly why?: string, // fixed text, never the request's
   ) {
     super(code);
   }
@@ -175,6 +202,7 @@ function routeOf(parts: string[]): Route {
 // A GET route's answer: a reply, or the variables to decrypt and send.
 type Answer =
   | { status: number; body: object; outcome: string }
+  | { status: number; error: string; outcome: string; why?: string }
   | { read: { variables: any[] }; vaultId: string; environment: string };
 
 // A GET route's database work, in the transaction asCliToken opened as the
@@ -190,14 +218,14 @@ async function getRoute(c: pg.PoolClient, route: Route, parts: string[]): Promis
   }
   if (route === ":vault/:environment" && UUID.test(parts[0]) && ENVIRONMENT.test(parts[1])) {
     const [vaultId, environment] = parts;
-    if (!variablesConfigured()) return { status: 503, body: { error: "not_configured" }, outcome: "not_configured" };
+    if (!variablesConfigured()) return { status: 503, error: "not_configured", outcome: "not_configured" };
     const r = (await c.query("select public.read_variables($1, $2) as r", [vaultId, environment])).rows[0].r;
-    if (!r.ok) return { status: STATUS[r.error] ?? 403, body: { error: r.error }, outcome: r.error };
+    if (!r.ok) return { status: STATUS[r.error] ?? 403, error: r.error, outcome: r.error };
     return { read: r, vaultId, environment };
   }
   if (route === "imports/:id" && UUID.test(parts[1])) {
     const r = (await c.query("select public.env_import_status($1) as r", [parts[1]])).rows[0].r;
-    if (!r.ok) return { status: STATUS[r.error] ?? 404, body: { error: r.error }, outcome: r.error };
+    if (!r.ok) return { status: STATUS[r.error] ?? 404, error: r.error, outcome: r.error };
     return {
       status: 200,
       body: {
@@ -211,14 +239,25 @@ async function getRoute(c: pg.PoolClient, route: Route, parts: string[]): Promis
       outcome: r.status,
     };
   }
-  return { status: 404, body: { error: "not_found" }, outcome: "not_found" };
+  return { status: 404, error: "not_found", outcome: "not_found", why: `There’s no env API route at /api/env/${route === "other" ? "…" : route}, or its vault id or environment name isn’t well formed` };
+}
+
+// What an env API request is doing, for its errors (never a value).
+function describeRoute(route: Route, parts: string[]): string {
+  const vault = (id: string) => `vault ${UUID.test(id) ? id.slice(0, 8) : "?"}`;
+  const env = (e: string) => (ENVIRONMENT.test(e) ? e : "an environment");
+  if (route === "vaults") return "Listing your vaults and environments";
+  if (route === ":vault/:environment") return `Reading ${env(parts[1])} in ${vault(parts[0])}`;
+  if (route === ":vault/:environment/imports") return `Sending values to ${env(parts[1])} in ${vault(parts[0])} for approval`;
+  if (route === "imports/:id") return `Checking push ${UUID.test(parts[1]) ? parts[1].slice(0, 8) : "?"}`;
+  return "Calling the env API";
 }
 
 // Handles the env API's paths and returns true; false for any other path.
 export async function envApi(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean> {
   const path = url.pathname;
   if (path === PRM_PATH) {
-    if (req.method !== "GET") send(res, 405, { error: "method_not_allowed" }, { allow: "GET" });
+    if (req.method !== "GET") sendError(res, 405, "method_not_allowed", { allow: "GET" }, `${req.method} isn’t accepted on this path; it takes GET`);
     else {
       send(
         res,
@@ -235,11 +274,13 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
   const parts = path.split("/").slice(3); // after "", "api", "env"
   const route = routeOf(parts);
   const method = route === ":vault/:environment/imports" ? "POST" : "GET";
+  // The log names the route's shape only, never a vault id or environment.
+  doing(describeRoute(route, parts), `env api ${req.method} /api/env/${route}`);
   let outcome = "ok";
   const challenge = () => {
     // RFC 6750: no error code when no credentials were sent.
     const value = `Bearer realm="reliquary", resource_metadata="${issuer()}${PRM_PATH}"${req.headers.authorization ? ', error="invalid_token"' : ""}`;
-    send(res, 401, { error: "invalid_token" }, { "www-authenticate": value });
+    sendError(res, 401, "invalid_token", { "www-authenticate": value });
     outcome = "invalid_token";
   };
   try {
@@ -250,7 +291,7 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
     const wait = bearer ? await limitToken(hashOf(bearer[1]), [{ name: "env_grant_minute" }, { name: "env_grant_day" }]) : 0;
     if (wait) {
       req.resume();
-      send(res, 429, { error: "rate_limited" }, { "retry-after": String(wait) });
+      sendError(res, 429, "rate_limited", { "retry-after": String(wait) }, `Too many requests from this sign-in in a short time; retry after ${wait} seconds`);
       outcome = "rate_limited";
     } else if (method === "GET" && req.method === "GET") {
       // One checkout: the token is resolved inside the route's transaction.
@@ -267,9 +308,13 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
           send(res, 200, { vault: vaultId, environment, variables });
         } catch (err) {
           if (!(err instanceof SecretsError)) throw err;
-          send(res, 500, { error: "decrypt_failed" });
+          // Names the variable and environment (never a value or a key).
+          sendError(res, 500, "decrypt_failed", {}, `${err.message}; nothing was delivered. Set that value again in the web app`);
           outcome = "decrypt_failed";
         }
+      } else if ("error" in out.result) {
+        sendError(res, out.result.status, out.result.error, {}, out.result.why);
+        outcome = out.result.outcome;
       } else {
         send(res, out.result.status, out.result.body);
         outcome = out.result.outcome;
@@ -278,23 +323,25 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
       const grant = bearer ? await resolve(bearer[1]) : null;
       if (!grant) challenge();
       else if (req.method !== method) {
-        send(res, 405, { error: "method_not_allowed" }, { allow: method });
+        sendError(res, 405, "method_not_allowed", { allow: method }, `${req.method} isn’t accepted on this path; it takes ${method}`);
         outcome = "method";
       } else if (route === ":vault/:environment/imports" && UUID.test(parts[0]) && ENVIRONMENT.test(parts[1])) {
         outcome = await push(req, res, grant, parts[0], parts[1]);
       } else {
-        send(res, 404, { error: "not_found" });
+        sendError(res, 404, "not_found", {}, "There’s no env API route at this path, or its vault id or environment name isn’t well formed");
         outcome = "not_found";
       }
     }
   } catch (err) {
     if (err instanceof BadRequest) {
-      if (!res.headersSent) send(res, err.status, { error: err.code });
+      if (!res.headersSent) sendError(res, err.status, err.code, {}, err.why);
       outcome = err.code;
     } else {
-      console.error("env api error", (err as { code?: string }).code ?? (err as Error).name);
-      if (!res.headersSent) send(res, 500, { error: "server_error" });
-      outcome = "server_error";
+      // What was being done, where it broke and why, with the reference
+      // that finds the detail in the log (failure.ts).
+      const f = fail(err, { where: "env API" });
+      if (!res.headersSent) send(res, f.status, apiBody(f, "server_error"));
+      outcome = `server_error ref=${f.ref}`;
     }
   }
   // The route's shape only: never a vault id, environment, name, token or value.
@@ -307,7 +354,7 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
 async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: Grant, vaultId: string, environment: string): Promise<string> {
   if (!variablesConfigured()) {
     req.resume();
-    send(res, 503, { error: "not_configured" });
+    sendError(res, 503, "not_configured");
     return "not_configured";
   }
   const { entries, refused } = pushBody(await readJson(req, MAX_PUSH_BYTES));
@@ -326,19 +373,19 @@ async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: 
       ).rows[0].r;
     });
   } catch (err) {
-    const e = err as { code?: string; message?: string };
     // 22023: the database refused the input (a name, the shape).
-    if (e.code === "22023") throw new BadRequest(400, "invalid_request");
+    // The database's own message names the rule, never a value.
+    if ((err as { code?: string }).code === "22023") throw new BadRequest(400, "invalid_request", refusalWhy(err));
     // RLP01: the vault's storage limit (20260925230000_plans.sql). The
-    // message names the vault and the sizes, never a value.
-    if (e.code === "RLP01") {
-      send(res, 507, { error: "storage_limit", message: e.message ?? "" });
+    // database's message names the vault and the sizes, never a value.
+    if ((err as { code?: string }).code === "RLP01") {
+      sendError(res, 507, "storage_limit", {}, refusalWhy(err));
       return "storage_limit";
     }
     throw err;
   }
   if (!r.ok) {
-    send(res, STATUS[r.error] ?? 403, { error: r.error });
+    sendError(res, STATUS[r.error] ?? 403, r.error);
     return r.error;
   }
   send(res, 201, {

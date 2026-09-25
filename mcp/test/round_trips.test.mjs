@@ -109,7 +109,8 @@ test("round trips: no vault by that name or id is still the same answer, in the 
     ]) {
       const r = await own(name, args);
       assert.equal(r.isError, true, name);
-      assert.equal(r.text, "No vault with that name or id is available to you. Use list_vaults to see yours.", name);
+      assert.equal(r.text.split("\n")[0], "No vault with that name or id is available to you. Use list_vaults to see yours.", name);
+      assert.match(r.text, /\n\(what: Calling [a-z_]+; where: MCP tool [a-z_]+: database \(function private.vault_ref\); ref [0-9a-f]{8}\)$/, name);
       // The failed call's query, then rollback instead of commit.
       assert.equal(r.queries, 1, name);
     }

@@ -38,6 +38,8 @@ import { html, notice, page, type Theme } from "./html.js";
 import { inviteTokenOf, maskEmail, peekInvite, type Peek } from "./invites.js";
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
+import { errorPage } from "./errorpage.js";
+import { failure, noteUpstream, upstreamNote } from "./failure.js";
 
 // The live invite a sign-in is for, if `next` is an invite page. Looking
 // one up counts against the address's invite limit (ratelimit.ts), like
@@ -153,17 +155,28 @@ function confirmForm(csrf: string, tokenHash: string, theme: Theme): string {
   );
 }
 
-const unavailable = (theme: Theme): Reply => ({
-  status: 503,
-  html: notice("Sign-in is unavailable", "Reliquary can’t reach its sign-in service right now. Try again in a minute.", theme),
-});
+// Sign-in can't go on: the error page, with the reason noted where the call
+// failed (auth.ts, or the rate limit below) and a reference.
+export function signinUnavailablePage(theme: Theme): string {
+  const up = upstreamNote();
+  const f = failure({
+    status: 503,
+    where: up?.where ?? "sign-in (Supabase Auth)",
+    why: up?.why ?? "Reliquary couldn’t reach its sign-in service",
+  });
+  return errorPage(f, { theme, title: "Sign-in is unavailable", lede: "Reliquary can’t reach its sign-in service right now. Try again in a minute." });
+}
+const unavailable = (theme: Theme): Reply => ({ status: 503, html: signinUnavailablePage(theme) });
 
 // Sign-in's limits (ratelimit.ts) fail closed: with the counter out of
 // reach, sign-in is unavailable rather than open to guessing. The same
 // answer for every address, with an account or not.
 async function signinLimit(checks: Check[], theme: Theme): Promise<Reply | undefined> {
   const wait = await limitStrict(checks);
-  if (wait === "unavailable") return unavailable(theme);
+  if (wait === "unavailable") {
+    noteUpstream("rate limit (database)", "The sign-in attempt counter in the database couldn’t be reached, and sign-in stays closed without it");
+    return unavailable(theme);
+  }
   if (wait) return { status: 429, retryAfter: wait, html: tooManyPage(wait, theme, "That was too many sign-in attempts in a short time") };
   return undefined;
 }

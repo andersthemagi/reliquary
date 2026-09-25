@@ -253,9 +253,15 @@ main(process.argv.slice(2)).then(
       say(`reliquary: ${err.message}`);
       process.exit(err.exitCode);
     }
-    // Unexpected: the kind of error only, never a message that might carry
-    // something from a response.
-    say(`reliquary: unexpected error (${(err as NodeJS.ErrnoException)?.code ?? (err as Error)?.name ?? "unknown"}). Please report it.`);
+    // A bug in the CLI: which command, the error's kind and code, and where
+    // in the CLI it was thrown; never its message, which might carry
+    // something from a response or a value.
+    const e = err as NodeJS.ErrnoException | undefined;
+    const kind = `${e?.name ?? "Error"}${typeof e?.code === "string" ? ` ${e.code}` : ""}`;
+    const at = /\/(dist\/[\w.-]+\.js:\d+)(?::\d+)?\)?$/m.exec(typeof e?.stack === "string" ? e.stack.split("\n").slice(1).join("\n") : "");
+    const [first, second] = process.argv.slice(2);
+    const command = ["login", "logout", "vaults", "run"].includes(first) ? first : first === "env" && ["pull", "push"].includes(second) ? `env ${second}` : "the command";
+    say(`reliquary: ${command === "the command" ? command : `\`reliquary ${command}\``} stopped on a bug in the CLI: ${kind}${at ? ` at ${at[1]}` : ""}. Nothing more is shown in case it holds a value. Please report this line (\`reliquary --version\` too).`);
     process.exit(1);
   },
 );

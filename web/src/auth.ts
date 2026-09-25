@@ -20,6 +20,7 @@ import { createHmac, createPublicKey, randomBytes, timingSafeEqual, verify as ve
 import { writeFileSync } from "node:fs";
 import type http from "node:http";
 import { limit } from "./ratelimit.js";
+import { networkReason, noteUpstream } from "./failure.js";
 
 export type AuthMode = "local" | "supabase";
 export type Alg = "ES256" | "RS256";
@@ -220,7 +221,16 @@ function localSession(req: http.IncomingMessage): Lookup {
 
 // Supabase ------------------------------------------------------------------
 
-class Unavailable extends Error {}
+// Supabase Auth could not answer. The reason (never a token or an address)
+// goes to the request's error (failure.ts), for the "unavailable" page.
+class Unavailable extends Error {
+  constructor(why: string) {
+    super(why);
+    noteUpstream("sign-in (Supabase Auth)", why);
+  }
+}
+const unreachable = (call: string, err: unknown) =>
+  new Unavailable(`${call} failed: ${networkReason(err) ?? `${(err as Error)?.name ?? "error"} before an answer`}`);
 
 async function supabaseSession(req: http.IncomingMessage): Promise<Lookup> {
   const cookies: string[] = [];
@@ -273,7 +283,7 @@ async function supabaseSession(req: http.IncomingMessage): Promise<Lookup> {
     return { session: supabaseSessionFor(req, claims, accessToken, cookies), cookies, unavailable: false };
   } catch (err) {
     if (err instanceof Unavailable) {
-      console.error("auth: Supabase Auth unreachable");
+      console.error(`auth: Supabase Auth unreachable: ${err.message}`);
       return { session: null, cookies: [], unavailable: true };
     }
     throw err;
@@ -327,10 +337,10 @@ async function gotrue(path: string, body: unknown, headers: Record<string, strin
       redirect: "error",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch {
-    throw new Unavailable();
+  } catch (err) {
+    throw unreachable(`POST ${path}`, err);
   }
-  if (res.status >= 500) throw new Unavailable();
+  if (res.status >= 500) throw new Unavailable(`POST ${path} answered ${res.status}`);
   const json = await res.json().catch(() => ({}));
   return { status: res.status, json };
 }
@@ -525,12 +535,12 @@ async function fetchJwksOnce(): Promise<Jwk[]> {
       redirect: "error",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch {
-    throw new Unavailable();
+  } catch (err) {
+    throw unreachable("GET /.well-known/jwks.json (signing keys)", err);
   }
-  if (res.status !== 200) throw new Unavailable();
+  if (res.status !== 200) throw new Unavailable(`GET /.well-known/jwks.json (signing keys) answered ${res.status}`);
   const body = (await res.json().catch(() => undefined)) as { keys?: unknown } | undefined;
-  if (!body || !Array.isArray(body.keys)) throw new Unavailable();
+  if (!body || !Array.isArray(body.keys)) throw new Unavailable("GET /.well-known/jwks.json (signing keys) answered with no key list");
   const keys = body.keys.filter((k): k is Jwk => typeof k === "object" && k !== null);
   jwks = { keys, at: Date.now() };
   return keys;

@@ -22,6 +22,7 @@ import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef,
 import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnauthorized, rateLimitedBody } from "./ratelimit.js";
 import { registerTools } from "./tools.js";
 import { BUILD, versionJson } from "./version.js";
+import { compact, fail, failure, withRequest, type Failure } from "./failure.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8787);
@@ -130,7 +131,31 @@ function keepaliveAllowed(header: string | string[] | undefined): boolean {
   return timingSafeEqual(digest(header), digest(want));
 }
 
-const httpServer = http.createServer(async (req, res) => {
+// JSON-RPC's internal error code, for failures of the server itself.
+const INTERNAL_ERROR = -32603;
+
+// An error as JSON-RPC (failure.ts's fields in `data`, the reason in
+// `message`), with the failure's HTTP status.
+function sendRpcError(res: http.ServerResponse, f: Failure, id: unknown = null): void {
+  send(res, f.status, {
+    jsonrpc: "2.0",
+    id: typeof id === "string" || typeof id === "number" ? id : null,
+    error: { code: INTERNAL_ERROR, message: compact(f), data: { what: f.what, where: f.where, why: f.why, ref: f.ref } },
+  });
+}
+
+// A refusal before any JSON-RPC message was read: the old `error` string,
+// with the error model's fields beside it.
+function refuseHttp(res: http.ServerResponse, status: number, error: string, why: string, headers: Record<string, string> = {}): void {
+  const f = failure({ status, where: "MCP server (request check)", why });
+  send(res, status, { error, message: `${f.what} failed: ${f.why}`, where: f.where, ref: f.ref }, headers);
+}
+
+// Every request runs with its own reference (failure.ts); a tool call gets
+// one of its own (tools.ts).
+const httpServer = http.createServer((req, res) => withRequest("Handling an MCP request", `mcp ${req.method}`, () => serve(req, res)));
+
+async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
 
   if (path === "/healthz") {
@@ -158,7 +183,7 @@ const httpServer = http.createServer(async (req, res) => {
   }
   if (path === OAUTH.prmPath || path === "/.well-known/oauth-protected-resource") {
     if (req.method !== "GET" && req.method !== "OPTIONS") {
-      send(res, 405, { error: "method_not_allowed" }, { Allow: "GET" });
+      refuseHttp(res, 405, "method_not_allowed", `${req.method} isn’t accepted here; this metadata takes GET`, { Allow: "GET" });
       return;
     }
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "mcp-protocol-version" };
@@ -170,7 +195,7 @@ const httpServer = http.createServer(async (req, res) => {
     return;
   }
   if (path !== "/mcp") {
-    send(res, 404, { error: "not_found" });
+    refuseHttp(res, 404, "not_found", `There’s nothing at ${path.slice(0, 200)}; the MCP endpoint is /mcp`);
     return;
   }
 
@@ -189,7 +214,7 @@ const httpServer = http.createServer(async (req, res) => {
     }
     // RFC 6750: no error code when no credentials were sent.
     const challenge = `Bearer realm="reliquary", resource_metadata="${OAUTH.prmUrl}"${bearer ? ', error="invalid_token"' : ""}`;
-    send(res, 401, { error: "invalid_token" }, { "WWW-Authenticate": challenge });
+    refuseHttp(res, 401, "invalid_token", bearer ? "The token isn’t live: it is unknown, expired or revoked, or was issued for another resource" : "No token: send Authorization: Bearer <token>", { "WWW-Authenticate": challenge });
     console.info("mcp 401");
   };
   // A request that fails before any tool could run answers 401 for a bad
@@ -206,7 +231,7 @@ const httpServer = http.createServer(async (req, res) => {
 
   // Stateless: no server-initiated streams or sessions to resume.
   if (req.method !== "POST") {
-    if (await knownOr401()) send(res, 405, { error: "method_not_allowed" }, { Allow: "POST" });
+    if (await knownOr401()) refuseHttp(res, 405, "method_not_allowed", `${req.method} isn’t accepted: this endpoint is stateless and takes POST only`, { Allow: "POST" });
     return;
   }
 
@@ -214,12 +239,15 @@ const httpServer = http.createServer(async (req, res) => {
   try {
     body = await readJson(req);
   } catch (err) {
-    if (await knownOr401()) send(res, 400, { error: (err as Error).message });
+    if (await knownOr401()) {
+      const m = (err as Error).message;
+      refuseHttp(res, 400, m, m === "body too large" ? `The request body is over ${MAX_BODY / 1024 / 1024} MiB` : "The request body isn’t valid JSON");
+    }
     return;
   }
   if (Array.isArray(body) && body.length > MAX_BATCH) {
     if (await knownOr401()) {
-      send(res, 400, { error: `batch too large: at most ${MAX_BATCH} messages per request` });
+      refuseHttp(res, 400, `batch too large: at most ${MAX_BATCH} messages per request`, `A JSON-RPC batch holds at most ${MAX_BATCH} messages`);
       console.info("mcp 400 batch");
     }
     return;
@@ -235,11 +263,23 @@ const httpServer = http.createServer(async (req, res) => {
   let identity: Identity | null;
   // Tool calls per token (ratelimit.ts), counted while the token resolves.
   let wait = 0;
+  // A token that can't be checked (the database is down, or timed out) is
+  // not a bad token: a 503 with the reason, never a 401 that would send the
+  // client to sign in again.
+  let broken: unknown = null;
+  const checked = <T,>(p: Promise<T>) => p.catch((err) => ((broken = err), null));
   if (calls) {
     session = new Session(ref);
-    [identity, wait] = await Promise.all([session.open().catch(() => null), limitToolCalls(ref.hash, calls)]);
+    [identity, wait] = await Promise.all([checked(session.open()), limitToolCalls(ref.hash, calls)]);
   } else {
-    identity = await identify(bearer![1]).catch(() => null);
+    identity = await checked(identify(bearer![1]));
+  }
+  if (broken) {
+    await session?.close();
+    const f = fail(broken, { where: "MCP (token check)", what: "Checking the token" });
+    sendRpcError(res, f, Array.isArray(body) ? null : (body as { id?: unknown } | null)?.id);
+    console.info(`mcp ${f.status} token check ref=${f.ref}`);
+    return;
   }
   if (!identity) {
     await unauthorized();
@@ -275,12 +315,15 @@ const httpServer = http.createServer(async (req, res) => {
     await transport.handleRequest(req, res, body);
     console.info(`mcp ${res.statusCode} user=${identity.userId.slice(0, 8)}`);
   } catch (err) {
-    console.error("mcp error", (err as Error).name);
-    if (!res.headersSent) send(res, 500, { error: "server_error" });
+    // What was being done, where it broke, why, and the reference, which is
+    // also in the log with the detail (failure.ts).
+    const f = fail(err, { where: "MCP server" });
+    if (!res.headersSent) sendRpcError(res, f, Array.isArray(body) ? null : (body as { id?: unknown } | null)?.id);
+    console.info(`mcp ${f.status} ref=${f.ref}`);
   } finally {
     await session?.close();
   }
-});
+}
 
 // On Vercel the app runs as one function (api/index.js) that hands every
 // request to this handler; the platform owns the socket. Locally, listen on

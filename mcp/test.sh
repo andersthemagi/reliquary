@@ -26,7 +26,7 @@ webport=$((port + 1))
 rlport=$((18788 + 10 * slot))
 node=docker.io/library/node:22-slim
 
-cleanup() { "$engine" rm -f "$pg" "$srv" "$web" "$rl" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot"; }
+cleanup() { "$engine" rm -f "$pg" "$srv" "$web" "$rl" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot" ".error-refs-$slot"; }
 trap cleanup EXIT
 cleanup
 
@@ -87,7 +87,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 # docs/ read-only, for test/parity.test.mjs (every tool is in docs/parity.md).
 "$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" \
   -e MCP_URL="http://127.0.0.1:$port/mcp" -e TEST_DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
-  -e MCP_RL_URL="http://127.0.0.1:$rlport/mcp" -e TEST_SUPER_URL="postgres://postgres:test@127.0.0.1:$pgport/postgres" \
+  -e MCP_ERROR_REFS_FILE="/app/.error-refs-$slot" -e MCP_RL_URL="http://127.0.0.1:$rlport/mcp" -e TEST_SUPER_URL="postgres://postgres:test@127.0.0.1:$pgport/postgres" \
   -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
   -e TOKEN_LOAD_MEASURE_ONLY="${TOKEN_LOAD_MEASURE_ONLY:-}" \
@@ -99,10 +99,19 @@ echo "== server log (must contain no tokens or file text)"
 # and truncates it, losing the test output.
 server_log=$("$engine" logs "$srv" 2>&1; "$engine" logs "$rl" 2>&1)
 printf '%s\n' "$server_log" >&2
-grep -E 'rlq_|800 EUR|Hermes|Falcon|CIPHERTEXT-MARKER' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
+grep -E 'rlq_|800 EUR|Hermes|Falcon|CIPHERTEXT-MARKER|SEKRIT' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
 # The addresses test/rate_limits.test.mjs sends from.
 grep -E '198\.51\.100\.|2001:db8' <<< "$server_log" && { echo "LEAK: a client address in the server log"; exit 1; } || echo "clean (addresses)"
 # OAuth: no personal token, access (MCP or CLI) or refresh token, or code in either app's log.
 web_log=$("$engine" logs "$web" 2>&1)
 grep -E 'rl[qorce]_[0-9a-f]' <<< "$server_log
 $web_log" && { echo "LEAK: a token or code in a server log"; exit 1; } || echo "clean (oauth)"
+# Every reference test/errors.test.mjs saw is in the server log, with its detail.
+if [ -z "${MCP_TESTS:-}" ] || [[ "$MCP_TESTS" == *errors* ]]; then
+  echo "== error references"
+  [ -s ".error-refs-$slot" ] || { echo "test/errors.test.mjs recorded no references"; exit 1; }
+  while read -r ref; do
+    grep -q "^failure ref=$ref {" <<< "$server_log" || { echo "reference $ref is not in the server log"; exit 1; }
+  done < ".error-refs-$slot"
+  echo "found $(wc -l < ".error-refs-$slot") references"
+fi

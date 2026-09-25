@@ -35,6 +35,7 @@ import { createHmac } from "node:crypto";
 import type http from "node:http";
 import net from "node:net";
 import { pool } from "./db.js";
+import { failure } from "./failure.js";
 
 export type Limit = { limit: number; window: number };
 
@@ -182,13 +183,15 @@ export async function limitUnauthorized(ip: string): Promise<number> {
 // the agent to wait. Short, and nothing about what was counted or how.
 export const RATE_LIMITED_CODE = -32029;
 export function rateLimitedBody(wait: number, id: unknown = null): object {
+  // The error model's where and reference (failure.ts), logged like any failure.
+  const f = failure({ status: 429, where: "rate limit", why: `Rate limit reached; retry after ${wait} seconds`, code: "rate_limited" });
   return {
     jsonrpc: "2.0",
     id: typeof id === "string" || typeof id === "number" ? id : null,
     error: {
       code: RATE_LIMITED_CODE,
       message: `Rate limit reached. Wait ${wait} seconds, then retry.`,
-      data: { retry_after: wait },
+      data: { retry_after: wait, where: f.where, ref: f.ref },
     },
   };
 }

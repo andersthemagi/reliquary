@@ -34,7 +34,9 @@ import { createHmac } from "node:crypto";
 import type http from "node:http";
 import net from "node:net";
 import { pool } from "./db.js";
-import { html, notice, when, type Theme } from "./html.js";
+import { when, type Theme } from "./html.js";
+import { errorPage } from "./errorpage.js";
+import { failure } from "./failure.js";
 
 export type Limit = { limit: number; window: number };
 
@@ -220,9 +222,10 @@ export function waitText(seconds: number): string {
 export function tooManyPage(retryAfter: number, theme: Theme, what = "That was too many requests in a short time"): string {
   // Rounded up to the minute, as when() shows minutes.
   const at = new Date(Math.ceil((Date.now() + retryAfter * 1000) / 60_000) * 60_000);
-  return notice(
-    "Too many requests",
-    html`${what}, so Reliquary is pausing them. Try again in ${waitText(retryAfter)}, after ${when(at)}. Nothing was changed.`,
-    theme,
-  );
+  const f = failure({
+    status: 429,
+    where: "rate limit",
+    why: `${what}, so Reliquary is pausing them. Try again in ${waitText(retryAfter)}, after ${when(at)}. Nothing was changed.`,
+  });
+  return errorPage(f, { theme, title: "Too many requests" });
 }

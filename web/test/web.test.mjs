@@ -205,11 +205,18 @@ test("rules: owner adds a rule, the checker explains it, and it can be removed",
 });
 
 test("isolation: someone else's vault, file or proposal looks missing", async () => {
-  const missing = await text(await get("/v/00000000-0000-0000-0000-000000000000"));
+  // The same request for a vault that doesn't exist, byte for byte, but for
+  // the vault id the URL itself names and the error's reference and time,
+  // which differ on every request (failure.ts).
+  const NONE = "ffffffff-0000-4000-8000-000000000000";
+  const plain = (h, id) =>
+    h.replaceAll(id, "ID").replaceAll(id.slice(0, 8), "ID").replace(/ref:? +[0-9a-f]{8}/g, "ref").replace(/time: \S+/g, "time");
   for (const path of [`/v/${DEE_VAULT}`, `/v/${DEE_VAULT}/file?path=x`, `/v/${DEE_VAULT}/proposals/${PROPOSAL}`, `/v/${DEE_VAULT}/rules`]) {
     const r = await get(path);
     assert.equal(r.status, 404, path);
-    assert.equal(await text(r), missing, path);
+    const missing = await get(path.replace(DEE_VAULT, NONE));
+    assert.equal(missing.status, 404, path);
+    assert.equal(plain(await text(r), DEE_VAULT), plain(await text(missing), NONE), path);
   }
 });
 

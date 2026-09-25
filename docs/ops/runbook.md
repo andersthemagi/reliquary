@@ -286,6 +286,39 @@ suspected leak of a key, rotate it and rotate the values too (at their
 providers): re-encryption protects stored ciphertext, not a value someone
 already decrypted.
 
+## Finding an error by its ref
+
+Every failure a person or agent sees carries a reference, `ref 7f3a2c9e`
+(the public page: docs/public/reference/errors.md). The same request wrote
+one log line that starts with it:
+
+```text
+failure ref=7f3a2c9e {"status":504,"what":"POST /v/:id/file <vault id> action=write","where":"database (function public.search)","why":"57014 statement timeout: ...","sqlstate":"57014","message":"canceling statement due to statement timeout","functions":"public.search line 12 < ...","routine":"ProcessInterrupts","stack":"..."}
+```
+
+1. Vercel, the project the person was using (web app for pages, the env
+   API, OAuth and the CLI; MCP for tool calls), **Logs**, set the time range
+   around when it happened, and search for the ref (`7f3a2c9e`). With the
+   CLI: `vercel logs <deployment url> | grep 7f3a2c9e` (logs are kept for a
+   limited time, so look soon).
+2. Read the JSON: `status`, `what` (the route's shape and ids, never a path
+   or name someone typed), `where`, `why`, and for database errors
+   `sqlstate`, `constraint`, `table`, `column`, `functions` (innermost
+   first, with line numbers), `detail` (values redacted to `(…)`) and
+   `hint`. A 5xx has `stack` (frames only). 5xx lines are at error level,
+   the rest at info.
+3. Next to it, the request's own line (`POST /v/... 504 ref=7f3a2c9e`, or
+   the env API's and OAuth's route line with `server_error ref=...`).
+4. A `57014` or `55P03` is a slow query or a held lock: find the function
+   in `functions`, and check Supabase's query performance for it. An `08xxx`
+   or `53300` is the database connection: check Supabase's status and the
+   pooler. A `sign-in (Supabase Auth)` failure names the call and its status
+   or network error.
+
+Logs never hold a value, a token, a file's text, an email address or a
+failing row's values; if one ever does, that is a bug to fix before
+anything else.
+
 ## If something is wrong
 
 1. Check the uptime issue and the last `deploy` run.

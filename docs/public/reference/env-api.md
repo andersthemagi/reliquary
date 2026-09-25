@@ -32,6 +32,13 @@ WWW-Authenticate: Bearer realm="reliquary", resource_metadata="<server>/.well-kn
 
 Every answer is JSON, `cache-control: no-store, private`, with no CORS headers.
 
+Every error carries its code in `error` (the codes below), and beside it `message` (what failed and why), `where` (the part of Reliquary that failed) and `ref` (a reference ID to quote when you report it). The message never echoes what you sent. A failure of the server itself is `server_error` with the status that fits it: 500, 503 when the database is unreachable, 504 when it timed out. [Errors and reference IDs](errors.md) explains the fields.
+
+```json
+{ "error": "forbidden", "message": "Reading production in vault 3f2a9c1d failed: Your role can't use this environment's values (a viewer, or an editor in an owners-only environment such as production).",
+  "where": "database (your role)", "ref": "7f3a2c9e" }
+```
+
 Each sign-in may make 60 requests a minute and 5000 a day ([Limits](limits.md#rate-limits)). Past that, any route answers `429 {"error": "rate_limited"}` with `Retry-After` in seconds; wait that long and try again.
 
 ### GET /api/env/vaults
@@ -76,7 +83,7 @@ Sends variables for a person to apply (a push). Needs a sign-in allowed to send 
       "url": "<server>/v/<vault>/variables/imports/<import>" }
 ```
 
-Errors: 400 `invalid_request` (not JSON, a bad or refused name, an empty or oversized value; never echoed), 403 `forbidden` or `push_not_allowed`, 404 `not_found`, 413 `too_large`, 415 `unsupported_media_type`, 429 `rate_limited`, 503 `not_configured`.
+Errors: 400 `invalid_request` (not JSON, a bad or refused name, an empty or oversized value; never echoed), 403 `forbidden` or `push_not_allowed`, 404 `not_found`, 413 `too_large`, 415 `unsupported_media_type`, 429 `rate_limited`, 503 `not_configured`, 507 `storage_limit` (the vault is at its storage limit: [Plans and limits](../concepts/plans-and-limits.md)).
 
 ### GET /api/env/imports/`<import id>`
 

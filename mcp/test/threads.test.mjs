@@ -30,6 +30,9 @@ async function call(token, name, args = {}) {
 
 const read = (token, id = THREAD_PROPOSAL) => call(token, "read_proposal", { proposal_id: id });
 const comment = (token, text, id = THREAD_PROPOSAL) => call(token, "comment_on_proposal", { proposal_id: id, comment: text });
+// An error's reference differs per call (failure.ts); everything else in an
+// outsider's answer must be the same as for something that doesn't exist.
+const noRef = (t) => t.replace(/ref [0-9a-f]{8}/g, "ref");
 
 test("thread: the reviewer's note is already in the thread, fenced", async () => {
   const r = await read(BEN_TOKEN);
@@ -97,10 +100,10 @@ test("outsider: someone else's proposal is indistinguishable from a missing one"
   const missing = await read(DEE_TOKEN, "00000000-0000-0000-0000-000000000000");
   const hidden = await read(DEE_TOKEN);
   assert.equal(hidden.isError, true);
-  assert.equal(hidden.text, missing.text);
+  assert.equal(noRef(hidden.text), noRef(missing.text));
   const c = await comment(DEE_TOKEN, "hello");
   assert.equal(c.isError, true);
-  assert.equal(c.text, (await comment(DEE_TOKEN, "hello", "00000000-0000-0000-0000-000000000000")).text);
+  assert.equal(noRef(c.text), noRef((await comment(DEE_TOKEN, "hello", "00000000-0000-0000-0000-000000000000")).text));
   // And the other way round: Team members can't reach into Dee's vault.
   assert.equal((await comment(ANA_TOKEN, "peek", DEE_PROPOSAL)).isError, true);
   assert.doesNotMatch((await read(ANA_TOKEN, DEE_PROPOSAL)).text, /Plan\./);

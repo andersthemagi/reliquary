@@ -67,7 +67,9 @@ async function limited(r, { max, min = 1, rpcId = null } = {}) {
   assert.equal(body.id, rpcId);
   assert.equal(body.error.code, -32029);
   assert.equal(body.error.message, `Rate limit reached. Wait ${wait} seconds, then retry.`);
-  assert.deepEqual(body.error.data, { retry_after: wait });
+  assert.equal(body.error.data.retry_after, wait);
+  assert.equal(body.error.data.where, "rate limit");
+  assert.match(body.error.data.ref, /^[0-9a-f]{8}$/);
   return wait;
 }
 

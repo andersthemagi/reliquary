@@ -32,8 +32,10 @@ test("plans: list_vaults notes a vault near its storage limit, with its usage", 
 test("plans: a write past the storage limit reaches the agent as a clear refusal, and nothing is written", async () => {
   const r = await call("write_file", { vault: "Pat full", path: "notes/more.md", content: "m".repeat(20) });
   assert.equal(r.isError, true);
-  assert.equal(r.text,
+  const [first, second] = r.text.split("\n");
+  assert.equal(first,
     "Limit reached: Pat full has 90 bytes of its 100 bytes storage limit on the MCP small plan, and this needs 20 bytes more. Erase files you no longer need (deleting a file keeps its history) or delete variables, then try again");
+  assert.match(second, /^\(what: .*; where: MCP tool write_file.*; ref [0-9a-f]{8}\)$/);
   const files = await call("list_files", { vault: "Pat full" });
   assert.doesNotMatch(files.text, /more\.md/);
 });
@@ -47,7 +49,7 @@ test("plans: a proposal that wouldn't fit is refused when made", async () => {
 test("plans: create_vault at the account's vault limit reaches the agent as a clear refusal", async () => {
   const r = await call("create_vault", { name: "Pat second" });
   assert.equal(r.isError, true);
-  assert.equal(r.text,
+  assert.equal(r.text.split("\n")[0],
     "Limit reached: you're at your 1-vault limit on the MCP small plan (you own 1): delete a vault you no longer need, or ask for a bigger plan");
   assert.doesNotMatch((await call("list_vaults")).text, /Pat second/);
 });
