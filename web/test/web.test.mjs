@@ -110,7 +110,9 @@ test("csrf: decisions need the form token, a same-origin Origin, and not an opaq
 test("request changes: refused without a note, then kept alive with one", async () => {
   const token = await csrf(`${V}/proposals/${PROPOSAL}`);
   const url = `${V}/proposals/${PROPOSAL}/decide`;
-  assert.match(await follow(await post(url, { decision: "request_changes", note: "", csrf: token })), /Say why, so the proposer can act on it/);
+  const refused = await post(url, { decision: "request_changes", note: "", csrf: token });
+  assert.equal(refused.status, 400);
+  assert.match(await refused.text(), /Say why, so the proposer can act on it/);
   const h = await follow(await post(url, { decision: "request_changes", note: "Keep 800 until January.", csrf: token }));
   assert.match(h, /Changes requested\. The proposer can see your note/);
   assert.match(h, /Requested changes · you · revision 1/);

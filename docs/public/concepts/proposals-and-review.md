@@ -18,19 +18,24 @@ A proposal is one of:
 | Rejected | a reviewer rejected it, with a note |
 | Stale | the file changed after it was proposed, so it can't apply; **Propose again** (or `propose` with the same text) starts a new one on the current file |
 
+A vault's **Proposals** page lists them in tabs, each with its count: **Open**, **Changes requested**, **Applied** and **Closed** (rejected and stale ones, each marked). A decided proposal's row says how it ended, such as "Rejected by you, 2 days ago", instead of its approvals.
+
 ## Reviewing
 
 The **Inbox** in the top bar counts what waits on you, across all your vaults, and lists it on the Inbox page (see [The top bar, inbox and account](inbox-and-account.md)). A proposal's page puts the decision first:
 
-1. The status, and the latest request for changes if there is one.
-2. The decision: a note, then **Approve**, **Request changes**, **Reject**, or **Edit, then approve**.
-3. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted.
-4. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
-5. Approvals and the discussion.
+1. The status, who proposed it (the agent first, then its person) and when. **Snooze**, **Revise** and **Edit, then approve** are at the top right.
+2. The latest request for changes if there is one, and what's worth a closer look (below).
+3. The decision: a note, then **Approve**, **Request changes** or **Reject**.
+4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted.
+5. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
+6. Approvals so far and the discussion.
+
+If a decision is refused, for example **Reject** without a note, the page comes back with the reason in the decision box and your note as you typed it; nothing was decided. Once a proposal is decided, the top of its page says how it ended, who decided and when, in place of the approvals.
 
 - **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it.
 - **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
-- **Edit, then approve** lets you fix the text yourself and approve your version. It is credited to you, and with a quorum above 1 it waits for another approval of the edit.
+- **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit.
 
 ### Worth a closer look
 
@@ -63,4 +68,4 @@ Every proposal has one timeline: comments, review notes and approvals, oldest fi
 
 ## Snooze
 
-From a proposal's page, or its row in the Inbox, you can snooze it **for a day**, **for a week**, or **until it changes**. A snoozed proposal leaves your Inbox and its count until the time passes, someone else comments, or it gets a new revision. Snoozes are private to you and not logged. Agents can't snooze, so an agent can't hide its own proposal from you.
+From a proposal's page (**Snooze**, at the top right), or its row in the Inbox, you can snooze it **for a day**, **for a week**, or **until it changes**. A snoozed proposal leaves your Inbox and its count until the time passes, someone else comments, or it gets a new revision. Snoozes are private to you and not logged. Agents can't snooze, so an agent can't hide its own proposal from you.

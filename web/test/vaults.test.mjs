@@ -144,7 +144,7 @@ test("revise: the proposer revises their own proposal without approving it", asy
   const p = await evePage(proposal);
   assert.match(header(p), new RegExp(`<a class="button" href="${proposal}/revise">Revise</a>`));
   const form = await evePage(`${proposal}/revise`);
-  assert.match(form, /<h1 class="path">Revise your proposal<\/h1>/);
+  assert.match(form, /<h1 class="path">Revise [^<]+<\/h1>/);
   assert.match(form, /<textarea id="content" name="content">First plan\.<\/textarea>/);
   token = csrfOf(form);
   const r = await evePost(`${proposal}/revise`, { csrf: token, content: "Second plan.", reason: "shorter" });
@@ -154,7 +154,7 @@ test("revise: the proposer revises their own proposal without approving it", asy
   assert.match(after, /Revised\. This is revision 2, waiting for review again\./);
   assert.match(after, /<span>Revision 2<\/span>/);
   assert.match(after, /<span class="badge state open">Open<\/span>/);
-  assert.match(after, /0 of 1 for revision 2/);
+  assert.match(after, /0 of 1 approval for revision 2/);
 });
 
 test("revise: needs the form token", async () => {

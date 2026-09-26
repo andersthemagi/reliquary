@@ -3,12 +3,12 @@
 // (reviewRow). Each handler runs as the signed-in person through asPerson();
 // the database decides who may decide, revise or propose.
 
+import type pg from "pg";
 import { asPerson } from "./db.js";
 import { diffMode, diffSection } from "./diffview.js";
-import { csrfField, html, pageHeader, raw, when } from "./html.js";
+import { callout, csrfField, emptyState, html, pageHeader, time, type CrumbPart, type Raw, type Tone } from "./html.js";
 import { vaultShell } from "./files.js";
 import {
-  ago,
   canWrite,
   message,
   notFound,
@@ -17,83 +17,20 @@ import {
   UUID,
   vault,
   vaultPath,
-  who,
   type Ctx,
   type Reply,
+  type Vault,
 } from "./pages.js";
-import { latestFeedback, rowSnooze, snoozeControl, threadSection } from "./thread.js";
+import { byWhom, latestFeedback, person, rowSnooze, snoozeControl, threadSection } from "./thread.js";
 import { risks } from "./risk.js";
 
 export { risks } from "./risk.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
-  // A new file is shown as a neutral label; only real risks get the amber badge.
-  const r = risks(p);
-  const verb = p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
-  return html`<li>
-    <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${verb} ${p.path}</a>
-      <span class="muted small"> · ${showVault ? `${p.vault} · ` : ""}by ${who(ctx, p.proposed_by, p.agent)} · ${ago(p.created_at)}</span></span>
-    <span class="row-end small">${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${r.length ? html`<span class="badge attention risk-count" title="${r.map((x) => x.long).join(" ")}">${r[0].short}${r.length > 1 ? ` +${r.length - 1} more` : ""}</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
-      snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : ""
-    }</span>
-  </li>`;
-};
+const verbOf = (p: { kind: string; current_body: string | null }) =>
+  p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
 
-// ---------------------------------------------------------------------------
-// Proposals
-
-const STATES = [
-  ["open", "Open"],
-  ["changes_requested", "Changes requested"],
-  ["applied", "Applied"],
-  ["rejected", "Rejected"],
-  ["stale", "Stale"],
-] as const;
-
-export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
-  const requested = ctx.url.searchParams.get("status");
-  const status = STATES.find(([s]) => s === requested)?.[0] ?? "open";
-  const data = await asPerson(ctx.userId, async (c) => {
-    const v = await vault(c, ctx, id);
-    if (!v) return null;
-    const rows = (
-      await c.query(
-        // Quorums from one set-based rules_for() for the page, not
-        // rule_for() per row.
-        `with page as (
-           select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
-                  row_number() over (order by p.created_at desc) as ord
-             from public.proposals p where p.vault_id = $1 and p.status = $2 order by p.created_at desc limit 100)
-         select p.*, cur.body as current_body, r.quorum,
-                (select count(*) from public.approvals a where a.proposal_id = p.id and a.decision = 'approve'
-                  and a.revision = p.revision)::int as approvals
-           from page p
-           join private.rules_for($1, array(select distinct path from page)) r on r.path = p.path
-           left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
-           left join public.file_versions cur on cur.id = f.current_version_id
-          order by p.ord`,
-        [id, status],
-      )
-    ).rows;
-    const empty: Record<string, string> = {
-      open: "Nothing waiting. When an agent proposes a change to a canon file, it shows up here.",
-      changes_requested: "Nothing is waiting on a revision.",
-      applied: "No proposals have been applied yet.",
-      rejected: "No proposals have been rejected.",
-      stale: "No stale proposals. One goes stale when its file changes before it’s approved.",
-    };
-    const body = html`
-      ${pageHeader({ title: "Proposals" })}
-      <nav class="tabs" aria-label="Proposal status">${STATES.map(
-        ([s, label]) => html`<a href="${vaultPath(id, `/proposals?status=${s}`)}"${s === status ? raw(' aria-current="page"') : ""}>${label}</a>`,
-      )}</nav>
-      ${rows.length ? html`<ul class="rows">${rows.map((p) => reviewRow(ctx, p))}</ul>` : html`<div class="empty">${empty[status]}</div>`}`;
-    return { v, shell: await vaultShell(c, ctx, v, { section: "proposals" }, body) };
-  });
-  if (!data) return notFound(ctx);
-  return render(ctx, "Proposals", data.shell, "vaults");
-}
+// A file's name, the last part of its path, for titles that name it.
+const fileName = (path: string) => path.split("/").filter(Boolean).pop() ?? path;
 
 const STATE_TEXT: Record<string, string> = {
   open: "Open",
@@ -102,8 +39,160 @@ const STATE_TEXT: Record<string, string> = {
   rejected: "Rejected",
   stale: "Stale",
 };
+const STATE_HELP: Record<string, string> = {
+  stale: "The file changed before this was approved, so it can’t apply",
+};
+const stateBadge = (status: string) =>
+  html`<span class="badge state ${status}"${STATE_HELP[status] ? html` title="${STATE_HELP[status]}"` : ""}>${STATE_TEXT[status] ?? status}</span>`;
 
-export async function proposalView(ctx: Ctx, id: string, pid: string): Promise<Reply> {
+const decided = (status: string | undefined) => status === "applied" || status === "rejected" || status === "stale";
+
+// "n of m approvals": the count always says what it counts.
+const approvalCount = (n: number, quorum: number) => `${n} of ${quorum} approval${quorum === 1 ? "" : "s"}`;
+
+// How a decided proposal ended, in one line: who decided and when. `by` is
+// who approved it (applied) or who rejected it.
+function outcome(ctx: Ctx, status: string, by: string[], at: Date | null): Raw {
+  const names = by.map((id) => person(ctx, id)).join(", ");
+  const text =
+    status === "applied"
+      ? names
+        ? `Applied, approved by ${names}`
+        : "Applied"
+      : status === "rejected"
+        ? names
+          ? `Rejected by ${names}`
+          : "Rejected"
+        : "Went stale: the file changed before it was approved";
+  return html`${text}${at ? html` · ${time(at)}` : ""}`;
+}
+
+// A proposal in a list (the vault's Proposals, the Inbox, Home): what it
+// does to which file, then the vault (across vaults), who proposed it and
+// when. At the end, while it's live: a New file label, the first risk (all
+// of them in the badge's title) and its approvals so far; once decided, how
+// it ended. Rows the Inbox can snooze carry a Snooze menu.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
+  const verb = verbOf(p);
+  const done = decided(p.status);
+  const r = done ? [] : risks(p);
+  const end = done
+    ? html`<span class="muted outcome">${outcome(ctx, p.status, p.deciders ?? [], p.decided_at ?? null)}</span> ${stateBadge(p.status)}`
+    : html`${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${
+        r.length
+          ? html`<span class="badge attention risk-count" title="${r.map((x) => x.long).join(" ")}">${r[0].short}${
+              r.length > 1 ? ` +${r.length - 1} more` : ""
+            }</span> `
+          : ""
+      }<span class="muted">${approvalCount(p.approvals, p.quorum)}</span>`;
+  return html`<li>
+    <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${verb} ${p.path}</a>
+      <span class="muted small"> · ${showVault ? `${p.vault} · ` : ""}${byWhom(ctx, p.proposed_by, p.agent)} · ${time(p.created_at)}</span></span>
+    <span class="row-end small">${end}${snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : ""}</span>
+  </li>`;
+};
+
+// ---------------------------------------------------------------------------
+// Proposals: the vault's list, by state, as tabs with counts. Rejected and
+// stale proposals share Closed, each row saying which.
+
+const TABS = [
+  ["open", "Open"],
+  ["changes_requested", "Changes requested"],
+  ["applied", "Applied"],
+  ["closed", "Closed"],
+] as const;
+type TabId = (typeof TABS)[number][0];
+const IN_TAB: Record<TabId, string[]> = {
+  open: ["open"],
+  changes_requested: ["changes_requested"],
+  applied: ["applied"],
+  closed: ["rejected", "stale"],
+};
+const EMPTY: Record<TabId, { title: string; body: string }> = {
+  open: { title: "Nothing waiting", body: "When someone or their agent proposes a change to a canon file, it shows up here." },
+  changes_requested: {
+    title: "Nothing sent back",
+    body: "When a reviewer asks for changes, the proposal waits here until its proposer revises it.",
+  },
+  applied: { title: "Nothing applied yet", body: "A proposal applies when it gets the approvals its rule asks for." },
+  closed: {
+    title: "Nothing closed",
+    body: "Rejected proposals end up here, and stale ones: their file changed before they were approved.",
+  },
+};
+
+export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
+  const requested = ctx.url.searchParams.get("status");
+  // Older links name rejected or stale: both are in Closed now.
+  const tab: TabId =
+    requested === "rejected" || requested === "stale" ? "closed" : (TABS.find(([s]) => s === requested)?.[0] ?? "open");
+  const data = await asPerson(ctx.userId, async (c) => {
+    const v = await vault(c, ctx, id);
+    if (!v) return null;
+    const counts = new Map<string, number>(
+      (await c.query(`select status, count(*)::int as n from public.proposals where vault_id = $1 group by status`, [id])).rows.map(
+        (r) => [r.status as string, r.n as number],
+      ),
+    );
+    const rows = (
+      await c.query(
+        // Quorums from one set-based rules_for() for the page, not
+        // rule_for() per row. Who decided: the approvers of the applied
+        // revision, or who rejected it. Decided ones by when, newest first.
+        `with page as (
+           select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
+                  p.status, p.decided_at,
+                  row_number() over (order by coalesce(p.decided_at, p.created_at) desc) as ord
+             from public.proposals p where p.vault_id = $1 and p.status = any($2::text[])
+            order by coalesce(p.decided_at, p.created_at) desc limit 100)
+         select p.*, cur.body as current_body, r.quorum,
+                (select count(*) from public.approvals a where a.proposal_id = p.id and a.decision = 'approve'
+                  and a.revision = p.revision)::int as approvals,
+                array(select a.user_id from public.approvals a
+                       where a.proposal_id = p.id and a.revision = p.revision
+                         and a.decision = case when p.status = 'rejected' then 'reject' else 'approve' end
+                       order by a.at) as deciders
+           from page p
+           join private.rules_for($1, array(select distinct path from page)) r on r.path = p.path
+           left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
+           left join public.file_versions cur on cur.id = f.current_version_id
+          order by p.ord`,
+        [id, IN_TAB[tab]],
+      )
+    ).rows;
+    const count = (t: TabId) => IN_TAB[t].reduce((n, s) => n + (counts.get(s) ?? 0), 0);
+    const body = html`
+      ${pageHeader({
+        crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Proposals" }],
+        title: "Proposals",
+        tabs: TABS.map(([t, label]) => ({ href: vaultPath(id, `/proposals?status=${t}`), label, count: count(t), current: t === tab })),
+        tabsLabel: "Proposal status",
+      })}
+      ${rows.length ? html`<ul class="rows proposal-rows">${rows.map((p) => reviewRow(ctx, p))}</ul>` : emptyState(EMPTY[tab])}`;
+    return { v, shell: await vaultShell(c, ctx, v, { section: "proposals" }, body) };
+  });
+  if (!data) return notFound(ctx);
+  return render(ctx, "Proposals", data.shell, "vaults");
+}
+
+// Where a proposal's pages sit: the vault, its Proposals, the proposal, and
+// the page under it, if any.
+function proposalCrumb(v: Vault, p: { id: string; kind: string; path: string; current_body: string | null }, here?: string): CrumbPart[] {
+  return [
+    { label: v.name, href: vaultPath(v.id) },
+    { label: "Proposals", href: vaultPath(v.id, "/proposals") },
+    { label: `${verbOf(p)} ${p.path}`, href: proposalPath(v.id, p.id) },
+    ...(here ? [{ label: here }] : []),
+  ];
+}
+
+// A refused decision, shown again on the proposal page (answered 400): the
+// database's reason inside the decision box, and the note as it was typed.
+type Refused = { error: string; decision: string; note: string };
+
+export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: Refused): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
@@ -134,33 +223,39 @@ export async function proposalView(ctx: Ctx, id: string, pid: string): Promise<R
           ])
         ).rows[0].n === 0
       : false;
-    const verb = p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
+    const verb = verbOf(p);
+    const live = p.status === "open" || p.status === "changes_requested";
     const approvers = approvals.filter((a) => a.decision === "approve");
     const mine = approvals.some((a) => a.user_id === ctx.userId);
-    const flags = p.status === "open" || p.status === "changes_requested"
-      ? risks(
-          p,
-          firstFromAgent ? [{ short: `First proposal from ${p.agent}`, long: `First proposal from ${p.agent} in this vault.` }] : [],
-        )
+    const flags = live
+      ? risks(p, firstFromAgent ? [{ short: `First proposal from ${p.agent}`, long: `First proposal from ${p.agent} in this vault.` }] : [])
       : [];
     const decidable = canWrite(v) && p.status === "open" && !mine;
     const rejectable = canWrite(v) && (decidable || p.status === "changes_requested");
-    const editable = canWrite(v) && (p.status === "open" || p.status === "changes_requested") && p.kind === "write" && p.body !== null;
+    const editable = canWrite(v) && live && p.kind === "write" && p.body !== null;
     // The proposer revises their own proposal (as their agent can over MCP):
     // a new revision, approved by nobody.
     const revisable = editable && p.proposed_by === ctx.userId;
     const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: canWrite(v) });
     const feedback = await latestFeedback(c, ctx, p);
-    const snoozeForm = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
+    const snooze = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
 
     // The decision sits at the top, under the title, as on a GitHub pull
     // request: the note, then the verdicts, all visible without opening
     // anything. The diff follows immediately. (docs/research/ux-patterns.md)
+    // A refused decision comes back here with the reason inside the box and
+    // the note as typed; a missing note marks the field.
+    const noteMissing = !!refused && refused.decision !== "approve" && !refused.note.trim();
+    const refusal = refused ? callout("danger", refused.error, { id: "decide-error" }) : html``;
     const controls = rejectable
       ? html`<form method="post" action="${proposalPath(id, pid, "/decide")}" class="panel decide" aria-label="Your review">
           ${csrfField(ctx.csrf)}
-          <label for="note">Note <span class="hint">Required to request changes or reject. The proposer sees it.</span></label>
-          <textarea id="note" name="note" class="note-field" rows="2"></textarea>
+          ${refusal}
+          <label for="note">Note</label>
+          <p class="hint" id="note-hint">Required to request changes or reject. The proposer sees it.</p>
+          <textarea id="note" name="note" class="note-field" rows="2" aria-describedby="${noteMissing ? "decide-error note-hint" : "note-hint"}"${
+            noteMissing ? html` aria-invalid="true"` : ""
+          }>${refused?.note ?? ""}</textarea>
           <div class="actions">
             ${decidable
               ? html`<button class="primary" name="decision" value="approve">Approve</button>
@@ -169,27 +264,40 @@ export async function proposalView(ctx: Ctx, id: string, pid: string): Promise<R
             <button class="danger" name="decision" value="reject">Reject</button>
           </div>
         </form>`
-      : "";
+      : null;
+    const by = (d: string) => approvals.filter((a) => a.decision === d).map((a) => a.user_id as string);
+    const ended = decided(p.status) ? outcome(ctx, p.status, by(p.status === "rejected" ? "reject" : "approve"), p.decided_at) : null;
+    const again = p.status === "stale" && canWrite(v) && p.kind === "write" && p.body !== null;
     const status =
-      p.status === "stale" && canWrite(v) && p.kind === "write" && p.body !== null
-        ? html`<div class="callout attention"><p>The file changed after this was proposed, so it wasn’t applied. You can propose the same text again against the current version; the diff will show what it would change now.</p>
-            <form method="post" action="${proposalPath(id, pid, "/repropose")}">${csrfField(ctx.csrf)}
-              <button class="primary">Propose again</button></form></div>`
-        : p.status === "changes_requested"
-          ? html`<p class="callout neutral">Waiting for the proposer to revise.${rejectable ? " You can still edit it yourself, or reject it." : ""}</p>`
-          : p.status === "open" && mine
-            ? html`<p class="callout neutral">You’ve decided on this revision. It needs more approvals before it applies.</p>`
-            : "";
+      p.status === "stale"
+        ? html`<div class="callout warning outcome-line"><p>${ended}.${
+            again ? " You can propose the same text again against the current version; the diff will show what it would change now." : ""
+          }</p>${
+            again
+              ? html`<form method="post" action="${proposalPath(id, pid, "/repropose")}">${csrfField(ctx.csrf)}
+              <button class="primary">Propose again</button></form>`
+              : ""
+          }</div>`
+        : ended
+          ? html`<p class="callout ${p.status === "applied" ? "success" : "neutral"} outcome-line">${ended}.</p>`
+          : p.status === "changes_requested"
+            ? html`<p class="callout neutral">Waiting for the proposer to revise.${rejectable ? " You can still edit it yourself, or reject it." : ""}</p>`
+            : p.status === "open" && mine
+              ? html`<p class="callout neutral">You’ve decided on this revision. It needs more approvals before it applies.</p>`
+              : "";
 
     const body = html`
       ${pageHeader({
-        crumb: html`<p class="crumb"><a href="${vaultPath(id, "/proposals")}">Proposals</a></p>`,
+        crumb: proposalCrumb(v, p),
         title: `${verb} ${p.path}`,
         path: true,
-        badge: html`<span class="badge state ${p.status}">${STATE_TEXT[p.status]}</span>`,
-        meta: html`<p class="meta"><span>Revision ${p.revision}</span>
-          <span>By ${who(ctx, p.proposed_by, p.agent)}</span><span>${when(p.created_at)}</span></p>`,
-        actions: html`${revisable ? html`<a class="button" href="${proposalPath(id, pid, "/revise")}">Revise</a>` : ""}${
+        badge: html`${stateBadge(p.status)}${verb === "Create" ? html` <span class="badge">New file</span>` : ""}`,
+        meta: html`<p class="meta">${p.revision > 1 ? html`<span>Revision ${p.revision}</span>` : ""}<span>By ${byWhom(
+          ctx,
+          p.proposed_by,
+          p.agent,
+        )}</span><span>${time(p.created_at)}</span></p>`,
+        secondary: html`${snooze.menu}${revisable ? html`<a class="button" href="${proposalPath(id, pid, "/revise")}">Revise</a>` : ""}${
           editable && rejectable ? html`<a class="button" href="${proposalPath(id, pid, "/edit")}">Edit, then approve</a>` : ""
         }`,
       })}
@@ -197,13 +305,14 @@ export async function proposalView(ctx: Ctx, id: string, pid: string): Promise<R
         ${p.proposed_by === ctx.userId && p.agent
           ? html`<p class="callout info">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
           : ""}
+        ${snooze.note}
         ${feedback}
-        ${flags.length || verb === "Create"
-          ? html`<ul class="risks" aria-label="Worth a closer look">${verb === "Create" ? html`<li class="badge">New file</li>` : ""}${flags.map(
-              (f) => html`<li class="badge attention" title="${f.long}">${f.short}</li>`,
+        ${flags.length
+          ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map(
+              (f) => html`<li><span class="badge attention">${f.short}</span> <span class="risk-long">${f.long}</span></li>`,
             )}</ul>`
           : ""}
-        ${status}${controls}${snoozeForm}
+        ${status}${controls ?? refusal}
       </div>
 
       ${p.body === null && p.kind === "write"
@@ -218,16 +327,27 @@ export async function proposalView(ctx: Ctx, id: string, pid: string): Promise<R
       <h2>${p.agent ? "Agent’s stated reason (unverified)" : "Reason"}</h2>
       <blockquote class="claim">${p.reason || "No reason given."}</blockquote>
 
-      <h2>Approvals</h2>
-      <p>${approvers.length} of ${p.quorum} for revision ${p.revision}${
-        approvers.length ? `: ${approvers.map((a) => who(ctx, a.user_id, null)).join(", ")}` : "."
-      }</p>
+      ${live
+        ? html`<h2>Approvals</h2>
+      <p>${approvalCount(approvers.length, p.quorum)}${p.revision > 1 ? ` for revision ${p.revision}` : ""}${
+        approvers.length ? `: ${approvers.map((a) => person(ctx, a.user_id)).join(", ")}` : "."
+      }</p>`
+        : ""}
 
       ${thread}`;
     return { v, p, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, `Proposal: ${data.p.path}`, data.shell, "vaults");
+  const reply = render(ctx, `Proposal: ${data.p.path}`, data.shell, "vaults");
+  return refused ? { ...reply, status: 400 } : reply;
+}
+
+// Edit, then approve, and Revise: the proposed text in an editor, with the
+// file as it is now folded above it to compare against.
+function currentFile(current: string | null): Raw {
+  return current === null
+    ? html``
+    : html`<details class="current-file"><summary>The file as it is now</summary><pre class="current-text">${current}</pre></details>`;
 }
 
 export async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<Reply> {
@@ -235,23 +355,18 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<R
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v || !canWrite(v)) return null;
-    const p = (
-      await c.query(
-        `select * from public.proposals where id = $1 and vault_id = $2 and kind = 'write'
-            and status in ('open', 'changes_requested') and body is not null`,
-        [pid, id],
-      )
-    ).rows[0];
+    const p = await loadEditable(c, id, pid, null);
     if (!p) return null;
     const body = html`
       ${pageHeader({
-        crumb: html`<p class="crumb"><a href="${proposalPath(id, pid)}">Back to the proposal</a></p>`,
-        title: "Edit, then approve",
+        crumb: proposalCrumb(v, p, "Edit, then approve"),
+        title: `Edit, then approve ${fileName(p.path)}`,
         path: true,
-        actions: html`<a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>
-          <button class="primary" form="edit-approve">Save edit and approve</button>`,
+        secondary: html`<a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>`,
+        primary: html`<button class="primary" form="edit-approve">Save edit and approve</button>`,
       })}
       <p class="lede">Change the proposed text of <code>${p.path}</code>. Saving records your edit as a new revision and approves it. If this path needs more than one approval, the others approve your edited version.</p>
+      ${currentFile(p.current_body)}
       <form method="post" action="${proposalPath(id, pid, "/edit")}" class="panel" id="edit-approve">
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
@@ -261,10 +376,27 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<R
         <div class="actions"><button class="primary">Save edit and approve</button>
           <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a></div>
       </form>`;
-    return { v, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
+    return { v, p, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, "Edit, then approve", data.shell, "vaults");
+  return render(ctx, `Edit, then approve ${fileName(data.p.path)}`, data.shell, "vaults");
+}
+
+// A live write proposal in the vault with its text and the file's current
+// text; `own` limits it to one this person proposed (Revise).
+async function loadEditable(c: pg.PoolClient, id: string, pid: string, own: string | null) {
+  return (
+    await c.query(
+      `select p.*, cur.body as current_body
+         from public.proposals p
+         left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
+         left join public.file_versions cur on cur.id = f.current_version_id
+        where p.id = $1 and p.vault_id = $2 and p.kind = 'write'
+          and p.status in ('open', 'changes_requested') and p.body is not null
+          and ($3::uuid is null or p.proposed_by = $3)`,
+      [pid, id, own],
+    )
+  ).rows[0];
 }
 
 // Revising your own proposal: the same editor, without approving. The
@@ -274,23 +406,18 @@ export async function proposalRevise(ctx: Ctx, id: string, pid: string): Promise
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v || !canWrite(v)) return null;
-    const p = (
-      await c.query(
-        `select * from public.proposals where id = $1 and vault_id = $2 and kind = 'write' and proposed_by = $3
-            and status in ('open', 'changes_requested') and body is not null`,
-        [pid, id, ctx.userId],
-      )
-    ).rows[0];
+    const p = await loadEditable(c, id, pid, ctx.userId);
     if (!p) return null;
     const body = html`
       ${pageHeader({
-        crumb: html`<p class="crumb"><a href="${proposalPath(id, pid)}">Back to the proposal</a></p>`,
-        title: "Revise your proposal",
+        crumb: proposalCrumb(v, p, "Revise"),
+        title: `Revise ${fileName(p.path)}`,
         path: true,
-        actions: html`<a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>
-          <button class="primary" form="revise-proposal">Save revision</button>`,
+        secondary: html`<a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>`,
+        primary: html`<button class="primary" form="revise-proposal">Save revision</button>`,
       })}
       <p class="lede">Change the proposed text of <code>${p.path}</code>. Saving makes it revision ${p.revision + 1} and sends it back for review; approvals of earlier revisions no longer count.</p>
+      ${currentFile(p.current_body)}
       <form method="post" action="${proposalPath(id, pid, "/revise")}" class="panel" id="revise-proposal">
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
@@ -300,10 +427,10 @@ export async function proposalRevise(ctx: Ctx, id: string, pid: string): Promise
         <div class="actions"><button class="primary">Save revision</button>
           <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a></div>
       </form>`;
-    return { v, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
+    return { v, p, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, "Revise your proposal", data.shell, "vaults");
+  return render(ctx, `Revise ${fileName(data.p.path)}`, data.shell, "vaults");
 }
 
 export async function reviseProposal(ctx: Ctx, id: string, pid: string): Promise<Reply> {
@@ -320,33 +447,43 @@ export async function reviseProposal(ctx: Ctx, id: string, pid: string): Promise
           ])
         ).rows[0].r as number,
     );
-    ctx.setFlash(`Revised. This is revision ${revision}, waiting for review again.`);
+    ctx.setFlash(`Revised. This is revision ${revision}, waiting for review again.`, "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
   return { redirect: proposalPath(id, pid) };
 }
 
-const DECIDED: Record<string, string> = {
-  applied: "Approved and applied.",
-  open: "Approved. It needs more approvals before it applies.",
-  rejected: "Rejected. The file is unchanged.",
-  changes_requested: "Changes requested. The proposer can see your note and revise.",
-  stale: "The file changed after this was proposed, so it was marked stale instead of applied.",
+// What a decision did, in its tone: done is success; a proposal that went
+// stale instead of applying is a warning.
+const DECIDED: Record<string, [string, Tone]> = {
+  applied: ["Approved and applied.", "success"],
+  open: ["Approved. It needs more approvals before it applies.", "success"],
+  rejected: ["Rejected. The file is unchanged.", "success"],
+  changes_requested: ["Changes requested. The proposer can see your note and revise.", "success"],
+  stale: ["The file changed after this was proposed, so it was marked stale instead of applied.", "warning"],
+};
+const decidedFlash = (ctx: Ctx, result: string) => {
+  const [text, tone] = DECIDED[result] ?? [result, "info" as Tone];
+  ctx.setFlash(text, tone);
 };
 
+// A decision. Refused (a missing note, a decision already made, a proposal
+// no longer open), the proposal page is answered again with the reason in
+// the decision box and the note kept, not a redirect that loses it.
 export async function decide(ctx: Ctx, id: string, pid: string): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
   const d = ctx.form.get("decision");
   const decision = d === "reject" || d === "request_changes" ? d : "approve";
+  const note = ctx.form.get("note") ?? "";
   try {
     const result = await asPerson(
       ctx.userId,
-      async (c) => (await c.query(`select public.decide($1, $2, $3) as r`, [pid, decision, ctx.form.get("note") || null])).rows[0].r as string,
+      async (c) => (await c.query(`select public.decide($1, $2, $3) as r`, [pid, decision, note || null])).rows[0].r as string,
     );
-    ctx.setFlash(DECIDED[result] ?? result);
+    decidedFlash(ctx, result);
   } catch (err) {
-    ctx.setFlash(message(err));
+    return proposalView(ctx, id, pid, { error: message(err), decision, note });
   }
   return { redirect: proposalPath(id, pid) };
 }
@@ -365,7 +502,7 @@ export async function editAndApprove(ctx: Ctx, id: string, pid: string): Promise
           ])
         ).rows[0].r as string,
     );
-    ctx.setFlash(DECIDED[result] ?? result);
+    decidedFlash(ctx, result);
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -384,7 +521,7 @@ export async function repropose(ctx: Ctx, id: string, pid: string): Promise<Repl
         .id as string;
     });
     if (!next) return notFound(ctx);
-    ctx.setFlash("Proposed again against the current version.");
+    ctx.setFlash("Proposed again against the current version.", "success");
     return { redirect: proposalPath(id, next) };
   } catch (err) {
     ctx.setFlash(message(err));

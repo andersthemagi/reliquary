@@ -121,8 +121,8 @@ test("snooze: for a day hides it from Review and the count, until unsnoozed", as
   assert.match(review, /<a href="\/inbox\?snoozed=1">Show snoozed \(1\)<\/a>/);
 
   const shown = await page("/inbox?snoozed=1");
-  assert.match(shown, /Create canon\/later\.md<\/a>\s*<span class="muted small"> · Threads · by 00000000 via Hermes on Linux · until \d{4}-\d\d-\d\d \d\d:\d\d UTC/);
-  assert.match(await page(`${T}/proposals/${TW_SNOOZE}`), /Snoozed in your Review until [^,]+, or until it changes\./);
+  assert.match(shown, /Create canon\/later\.md<\/a>\s*<span class="muted small"> · Threads · Hermes on Linux for 00000000 · until \d{4}-\d\d-\d\d \d\d:\d\d UTC/);
+  assert.match(await page(`${T}/proposals/${TW_SNOOZE}`), /Snoozed in your inbox until [^,]+, or until it changes\./);
 
   const un = await post(`${T}/proposals/${TW_SNOOZE}/unsnooze`, { csrf: token, back: "review" });
   assert.equal(un.headers.get("location"), "/inbox?snoozed=1");
@@ -137,7 +137,7 @@ test("snooze: until it changes, then unsnoozed from the proposal page", async ()
   assert.equal(await waiting(), before - 1);
   assert.match(await page("/inbox?snoozed=1"), /Create canon\/brief\.md<\/a>\s*<span class="muted small">[^<]*until it changes/);
   const h = await page(`${T}/proposals/${TW_COMMENT}`);
-  assert.match(h, /Snoozed in your Review until it changes\./);
+  assert.match(h, /Snoozed in your inbox until it changes\./);
   assert.doesNotMatch(h, /value="week"/);
   const un = await post(`${T}/proposals/${TW_COMMENT}/unsnooze`, { csrf: token, back: "proposal" });
   assert.equal(un.headers.get("location"), `${T}/proposals/${TW_COMMENT}`);

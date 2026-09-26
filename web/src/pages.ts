@@ -7,7 +7,7 @@ import type pg from "pg";
 import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
-import { csrfField, html, page, pageHeader, type Nav, type Raw, type Shell, type Theme } from "./html.js";
+import { csrfField, emptyState, html, page, pageHeader, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
 import { accountSettings, saveDisplayName } from "./settings.js";
@@ -364,8 +364,11 @@ async function inbox(ctx: Ctx): Promise<Reply> {
   return render(
     ctx,
     "Inbox",
-    html`${pageHeader({ title: "Inbox" })}
-    <p class="lede">What needs you, across your vaults: changes to review, your proposals sent back for changes, .env imports to apply and invites. Read a change itself before its reason. Not now? Snooze a review: it comes back when its time is up or it changes.</p>
+    html`${pageHeader({
+      title: "Inbox",
+      badge: waiting.length ? html`<span class="badge count-badge">${waiting.length} to review</span>` : undefined,
+      description: "What needs you across your vaults: changes to review, proposals sent back, .env imports and invites.",
+    })}
     ${gone.html.trim() ? html`<div id="notices">${gone}</div>` : ""}
     ${invites.length
       ? html`<h2 id="invites">Invites</h2>
@@ -382,7 +385,10 @@ async function inbox(ctx: Ctx): Promise<Reply> {
         <ul class="rows">${mine.map((p) => reviewRow(ctx, p, true))}</ul>`
       : ""}
     ${nothing
-      ? html`<div class="empty"><strong>Nothing needs you.</strong> When an agent proposes a change to a canon file, someone asks for changes on your proposal, a .env import waits to be applied or someone invites you, it shows up here.</div>`
+      ? emptyState({
+          title: "Nothing needs you.",
+          body: "When an agent proposes a change to a canon file, someone asks for changes on your proposal, a .env import waits to be applied or someone invites you, it shows up here.",
+        })
       : [...byVault.entries()].map(
           ([name, items]) => html`<h2>${name}</h2><ul class="rows review-rows">${items.map((p) => reviewRow(ctx, p, false, true))}</ul>`,
         )}
