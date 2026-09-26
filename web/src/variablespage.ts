@@ -4,6 +4,11 @@
 // call goes through src/variables.ts as the signed-in person, and the
 // database decides: this page only chooses what to offer.
 //
+// Four tabs under one header: Values (the table), Environments (owners),
+// Access log and Imports (owners and editors). One word for a .env brought
+// in at once: an import, pasted in the web app or sent from the CLI with
+// `reliquary env push` ("an import from the CLI").
+//
 // A value exists in plaintext here only in two places: the set form's POST
 // body, handed straight to setVariable(), and the reveal response, which is a
 // page rendered from one POST (never a redirect, never a GET, so never in a
@@ -12,8 +17,25 @@
 // empty.
 
 import { asPerson } from "./db.js";
-import { csrfField, html, page, pageHeader, raw, when, type Raw } from "./html.js";
-import { ago, message, notFound, UUID, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
+import {
+  callout,
+  confirmPage,
+  csrfField,
+  emptyState,
+  html,
+  menu,
+  page,
+  pageHeader,
+  raw,
+  relativeTime,
+  time,
+  utc,
+  type CrumbPart,
+  type MenuItem,
+  type Raw,
+  type Tab,
+} from "./html.js";
+import { message, notFound, UUID, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
 import { SecretsError, variablesConfigured } from "./secrets.js";
 import { failure } from "./failure.js";
@@ -38,7 +60,6 @@ import {
   type EnvImport,
   type Environment,
   type Variable,
-  type VariableValue,
 } from "./variables.js";
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
@@ -54,8 +75,8 @@ const ACTION_LABEL: Record<string, string> = {
   read: "Read",
   reveal: "Revealed",
   refused: "Refused",
-  push: "Sent for approval",
-  reject: "Rejected",
+  push: "Import sent from the CLI",
+  reject: "Import rejected",
   rotate_key: "Re-encrypted (key rotation)",
   create_environment: "Environment added",
   rename_environment: "Environment renamed",
@@ -63,10 +84,13 @@ const ACTION_LABEL: Record<string, string> = {
 };
 const DEFAULT_ENVIRONMENTS = ["development", "preview", "production"];
 const LOG_PAGE = 50;
+// An import this long gets its Apply and Reject again under the list.
+const LONG_IMPORT = 12;
 
 const q = encodeURIComponent;
 const base = (id: string, rest = "") => vaultPath(id, `/variables${rest}`);
 const slotQuery = (name: string, environment: string) => `?name=${q(name)}&environment=${q(environment)}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // Who may do what with values, as the database decides it (docs/variables.md,
 // "What holds"): owners everywhere, editors outside owners-only environments.
@@ -102,17 +126,45 @@ async function shell(ctx: Ctx, v: Vault, title: string, body: Raw, status = 200,
 
 const theVault = (ctx: Ctx, id: string) => asPerson(ctx.userId, (c) => vault(c, ctx, id));
 
-const crumb = (v: Vault, here?: string) =>
-  html`<p class="crumb"><a href="${vaultPath(v.id)}">${v.name}</a>${here
-    ? html`<span aria-hidden="true"> / </span><a href="${base(v.id)}">Variables</a>`
-    : ""}</p>`;
+// Breadcrumbs: the vault, then Variables. On the four tab pages Variables is
+// the last crumb (the tab says which); below them, it links back.
+const crumbs = (v: Vault, ...here: CrumbPart[]): CrumbPart[] =>
+  here.length
+    ? [{ label: v.name, href: vaultPath(v.id) }, { label: "Variables", href: base(v.id) }, ...here]
+    : [{ label: v.name, href: vaultPath(v.id) }, { label: "Variables" }];
+
+// The tabs a role gets: Values for everyone, Environments for owners, Access
+// log and Imports for owners and editors (with the imports waiting as a
+// count). A viewer gets Values alone, so no tabs.
+type Section = "values" | "environments" | "log" | "imports";
+function sectionTabs(v: Vault, current: Section, waiting: number): Tab[] {
+  const t: Tab[] = [{ href: base(v.id), label: "Values", current: current === "values" }];
+  if (v.role === "owner") t.push({ href: base(v.id, "/environments"), label: "Environments", current: current === "environments" });
+  if (readsLog(v.role)) {
+    t.push({ href: base(v.id, "/log"), label: "Access log", current: current === "log" });
+    t.push({ href: base(v.id, "/imports"), label: "Imports", current: current === "imports", ...(waiting ? { count: waiting } : {}) });
+  }
+  return t.length > 1 ? t : [];
+}
+
+// A refused form's reason, above the form: the danger callout as one
+// paragraph, read out at once.
+const refusal = (why: Raw | string) => html`<p class="callout danger" role="alert">${why}</p>`;
+
+// The imports from the CLI waiting in this vault, for the Imports tab's
+// count (owners and editors see them; others get none).
+const waitingIn = (ctx: Ctx, v: Vault) => (readsLog(v.role) ? pendingPushes(ctx.userId, v.id) : Promise.resolve([]));
+
+function sectionHeader(v: Vault, current: Section, waiting: number, o: { description?: Raw | string; secondary?: Raw | ""; primary?: Raw | "" } = {}): Raw {
+  return pageHeader({ crumb: crumbs(v), title: "Variables", tabs: sectionTabs(v, current, waiting), tabsLabel: "Variables", ...o });
+}
 
 // ---------------------------------------------------------------------------
-// The list
+// Values
 
-// Who read or revealed each value since it was set, as the cells show it
-// ("read by you (CLI)", "revealed by 1a2b3c4d"), newest first, once each,
-// keyed by name and environment.
+// Who read or revealed each value since it was set ("read by you (CLI)",
+// "revealed by 1a2b3c4d"), newest first, once each, keyed by name and
+// environment.
 type Readers = Map<string, { who: string[]; read: boolean }>;
 const slot = (name: string, environment: string) => `${name}\u0000${environment}`;
 function readersOf(ctx: Ctx, rows: ReaderRow[]): Readers {
@@ -129,31 +181,48 @@ function readersOf(ctx: Ctx, rows: ReaderRow[]): Readers {
 }
 
 // The environment's name as each cell carries it, for the stacked layout.
-const label = (e: Environment) => (e.ownersOnly ? `${e.name} (owners)` : e.name);
+const label = (e: Environment) => (e.ownersOnly ? `${e.name} (owners only)` : e.name);
+const OWNERS_ONLY_HELP = "Only owners set, reveal or read values here";
 
+// One cell: "Set 6 min ago" ("by you" is read out, and shown on a phone;
+// who, the exact time and the version are in its title and at the top of
+// its menu), a "Read since set" mark when someone has, and one ⋯ menu with
+// Reveal, Rotate and Delete; or "Not set" with a Set link.
 function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByCell: Readers | null, keyed: boolean): Raw {
   const value = variable.values.find((x) => x.environment === e.name);
-  const may = writes(v.role, e);
+  const may = keyed && writes(v.role, e);
+  const where = `${variable.name} in ${e.name}`;
   if (!value) {
-    return html`<td data-label="${label(e)}"><div><span class="muted small">Not set</span>${
-      may && keyed ? html`<span class="var-actions"><a class="button" href="${base(v.id, "/set")}${slotQuery(variable.name, e.name)}">Set a value</a></span>` : ""
+    return html`<td data-label="${label(e)}"><div class="var-cell"><span class="var-none">Not set</span>${
+      may ? html`<a class="button ghost var-add" href="${base(v.id, "/set")}${slotQuery(variable.name, e.name)}" aria-label="Set ${where}">Set</a>` : ""
     }</div></td>`;
   }
   const readers = readersByCell?.get(slot(variable.name, e.name)) ?? { who: [], read: false };
-  return html`<td data-label="${label(e)}"><div>
-    <span class="var-set">Set</span> <span class="muted small">v${value.version} · ${who(ctx, value.updatedBy, null)}, <span title="${when(value.updatedAt)}">${ago(value.updatedAt)}</span></span>
-    ${readers.who.length
-      ? html`<span class="var-readers small">Since then: ${readers.who.join("; ")}.${
-          readers.read ? html` <a href="/tokens">Revoke a sign-in</a>` : ""}</span>`
-      : ""}
-    ${may && keyed
-      ? html`<span class="var-actions">
-        <form method="post" action="${base(v.id, "/reveal")}">${csrfField(ctx.csrf)}<input type="hidden" name="name" value="${variable.name}"><input type="hidden" name="environment" value="${e.name}"><button>Reveal</button></form>
-        <a class="button" href="${base(v.id, "/set")}${slotQuery(variable.name, e.name)}">Rotate</a>
-        <a class="button danger" href="${base(v.id, "/delete")}${slotQuery(variable.name, e.name)}">Delete</a>
-      </span>`
-      : ""}
+  const setBy = who(ctx, value.updatedBy, null);
+  const seen = readers.who.join("; ");
+  const items: MenuItem[] = [
+    { action: base(v.id, "/reveal"), csrf: ctx.csrf, fields: { name: variable.name, environment: e.name }, label: "Reveal", description: "Show it once; the reveal is logged" },
+    { href: `${base(v.id, "/set")}${slotQuery(variable.name, e.name)}`, label: "Rotate", description: "Replace it with a new value" },
+    ...(readers.read ? [{ href: "/tokens", label: "Manage CLI sign-ins", description: "Cut off a computer that read it" }] : []),
+    { href: `${base(v.id, "/delete")}${slotQuery(variable.name, e.name)}`, label: "Delete", description: `Remove it from ${e.name}`, danger: true },
+  ];
+  return html`<td data-label="${label(e)}"><div class="var-cell">
+    <span class="var-state" title="Set by ${setBy}, ${utc(value.updatedAt)} (version ${value.version})"><span class="var-set">Set</span> <span class="var-meta"><time datetime="${value.updatedAt.toISOString()}">${relativeTime(value.updatedAt)}</time><span class="var-by"> by ${setBy}</span></span>${
+      seen ? html`<span class="var-readers" title="Since it was set: ${seen}">${readers.read ? "Read since set" : "Revealed since set"}</span>` : ""}</span>
+    ${may ? menu({ label: `Actions for ${where}`, icon: "more", items, heading: `Set by ${setBy}, ${utc(value.updatedAt)}.${seen ? ` Since then: ${seen}.` : ""}`, className: "var-menu" }) : ""}
   </div></td>`;
+}
+
+// Imports from the CLI waiting, as one line on the Values tab.
+function waitingNotice(ctx: Ctx, v: Vault, pushes: EnvImport[]): Raw {
+  if (!pushes.length) return raw("");
+  const [p] = pushes;
+  return callout(
+    "warning",
+    pushes.length === 1
+      ? html`<p><strong>An import from the CLI is waiting to be applied:</strong> <a href="${importPath(v.id, p.id)}">${plural(p.names.length, "variable")} for ${p.environments.join(", ")}</a>, from ${who(ctx, p.createdBy, null)}. Nothing is set until a person applies it.</p>`
+      : html`<p><strong>${pushes.length} imports from the CLI are waiting to be applied.</strong> <a href="${base(v.id, "/imports")}">Review them</a>. Nothing is set until a person applies them.</p>`,
+  );
 }
 
 async function list(ctx: Ctx, id: string): Promise<Reply> {
@@ -164,43 +233,42 @@ async function list(ctx: Ctx, id: string): Promise<Reply> {
   const readers = readsLog(v.role) && variables.length ? readersOf(ctx, await readersSinceSet(ctx.userId, id)) : null;
   const canSet = keyed && environments.some((e) => writes(v.role, e));
   const ownersOnly = environments.filter((e) => e.ownersOnly).map((e) => e.name);
-  const pushes = readsLog(v.role) ? await pendingPushes(ctx.userId, id) : [];
+  const pushes = await waitingIn(ctx, v);
 
   const body = html`
-    ${pageHeader({
-      crumb: crumb(v),
-      title: "Variables",
-      actions: html`${v.role === "owner" ? html`<a class="button" href="${base(id, "/environments")}">Environments</a>` : ""}${
-        canSet ? html`<a class="button" href="${base(id, "/import")}">Import .env</a>` : ""}${
-        readsLog(v.role) ? html`<a class="button" href="${base(id, "/log")}">Access log</a>` : ""}${
-        canSet ? html`<a class="button primary" href="${base(id, "/set")}">Add a variable</a>` : ""
-      }`,
+    ${sectionHeader(v, "values", pushes.length, {
+      description: "Secrets for this vault’s projects, one value per environment. This page shows names and who set them, never a value.",
+      secondary: canSet ? html`<a class="button" href="${base(id, "/import")}">Import .env</a>` : "",
+      primary: canSet ? html`<a class="button primary" href="${base(id, "/set")}">Add a variable</a>` : "",
     })}
-    <p class="lede">Shared environment variables for this vault’s projects: API keys, database URLs, other secrets. This page shows names and who set them, never values.</p>
-    ${keyed ? "" : html`<p class="callout attention">This server has no encryption key, so values can’t be set or revealed here. Names are listed as usual.</p>`}
-    ${pushes.length ? pendingList(ctx, pushes, false) : ""}
+    ${keyed ? "" : callout("warning", "This server has no encryption key, so values can’t be set or revealed here. Names are listed as usual.")}
+    ${waitingNotice(ctx, v, pushes)}
     ${v.role === "viewer"
       ? html`<p class="muted small">As a viewer you see names only. Owners and editors set and use values.</p>`
       : v.role === "editor" && ownersOnly.length
         ? html`<p class="muted small">Only owners set, rotate, delete or reveal values in ${ownersOnly.join(", ")}.</p>`
         : ""}
     ${variables.length
-      ? html`<div class="vars-wrap"><table class="vars">
-        <thead><tr><th>Name</th>${environments.map((e) => html`<th>${e.name}${e.ownersOnly ? html` <span class="muted">(owners)</span>` : ""}</th>`)}</tr></thead>
+      ? html`<div class="var-values"><div class="var-grid-wrap"><table class="var-grid">
+        <thead><tr><th scope="col">Name</th>${environments.map(
+          (e) => html`<th scope="col"><span class="var-env">${e.name}</span>${e.ownersOnly ? html` <span class="badge var-owners" title="${OWNERS_ONLY_HELP}">Owners only</span>` : ""}</th>`,
+        )}</tr></thead>
         <tbody>${variables.map(
           (x) => html`<tr><th scope="row"><code>${x.name}</code></th>${environments.map((e) => cell(ctx, v, x, e, readers, keyed))}</tr>`,
-        )}</tbody></table></div>`
-      : html`<div class="empty"><strong>No variables yet.</strong>
-        <p>Keep your projects’ secrets here instead of in <code>.env</code> files passed around by hand. Each value is encrypted, and every set, read and reveal is logged.</p>
-        ${canSet ? html`<p><a class="button" href="${base(id, "/set")}">Add a variable</a></p>` : ""}</div>`}
+        )}</tbody></table></div></div>`
+      : emptyState({
+          title: "No variables yet.",
+          body: html`Keep your projects’ secrets here instead of in <code>.env</code> files passed around by hand. Each value is encrypted, and every set, read and reveal is logged.`,
+          action: canSet ? html`<a class="button" href="${base(id, "/set")}">Add a variable</a>` : undefined,
+        })}
     <h2>Use them</h2>
     <p>Run a command with this vault’s variables, without writing them to disk:</p>
     <pre class="code">npx @reliquary-ai/cli run --env development -- &lt;command&gt;</pre>
     <p class="small muted">The first time, <code>npx @reliquary-ai/cli login</code> signs this computer in. <code>env pull</code> writes a <code>.env</code> instead, only where git ignores it. Setup is on the <a href="/connect#cli">Connect</a> page.</p>
-    <ul class="plain small muted var-caveats">
-      <li><strong>Agents can read what reaches them.</strong> An agent that runs commands where a value was delivered can read it. <code>run</code> limits a value to one process; prefer short-lived, narrowly scoped keys.</li>
-      <li><strong>The hosted operator can decrypt.</strong> Values are encrypted with a key the database never sees, but whoever runs this server holds both.</li>
-    </ul>`;
+    <div class="callout warning var-caveats">
+      <p><strong>Agents can read what reaches them.</strong> An agent that runs commands where a value was delivered can read it. <code>run</code> limits a value to one process; prefer short-lived, narrowly scoped keys.</p>
+      <p><strong>The hosted operator can decrypt.</strong> Values are encrypted with a key the database never sees, but whoever runs this server holds both.</p>
+    </div>`;
   return shell(ctx, v, "Variables", body);
 }
 
@@ -214,6 +282,7 @@ async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Promise<Re
   const allowed = environments.filter((e) => writes(v.role, e));
   const exists = !!f.name && !!f.environment && variables.some((x) => x.name === f.name && x.values.some((y) => y.environment === f.environment));
   const title = exists ? `Rotate ${f.name}` : "Add a variable";
+  const crumb = crumbs(v, { label: title });
   const keyed = variablesConfigured();
   const lockedEnv = exists && !allowed.some((e) => e.name === f.environment);
   if (!allowed.length || !keyed || lockedEnv) {
@@ -222,28 +291,38 @@ async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Promise<Re
       : lockedEnv
         ? `Only owners set values in ${f.environment}.`
         : "Your role in this vault can’t set variables. Ask an owner.";
-    return shell(ctx, v, title, html`${pageHeader({ crumb: crumb(v, "set"), title })}<p class="callout attention">${why}</p>`, 403);
+    return shell(ctx, v, title, html`${pageHeader({ crumb, title, path: exists })}${callout("warning", why)}`, 403);
   }
+  // Every environment as a radio; the ones this role can't set are shown,
+  // disabled, so the rule is visible where the choice is made.
+  const chosen = allowed.some((e) => e.name === f.environment) ? f.environment : allowed[0].name;
+  const locked = environments.filter((e) => !writes(v.role, e)).map((e) => e.name);
   const envChoice = exists
     ? html`<input type="hidden" name="environment" value="${f.environment}"><p class="small"><span class="muted">Environment</span> <strong>${f.environment}</strong></p>`
-    : html`<label for="ve">Environment</label>
-      <select id="ve" name="environment">${allowed.map(
-        (e) => html`<option value="${e.name}"${e.name === f.environment ? raw(" selected") : ""}>${e.name}</option>`,
-      )}</select>
-      ${allowed.length < environments.length ? html`<p class="hint">Only owners set values in ${environments.filter((e) => !writes(v.role, e)).map((e) => e.name).join(", ")}.</p>` : ""}`;
+    : html`<fieldset class="var-envs">
+        <legend>Environment</legend>
+        ${environments.map((e) => {
+          const ok = writes(v.role, e);
+          return html`<label class="choice${ok ? "" : " is-disabled"}"><input type="radio" name="environment" value="${e.name}"${
+            ok ? raw(e.name === chosen ? " checked required" : " required") : raw(" disabled")}> ${e.name}${
+            e.ownersOnly ? html` <span class="badge var-owners" title="${OWNERS_ONLY_HELP}">Owners only</span>` : ""}</label>`;
+        })}
+        ${locked.length ? html`<p class="hint">Only owners set values in ${locked.join(", ")}.</p>` : ""}
+      </fieldset>`;
+  const button = exists ? "Save new value" : "Save variable";
   const body = html`
     ${pageHeader({
-      crumb: crumb(v, "set"),
+      crumb,
       title,
       path: exists,
-      actions: html`<a class="button quiet" href="${base(v.id)}">Cancel</a>
-        <button class="primary" form="set-variable">${exists ? "Save new value" : "Save variable"}</button>`,
+      secondary: html`<a class="button quiet" href="${base(v.id)}">Cancel</a>`,
+      primary: html`<button class="primary" form="set-variable">${button}</button>`,
     })}
-    ${f.error ? html`<p class="callout danger" role="alert">${f.error}</p>` : ""}
+    ${f.error ? refusal(f.error) : ""}
     <p class="lede">${exists
       ? html`The new value replaces the old one in <strong>${f.environment}</strong>. Anyone who already read the old value still has it: rotate it at its provider too.`
       : "Programs run with the CLI get it as an environment variable. The value is encrypted before it’s stored, and isn’t shown here again unless an owner or editor reveals it."}</p>
-    <form method="post" action="${base(v.id, "/set")}" class="panel" id="set-variable" autocomplete="off">
+    <form method="post" action="${base(v.id, "/set")}" class="panel choice-form" id="set-variable" autocomplete="off">
       ${csrfField(ctx.csrf)}
       ${exists
         ? html`<input type="hidden" name="name" value="${f.name}"><p class="small"><span class="muted">Name</span> <code>${f.name}</code></p>`
@@ -255,7 +334,7 @@ async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Promise<Re
       <label for="vv">Value</label>
       <textarea id="vv" name="value" class="short secret-input" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
       <p class="hint">Up to 64 KiB of text. It isn’t shown back after you save.</p>
-      <div class="actions"><button class="primary">${exists ? "Save new value" : "Save variable"}</button>
+      <div class="actions"><button class="primary">${button}</button>
         <a class="button quiet" href="${base(v.id)}">Cancel</a></div>
     </form>`;
   return shell(ctx, v, title, body, status, base(v.id));
@@ -298,15 +377,17 @@ async function confirmDelete(ctx: Ctx, v: Vault): Promise<Reply> {
   const { variables } = await listVariables(ctx.userId, v.id);
   if (!variables.some((x) => x.name === name && x.values.some((y) => y.environment === environment))) return notFound(ctx);
   const title = `Delete ${name}`;
-  const body = html`
-    ${pageHeader({ crumb: crumb(v, "delete"), title, path: true })}
-    <p class="lede">Delete the value of <code>${name}</code> in <strong>${environment}</strong>? Programs run with the CLI won’t get it any more. This can’t be undone; the access log keeps the record.</p>
-    <form method="post" action="${base(v.id, "/delete")}" class="danger-zone">
-      ${csrfField(ctx.csrf)}
-      <input type="hidden" name="name" value="${name}"><input type="hidden" name="environment" value="${environment}">
-      <p class="muted small">Other environments keep their values.</p>
-      <span class="actions"><a class="button quiet" href="${base(v.id)}">Cancel</a><button class="danger">Delete this value</button></span>
-    </form>`;
+  const body = html`<div class="var-confirm">${confirmPage({
+    title,
+    crumb: crumbs(v, { label: title }),
+    lede: html`Delete the value of <code>${name}</code> in <strong>${environment}</strong>? Programs run with the CLI won’t get it any more.`,
+    consequences: ["This can’t be undone; the access log keeps the record.", "Other environments keep their values."],
+    action: base(v.id, "/delete"),
+    csrf: ctx.csrf,
+    fields: { name, environment },
+    button: `Delete ${name} from ${environment}`,
+    cancel: base(v.id),
+  })}</div>`;
   return shell(ctx, v, title, body);
 }
 
@@ -330,8 +411,8 @@ async function reveal(ctx: Ctx, v: Vault): Promise<Reply> {
   const environment = ctx.form.get("environment") ?? "";
   const back = base(v.id);
   const fail = (status: number, text: Raw | string) =>
-    shell(ctx, v, `Reveal ${name}`, html`${pageHeader({ crumb: crumb(v, "reveal"), title: `Reveal ${name}`, path: true })}
-      <p class="callout danger" role="alert">${text}</p><p><a href="${back}">Back to variables</a></p>`, status, back);
+    shell(ctx, v, `Reveal ${name}`, html`${pageHeader({ crumb: crumbs(v, { label: `Reveal ${name}` }), title: `Reveal ${name}`, path: true, primary: html`<a class="button" href="${back}">Back to variables</a>` })}
+      ${refusal(text)}`, status, back);
   if (!NAME.test(name) || !ENV.test(environment)) return fail(404, "There’s no such variable.");
   // Without the key nothing could be opened: don't let the database log a
   // reveal that shows nothing.
@@ -352,11 +433,11 @@ async function reveal(ctx: Ctx, v: Vault): Promise<Reply> {
   const title = `${name} in ${environment}`;
   const body = html`
     ${pageHeader({
-      crumb: crumb(v, "reveal"),
+      crumb: crumbs(v, { label: `Reveal ${name}` }),
       title,
       path: true,
-      meta: html`<p class="meta"><span>Set by ${who(ctx, r.updatedBy, null)}, ${ago(new Date(r.updatedAt))}</span></p>`,
-      actions: html`<a class="button" href="${back}">Done</a>`,
+      meta: html`<p class="meta"><span>Set by ${who(ctx, r.updatedBy, null)}, ${time(r.updatedAt)}</span></p>`,
+      primary: html`<a class="button" href="${back}">Done</a>`,
     })}
     <div class="callout attention reveal" role="status">
       <strong>This reveal is logged.</strong>
@@ -368,35 +449,66 @@ async function reveal(ctx: Ctx, v: Vault): Promise<Reply> {
 }
 
 // ---------------------------------------------------------------------------
-// Imports: paste a .env (a draft), or review a push from the CLI. Values are
-// in plaintext here only in the paste form's POST body, handed straight to
-// createImport() (sealed, stored as a draft). No page shows one: the
-// preview names what will be set or replaced, and the confirm step sends
-// only the import's id, so a value never goes back to the browser.
+// Imports: a .env brought in at once, pasted here or sent from the CLI with
+// `reliquary env push`. Values are in plaintext here only in the paste
+// form's POST body, handed straight to createImport() (sealed, stored as a
+// pasted import only its author sees). No page shows one: the preview names
+// what will be set or replaced, and the confirm step sends only the
+// import's id, so a value never goes back to the browser.
 
 const importPath = (vaultId: string, importId: string, rest = "") => base(vaultId, `/imports/${importId}${rest}`);
+const importWhat = (p: EnvImport) => `${plural(p.names.length, "variable")} for ${p.environments.join(", ")}`;
 
-// Minutes or hours from now, for "expires in".
-function inTime(d: Date): string {
-  const s = Math.max(0, (d.getTime() - Date.now()) / 1000);
-  if (s < 90) return "a minute";
-  if (s < 5400) return `${Math.round(s / 60)} minutes`;
-  return `${Math.round(s / 3600)} hours`;
-}
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-// Pending pushes, on the Variables page (one vault) and in Review (all).
+// Imports from the CLI waiting, in the Inbox (every vault; `showVault`).
 export function pendingList(ctx: Ctx, pushes: (EnvImport & { vaultName: string; mayApply: boolean })[], showVault: boolean): Raw {
-  return html`<section class="callout attention pending-imports" aria-label="Pushes waiting for approval">
-    <strong>${pushes.length === 1 ? "A push is" : `${pushes.length} pushes are`} waiting for approval</strong>
+  return html`<section class="callout attention pending-imports" aria-label="Imports from the CLI waiting to be applied">
+    <strong>${pushes.length === 1 ? "An import from the CLI is" : `${pushes.length} imports from the CLI are`} waiting to be applied</strong>
     <p class="small">Sent with <code>reliquary env push</code>. Nothing is set until a person applies it here.</p>
     <ul class="rows">${pushes.map(
-      (p) => html`<li><span><a class="name" href="${importPath(p.vaultId, p.id)}">${plural(p.names.length, "variable")} for ${p.environments.join(", ")}</a>
-        <span class="muted small"> · ${showVault ? `${p.vaultName} · ` : ""}from ${who(ctx, p.createdBy, null)} via the CLI · ${ago(p.createdAt)} · expires in ${inTime(p.expiresAt)}</span></span>
+      (p) => html`<li><span><a class="name" href="${importPath(p.vaultId, p.id)}">${importWhat(p)}</a>
+        <span class="muted small"> · ${showVault ? `${p.vaultName} · ` : ""}from ${who(ctx, p.createdBy, null)} via the CLI · ${time(p.createdAt)} · expires ${time(p.expiresAt)}</span></span>
         <span class="row-end small">${p.mayApply ? html`<a class="button" href="${importPath(p.vaultId, p.id)}">Review</a>` : html`<span class="muted">Owners apply it</span>`}</span></li>`,
     )}</ul>
   </section>`;
+}
+
+// The Imports tab: imports from the CLI waiting in this vault. A pasted
+// import opens on its own preview and is its author's alone, so it isn't
+// listed here.
+async function importsPage(ctx: Ctx, id: string): Promise<Reply> {
+  const v = await theVault(ctx, id);
+  if (!v) return notFound(ctx);
+  const pushes = await waitingIn(ctx, v);
+  const { environments } = await listVariables(ctx.userId, id);
+  const canSet = variablesConfigured() && environments.some((e) => writes(v.role, e));
+  let content: Raw;
+  if (!readsLog(v.role)) {
+    content = emptyState({ title: "Only owners and editors see this vault’s imports." });
+  } else if (!pushes.length) {
+    content = emptyState({
+      title: "No imports waiting.",
+      body: html`Send a <code>.env</code> from a project with <code>npx @reliquary-ai/cli env push --env development</code>: it waits here until a person applies it. A <code>.env</code> you paste with Import .env opens straight on its preview.`,
+    });
+  } else {
+    content = html`<div class="table-wrap"><table class="table-stack var-imports">
+      <thead><tr><th scope="col">Import</th><th scope="col">From</th><th scope="col">Sent</th><th scope="col">Expires</th><th scope="col"><span class="sr-only">Review</span></th></tr></thead>
+      <tbody>${pushes.map(
+        (p) => html`<tr>
+          <td data-label="Import"><a href="${importPath(id, p.id)}">${importWhat(p)}</a></td>
+          <td data-label="From">${who(ctx, p.createdBy, null)} <span class="muted">· CLI</span></td>
+          <td data-label="Sent">${time(p.createdAt)}</td>
+          <td data-label="Expires">${time(p.expiresAt)}</td>
+          <td data-label="">${p.mayApply ? html`<a class="button" href="${importPath(id, p.id)}">Review</a>` : html`<span class="muted small">Owners apply it</span>`}</td>
+        </tr>`,
+      )}</tbody></table></div>`;
+  }
+  const body = html`
+    ${sectionHeader(v, "imports", pushes.length, {
+      description: "A .env brought in at once waits here until a person applies it; nothing is set before.",
+      primary: canSet ? html`<a class="button primary" href="${base(id, "/import")}">Import .env</a>` : "",
+    })}
+    ${content}`;
+  return shell(ctx, v, "Imports · Variables", body);
 }
 
 type ImportForm = { environments?: string[]; error?: Raw | string; refused?: { line: number; name: string | null; reason: string }[] };
@@ -411,25 +523,30 @@ async function importForm(ctx: Ctx, v: Vault, f: ImportForm, status = 200): Prom
   const { environments } = await listVariables(ctx.userId, v.id);
   const allowed = environments.filter((e) => writes(v.role, e));
   const title = "Import a .env";
+  const crumb = crumbs(v, { label: "Imports", href: base(v.id, "/imports") }, { label: title });
   if (!allowed.length || !variablesConfigured()) {
     const why = variablesConfigured() ? "Your role in this vault can’t set variables. Ask an owner." : "This server has no encryption key, so values can’t be set here.";
-    return shell(ctx, v, title, html`${pageHeader({ crumb: crumb(v, "import"), title })}<p class="callout attention">${why}</p>`, 403);
+    return shell(ctx, v, title, html`${pageHeader({ crumb, title })}${callout("warning", why)}`, 403);
   }
   const chosen = f.environments?.length ? f.environments : ["development"];
   const body = html`
     ${pageHeader({
-      crumb: crumb(v, "import"),
+      crumb,
       title,
-      actions: html`<a class="button quiet" href="${base(v.id)}">Cancel</a>`,
+      description: "Paste a .env file; you see which names are new and which replace a value, without the values, before anything is set.",
+      secondary: html`<a class="button quiet" href="${base(v.id)}">Cancel</a>`,
+      primary: html`<button class="primary" form="import-env">Review the import</button>`,
     })}
-    ${f.error ? html`<p class="callout danger" role="alert">${f.error}</p>` : ""}
-    ${f.refused?.length ? html`<div class="callout attention"><p><strong>Not taken:</strong></p>${refusedList(f.refused)}</div>` : ""}
-    <p class="lede">Paste a <code>.env</code> file. Each <code>NAME=value</code> line becomes a variable in the environments you tick. Next you see which names are new and which replace a value, without the values, and nothing is saved until you apply it.</p>
+    ${f.error ? refusal(f.error) : ""}
+    ${f.refused?.length ? callout("warning", html`<p><strong>Not taken:</strong></p>${refusedList(f.refused)}`) : ""}
     <form method="post" action="${base(v.id, "/import")}" class="panel choice-form" id="import-env" autocomplete="off">
       ${csrfField(ctx.csrf)}
       <label for="ie">Contents of the .env</label>
       <textarea id="ie" name="dotenv" class="secret-input" rows="12" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="STRIPE_SECRET_KEY=sk_test_...&#10;DATABASE_URL=&quot;postgres://...&quot;"></textarea>
-      <p class="hint">Comments, blank lines, <code>export</code>, single and double quotes (with <code>\\n</code> escapes in double quotes) and multi-line quoted values are understood; <code>\${VAR}</code> isn’t expanded. Up to ${DOTENV_MAX_ENTRIES} variables. Names like <code>PATH</code> or <code>NODE_OPTIONS</code> are refused.</p>
+      <details class="var-syntax">
+        <summary>What’s understood</summary>
+        <p class="hint">Each <code>NAME=value</code> line becomes a variable. Comments, blank lines, <code>export</code>, single and double quotes (with <code>\\n</code> escapes in double quotes) and multi-line quoted values are understood; <code>\${VAR}</code> isn’t expanded. Up to ${DOTENV_MAX_ENTRIES} variables. Names like <code>PATH</code> or <code>NODE_OPTIONS</code> are refused.</p>
+      </details>
       <fieldset>
         <legend>Environments</legend>
         ${allowed.map(
@@ -440,7 +557,7 @@ async function importForm(ctx: Ctx, v: Vault, f: ImportForm, status = 200): Prom
       <div class="actions"><button class="primary">Review the import</button>
         <a class="button quiet" href="${base(v.id)}">Cancel</a></div>
     </form>
-    <p class="small muted">From a terminal, or an agent: <code>npx @reliquary-ai/cli env push --env development</code> sends a <code>.env</code> file for you to approve here. It never sets a value by itself.</p>`;
+    <p class="small muted">From a terminal, or an agent: <code>npx @reliquary-ai/cli env push --env development</code> sends a <code>.env</code> file as an import from the CLI, which waits on the Imports tab for a person to apply it. It never sets a value by itself.</p>`;
   return shell(ctx, v, title, body, status, base(v.id));
 }
 
@@ -486,22 +603,34 @@ async function reviewImport(ctx: Ctx, v: Vault, importId: string): Promise<Reply
   const envs = environments.filter((e) => imp.environments.includes(e.name));
   const mayApply = envs.length === imp.environments.length && envs.every((e) => writes(v.role, e));
   const pending = imp.status === "pending";
-  const push = imp.source === "cli";
-  const title = push ? "Review a push" : "Review your import";
+  const fromCli = imp.source === "cli";
+  const title = fromCli ? "Review an import from the CLI" : "Review an import you pasted";
   const replaced = imp.names.filter((n) => existing.has(n)).length;
+  // Apply and Reject (Discard for your own paste): in the header, and again
+  // under a long list.
+  const decide = pending && mayApply
+    ? html`<span class="import-decide">
+        <form method="post" action="${importPath(v.id, imp.id, "/reject")}">${csrfField(ctx.csrf)}<button class="danger">${fromCli ? "Reject" : "Discard"}</button></form>
+        <form method="post" action="${importPath(v.id, imp.id, "/apply")}">${csrfField(ctx.csrf)}<button class="primary">Apply: set ${plural(imp.names.length, "variable")}</button></form>
+      </span>`
+    : "";
   const body = html`
     ${pageHeader({
-      crumb: crumb(v, "import"),
+      crumb: crumbs(v, { label: "Imports", href: base(v.id, "/imports") }, { label: fromCli ? "From the CLI" : "Pasted" }),
       title,
-      meta: html`<p class="meta"><span>${push ? html`Sent by ${who(ctx, imp.createdBy, null)} with the Reliquary CLI` : "Pasted by you"}, ${ago(imp.createdAt)}</span>${
-        pending ? html`<span>Expires in ${inTime(imp.expiresAt)}</span>` : ""}</p>`,
+      meta: html`<p class="meta"><span>${fromCli ? html`Sent by ${who(ctx, imp.createdBy, null)} with the Reliquary CLI` : "Pasted by you"}, ${time(imp.createdAt)}</span>${
+        pending ? html`<span>Expires ${time(imp.expiresAt)}</span>` : ""}</p>`,
+      primary: decide,
     })}
     ${pending
       ? ""
-      : html`<p class="callout ${imp.status === "applied" ? "success" : "neutral"}" role="status">${STATUS_TEXT[imp.status]}${
-          imp.decidedBy && imp.status !== "expired" ? ` (${who(ctx, imp.decidedBy, null)}, ${ago(imp.decidedAt!)})` : ""}</p>`}
-    ${pending && push
-      ? html`<p class="callout attention">Sent from a computer signed in as ${who(ctx, imp.createdBy, null)}; an agent may have run it. Check the names before you apply. Values are set as you, and the access log records that they came from this push.</p>`
+      : callout(imp.status === "applied" ? "success" : "info", `${STATUS_TEXT[imp.status]}${
+          imp.decidedBy && imp.status !== "expired" ? ` (${who(ctx, imp.decidedBy, null)}, ${relativeTime(imp.decidedAt!)})` : ""}`)}
+    ${pending && fromCli
+      ? callout("warning", `Sent from a computer signed in as ${who(ctx, imp.createdBy, null)}; an agent may have run it. Check the names before you apply. Values are set as you, and the access log records that they came from this import.`)
+      : ""}
+    ${pending && !mayApply
+      ? html`<p class="muted small">Only owners set values in ${envs.filter((e) => !writes(v.role, e)).map((e) => e.name).join(", ")}, so an owner applies this.</p>`
       : ""}
     <p class="lede">${plural(imp.names.length, "variable")} for ${imp.environments.join(", ")}: ${
       plural(imp.names.length - replaced, "new name")}, ${plural(replaced, "replacing a value", "replacing values")}. Values aren’t shown here.</p>
@@ -509,21 +638,15 @@ async function reviewImport(ctx: Ctx, v: Vault, importId: string): Promise<Reply
       <thead><tr><th>Name</th>${envs.map((e) => html`<th>${e.name}</th>`)}</tr></thead>
       <tbody>${imp.names.map(
         (n) => html`<tr><th scope="row"><code>${n}</code></th>${envs.map((e) => {
-          const version = existing.get(n)?.get(e.name);
-          return html`<td data-label="${e.name}"><div>${version
-            ? html`<span class="badge attention">Replaces v${version}</span>`
-            : html`<span class="badge">New</span>`} <span class="muted small">value set, hidden</span></div></td>`;
+          const replaces = !!existing.get(n)?.get(e.name);
+          return html`<td data-label="${e.name}"><div>${replaces
+            ? html`<span class="badge attention">Replaces a value</span>`
+            : html`<span class="badge">New</span>`}</div></td>`;
         })}</tr>`,
       )}</tbody></table></div>
     ${imp.refused.length ? html`<h2>Not taken</h2><p class="small muted">Lines of the file that won’t be imported, and why.</p>${refusedList(imp.refused)}` : ""}
-    ${pending && mayApply
-      ? html`<div class="actions import-actions">
-          <form method="post" action="${importPath(v.id, imp.id, "/apply")}">${csrfField(ctx.csrf)}<button class="primary">Apply: set ${plural(imp.names.length, "variable")}</button></form>
-          <form method="post" action="${importPath(v.id, imp.id, "/reject")}">${csrfField(ctx.csrf)}<button class="danger">${push ? "Reject" : "Discard"}</button></form>
-        </div>`
-      : pending
-        ? html`<p class="muted small">Only owners set values in ${envs.filter((e) => !writes(v.role, e)).map((e) => e.name).join(", ")}, so an owner applies this.</p>`
-        : html`<p><a href="${base(v.id)}">Back to variables</a></p>`}`;
+    ${pending && mayApply && imp.names.length > LONG_IMPORT ? html`<div class="actions import-actions">${decide}</div>` : ""}
+    ${pending ? "" : html`<p><a href="${base(v.id)}">Back to variables</a></p>`}`;
   return shell(ctx, v, title, body);
 }
 
@@ -560,29 +683,42 @@ async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: boolean
 const envBase = (vaultId: string, rest = "") => base(vaultId, `/environments${rest}`);
 
 async function ownersOnlyPage(ctx: Ctx, v: Vault, title: string): Promise<Reply> {
-  return shell(ctx, v, title, html`${pageHeader({ crumb: crumb(v, "environments"), title })}
-    <p class="callout attention">Only owners manage a vault’s environments.</p>`, 403);
+  return shell(ctx, v, title, html`${pageHeader({ crumb: crumbs(v, { label: title }), title })}
+    ${callout("warning", "Only owners manage a vault’s environments.")}`, 403);
 }
 
 async function environmentsPage(ctx: Ctx, v: Vault, f: { name?: string; ownersOnly?: boolean; error?: string } = {}, status = 200): Promise<Reply> {
   const title = "Environments";
   if (v.role !== "owner") return ownersOnlyPage(ctx, v, title);
   const { environments, variables } = await listVariables(ctx.userId, v.id);
+  const pushes = await waitingIn(ctx, v);
   const count = (e: string) => variables.filter((x) => x.values.some((y) => y.environment === e)).length;
   const body = html`
-    ${pageHeader({ crumb: crumb(v, "environments"), title, actions: html`<a class="button" href="${base(v.id)}">Variables</a>` })}
-    ${f.error ? html`<p class="callout danger" role="alert">${f.error}</p>` : ""}
-    <p class="lede">Each environment holds its own value of every variable. Programs get one environment’s values: <code>reliquary run --env &lt;name&gt;</code>. Owners-only environments are set and read by owners alone.</p>
-    <ul class="rows env-list">${environments.map((e) => {
-      const n = count(e.name);
-      const isDefault = DEFAULT_ENVIRONMENTS.includes(e.name);
-      return html`<li><span><strong>${e.name}</strong>${e.ownersOnly ? html` <span class="badge">Owners only</span>` : ""}
-        <span class="muted small"> · ${plural(n, "value")}${isDefault ? " · default" : ""}</span></span>
-        <span class="row-end small">${isDefault ? "" : html`<a class="button" href="${envBase(v.id, "/rename")}?name=${q(e.name)}">Rename</a>`}${
-          !isDefault || n === 0 ? html`<a class="button danger" href="${envBase(v.id, "/delete")}?name=${q(e.name)}">Delete</a>` : ""}</span></li>`;
-    })}</ul>
+    ${sectionHeader(v, "environments", pushes.length, {
+      description: html`Each environment holds its own value of every variable; programs get one environment’s values with <code>reliquary run --env &lt;name&gt;</code>.`,
+      primary: html`<a class="button primary" href="#add-environment">Add environment</a>`,
+    })}
+    ${f.error ? refusal(f.error) : ""}
+    <div class="table-wrap"><table class="table-stack var-envtable">
+      <thead><tr><th scope="col">Environment</th><th scope="col">Values</th><th scope="col">Who can set</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>${environments.map((e) => {
+        const n = count(e.name);
+        const isDefault = DEFAULT_ENVIRONMENTS.includes(e.name);
+        const items: MenuItem[] = [
+          ...(isDefault ? [] : [{ href: `${envBase(v.id, "/rename")}?name=${q(e.name)}`, label: "Rename", description: "Its values move with it" }]),
+          ...(!isDefault || n === 0
+            ? [{ href: `${envBase(v.id, "/delete")}?name=${q(e.name)}`, label: "Delete", description: n ? "Destroys its values" : "It holds no values", danger: true }]
+            : []),
+        ];
+        return html`<tr>
+          <th scope="row" data-label="Environment"><strong>${e.name}</strong>${isDefault ? html` <span class="badge">Default</span>` : ""}</th>
+          <td data-label="Values">${plural(n, "value")}</td>
+          <td data-label="Who can set">${e.ownersOnly ? html`<span class="badge var-owners" title="${OWNERS_ONLY_HELP}">Owners only</span>` : "Owners and editors"}</td>
+          <td data-label="" class="var-row-end">${items.length ? menu({ label: `Actions for ${e.name}`, icon: "more", items, className: "var-menu" }) : ""}</td>
+        </tr>`;
+      })}</tbody></table></div>
     <p class="small muted">The defaults keep their names, and are deleted only when they hold no value. A vault has at most 20 environments.</p>
-    <h2>Add an environment</h2>
+    <h2 id="add-environment">Add an environment</h2>
     <form method="post" action="${envBase(v.id)}" class="panel choice-form" autocomplete="off">
       ${csrfField(ctx.csrf)}
       <label for="en">Name</label>
@@ -592,7 +728,7 @@ async function environmentsPage(ctx: Ctx, v: Vault, f: { name?: string; ownersOn
       <label class="choice"><input type="checkbox" name="owners_only" value="1"${f.ownersOnly ? raw(" checked") : ""}> Owners only (like production)</label>
       <div class="actions"><button class="primary">Add environment</button></div>
     </form>`;
-  return shell(ctx, v, title, body, status, envBase(v.id));
+  return shell(ctx, v, "Environments · Variables", body, status, envBase(v.id));
 }
 
 async function createEnvironmentPost(ctx: Ctx, v: Vault): Promise<Reply> {
@@ -615,10 +751,16 @@ async function renamePage(ctx: Ctx, v: Vault, from: string, f: { to?: string; er
   if (!environments.some((e) => e.name === from)) return notFound(ctx);
   const n = variables.filter((x) => x.values.some((y) => y.environment === from)).length;
   const body = html`
-    ${pageHeader({ crumb: crumb(v, "environments"), title, path: true })}
-    ${f.error ? html`<p class="callout danger" role="alert">${f.error}</p>` : ""}
-    <p class="lede">${n ? `Its ${plural(n, "value")} ${n === 1 ? "moves" : "move"} with it.` : "It holds no values."} Scripts and <code>.reliquary.json</code> files that name <strong>${from}</strong> need the new name, and pushes waiting for approval for ${from} are rejected: send them again.</p>
-    <form method="post" action="${envBase(v.id, "/rename")}" class="panel" autocomplete="off">
+    ${pageHeader({
+      crumb: crumbs(v, { label: "Environments", href: envBase(v.id) }, { label: title }),
+      title,
+      path: true,
+      secondary: html`<a class="button quiet" href="${envBase(v.id)}">Cancel</a>`,
+      primary: html`<button class="primary" form="rename-environment">Rename</button>`,
+    })}
+    ${f.error ? refusal(f.error) : ""}
+    <p class="lede">${n ? `Its ${plural(n, "value")} ${n === 1 ? "moves" : "move"} with it.` : "It holds no values."} Scripts and <code>.reliquary.json</code> files that name <strong>${from}</strong> need the new name, and imports from the CLI waiting to be applied to ${from} are rejected: send them again.</p>
+    <form method="post" action="${envBase(v.id, "/rename")}" class="panel" id="rename-environment" autocomplete="off">
       ${csrfField(ctx.csrf)}
       <input type="hidden" name="from" value="${from}">
       <label for="et">New name</label>
@@ -634,7 +776,7 @@ async function renamePost(ctx: Ctx, v: Vault): Promise<Reply> {
   if (!ENV.test(from)) return notFound(ctx);
   try {
     const r = await renameEnvironment(ctx.userId, v.id, from, to);
-    ctx.setFlash(`Renamed ${from} to ${to}${r.moved ? ` with its ${plural(r.moved, "value")}` : ""}.${r.rejectedImports ? ` ${plural(r.rejectedImports, "pending import was", "pending imports were")} rejected.` : ""}`, "success");
+    ctx.setFlash(`Renamed ${from} to ${to}${r.moved ? ` with its ${plural(r.moved, "value")}` : ""}.${r.rejectedImports ? ` ${plural(r.rejectedImports, "waiting import was", "waiting imports were")} rejected.` : ""}`, "success");
     return { redirect: envBase(v.id) };
   } catch (err) {
     if (err instanceof SecretsError) {
@@ -653,20 +795,25 @@ async function deleteEnvPage(ctx: Ctx, v: Vault, name: string, error?: string, s
   const { environments, variables } = await listVariables(ctx.userId, v.id);
   if (!environments.some((e) => e.name === name)) return notFound(ctx);
   const names = variables.filter((x) => x.values.some((y) => y.environment === name)).map((x) => x.name);
-  const body = html`
-    ${pageHeader({ crumb: crumb(v, "environments"), title, path: true })}
-    ${error ? html`<p class="callout danger" role="alert">${error}</p>` : ""}
-    <p class="lede">${names.length
-      ? html`This destroys the ${plural(names.length, "value")} in <strong>${name}</strong> (${names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`)}). They can’t be recovered; other environments keep theirs. Programs run with <code>--env ${name}</code> stop getting them.`
-      : html`<strong>${name}</strong> holds no values.`} Pushes waiting for approval for it are rejected. The access log keeps the record.</p>
-    <form method="post" action="${envBase(v.id, "/delete")}" class="panel" autocomplete="off">
-      ${csrfField(ctx.csrf)}
-      <input type="hidden" name="name" value="${name}">
-      <label for="ec">Type <strong>${name}</strong> to confirm</label>
-      <input id="ec" type="text" name="confirm_name" required autocomplete="off" autocapitalize="off" spellcheck="false">
-      <div class="actions"><button class="danger">Delete ${name}${names.length ? " and its values" : ""}</button>
-        <a class="button quiet" href="${envBase(v.id)}">Cancel</a></div>
-    </form>`;
+  const body = html`<div class="var-confirm">${confirmPage({
+    title,
+    crumb: crumbs(v, { label: "Environments", href: envBase(v.id) }, { label: title }),
+    lede: names.length
+      ? html`This destroys the ${plural(names.length, "value")} in <strong>${name}</strong> (${names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`)}). They can’t be recovered; other environments keep theirs.`
+      : html`<strong>${name}</strong> holds no values.`,
+    consequences: [
+      ...(names.length ? [html`Programs run with <code>--env ${name}</code> stop getting them.`] : []),
+      "Imports from the CLI waiting to be applied to it are rejected.",
+      "The access log keeps the record.",
+    ],
+    action: envBase(v.id, "/delete"),
+    csrf: ctx.csrf,
+    fields: { name },
+    typed: { value: name },
+    button: `Delete ${name}${names.length ? " and its values" : ""}`,
+    cancel: envBase(v.id),
+    error,
+  })}</div>`;
   return shell(ctx, v, title, body, status, envBase(v.id));
 }
 
@@ -710,6 +857,9 @@ function detail(r: AccessLogRow): string {
   return `${d.attempt ? `${d.attempt}: ` : ""}${d.reason ?? ""}`;
 }
 
+// An empty cell: a dash, read out as "none".
+const NONE = raw('<span class="muted" aria-label="none">—</span>');
+
 async function log(ctx: Ctx, id: string): Promise<Reply> {
   const v = await theVault(ctx, id);
   if (!v) return notFound(ctx);
@@ -721,27 +871,28 @@ async function log(ctx: Ctx, id: string): Promise<Reply> {
     const s = new URLSearchParams({ ...(action ? { action } : {}), ...(name ? { name } : {}), ...extra }).toString();
     return s ? `${base(id, "/log")}?${s}` : base(id, "/log");
   };
+  const pushes = await waitingIn(ctx, v);
   let table: Raw;
   if (!readsLog(v.role)) {
-    table = html`<div class="empty">Only owners and editors can see this vault’s access log.</div>`;
+    table = emptyState({ title: "Only owners and editors can see this vault’s access log." });
   } else {
     const rows = await accessLog(ctx.userId, id, { before, limit: LOG_PAGE + 1, action, name });
     const more = rows.length > LOG_PAGE;
     const shown = rows.slice(0, LOG_PAGE);
     table = html`${logFilters(ctx, id, action, name)}
       ${shown.length
-        ? html`<div class="vars-wrap"><table class="vars env-log">
-          <thead><tr><th>When</th><th>Who</th><th>What</th><th>Variables</th></tr></thead>
+        ? html`<div class="table-wrap"><table class="table-stack env-log">
+          <thead><tr><th>When</th><th>Who</th><th>What</th><th>Variables</th><th>Environment</th></tr></thead>
           <tbody>${shown.map(
-            (r) => html`<tr${r.action === "refused" ? raw(' class="refused"') : ""}><td class="small" data-label="When"><div>${when(r.at)}</div></td>
-              <td class="small" data-label="Who"><div>${who(ctx, r.actor, null)}<span class="muted token-client">from ${client(r)}</span></div></td>
+            (r) => html`<tr${r.action === "refused" ? raw(' class="refused"') : ""}><td class="small" data-label="When"><div>${time(r.at)}</div></td>
+              <td class="small" data-label="Who"><div>${who(ctx, r.actor, null)} <span class="muted">· ${client(r)}</span></div></td>
               <td class="small" data-label="What"><div>${r.action === "refused"
                 ? html`<span class="badge danger">Refused</span> <span class="muted">${detail(r)}</span>`
                 : html`${ACTION_LABEL[r.action] ?? r.action}${detail(r) ? html` <span class="muted">${detail(r)}</span>` : ""}`}</div></td>
-              <td class="small path-cell" data-label="Variables"><div>${r.names.length ? r.names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`) : html`<span class="muted">none</span>`}${
-                r.environment ? html` <span class="muted">in ${r.environment}</span>` : ""}</div></td></tr>`,
+              <td class="small path-cell" data-label="Variables"><div>${r.names.length ? r.names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`) : NONE}</div></td>
+              <td class="small" data-label="Environment"><div>${r.environment ? r.environment : NONE}</div></td></tr>`,
           )}</tbody></table></div>`
-        : html`<div class="empty">${before ? "No older entries." : action || name ? "Nothing matches these filters." : "Nothing has been set, read or revealed yet."}</div>`}
+        : emptyState({ title: before ? "No older entries." : action || name ? "Nothing matches these filters." : "Nothing has been set, read or revealed yet." })}
       ${more || before
         ? html`<nav class="pager" aria-label="Pages">${before ? html`<a href="${link({})}">Newest</a>` : ""}${
             more ? html`<a class="older" href="${link({ before: shown[shown.length - 1].seq })}">Older</a>` : ""
@@ -749,10 +900,11 @@ async function log(ctx: Ctx, id: string): Promise<Reply> {
         : ""}`;
   }
   const body = html`
-    ${pageHeader({ crumb: crumb(v, "log"), title: "Access log", actions: html`<a class="button" href="${base(id)}">Variables</a>` })}
-    <p class="lede">Who set, rotated, deleted, read or revealed which variables, newest first, and refused attempts with the reason. Nothing here holds a value, and nothing in it is ever edited or deleted.</p>
+    ${sectionHeader(v, "log", pushes.length, {
+      description: "Who set, rotated, deleted, read or revealed which variables, and refused attempts, newest first. It never holds a value, and nothing in it is edited or deleted.",
+    })}
     ${table}`;
-  return shell(ctx, v, "Access log", body);
+  return shell(ctx, v, "Access log · Variables", body);
 }
 
 // ---------------------------------------------------------------------------
@@ -762,6 +914,7 @@ export async function variablesRoutes(ctx: Ctx, id: string, rest: string): Promi
   const get = ctx.method === "GET";
   if (get && rest === "/variables") return list(ctx, id);
   if (get && rest === "/variables/log") return log(ctx, id);
+  if (get && rest === "/variables/imports") return importsPage(ctx, id);
   const v = await theVault(ctx, id);
   if (!v) return notFound(ctx);
   if (get && rest === "/variables/set") {

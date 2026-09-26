@@ -55,7 +55,7 @@ A proposal whose text wouldn't fit is refused when it is made, so an agent learn
 
 Removing things always works at a limit: deleting and erasing files, deleting variables, removing members, leaving, rejecting imports and deleting the vault.
 
-Over MCP a refusal reads `Limit reached:` and the message. The env API answers a push that doesn't fit with status 507 and `{"error": "storage_limit"}`.
+Over MCP a refusal reads `Limit reached:` and the message. The env API answers an import from the CLI that doesn't fit with status 507 and `{"error": "storage_limit"}`.
 
 ## When a plan gets smaller
 

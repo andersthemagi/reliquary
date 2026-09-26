@@ -33,7 +33,7 @@ Within your role and the connection's access:
 - write and delete open files;
 - propose changes to canon files, revise their own proposals, and comment;
 - create a vault for you, with a read-write connection that reaches all your vaults;
-- list environment variable names, and pushes waiting for you (never values).
+- list environment variable names, and imports from the CLI waiting for you (never values).
 
 The full list is in [MCP tools](../reference/mcp-tools.md); what people and agents can each do is in [Permissions](../reference/permissions.md).
 

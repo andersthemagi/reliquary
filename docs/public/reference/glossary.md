@@ -26,11 +26,11 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Environment.** A named set of values for a vault's variables, like `development`, `preview` or `production`. See [Environment variables](../concepts/variables.md#environments).
 
-**Env API.** The web app's HTTP API that the CLI uses to read variables and send pushes. See [Env API](env-api.md).
+**Env API.** The web app's HTTP API that the CLI uses to read variables and send imports. See [Env API](env-api.md).
 
 **Erase.** Blanking every version of a file's text, while the log keeps its entries. Owners only, in person. See [Export, delete and erase](../concepts/export-delete-erase.md#erase-a-file).
 
-**Import.** A whole `.env` brought in at once, by paste or push, waiting for a person to apply it. See [Imports](../concepts/imports.md).
+**Import.** A whole `.env` brought in at once, pasted in the web app or sent from the CLI, waiting for a person to apply it. See [Imports](../concepts/imports.md).
 
 **Inbox.** The top bar's list of what needs you: changes to review, your proposals sent back, .env imports to apply, invites and deleted-vault notices. See [The top bar, inbox and account](../concepts/inbox-and-account.md#inbox).
 
@@ -44,7 +44,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Proposal.** A suggested change to a file that waits for people to approve, request changes or reject it. See [Proposals and review](../concepts/proposals-and-review.md).
 
-**Push.** An import sent from the CLI with `reliquary env push`, often by an agent, that a person applies in the web app. See [Imports](../concepts/imports.md).
+**Push.** Sending a `.env` with `reliquary env push`, often by an agent. It makes an import from the CLI, which a person applies in the web app. See [Imports](../concepts/imports.md).
 
 **Quorum.** How many different people must approve a canon change, 1 to 20, set by a rule. See [Canon, open and rules](../concepts/canon-and-rules.md#quorum).
 

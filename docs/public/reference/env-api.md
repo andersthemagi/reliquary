@@ -1,6 +1,6 @@
 # Env API
 
-The HTTP API the Reliquary CLI uses to read environment variables and send pushes, for anyone building their own client.
+The HTTP API the Reliquary CLI uses to read environment variables and send imports, for anyone building their own client.
 
 The API lives on the web app, at `https://app.reliquary.redmage.cc/api/env`. It only accepts CLI sign-ins: an MCP token or connection is refused, and a CLI sign-in is refused at the MCP endpoint.
 
@@ -68,7 +68,7 @@ Every variable with a value in that environment, decrypted, in name order. Logge
 
 ### POST /api/env/`<vault id>`/`<environment>`/imports
 
-Sends variables for a person to apply (a push). Needs a sign-in allowed to send `.env` files. JSON, at most 1 MiB:
+Sends variables for a person to apply (an import from the CLI). Needs a sign-in allowed to send `.env` files. JSON, at most 1 MiB:
 
 ```json
 { "variables": { "API_KEY": "...", "DATABASE_URL": "..." },
@@ -87,7 +87,7 @@ Errors: 400 `invalid_request` (not JSON, a bad or refused name, an empty or over
 
 ### GET /api/env/imports/`<import id>`
 
-The push's status, for the person who sent it: `pending`, `applied`, `rejected` or `expired`.
+The import's status, for the person who sent it: `pending`, `applied`, `rejected` or `expired`.
 
 ```json
 { "import": "<uuid>", "status": "pending", "environments": ["development"],

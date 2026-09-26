@@ -22,7 +22,7 @@ The **Inbox** button counts what needs you. The count is hidden when nothing doe
 
 - **Changes to review**: open proposals in vaults where you're an owner or editor that you haven't decided on yet. See [Proposals and review](proposals-and-review.md).
 - **Changes requested on your proposals**: yours, or your agents', sent back by a reviewer. Open one to read the note and choose **Revise**.
-- **.env imports to apply**: pushes sent with `reliquary env push` that your role lets you apply. See [Imports](imports.md).
+- **.env imports to apply**: imports from the CLI (sent with `reliquary env push`) that your role lets you apply. See [Imports](imports.md).
 - **Invites**: invites to join a vault, made out to your address. To join, open the link the owner sent you; the Inbox tells you who sent it and when it expires.
 - **Deleted vaults**: a vault you were in was deleted by an owner. The notice is counted until the Inbox or Home shows it, then it's gone.
 

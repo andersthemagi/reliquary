@@ -4,22 +4,24 @@ An import brings a whole `.env` file into a vault at once, and nothing is set un
 
 ## Two ways in
 
-| | Paste | Push |
+Either way it is called an import: one you pasted, or one from the CLI.
+
+| | Pasted | From the CLI |
 |---|---|---|
-| How | Variables page, **Import .env**, paste the file, tick environments | `reliquary env push --file .env` from the CLI |
+| How | Variables page, **Import .env**, paste the file, tick environments, **Review the import** | `reliquary env push --file .env` from the CLI |
 | Who | an owner or editor, in the web app | you, or an agent running the CLI for you |
-| Waits as | a draft, only yours, for 30 minutes | a pending import, for 24 hours |
-| Applied by | you, from its preview | an owner or editor, from the Variables page's notice or the Inbox |
+| Waits | for 30 minutes, seen only by you | for 24 hours, on the Variables page's **Imports** tab and in the Inbox |
+| Applied by | you, from its preview | an owner or editor, from the Imports tab or the Inbox |
 
-Either way the values are encrypted on arrival and held on the server. The preview names each variable, says whether it is new or replaces a value (and which version), and lists the lines that weren't taken and why. It never shows a value. **Apply** sets them all, each logged; **Discard** or **Reject** drops them.
+Either way the values are encrypted on arrival and held on the server. The review page names each variable, says whether it is **New** or **Replaces a value**, and lists the lines that weren't taken and why. It never shows a value. **Apply** and **Reject** (**Discard** for one you pasted) are at the top of the page: **Apply** sets them all, each logged; **Reject** or **Discard** drops them.
 
-## Why a push needs a person
+## Why an import from the CLI needs a person
 
-A push is how an agent can move a `.env` into a vault without the values passing through the conversation: the CLI reads the file and sends it straight to Reliquary. But anything an agent can run, injected text can try to run, so a push can only ever wait for approval. Only a person applies it, in the web app. The review page says an agent may have sent it.
+`reliquary env push` is how an agent can move a `.env` into a vault without the values passing through the conversation: the CLI reads the file and sends it straight to Reliquary. But anything an agent can run, injected text can try to run, so an import from the CLI can only ever wait for a person. Only a person applies it, in the web app. The review page says an agent may have sent it.
 
-A CLI sign-in can push only if you ticked **Also let it send .env files here** when you signed it in. Editors can't push to owners-only environments like `production`; the CLI says so before sending anything.
+A CLI sign-in can send imports only if you ticked **Also let it send .env files here** when you signed it in. Editors can't send to owners-only environments like `production`; the CLI says so before sending anything.
 
-Agents see waiting pushes (names, environments, who and when, never values) through `list_variables`. No MCP tool sends, applies or rejects one.
+Agents see imports from the CLI waiting (names, environments, who and when, never values) through `list_variables`. No MCP tool sends, applies or rejects one.
 
 ## What the parser accepts
 

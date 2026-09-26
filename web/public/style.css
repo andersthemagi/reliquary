@@ -1375,3 +1375,116 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure-details > summary { cursor: pointer; width: fit-content; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .failure-details > summary:hover { color: var(--fg); }
 .failure-details[open] > summary { margin-bottom: var(--space-3); }
+
+/* Package F: variables */
+/* The Values table (variablespage.ts): a column per environment, the name
+   column sticky while the rest scrolls sideways inside its box; each set
+   value one line and one ⋯ menu. On a phone, one block per variable. */
+.var-values { margin: 0 0 var(--space-6); }
+.var-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
+/* No clipping on the table itself (the base table hides overflow), so the
+   sticky column sticks to the scrolling box and the menus aren't cut off. */
+table.var-grid { border: 0; border-radius: 0; overflow: visible; }
+.var-grid th, .var-grid td { padding: var(--space-2) var(--space-4); vertical-align: middle; }
+.var-grid td { min-width: 10.5rem; height: 44px; padding-right: var(--space-2); }
+.var-grid thead th { vertical-align: bottom; }
+.var-grid tr:hover > td { background: transparent; }
+.var-grid th:first-child {
+  position: sticky; left: 0; z-index: 1; background: var(--bg);
+  box-shadow: inset -1px 0 0 var(--border);
+}
+.var-grid thead th:first-child { background: var(--bg-subtle); z-index: 2; }
+.var-grid th[scope="row"] { font-weight: 500; color: var(--fg); }
+.var-grid th[scope="row"] code { white-space: nowrap; font-size: var(--text-sm); color: var(--fg); }
+.var-env { color: var(--fg); }
+.var-owners { margin-left: var(--space-1); }
+.var-owners::before {
+  /* A small padlock: shackle and body, drawn in CSS. */
+  content: ""; width: 8px; height: 7px; margin-top: 3px; flex: none;
+  border: 1.5px solid currentColor; border-radius: 1px;
+  box-shadow: 0 -4px 0 -2.5px currentColor;
+}
+.var-cell { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--control-sm); }
+.var-state { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); min-width: 0; }
+.var-set { font-weight: 600; font-size: var(--text-sm); color: var(--fg); }
+.var-meta { color: var(--fg-muted); font-size: var(--text-sm); }
+.var-none { color: var(--fg-muted); font-size: var(--text-sm); }
+/* Who set it: read out everywhere, shown where a cell has room (a phone's
+   stacked rows); in the table it's in the title and the menu. */
+/* In flow, not absolute: an absolute box here would sit outside the
+   scrolling box and widen the page. */
+.var-grid .var-by { display: inline-block; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; vertical-align: top; }
+.var-readers { display: inline-flex; align-items: center; gap: 6px; color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); flex-basis: 100%; }
+.var-readers::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--info); flex: none; }
+td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
+
+/* A ⋯ menu inside a table: positioned from where it would sit (under its
+   button, aligned to its right edge) rather than from the cell, so a table
+   or a scrolling box never clips it. */
+.var-menu.menu-wrap { position: static; flex: none; }
+.var-menu > summary.icon-button { width: 32px; min-height: var(--control-sm); padding: 0; }
+.var-menu > .menu { top: auto; right: auto; left: auto; margin-top: 4px; transform: translateX(calc(-100% + 32px)); }
+.var-menu > .menu > .menu-label { max-width: 17rem; font-weight: 400; font-size: var(--text-xs); line-height: var(--lh-xs); white-space: normal; }
+.var-row-end { text-align: right; width: 1%; }
+/* A one-button form item lines up with the link items (the base button
+   centres its content). */
+.var-menu .menu-item { justify-content: start; }
+
+/* "Set" in an empty cell shows on hover or focus where there is a pointer
+   to hover with; always on touch screens and phones. */
+@media (hover: hover) and (min-width: 641px) {
+  .var-grid .var-add { opacity: 0; transition: opacity 120ms ease-out; }
+  .var-grid tr:hover .var-add, .var-grid .var-add:focus-visible { opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .var-grid-wrap { overflow: visible; border: 0; background: transparent; }
+  table.var-grid, .var-grid tbody, .var-grid tr, .var-grid th, .var-grid td { display: block; }
+  .var-grid thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .var-grid tr { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); margin: 0 0 var(--space-3); }
+  .var-grid th[scope="row"] {
+    position: static; box-shadow: none; background: var(--bg-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: var(--space-3) var(--space-4);
+    overflow-wrap: anywhere;
+  }
+  .var-grid th[scope="row"] code { white-space: normal; overflow-wrap: anywhere; }
+  .var-grid .var-by { display: inline; width: auto; height: auto; margin: 0; overflow: visible; clip-path: none; white-space: normal; }
+  .var-grid td {
+    min-width: 0; height: auto; border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); column-gap: var(--space-3); align-items: center;
+  }
+  .var-grid td::before { content: attr(data-label); font-size: 0.8125rem; font-weight: 600; color: var(--fg-muted); overflow-wrap: anywhere; }
+}
+
+/* Environments: a menu at the end of each row; the stacked phone layout
+   keeps it on its own line, at the right. */
+@media (max-width: 640px) {
+  .var-envtable td.var-row-end { width: auto; display: flex; justify-content: flex-end; }
+  .var-imports td[data-label=""] .button { width: 100%; }
+}
+
+/* Set a value: the environments as radios, the ones a role can't set shown
+   disabled. */
+.var-envs label.choice.is-disabled { color: var(--fg-muted); cursor: not-allowed; }
+.var-envs label.choice .badge { margin-left: var(--space-1); }
+
+/* Import a .env: the accepted syntax, folded. */
+.var-syntax { margin: var(--space-2) 0 0; }
+.var-syntax > summary { cursor: pointer; width: fit-content; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.var-syntax > summary:hover { color: var(--fg); }
+
+/* Review an import: Apply and Reject in the header (and under a long list). */
+.import-decide { display: inline-flex; flex-wrap: wrap; gap: var(--space-3); }
+.import-decide form { margin: 0; }
+.import-actions .import-decide { margin-top: var(--space-2); }
+
+/* The stated-plainly caveats, one callout. */
+.callout.var-caveats p { max-width: var(--measure); }
+.callout.var-caveats p + p { margin-top: var(--space-3); }
+
+/* A revealed value selects in one click; long confirm titles wrap. */
+.reveal pre.secret { user-select: all; }
+.var-confirm h1 { overflow-wrap: anywhere; }
+
+/* Access log: who, then the client, on one line. */
+table.env-log td[data-label="Environment"] { white-space: nowrap; }

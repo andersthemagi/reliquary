@@ -150,8 +150,8 @@ test("environments page: owners get Environments on the Variables page; editors 
   assert.equal(r.status, 403);
   assert.match(await r.text(), /Only owners manage a vault’s environments/);
   const h = await page(vp("/environments"));
-  assert.match(h, /<strong>development<\/strong>[\s\S]*1 value · default/);
-  assert.match(h, /<strong>production<\/strong> <span class="badge">Owners only<\/span>/);
+  assert.match(h, /<strong>development<\/strong> <span class="badge">Default<\/span><\/th>\s*<td data-label="Values">1 value<\/td>/);
+  assert.match(h, /<strong>production<\/strong> <span class="badge">Default<\/span><\/th>[\s\S]*?<td data-label="Who can set"><span class="badge var-owners" title="Only owners set, reveal or read values here">Owners only<\/span><\/td>/);
   assert.doesNotMatch(h, /environments\/rename\?name=development/);
 });
 
@@ -161,14 +161,16 @@ test("environments page: an owner adds one, owners-only or not; it becomes a col
   r = await post(vp("/environments"), { name: "audit", owners_only: "1" });
   assert.equal(r.status, 303);
   assert.equal(await envs(), "audit*,development,preview,production*,staging");
-  assert.match(await page(vp()), /<th>staging<\/th>[\s\S]*<th>audit <span class="muted">\(owners\)<\/span><\/th>|<th>audit <span class="muted">\(owners\)<\/span><\/th>[\s\S]*<th>staging<\/th>/);
+  const cols = /<thead>[\s\S]*?<\/thead>/.exec(await page(vp()))[0];
+  assert.match(cols, /<span class="var-env">staging<\/span><\/th>/);
+  assert.match(cols, /<span class="var-env">audit<\/span> <span class="badge var-owners"[^>]*>Owners only<\/span><\/th>/);
   vals.stage = value("stage");
   r = await post(vp("/set"), { name: "STAGE_KEY", environment: "staging", value: vals.stage });
   assert.equal(r.status, 303);
   // Sol, an editor, may set staging but not the owners-only audit.
   const form = await page(vp("/set"), editor);
-  assert.match(form, /<option value="staging">/);
-  assert.doesNotMatch(form, /<option value="audit">/);
+  assert.match(form, /<input type="radio" name="environment" value="staging" required> staging/);
+  assert.match(form, /<input type="radio" name="environment" value="audit" disabled> audit/);
   r = await post(vp("/set"), { name: "SOL_KEY", environment: "audit", value: value("sol") }, { s: editor });
   assert.equal(r.status, 403);
 });

@@ -230,10 +230,10 @@ test("env import: a paste shows a preview naming each variable as new or replaci
   pasted.id = importOf(location);
   const h = await page(location);
   noValues(h);
-  assert.match(h, /<h1>Review your import<\/h1>/);
+  assert.match(h, /<h1>Review an import you pasted<\/h1>/);
   assert.match(h, /5 variables for development, preview: 4 new names, 1 replacing a value\. Values aren’t shown here\./);
   assert.match(h, /<th>development<\/th><th>preview<\/th>/);
-  assert.match(h, /<code>API_KEY<\/code><\/th><td data-label="development"><div><span class="badge attention">Replaces v1<\/span>/);
+  assert.match(h, /<code>API_KEY<\/code><\/th><td data-label="development"><div><span class="badge attention">Replaces a value<\/span><\/div>/);
   for (const n of ["DATABASE_URL", "DUP", "SINGLE", "TLS_KEY"]) assert.match(h, new RegExp(`<code>${n}</code>`));
   assert.match(h, /<li>Line 6, <code>PATH<\/code>: changes how programs start, so it can&#39;t be a shared variable<\/li>/);
   assert.match(h, /<li>Line 7: the name isn&#39;t letters, digits and underscores/);
@@ -370,19 +370,58 @@ test("env push: a CLI sign-in allowed to push makes a pending import: names, wha
 
 test("env push: it waits on the Variables page and in Review, and the review page warns that an agent may have sent it", async () => {
   const h = await page(vp(V.push));
-  assert.match(h, /A push is waiting for approval/);
+  assert.match(h, /An import from the CLI is waiting to be applied/);
   assert.match(h, new RegExp(`href="${vp(V.push, `/imports/${pasted.pushId}`)}">2 variables for development</a>`));
   const rv = await page("/inbox");
-  assert.match(rv, /A push is waiting for approval/);
+  assert.match(rv, /An import from the CLI is waiting to be applied/);
   assert.match(rv, /Imp Push · from you via the CLI/);
   assert.doesNotMatch(rv, /Nothing is waiting on you/);
   const p = await page(vp(V.push, `/imports/${pasted.pushId}`));
   noValues(p);
-  assert.match(p, /<h1>Review a push<\/h1>/);
+  assert.match(p, /<h1>Review an import from the CLI<\/h1>/);
   assert.match(p, /Sent by you with the Reliquary CLI/);
   assert.match(p, /an agent may have run it\. Check the names before you apply\./);
   assert.match(p, /<li>Line 4, <code>PATH<\/code>: changes how programs start/);
   assert.match(p, /<button class="danger">Reject<\/button>/);
+});
+
+test("env import tab: the Imports tab counts and lists imports from the CLI waiting, with who sent them, when they expire and Review", async () => {
+  const h = await page(vp(V.push, "/imports"));
+  noValues(h);
+  assert.match(h, new RegExp(`<a href="${vp(V.push, "/imports")}" aria-current="page">Imports<span class="count">1</span></a>`));
+  const rows = /<tbody>[\s\S]*?<\/tbody>/.exec(h)[0];
+  assert.match(rows, new RegExp(`<a href="${vp(V.push, `/imports/${pasted.pushId}`)}">2 variables for development</a>`));
+  assert.match(rows, /data-label="From">you <span class="muted">· CLI<\/span>/);
+  assert.match(rows, /data-label="Expires"><time datetime="[^"]+" title="[^"]+ UTC">in \d+ h<\/time>/);
+  assert.match(rows, />Review<\/a>/);
+  // The count is on every tab of the vault's Variables.
+  assert.match(await page(vp(V.push, "/log")), /Imports<span class="count">1<\/span>/);
+});
+
+test("env import review: Apply and Reject sit in the page header, above the list, and again under a long one", async () => {
+  const p = await page(vp(V.push, `/imports/${pasted.pushId}`));
+  assert.match(p, /<div class="page-actions"><span class="import-decide">[\s\S]*?<button class="danger">Reject<\/button>[\s\S]*?<button class="primary">Apply: set 2 variables<\/button>/);
+  assert.ok(p.indexOf("Apply: set 2 variables") < p.indexOf("<table"), "Apply is above the list");
+  assert.equal(p.split("Apply: set 2 variables").length - 1, 1, "a short import has one Apply");
+  const long = Array.from({ length: 13 }, (_, i) => `LONG_${i}=${value(`long-${i}`)}`).join("\n");
+  const r = await post(vp(V.own, "/import"), [["dotenv", long], ["environment", "development"]]);
+  const id = importOf(r.headers.get("location"));
+  const l = await page(vp(V.own, `/imports/${id}`));
+  noValues(l);
+  assert.equal(l.split('<button class="primary">Apply: set 13 variables</button>').length - 1, 2);
+  assert.equal(l.split('<button class="danger">Discard</button>').length - 1, 2);
+  assert.equal((await post(vp(V.own, `/imports/${id}/reject`), {})).status, 303);
+});
+
+test("env import words: the pages call a .env brought in at once an import, pasted or from the CLI, never a push or a draft", async () => {
+  // The words people read: no markup, no command names, not the vault's own name.
+  const words = (h) => h.replace(/<code>[^<]*<\/code>/g, "").replace(/<[^>]*>/g, " ").replaceAll("Imp Push", "");
+  const main = (h) => words(/<main id="main">[\s\S]*<\/main>/.exec(h)[0]);
+  for (const path of [vp(V.push), vp(V.push, "/imports"), vp(V.push, `/imports/${pasted.pushId}`), vp(V.push, "/log"), vp(V.own, "/import")]) {
+    assert.doesNotMatch(main(await page(path)), /\bpush(es|ed)?\b|\bdrafts?\b/i, path);
+  }
+  const inbox = /<section class="callout attention pending-imports"[\s\S]*?<\/section>/.exec(await page("/inbox"))[0];
+  assert.doesNotMatch(words(inbox), /\bpush(es|ed)?\b|\bdrafts?\b/i);
 });
 
 test("env push: a person applies it in the web UI; the CLI sees it applied, and the values decrypt as sent", async () => {
@@ -393,7 +432,7 @@ test("env push: a person applies it in the web UI; the CLI sees it applied, and 
   const token = await cliToken(RUTH, ruth.origin, false);
   const s = await (await api(`/imports/${pasted.pushId}`, token)).json();
   assert.equal(s.status, "applied");
-  assert.doesNotMatch(await page(vp(V.push)), /waiting for approval/);
+  assert.doesNotMatch(await page(vp(V.push)), /waiting to be applied/);
 });
 
 test("env push: refused without the push permission, for an editor's production, for a vault outside the sign-in, and for bad input", async () => {
