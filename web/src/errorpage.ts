@@ -6,6 +6,7 @@
 import { html, page, type Raw, type Shell, type Theme } from "./html.js";
 import { siteHref } from "./hosts.js";
 import { fail, ownRaise, plainText, Refusal, type Failure } from "./failure.js";
+import type { Flash } from "./flash.js";
 
 // A refusal to show on the page the person was on (a flash, or the form
 // again): the reason and the reference. Our own raised exceptions and
@@ -138,7 +139,7 @@ export type ErrorPageOpts = {
   // The signed-in frame, when there is one.
   user?: string;
   csrf?: string;
-  flash?: string;
+  flash?: Flash | string;
   shell?: Shell;
   path?: string;
 };

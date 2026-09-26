@@ -53,7 +53,7 @@ Reliquary never shows a variable's value, a token, a key, a password, a file's t
 
 ## What each surface shows
 
-The web app shows an error page with the right HTTP status (400, 403, 404, 409, 413, 429, 500, 502, 503 or 504), the four fields, and **Details to send if you report this**: open it for the same fields as plain text to paste into a report. A refusal on a form you just sent (you aren't allowed, a name is taken) shows at the top of the page you were on, ending with its reference.
+The web app shows an error page with the right HTTP status (400, 403, 404, 409, 413, 429, 500, 502, 503 or 504), the four fields, and **Details to send if you report this**: open it for the same fields as plain text to paste into a report. A refusal on a form you just sent (you aren't allowed, a name is taken) shows in red under the title of the page you were on, ending with its reference, and screen readers announce it at once. When a form works, the message saying what was done shows in the same place.
 
 An MCP tool error has two lines: the first says what failed and why, the second gives what, where and the reference:
 

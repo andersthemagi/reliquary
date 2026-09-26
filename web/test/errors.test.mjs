@@ -85,7 +85,7 @@ const post = (path, fields) =>
     body: new URLSearchParams(fields).toString(),
   });
 const csrf = async (path = "/") => /name="csrf" value="([0-9a-f]+)"/.exec(await (await get(path)).text())[1];
-const flashOf = (h) => /<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "";
+const flashOf = (h) => /<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "";
 
 // The four fields of an error page, and its copyable text.
 function fields(h) {

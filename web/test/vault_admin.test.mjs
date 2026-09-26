@@ -80,7 +80,7 @@ const flashAfter = async (r) => {
   assert.equal(r.status, 303);
   const h = await page(r.headers.get("location"));
   // A refusal ends with its reference (failure.ts), different each time.
-  return (/<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
+  return (/<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
 };
 const vaultRow = async (id) => (await sql("select name, default_policy from public.vaults where id = $1", [id]))[0];
 const events = async (id, event) =>
@@ -237,6 +237,36 @@ test("vault settings: an editor's forged rename is refused by the database", asy
 test("vault settings: a post without the form token changes nothing", async () => {
   const r = await post(`/v/${V.own}/config`, { name: "No token", default_policy: "open", confirm: "1" }, { csrf: false });
   assert.equal(r.status, 403);
+  assert.equal((await vaultRow(V.own)).name, "Admin Renamed");
+});
+
+// Flash messages (html.ts placeFlash, flash.ts): the tone, and the place.
+const flashPage = async (r) => {
+  assert.equal(r.status, 303);
+  return page(r.headers.get("location"));
+};
+
+test("flash: a change that was made shows as success, right under the page title in the content column", async () => {
+  const h = await flashPage(await post(`/v/${V.own}/config`, { name: "Admin Renamed", default_policy: "canon", confirm: "1" }));
+  assert.match(h, /<div class="content">\s*<div class="page-head">[\s\S]*?<h1>Settings<\/h1>[\s\S]*?<\/div>\s*<p class="callout success flash" role="status">Files with no rule are canon now\.<\/p>/);
+  assert.ok(h.indexOf("callout success flash") > h.indexOf('<aside class="side">'), "not above the sidebar");
+  assert.equal(h.split("flash").length - 1, 1, "shown once");
+  await post(`/v/${V.own}/config`, { name: "Admin Renamed", default_policy: "open", confirm: "1" });
+});
+
+test("flash: a refusal shows in danger tone as an alert, with its reference", async () => {
+  const h = await flashPage(await post(`/v/${V.walt}/config`, { name: "Vera's now", default_policy: "canon", confirm: "1" }));
+  assert.match(h, /<p class="callout danger flash" role="alert">Only owners rename a vault\. \(ref [0-9a-f]{8}\)<\/p>/);
+});
+
+test("flash: a message that is neither done nor refused shows as information", async () => {
+  const h = await flashPage(await post(`/v/${V.own}/config`, { name: "Admin Renamed", default_policy: "open" }));
+  assert.match(h, /<p class="callout info flash" role="status">Nothing changed\.<\/p>/);
+});
+
+test("flash: a field over its limit is refused before the database, in danger tone", async () => {
+  const r = await post(`/v/${V.own}/config`, { name: "x".repeat(201), default_policy: "open", confirm: "1" });
+  assert.match(await flashPage(r), /<p class="callout danger flash" role="alert">/);
   assert.equal((await vaultRow(V.own)).name, "Admin Renamed");
 });
 

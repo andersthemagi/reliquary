@@ -2,6 +2,8 @@
 // is no other way to put text on a page. File text is shown as plain text,
 // never rendered as markdown or HTML.
 
+import { randomBytes } from "node:crypto";
+import { toFlash, type Flash, type Tone } from "./flash.js";
 import { siteHref } from "./hosts.js";
 import { personRef } from "./personref.js";
 import { BUILD } from "./version.js";
@@ -114,7 +116,7 @@ export type Shell = {
 
 export type PageOpts = {
   user?: string;
-  flash?: string;
+  flash?: Flash | string; // a bare string is info, or danger when it ends with a ref (flash.ts)
   theme?: Theme;
   csrf?: string;
   path?: string; // current path and query: the theme form comes back here, the switcher and search read it
@@ -124,14 +126,7 @@ export type PageOpts = {
 
 const UUID_AT = /^\/v\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?]|$)/;
 
-function agoText(iso: string): string {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (!Number.isFinite(s)) return "";
-  if (s < 90) return "just now";
-  if (s < 5400) return `${Math.round(s / 60)} min ago`;
-  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
-  return `${Math.round(s / 86400)} days ago`;
-}
+const agoText = (iso: string): string => relativeTime(iso);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // One inbox item as a link: where it goes, what it is, and a line of context.
@@ -314,8 +309,7 @@ ${opts.user
   </div>
 </header>`}
 <main id="main">
-${opts.flash ? html`<p class="callout info flash" role="status">${opts.flash}</p>` : ""}
-${body}
+${placeFlash(body, opts.flash)}
 </main>
 <footer><span>Reliquary by Red Mage</span>${footerLinks()}${versionLink()}</footer>
 </body>
@@ -327,33 +321,273 @@ export function notice(title: string, message: Raw | string, theme?: Theme): str
   return page(title, html`<h1>${title}</h1><p class="lede">${message}</p>`, { theme });
 }
 
+// The exact time as text ("2026-09-26 06:49 UTC"). For markup, time() below.
 export function when(d: Date | null | undefined): string {
   if (!d) return "";
-  return d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
-}
-
-// The top of a page: breadcrumb, then the title with an optional status
-// badge and the page's main actions (right-aligned on wide screens, wrapping
-// below the title on narrow ones), then a meta line. A page's primary action
-// lives here, never only at the bottom. A submit button for a form further
-// down uses the form="" attribute (no script). At most one primary, last.
-export function pageHeader(o: {
-  title: Raw | string;
-  crumb?: Raw;
-  badge?: Raw;
-  meta?: Raw;
-  actions?: Raw | "";
-  path?: boolean; // the title is a file path or name: long, may need to break
-}): Raw {
-  return html`<div class="page-head">
-    ${o.crumb ?? ""}
-    <div class="page-title-row">
-      <div class="page-title"><h1${o.path ? raw(' class="path"') : ""}>${o.title}</h1>${o.badge ?? ""}</div>
-      ${o.actions && o.actions.html.trim() ? html`<div class="page-actions">${o.actions}</div>` : ""}
-    </div>
-    ${o.meta ?? ""}
-  </div>`;
+  return utc(d);
 }
 
 // Hidden field carrying the CSRF token for every form.
 export const csrfField = (token: string) => html`<input type="hidden" name="csrf" value="${token}">`;
+
+// ---------------------------------------------------------------------------
+// Components. The shared parts every page builds from; the inventory, with
+// when to use each, is in docs/research/ui-design-system.md ("Components as
+// built"). Each returns Raw and escapes whatever text it is given.
+
+export type { Flash, Tone } from "./flash.js";
+
+// Time --------------------------------------------------------------------------
+
+// "2026-09-26 06:49 UTC": the exact time, for a title or where exactness is
+// the point (an expiry, an error's timestamp).
+export const utc = (d: Date) => d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+
+const asDate = (d: Date | string | number | null | undefined): Date | undefined => {
+  if (d === null || d === undefined || d === "") return undefined;
+  const x = d instanceof Date ? d : new Date(d);
+  return Number.isFinite(x.getTime()) ? x : undefined;
+};
+
+// "just now", "6 min ago", "3 h ago", "4 days ago", and ahead of now "in 6
+// min" and so on; past 30 days either way, the date ("2026-08-01").
+export function relativeTime(d: Date | string | number | null | undefined, now = Date.now()): string {
+  const x = asDate(d);
+  if (!x) return "";
+  const s = (now - x.getTime()) / 1000;
+  const a = Math.abs(s);
+  const say = (n: number, unit: string) => (s >= 0 ? `${n} ${unit} ago` : `in ${n} ${unit}`);
+  if (a < 90) return "just now";
+  if (a < 5400) return say(Math.round(a / 60), "min");
+  if (a < 129600) return say(Math.round(a / 3600), "h");
+  if (a < 30 * 86400) return say(Math.round(a / 86400), "days");
+  return x.toISOString().slice(0, 10);
+}
+
+// One way to show a time: relative, with the exact UTC time in the title
+// and the machine form in datetime. { absolute: true } shows the UTC time
+// itself (expiries, timestamps to copy). Never wraps (style.css), so "UTC"
+// doesn't end up alone on a line. Nothing for a missing or invalid time.
+export function time(d: Date | string | number | null | undefined, o: { absolute?: boolean; now?: number } = {}): Raw {
+  const x = asDate(d);
+  if (!x) return raw("");
+  return o.absolute
+    ? html`<time datetime="${x.toISOString()}">${utc(x)}</time>`
+    : html`<time datetime="${x.toISOString()}" title="${utc(x)}">${relativeTime(x, o.now)}</time>`;
+}
+
+// Breadcrumbs -----------------------------------------------------------------
+
+// Where a page sits, from the vault down: vault / folder / … / this page.
+// A part with an href is a link; the last part is the current page (not a
+// link, aria-current="page") whether or not it has one.
+export type CrumbPart = { label: string; href?: string };
+export function crumb(parts: CrumbPart[]): Raw {
+  if (!parts.length) return raw("");
+  const last = parts.length - 1;
+  return html`<nav class="crumb" aria-label="Breadcrumb"><ol>${parts.map((p, i) =>
+    i === last
+      ? html`<li aria-current="page">${p.label}</li>`
+      : p.href
+        ? html`<li><a href="${p.href}">${p.label}</a></li>`
+        : html`<li>${p.label}</li>`,
+  )}</ol></nav>`;
+}
+
+// Tabs ------------------------------------------------------------------------
+
+// Links styled as tabs, flush under a page header: the current one marked
+// with aria-current, an optional count in a pill.
+export type Tab = { href: string; label: string; count?: number; current?: boolean };
+export function tabs(list: Tab[], label = "Sections"): Raw {
+  if (!list.length) return raw("");
+  return html`<nav class="tabs" aria-label="${label}">${list.map(
+    (t) =>
+      html`<a href="${t.href}"${t.current ? raw(' aria-current="page"') : ""}>${t.label}${
+        t.count !== undefined ? html`<span class="count">${t.count}</span>` : ""
+      }</a>`,
+  )}</nav>`;
+}
+
+// Page header -----------------------------------------------------------------
+
+// Where the flash goes: right after the page header, in the page's content
+// column (page() puts it there). A comment with a per-process random name,
+// so no text on a page (escaped, or rendered markdown) can place one.
+const FLASH_SLOT = `<!--flash-${randomBytes(8).toString("hex")}-->`;
+
+// The top of a page: breadcrumb, then the title with an optional status
+// badge and the page's actions (right-aligned on wide screens, wrapping
+// below the title on narrow ones), then a one-sentence description, a meta
+// line and tabs. Controls live here, at the top, never only at the bottom
+// (the owner's rule). Actions go secondary first, then the one primary,
+// last. A submit button for a form further down uses the form="" attribute
+// (no script); it only submits a form whose required fields are on the
+// first screen. `actions` is the older slot: everything in it goes before
+// `secondary` and `primary`.
+export function pageHeader(o: {
+  title: Raw | string;
+  crumb?: Raw | CrumbPart[];
+  badge?: Raw;
+  description?: Raw | string;
+  meta?: Raw;
+  actions?: Raw | "";
+  secondary?: Raw | "";
+  primary?: Raw | "";
+  tabs?: Tab[];
+  tabsLabel?: string;
+  path?: boolean; // the title is a file path or name: long, may need to break
+}): Raw {
+  const acts = [o.actions, o.secondary, o.primary].filter((a): a is Raw => a instanceof Raw && a.html.trim() !== "");
+  const top = Array.isArray(o.crumb) ? crumb(o.crumb) : (o.crumb ?? "");
+  return html`<div class="page-head${o.tabs?.length ? " has-tabs" : ""}">
+    ${top}
+    <div class="page-title-row">
+      <div class="page-title"><h1${o.path ? raw(' class="path"') : ""}>${o.title}</h1>${o.badge ?? ""}</div>
+      ${acts.length ? html`<div class="page-actions">${acts}</div>` : ""}
+    </div>
+    ${o.description ? html`<p class="page-desc">${o.description}</p>` : ""}
+    ${o.meta ?? ""}
+    ${o.tabs?.length ? tabs(o.tabs, o.tabsLabel) : ""}
+  </div>${raw(FLASH_SLOT)}`;
+}
+
+// Flash -------------------------------------------------------------------------
+
+// The message a form left for the next page, in its tone: danger is an
+// alert (read out at once), the rest a status.
+export function flashMessage(f: Flash | string): Raw {
+  const x = typeof f === "string" ? toFlash(f) : f;
+  return html`<p class="callout ${x.tone} flash" role="${x.tone === "danger" ? "alert" : "status"}">${x.text}</p>`;
+}
+
+// The page body with the flash placed: after the page header when the page
+// has one (so, in a vault, in the content column beside the sidebar), else
+// at the top of <main>.
+export function placeFlash(body: Raw, f: Flash | string | undefined): Raw {
+  const at = body.html.indexOf(FLASH_SLOT);
+  const shown = f ? flashMessage(f).html : "";
+  if (at < 0) return raw(shown + body.html);
+  return raw(body.html.slice(0, at) + shown + body.html.slice(at + FLASH_SLOT.length).replaceAll(FLASH_SLOT, ""));
+}
+
+// Callouts --------------------------------------------------------------------
+
+// A boxed message in a tone: info (context), success (done), warning (check
+// this first), danger (refused or destructive; an alert, read out at once).
+// A string body is one paragraph; a Raw body is used as it is.
+export function callout(tone: Tone, body: Raw | string, o: { title?: string; id?: string } = {}): Raw {
+  return html`<div class="callout ${tone}"${tone === "danger" ? raw(' role="alert"') : ""}${o.id ? html` id="${o.id}"` : ""}>${
+    o.title ? html`<p class="callout-title"><strong>${o.title}</strong></p>` : ""
+  }${typeof body === "string" ? html`<p>${body}</p>` : body}</div>`;
+}
+
+// Badges ------------------------------------------------------------------------
+
+// Canon and open: a filled or hollow diamond (drawn in CSS) and the word,
+// with what the word means in the title, so the policy never rests on the
+// mark alone and the term is explained wherever it appears.
+export const POLICY_HELP: Record<string, string> = {
+  canon: "Canon: changes are proposals that people approve",
+  open: "Open: members and agents write directly",
+};
+export function policyBadge(policy: string): Raw {
+  const label = policy === "canon" ? "Canon" : policy === "open" ? "Open" : policy;
+  const help = POLICY_HELP[policy];
+  return help
+    ? html`<span class="badge policy ${policy}" title="${help}">${label}</span>`
+    : html`<span class="badge">${label}</span>`;
+}
+
+// Menus -----------------------------------------------------------------------
+
+// An action menu (More, ⋯, Snooze): a <details> whose summary is a button,
+// opened with Enter or Space, closed the same way; its items are links, or
+// one-button forms (POST with the CSRF token) for actions. No script (the
+// CSP forbids it), and no role="menu", which would promise arrow keys: the
+// items are a list you Tab through. Destructive items say so (danger) and
+// should lead to a confirm page rather than act at once.
+const ICON_MORE = raw(
+  '<svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg>',
+);
+export type MenuItem =
+  | { href: string; label: string; description?: string; danger?: boolean; current?: boolean }
+  | { action: string; csrf: string; fields?: Record<string, string>; label: string; description?: string; danger?: boolean };
+export function menu(o: {
+  label: string; // the button's text; with icon "more", its accessible name
+  items: MenuItem[];
+  icon?: "more"; // a ⋯ button instead of a text one
+  heading?: string; // a line at the top of the open menu
+  align?: "left" | "right"; // which edge the menu lines up with (default right)
+  ghost?: boolean; // a ghost button rather than a secondary one
+  className?: string;
+}): Raw {
+  const item = (i: MenuItem) => {
+    const inner = html`<span class="menu-item-title">${i.label}</span>${i.description ? html`<span class="menu-item-meta">${i.description}</span>` : ""}`;
+    const cls = `menu-item${i.danger ? " danger" : ""}`;
+    if ("href" in i) return html`<li><a class="${cls}" href="${i.href}"${i.current ? raw(' aria-current="page"') : ""}>${inner}</a></li>`;
+    return html`<li><form method="post" action="${i.action}">${csrfField(i.csrf)}${hiddenFields(i.fields)}<button class="${cls}">${inner}</button></form></li>`;
+  };
+  const summary =
+    o.icon === "more"
+      ? html`<summary class="button quiet icon-button" aria-label="${o.label}" title="${o.label}">${ICON_MORE}</summary>`
+      : html`<summary class="button${o.ghost ? " quiet" : ""}">${o.label}</summary>`;
+  return html`<details class="menu-wrap action-menu${o.className ? ` ${o.className}` : ""}">
+    ${summary}
+    <div class="menu action-list${o.align === "left" ? " menu-left" : ""}">
+      ${o.heading ? html`<p class="menu-label">${o.heading}</p>` : ""}
+      <ul class="menu-list">${o.items.map(item)}</ul>
+    </div>
+  </details>`;
+}
+
+const hiddenFields = (fields: Record<string, string> = {}) =>
+  Object.entries(fields).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`);
+
+// Empty states ----------------------------------------------------------------
+
+// What's missing, when it will appear, and the action that fills it (a
+// secondary button or a link). Filtered to nothing: say so and offer
+// "Clear filters", not a create button.
+export function emptyState(o: { title: string; body?: Raw | string; action?: Raw }): Raw {
+  return html`<div class="empty"><strong>${o.title}</strong>${o.body ? html`<p>${o.body}</p>` : ""}${
+    o.action ? html`<p class="empty-action">${o.action}</p>` : ""
+  }</div>`;
+}
+
+// Confirm pages ------------------------------------------------------------------
+
+// A destructive action's confirm step: the header (with where it happens),
+// what will happen in one sentence, the consequences as a list, and a form
+// with the danger button (repeating the verb and the object: "Revoke Claude
+// Code on laptop") and Cancel. `typed` asks for a name typed exactly (the
+// database checks it; this only asks). `error` re-renders it after a wrong
+// name, as an alert. Returns the body; the caller renders it (status 400
+// with an error).
+export function confirmPage(o: {
+  title: string;
+  crumb?: Raw | CrumbPart[];
+  lede: Raw | string;
+  consequences?: (Raw | string)[];
+  action: string;
+  csrf: string;
+  fields?: Record<string, string>;
+  typed?: { value: string; name?: string; label?: Raw | string };
+  button: string;
+  cancel: string; // where Cancel goes: the page the person came from
+  error?: string;
+}): Raw {
+  const t = o.typed;
+  return html`${pageHeader({ crumb: o.crumb, title: o.title })}
+    ${o.error ? callout("danger", o.error) : ""}
+    <p class="lede confirm-lede">${o.lede}</p>
+    ${o.consequences?.length ? html`<ul class="consequences">${o.consequences.map((c) => html`<li>${c}</li>`)}</ul>` : ""}
+    <form method="post" action="${o.action}" class="panel confirm">
+      ${csrfField(o.csrf)}${hiddenFields(o.fields)}
+      ${t
+        ? html`<label for="confirm-typed">${t.label ?? html`Type <strong>${t.value}</strong> to confirm`}</label>
+          <input id="confirm-typed" type="text" name="${t.name ?? "confirm_name"}" required autocomplete="off" spellcheck="false" autocapitalize="off">`
+        : ""}
+      <div class="actions"><button class="danger solid">${o.button}</button><a class="button quiet" href="${o.cancel}">Cancel</a></div>
+    </form>`;
+}

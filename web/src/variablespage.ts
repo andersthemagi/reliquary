@@ -270,7 +270,7 @@ async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
   if (!value) return again("Enter a value.");
   try {
     const action = await setVariable(ctx.userId, v.id, name, environment, value);
-    ctx.setFlash(action === "rotate" ? `Rotated ${name} in ${environment}.` : `Set ${name} in ${environment}.`);
+    ctx.setFlash(action === "rotate" ? `Rotated ${name} in ${environment}.` : `Set ${name} in ${environment}.`, "success");
     return { redirect: base(v.id) };
   } catch (err) {
     if (err instanceof SecretsError) {
@@ -314,7 +314,7 @@ async function remove(ctx: Ctx, v: Vault): Promise<Reply> {
   const environment = ctx.form.get("environment") ?? "";
   try {
     await deleteVariable(ctx.userId, v.id, name, environment);
-    ctx.setFlash(`Deleted ${name} from ${environment}.`);
+    ctx.setFlash(`Deleted ${name} from ${environment}.`, "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -529,8 +529,8 @@ async function reviewImport(ctx: Ctx, v: Vault, importId: string): Promise<Reply
 async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: boolean): Promise<Reply> {
   const r = apply ? await applyImport(ctx.userId, importId) : await rejectImport(ctx.userId, importId);
   if (r.ok) {
-    if (apply) ctx.setFlash(`Set ${plural(r.names?.length ?? 0, "variable")} in ${(r.environments ?? []).join(", ")}.`);
-    else ctx.setFlash("The import is discarded; its values are gone.");
+    if (apply) ctx.setFlash(`Set ${plural(r.names?.length ?? 0, "variable")} in ${(r.environments ?? []).join(", ")}.`, "success");
+    else ctx.setFlash("The import is discarded; its values are gone.", "success");
     return { redirect: base(v.id) };
   }
   if (r.error === "not_found") return notFound(ctx);
@@ -547,7 +547,7 @@ async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: boolean
     rejected: "This import was already rejected or discarded.",
     unauthorized: "Your session ended. Sign in and try again.",
   };
-  ctx.setFlash(why[r.error] ?? "That was refused.");
+  ctx.setFlash(why[r.error] ?? "That was refused.", "danger");
   return { redirect: importPath(v.id, importId) };
 }
 
@@ -599,7 +599,7 @@ async function createEnvironmentPost(ctx: Ctx, v: Vault): Promise<Reply> {
   const ownersOnly = ctx.form.get("owners_only") === "1";
   try {
     await createEnvironment(ctx.userId, v.id, name, ownersOnly);
-    ctx.setFlash(`Added ${name}${ownersOnly ? " (owners only)" : ""}.`);
+    ctx.setFlash(`Added ${name}${ownersOnly ? " (owners only)" : ""}.`, "success");
     return { redirect: envBase(v.id) };
   } catch (err) {
     const code = (err as { code?: string }).code;
@@ -633,7 +633,7 @@ async function renamePost(ctx: Ctx, v: Vault): Promise<Reply> {
   if (!ENV.test(from)) return notFound(ctx);
   try {
     const r = await renameEnvironment(ctx.userId, v.id, from, to);
-    ctx.setFlash(`Renamed ${from} to ${to}${r.moved ? ` with its ${plural(r.moved, "value")}` : ""}.${r.rejectedImports ? ` ${plural(r.rejectedImports, "pending import was", "pending imports were")} rejected.` : ""}`);
+    ctx.setFlash(`Renamed ${from} to ${to}${r.moved ? ` with its ${plural(r.moved, "value")}` : ""}.${r.rejectedImports ? ` ${plural(r.rejectedImports, "pending import was", "pending imports were")} rejected.` : ""}`, "success");
     return { redirect: envBase(v.id) };
   } catch (err) {
     if (err instanceof SecretsError) {
@@ -675,7 +675,7 @@ async function deleteEnvPost(ctx: Ctx, v: Vault): Promise<Reply> {
   if (!ENV.test(name)) return notFound(ctx);
   try {
     const r = await deleteEnvironment(ctx.userId, v.id, name, typed);
-    ctx.setFlash(`Deleted ${name}${r.deleted ? ` and its ${plural(r.deleted, "value")}` : ""}.`);
+    ctx.setFlash(`Deleted ${name}${r.deleted ? ` and its ${plural(r.deleted, "value")}` : ""}.`, "success");
     return { redirect: envBase(v.id) };
   } catch (err) {
     const code = (err as { code?: string }).code;

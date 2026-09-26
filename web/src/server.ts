@@ -37,6 +37,7 @@ import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sam
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
 import { describe, errorPage } from "./errorpage.js";
 import { doing, fail, failure, withRequest } from "./failure.js";
+import { toFlash } from "./flash.js";
 import { signinUnavailablePage } from "./signin.js";
 import { envApi } from "./envapi.js";
 import { crossHost, hostKind, hostsConfigError, isSitePath } from "./hosts.js";
@@ -485,7 +486,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       // refusal from the database would be shown, without asking it.
       const long = tooLong(form);
       if (long) {
-        session.setFlash(long);
+        session.setFlash({ text: long, tone: "danger" });
         send(res, { redirect: formPage(req) }, {}, auth.cookies);
         console.info(`POST ${url.pathname} 303 too long`);
         return;
@@ -536,7 +537,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       flash: session.takeFlash(),
       theme,
       mcpUrl: MCP_URL,
-      setFlash: (m) => session.setFlash(m),
+      setFlash: (m, tone) => session.setFlash(toFlash(m, tone)),
       ip: clientIp(req),
     };
     const reply = await routes(ctx);

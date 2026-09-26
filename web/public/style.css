@@ -154,7 +154,6 @@ body {
   font-size: var(--text-md);
   line-height: var(--lh-md);
   font-optical-sizing: auto;
-  font-variant-numeric: tabular-nums;
   caret-color: var(--brand);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -982,6 +981,103 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
   .diff .fold > summary { padding-left: 6rem; }
   .snooze > span { flex-basis: 100%; }
   .snooze > span + button { margin-left: 0; }
+}
+
+/* Components (package A: html.ts time, crumb, tabs, pageHeader, flash,
+   callout, policyBadge, menu, emptyState, confirmPage; .table-stack). Shared
+   by every page; page CSS goes in its package's section further down. ---- */
+
+/* Figures line up only where numbers are compared: tables, counts, times,
+   diff stats. Elsewhere Inter's tabular hyphen would put a wide gap in
+   "read-only" or "Pre-alpha". */
+td, th, .num, time, .count, .diff-stat, .meter { font-variant-numeric: tabular-nums; }
+time { white-space: nowrap; }
+
+/* Breadcrumb: vault / folder / … / this page, the last not a link. */
+.crumb ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; }
+.crumb li { min-width: 0; }
+.crumb li + li::before { content: "/"; margin: 0 var(--space-3); color: var(--border-strong); }
+.crumb li[aria-current="page"] { color: var(--fg); }
+.crumb a { display: inline-block; padding: 2px 0; }
+
+/* Page header: a one-sentence description, and tabs flush under it. */
+.page-desc { margin: 0; color: var(--fg-muted); max-width: var(--measure); }
+.page-head.has-tabs { gap: var(--space-3); }
+.page-head > .tabs { margin: var(--space-2) 0 0; }
+.tabs .count { margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px; font-weight: 500; }
+.tabs a[aria-current="page"] .count { background: var(--fg); color: var(--bg); }
+
+/* The flash sits right under the page header, in the content column. */
+.page-head + .flash { margin-top: calc(-1 * var(--space-2)); }
+.flash { overflow-wrap: anywhere; }
+.callout-title { margin: 0 0 var(--space-2); }
+.callout.warning { background: var(--attention-bg); border-color: color-mix(in srgb, var(--attention) 35%, transparent); }
+.badge.warning { background: var(--attention-bg); color: var(--attention); border-color: color-mix(in srgb, var(--attention) 35%, transparent); }
+/* A tone mark before the text, so the tone never rests on colour alone. */
+.callout.success, .callout.warning, .callout.attention, .callout.danger { position: relative; padding-left: calc(var(--space-5) + 14px); }
+.callout.success::before, .callout.warning::before, .callout.attention::before, .callout.danger::before {
+  content: ""; position: absolute; left: var(--space-5); top: calc(var(--space-4) + 6px);
+  width: 7px; height: 7px; transform: rotate(45deg);
+}
+.callout.success::before { background: var(--success); }
+.callout.warning::before, .callout.attention::before { background: var(--attention); }
+.callout.danger::before { box-shadow: inset 0 0 0 2px var(--danger); }
+
+/* Buttons: primary (one per page, last), secondary (the default look),
+   ghost (.ghost or .quiet: Cancel, toolbar, menus), danger (outlined; the
+   confirm page's final step is .danger.solid, filled). */
+.secondary { background: var(--bg); border-color: var(--border-strong); color: var(--fg); }
+.ghost { background: transparent; border-color: transparent; color: var(--fg-muted); }
+.ghost:hover { background: var(--bg-muted); border-color: transparent; color: var(--fg); }
+td .quiet:hover, td .ghost:hover { background: var(--bg-muted); color: var(--fg); }
+.danger.solid { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+.danger.solid:hover { background: color-mix(in srgb, var(--danger) 85%, var(--fg)); border-color: color-mix(in srgb, var(--danger) 85%, var(--fg)); }
+
+/* Action menus (html.ts menu()): a button that opens a list of links and
+   one-button forms. */
+.action-menu { display: inline-block; }
+.action-menu > summary { cursor: pointer; }
+.action-list { min-width: 220px; padding: var(--space-2); gap: var(--space-1); }
+.action-list.menu-left { left: 0; right: auto; }
+.action-list > .menu-label { margin: var(--space-2) var(--space-3) 0; color: var(--fg-muted); }
+.action-list .menu-list { margin: 0; }
+.action-list form { margin: 0; }
+.action-list .menu-item {
+  display: grid; gap: 1px; justify-items: start; width: 100%; min-height: var(--control-sm);
+  padding: 6px var(--space-3); border: 0; border-radius: var(--radius-md); background: transparent;
+  color: var(--fg); font: 400 var(--text-sm)/var(--lh-sm) var(--font-sans); text-align: left; text-decoration: none; white-space: normal;
+}
+.action-list .menu-item:hover { background: var(--bg-muted); }
+.action-list .menu-item:focus-visible { outline-offset: -2px; }
+.action-list .menu-item.danger { color: var(--danger); }
+.action-list .menu-item.danger:hover { background: var(--danger-bg); }
+.action-list .menu-item.danger .menu-item-meta { color: var(--fg-muted); }
+
+/* Empty state's action, and the confirm page. */
+.empty-action { margin-top: var(--space-4) !important; }
+.consequences { max-width: var(--measure); margin: 0 0 var(--space-5); padding-left: 1.25em; }
+.consequences li + li { margin-top: var(--space-2); }
+form.confirm { max-width: 40rem; }
+form.confirm .actions:first-child { margin-top: 0; }
+
+/* Tables that stack on a phone: each row a block, each cell a line with its
+   column's name (data-label on the td) instead of a sideways scroll. */
+@media (max-width: 640px) {
+  table.table-stack { min-width: 0; }
+  .table-wrap:has(> table.table-stack) { margin: 0; padding: 0; overflow: visible; }
+  .table-stack, .table-stack tbody, .table-stack tr, .table-stack th, .table-stack td { display: block; }
+  .table-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .table-stack tr { padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+  .table-stack tbody tr:first-child { border-top: 0; }
+  .table-stack td, .table-stack tbody th {
+    height: auto; border-top: 0; padding: var(--space-1) var(--space-4);
+    display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); column-gap: var(--space-4); align-items: baseline;
+    text-align: left; overflow-wrap: anywhere;
+  }
+  .table-stack td::before, .table-stack tbody th::before { content: attr(data-label); font-size: 0.8125rem; font-weight: 600; color: var(--fg-muted); }
+  .table-stack td:not([data-label]), .table-stack td[data-label=""] { grid-template-columns: minmax(0, 1fr); }
+  .table-stack td:not([data-label])::before, .table-stack td[data-label=""]::before { content: none; }
+  .table-stack tr:hover > td { background: transparent; }
 }
 
 @media (prefers-reduced-motion: reduce) {

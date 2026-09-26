@@ -15,6 +15,7 @@ import { accountSettings, saveDisplayName } from "./settings.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure } from "./failure.js";
+import type { Flash, Tone } from "./flash.js";
 import { fillPeople, personRef } from "./people.js";
 import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
@@ -41,12 +42,14 @@ export type Ctx = {
   url: URL;
   form: URLSearchParams;
   method: string | undefined;
-  flash?: string;
+  flash?: Flash; // the message a form left for this page, with its tone (flash.ts)
   theme: Theme;
   mcpUrl: string;
   reviewCount?: number; // proposals waiting on this person (the shell's count), on GET pages
   shell?: Shell; // the top bar's data, loaded once per GET page (inbox.ts)
-  setFlash: (message: string) => void;
+  // A message for the next page. Say "success" for something done; a
+  // refusal (message(err), ending in its ref) is danger without saying so.
+  setFlash: (message: string, tone?: Tone) => void;
   ip: string; // the client's address, for rate limits only (ratelimit.ts)
 };
 // formAction: one more origin the page's forms may submit (and redirect) to.

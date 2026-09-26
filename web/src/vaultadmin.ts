@@ -139,6 +139,7 @@ async function saveSettings(ctx: Ctx, id: string): Promise<Reply> {
     });
     ctx.setFlash(
       [renamed ? `Renamed to ${name}.` : "", repoliced ? `Files with no rule are ${policy} now.` : ""].filter(Boolean).join(" "),
+      "success",
     );
   } catch (err) {
     ctx.setFlash(message(err));
@@ -186,7 +187,7 @@ async function exportDownload(ctx: Ctx, id: string): Promise<Reply> {
     };
   } catch (err) {
     const e = err as { code?: string; message?: string };
-    ctx.setFlash(e.code === "54000" ? `${(e.message ?? "Too large").replace(/^./, (s) => s.toUpperCase())}.` : message(err));
+    ctx.setFlash(e.code === "54000" ? `${(e.message ?? "Too large").replace(/^./, (s) => s.toUpperCase())}.` : message(err), "danger");
     return { redirect: settingsPath(id, "/export") };
   }
 }
@@ -246,7 +247,7 @@ async function deleteVault(ctx: Ctx, id: string): Promise<Reply> {
       return v.name;
     });
     if (name === null) return notFound(ctx);
-    ctx.setFlash(`Deleted ${name}. Its files, history and variables are gone.`);
+    ctx.setFlash(`Deleted ${name}. Its files, history and variables are gone.`, "success");
     return { redirect: "/" };
   } catch (err) {
     const e = err as { code?: string };
@@ -309,7 +310,7 @@ async function eraseFile(ctx: Ctx, id: string): Promise<Reply> {
       return (await c.query(`select public.erase_file($1, $2) as n`, [id, path])).rows[0].n as number;
     });
     if (n === null) return notFound(ctx);
-    ctx.setFlash(`Erased ${path}: ${plural(n, "version")} blanked.`);
+    ctx.setFlash(`Erased ${path}: ${plural(n, "version")} blanked.`, "success");
     return { redirect: vaultPath(id) };
   } catch (err) {
     ctx.setFlash(message(err));

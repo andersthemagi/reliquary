@@ -107,7 +107,7 @@ const unescape = (s) => s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace
 const flashAfter = async (who, r) => {
   assert.equal(r.status, 303);
   const h = await page(who, r.headers.get("location"));
-  return unescape(/<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "");
+  return unescape(/<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "");
 };
 
 let club = "";

@@ -101,7 +101,7 @@ const post = async (who, path, fields, csrf = true) =>
 const flashAfter = async (who, r) => {
   assert.equal(r.status, 303);
   const h = await page(who, r.headers.get("location"));
-  return (/<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
+  return (/<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
 };
 // The top bar, the main nav (without the switcher's menu), the inbox and the account menu.
 const bar = (h) => /<header class="top app-top">[\s\S]*?<\/header>/.exec(h)[0];
