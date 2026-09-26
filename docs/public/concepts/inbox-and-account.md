@@ -23,8 +23,15 @@ The **Inbox** button counts what needs you. The count is hidden when nothing doe
 - **Changes to review**: open proposals in vaults where you're an owner or editor that you haven't decided on yet. See [Proposals and review](proposals-and-review.md).
 - **Changes requested on your proposals**: yours, or your agents', sent back by a reviewer. Open one to read the note and choose **Revise**.
 - **.env imports to apply**: imports from the CLI (sent with `reliquary env push`) that your role lets you apply. See [Imports](imports.md).
-- **Invites**: invites to join a vault, made out to your address. To join, open the link the owner sent you; the Inbox tells you who sent it and when it expires.
+- **Invites**: invites to join a vault, made out to your address, with who sent each and when it expires. Choose **Join** to become a member with the invite's role, or **Decline** to turn it down (see below). The link the owner sent you works too.
 - **Deleted vaults**: a vault you were in was deleted by an owner. The notice is counted until the Inbox or Home shows it, then it's gone.
+
+### Join or decline an invite
+
+- **Join** makes you a member of the vault with the role the owner chose, and opens it. It is the same as opening the invite link, which then stops working.
+- **Decline** ends the invite: its link stops working and it leaves your Inbox and the owners' list of invites. The vault's **Activity** shows the owners that an invite was declined, never your address. To join later, ask an owner for a new invite.
+
+Only you can answer an invite to your address, signed in to the web app. Nobody else can use it, even with its id, and neither can an agent, token, connected app or CLI sign-in. Your address must be confirmed: until it is, invites don't show in your Inbox, so use the link instead. If the vault is full, **Join** says so and the invite keeps waiting; choose **Join** again once an owner makes room.
 
 A proposal you snoozed leaves the count and the list until the snooze ends. **Show snoozed** on the Inbox page lists them. The Inbox also shows proposals you sent back that are waiting on their proposer. Old links to `/review` open the Inbox.
 

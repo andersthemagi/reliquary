@@ -77,7 +77,7 @@ export function inviteLink(requestOrigin: string, token: string): string {
 }
 
 export type Peek = {
-  state: "pending" | "accepted" | "revoked" | "expired";
+  state: "pending" | "accepted" | "revoked" | "expired" | "declined";
   vaultId: string;
   vaultName: string;
   role: string;
@@ -145,6 +145,7 @@ export function invitePageBody(ctx: Ctx, token: string, p: Peek | undefined, me:
       accepted: "This invite has already been used.",
       revoked: "This invite was withdrawn.",
       expired: "This invite has expired: invites last 7 days.",
+      declined: "You declined this invite.",
     }[p.state];
     return html`${head(`Invite to ${p.vaultName}`)}<p class="lede">${why} Ask the person who invited you for a new one.</p>
       <p><a href="/">Your vaults</a></p>`;

@@ -15,6 +15,8 @@
 //   GET  /v/:id/config/leave                            confirm leaving; POST leaves
 //   GET  /invite?token=                                 what the invite is; Accept
 //   POST /invite                                        accept (token)
+//   POST /inbox/invites/join                            join from the Inbox (invite id)
+//   POST /inbox/invites/decline                         decline from the Inbox (invite id)
 //
 // Nothing here logs an address or a token; the server logs method, path
 // and status only.
@@ -26,6 +28,7 @@ import { deliverInvite, INVITE_TOKEN, type Delivery, invitePageBody, inviteLink,
 import { publicSiteOrigin } from "./hosts.js";
 import { mailerOn } from "./mailer.js";
 import { personRef } from "./people.js";
+import { Refusal } from "./failure.js";
 import { limit, tooManyPage } from "./ratelimit.js";
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
@@ -538,5 +541,41 @@ export async function inviteRoutes(ctx: Ctx): Promise<Reply> {
     const error = message(err);
     const p = await peekInvite(token);
     return { ...render(ctx, "Invite", invitePageBody(ctx, token, p, await myEmail(ctx), error)), status: 400 };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Invites answered from the Inbox (20260926140000_inbox_join.sql): Join or
+// Decline by the invite's id, which my_invites gives its addressee only.
+// The database decides: the caller in person (no agent, token or grant),
+// with the invite's address confirmed on their account, the invite still
+// waiting, and room in the vault. A refusal comes back to the Inbox with
+// its reason and reference.
+export async function inboxInviteRoutes(ctx: Ctx, action: "join" | "decline"): Promise<Reply> {
+  const id = ctx.form.get("invite") ?? "";
+  try {
+    if (!UUID.test(id)) {
+      throw new Refusal({
+        status: 400,
+        where: `web app (Inbox, ${action === "join" ? "Join" : "Decline"})`,
+        why: "The form didn’t say which invite: reload your inbox and try again",
+      });
+    }
+    if (action === "decline") {
+      const name = await asPerson(ctx.userId, async (c) =>
+        (await c.query(`select public.decline_my_invite($1) as name`, [id])).rows[0].name as string,
+      );
+      ctx.setFlash(`You declined the invite to ${name}. Its owners can see that in the vault’s activity; to join later, ask them for a new invite.`, "success");
+      return { redirect: "/inbox" };
+    }
+    const joined = await asPerson(ctx.userId, async (c) => {
+      const v = (await c.query(`select public.accept_my_invite($1) as v`, [id])).rows[0].v as string;
+      return (await vault(c, ctx, v))!;
+    });
+    ctx.setFlash(`You’re a member of ${joined.name}, as ${joined.role === "owner" ? "an" : "a"} ${joined.role}.`, "success");
+    return { redirect: vaultPath(joined.id) };
+  } catch (err) {
+    ctx.setFlash(message(err), "danger");
+    return { redirect: "/inbox#invites" };
   }
 }
