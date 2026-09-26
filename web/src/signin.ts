@@ -40,7 +40,7 @@ import {
   verifySignin,
   type Session,
 } from "./auth.js";
-import { html, page, type Theme } from "./html.js";
+import { html, notice, page, type Theme } from "./html.js";
 import { siteHref } from "./hosts.js";
 import { inviteTokenOf, maskEmail, peekInvite, type Peek } from "./invites.js";
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
