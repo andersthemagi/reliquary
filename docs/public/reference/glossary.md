@@ -22,6 +22,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Default policy.** What a vault's paths are, canon or open, where no rule says otherwise. Set on **Settings**.
 
+**Display name.** An optional name you set on **Account settings**, shown to people who share a vault with you next to your email. Only you set it, in the web app. See [The top bar, inbox and account](../concepts/inbox-and-account.md#display-name).
+
 **Environment.** A named set of values for a vault's variables, like `development`, `preview` or `production`. See [Environment variables](../concepts/variables.md#environments).
 
 **Env API.** The web app's HTTP API that the CLI uses to read variables and send pushes. See [Env API](env-api.md).
@@ -29,6 +31,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 **Erase.** Blanking every version of a file's text, while the log keeps its entries. Owners only, in person. See [Export, delete and erase](../concepts/export-delete-erase.md#erase-a-file).
 
 **Import.** A whole `.env` brought in at once, by paste or push, waiting for a person to apply it. See [Imports](../concepts/imports.md).
+
+**Inbox.** The top bar's list of what needs you: changes to review, your proposals sent back, .env imports to apply, invites and deleted-vault notices. See [The top bar, inbox and account](../concepts/inbox-and-account.md#inbox).
 
 **Invite.** A single-use link for one email address and a role, the only way to join a vault. See [Members and invites](../concepts/members.md).
 
@@ -50,6 +54,6 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Rule.** A policy (canon or open, with a quorum) on a folder or a file, set by an owner. See [Set rules](../how-to/set-rules.md).
 
-**Snooze.** Hiding a proposal from your own Review list for a day, a week, or until it changes. Private to you. See [Proposals and review](../concepts/proposals-and-review.md#snooze).
+**Snooze.** Hiding a proposal from your own Inbox for a day, a week, or until it changes. Private to you. See [Proposals and review](../concepts/proposals-and-review.md#snooze).
 
 **Vault.** The container for one team, client or project: files, variables, members and activity. See [Vaults, files and folders](../concepts/vaults-and-files.md).

@@ -47,7 +47,7 @@ It calls `list_vaults`, then `propose`. Because the vault is canon, nothing is w
 
 ## 5. Approve it
 
-In the web app, **Review** now shows a count of 1.
+In the web app, the **Inbox** in the top bar now shows a count of 1.
 
 1. Open the proposal. The diff comes first, then the agent's stated reason, marked unverified.
 2. Choose **Approve**.

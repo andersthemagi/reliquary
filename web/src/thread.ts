@@ -193,7 +193,7 @@ export async function snooze(ctx: Ctx, id: string, pid: string, notFound: () => 
     });
     if (!found) return notFound();
     ctx.setFlash(choice.flash);
-    return { redirect: "/review" };
+    return { redirect: "/inbox" };
   } catch (err) {
     ctx.setFlash(message(err));
     return { redirect: proposalPath(id, pid) };
@@ -207,8 +207,8 @@ export async function unsnooze(ctx: Ctx, id: string, pid: string, notFound: () =
     return true;
   });
   if (!found) return notFound();
-  ctx.setFlash("Back in your Review.");
-  return { redirect: ctx.form.get("back") === "review" ? "/review?snoozed=1" : proposalPath(id, pid) };
+  ctx.setFlash("Back in your inbox.");
+  return { redirect: ctx.form.get("back") === "review" ? "/inbox?snoozed=1" : proposalPath(id, pid) };
 }
 
 // ---------------------------------------------------------------------------
@@ -237,10 +237,10 @@ export async function snoozedList(c: pg.PoolClient, userId: string) {
 export function snoozedSection(ctx: Ctx, rows: any[]): Raw {
   if (rows.length === 0) return html``;
   if (!ctx.url.searchParams.has("snoozed")) {
-    return html`<p class="snooze-toggle small"><a href="/review?snoozed=1">Show snoozed (${rows.length})</a></p>`;
+    return html`<p class="snooze-toggle small"><a href="/inbox?snoozed=1">Show snoozed (${rows.length})</a></p>`;
   }
   return html`<h2 id="snoozed">Snoozed</h2>
-    <p class="muted small">Hidden from your Review until their time, or until they change. <a href="/review">Hide snoozed</a></p>
+    <p class="muted small">Hidden from your inbox until their time, or until they change. <a href="/inbox">Hide snoozed</a></p>
     <ul class="rows">${rows.map(
       (p) => html`<li>
         <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${p.kind === "delete" ? "Delete" : p.creates ? "Create" : "Change"} ${p.path}</a>

@@ -15,6 +15,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Vault templates](concepts/templates.md)
 - [Canon, open and rules](concepts/canon-and-rules.md)
 - [Proposals and review](concepts/proposals-and-review.md)
+- [The top bar, inbox and account](concepts/inbox-and-account.md)
 - [Agents and the ceiling](concepts/agents.md)
 - [Tokens, connections and sign-ins](concepts/connections.md)
 - [Environment variables](concepts/variables.md)

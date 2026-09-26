@@ -20,7 +20,7 @@ A proposal is one of:
 
 ## Reviewing
 
-**Review** in the top bar counts what waits on you, across all your vaults. A proposal's page puts the decision first:
+The **Inbox** in the top bar counts what waits on you, across all your vaults, and lists it on the Inbox page (see [The top bar, inbox and account](inbox-and-account.md)). A proposal's page puts the decision first:
 
 1. The status, and the latest request for changes if there is one.
 2. The decision: a note, then **Approve**, **Request changes**, **Reject**, or **Edit, then approve**.
@@ -49,4 +49,4 @@ Every proposal has one timeline: comments, review notes and approvals, oldest fi
 
 ## Snooze
 
-From a proposal's page, or its row in Review, you can snooze it **for a day**, **for a week**, or **until it changes**. A snoozed proposal leaves your Review list until the time passes, someone else comments, or it gets a new revision. Snoozes are private to you and not logged. Agents can't snooze, so an agent can't hide its own proposal from you.
+From a proposal's page, or its row in the Inbox, you can snooze it **for a day**, **for a week**, or **until it changes**. A snoozed proposal leaves your Inbox and its count until the time passes, someone else comments, or it gets a new revision. Snoozes are private to you and not logged. Agents can't snooze, so an agent can't hide its own proposal from you.

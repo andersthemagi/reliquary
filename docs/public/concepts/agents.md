@@ -44,6 +44,6 @@ File text, reasons, comments and review notes reach an agent inside fences with 
 ## For agents reading this
 
 - Before writing, check a path's policy: `list_files` marks canon files `[canon]`, and `read_file` names the policy. Use `write_file` for open files and `propose` for canon ones.
-- You can't approve. After proposing, tell your person there is a proposal waiting in Review.
+- You can't approve. After proposing, tell your person there is a proposal waiting in their Inbox.
 - Answer requests for changes with `revise_proposal`; read the notes in `changes_since` or `read_proposal`.
 - Never ask for or repeat a variable's value. To add a `.env` to a vault, run `npx @reliquary-ai/cli env push`; a person applies it. See [Move a .env into a vault](../how-to/move-env-into-vault.md).

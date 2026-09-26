@@ -237,7 +237,9 @@ test("variables page: a viewer sees names only: no value, no control, no access 
   noValues(h);
   assert.match(h, /<code>VIEW_KEY<\/code>/);
   assert.match(h, /As a viewer you see names only\./);
-  for (const s of ["/reveal", "/set", "/delete", "/log", "<button>Reveal", "Add a variable"]) assert.equal(h.includes(s), false, s);
+  // The page itself: the top bar links Account settings (/settings) on every page.
+  const main = /<main id="main">[\s\S]*<\/main>/.exec(h)[0];
+  for (const s of ["/reveal", "/set", "/delete", "/log", "<button>Reveal", "Add a variable"]) assert.equal(main.includes(s), false, s);
   const l = await page(vp(V.view, "/log"));
   assert.match(l, /Only owners and editors can see this vault’s access log\./);
   assert.doesNotMatch(l, /<table/);

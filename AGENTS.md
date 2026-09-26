@@ -64,6 +64,13 @@ Done so far:
   lookup per page), a one-time Home notice to the other members when a
   vault is deleted, and exports that are one snapshot, at most 10 an hour
   per vault, and never look whole when cut off.
+- the app shell (`20260926100000_shell_inbox.sql`, `web/src/html.ts`,
+  `web/src/inbox.ts`, `search.ts`, `settings.ts`, hostile tests in
+  `supabase/tests/shell_inbox_test.sql`): a top bar with a vault switcher,
+  search across the reader's vaults, an Inbox (reviews, proposals sent
+  back, imports, invites, deletion notices; `/review` redirects to
+  `/inbox`) and an account menu, drawn from one `shell_summary` call per
+  page; Account settings with a display name, the person's own, in person.
 
 Milestone 2: **environment variables**. Done so far (phase 1, the core;
 interface and phase 2's work in [docs/variables.md](docs/variables.md)):

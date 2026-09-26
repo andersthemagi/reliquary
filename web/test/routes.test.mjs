@@ -25,7 +25,11 @@ before(async () => {
 
 const pages = [
   ["/", "home"],
-  ["/review", "review inbox"],
+  ["/inbox", "inbox"],
+  ["/inbox?snoozed=1", "inbox, with snoozed"],
+  ["/search?q=standup", "search every vault"],
+  ["/settings", "account settings"],
+  ["/account", "plan and usage"],
   ["/activity", "activity across my vaults"],
   ["/connect", "connect a client"],
   ["/tokens", "tokens"],
@@ -64,6 +68,12 @@ for (const [path, what] of pages) {
     assert.match(h, /<nav/i, "page shell (nav) missing");
   });
 }
+
+test("route: the old review inbox (/review) sends you to /inbox, query and all", async () => {
+  const r = await get("/review?snoozed=1");
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), "/inbox?snoozed=1");
+});
 
 test("route: unknown paths and malformed ids are 404", async () => {
   for (const path of ["/nope", "/v/not-a-uuid", `${V}/nope`, `${V}/proposals/not-a-uuid`, "/v/00000000-0000-0000-0000-000000000000"]) {

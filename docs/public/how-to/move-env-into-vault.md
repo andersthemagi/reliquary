@@ -22,7 +22,7 @@ On the vault's **Variables** page, choose **Import .env**, paste the file's cont
 
 ## Apply it
 
-Open the approval link (or the notice on the Variables page, or **Review**). The preview lists each name, whether it is new or replaces a value, and the lines not taken, never a value. Choose **Apply**. Each variable is set as you and logged.
+Open the approval link (or the notice on the Variables page, or your **Inbox**). The preview lists each name, whether it is new or replaces a value, and the lines not taken, never a value. Choose **Apply**. Each variable is set as you and logged.
 
 A push waits 24 hours for a decision, a paste 30 minutes; after that it expires and nothing is set. See [Imports](../concepts/imports.md).
 

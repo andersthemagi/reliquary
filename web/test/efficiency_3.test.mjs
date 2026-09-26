@@ -134,7 +134,7 @@ test("waiting lists: Review and Home show each proposal's quorum from its own va
     }
     return { a, b };
   });
-  const review = await page("/review");
+  const review = await page("/inbox");
   const row = (vault, path) => {
     const m = new RegExp(`href="/v/${vault}/proposals/[^"]+">Create ${path.replace(".", "\\.")}</a>[\\s\\S]*?(\\d+) of (\\d+)`).exec(review);
     assert.ok(m, `${path} is listed`);
@@ -158,7 +158,7 @@ test("waiting lists: a proposal you sent back shows its quorum under changes req
     await c.query("select public.decide($1, 'request_changes', 'fix it')", [p]);
     return p;
   });
-  const review = await page("/review");
+  const review = await page("/inbox");
   const m = new RegExp(`/proposals/${pid}"[\\s\\S]*?(\\d+) of (\\d+)`).exec(review);
   assert.ok(m, "listed");
   assert.equal(`${m[1]} of ${m[2]}`, "0 of 5");

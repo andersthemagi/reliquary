@@ -8,7 +8,10 @@ import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
 import { diffMode, diffSection } from "./diffview.js";
-import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Theme } from "./html.js";
+import { csrfField, html, page, pageHeader, raw, when, type Nav, type Raw, type Shell, type Theme } from "./html.js";
+import { loadShell } from "./inbox.js";
+import { searchAll } from "./search.js";
+import { accountSettings, saveDisplayName } from "./settings.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure } from "./failure.js";
@@ -41,7 +44,8 @@ export type Ctx = {
   flash?: string;
   theme: Theme;
   mcpUrl: string;
-  reviewCount?: number;
+  reviewCount?: number; // proposals waiting on this person (the shell's count), on GET pages
+  shell?: Shell; // the top bar's data, loaded once per GET page (inbox.ts)
   setFlash: (message: string) => void;
   ip: string; // the client's address, for rate limits only (ratelimit.ts)
 };
@@ -93,7 +97,7 @@ export function render(ctx: Ctx, title: string, body: Raw, nav?: Nav): Reply {
       csrf: ctx.csrf,
       path: ctx.url.pathname + ctx.url.search,
       nav,
-      reviewCount: ctx.reviewCount,
+      shell: ctx.shell,
     }),
   };
 }
@@ -114,7 +118,7 @@ export const notFound = (ctx: Ctx): Reply => {
       title: "Not found",
       // The flash too: a refused write of a new path lands here, and its
       // message must not be dropped.
-      user: ctx.userId, flash: ctx.flash, theme: ctx.theme, csrf: ctx.csrf, path: "/", reviewCount: ctx.reviewCount,
+      user: ctx.userId, flash: ctx.flash, theme: ctx.theme, csrf: ctx.csrf, path: "/", shell: ctx.shell,
     }),
   };
 };
@@ -166,9 +170,6 @@ const waitingSql = (order: string, limit?: number) =>
   withQuorums(`select q.*, row_number() over (order by ${order}) as ord from (${WAITING_SQL}) q
                 order by ${order}${limit ? ` limit ${limit}` : ""}`);
 
-export async function reviewCount(userId: string): Promise<number> {
-  return asPerson(userId, async (c) => (await c.query(`select count(*)::int as n from (${WAITING_SQL}) w`, [userId])).rows[0].n);
-}
 
 // ---------------------------------------------------------------------------
 // Risk: facts about a change that deserve a closer look. Computed from the
@@ -329,7 +330,9 @@ function crumbs(id: string, v: Vault, path: string, isDir: boolean): Raw {
 // Home and Review
 
 async function home(ctx: Ctx): Promise<Reply> {
-  const { vaults, waiting, plan } = await asPerson(ctx.userId, async (c) => ({
+  const waitingCount = ctx.reviewCount ?? 0;
+  const counts = ctx.shell?.counts;
+  const { vaults, waiting, plan, gone } = await asPerson(ctx.userId, async (c) => ({
     plan: await myPlan(c),
     vaults: (
       await c.query(
@@ -341,28 +344,30 @@ async function home(ctx: Ctx): Promise<Reply> {
         [ctx.userId],
       )
     ).rows,
-    waiting: (await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows,
+    // Asked only when the top bar's count says something waits, or there
+    // are notices to show (and so take).
+    waiting: waitingCount > 0 ? (await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows : [],
+    gone: (counts?.notices ?? 1) > 0 ? await deletionNotices(c) : html``,
   }));
-  const gone = await asPerson(ctx.userId, deletionNotices);
+  const invites = counts?.invites ?? 0;
   // One primary per page: New vault. Review, when something waits, sits
-  // before it as a secondary button.
+  // before it as a secondary button. A section with nothing in it isn't
+  // shown: what needs the person is in the inbox.
   return render(
     ctx,
     "Home",
     html`${pageHeader({
       title: "Reliquary",
-      actions: html`${(ctx.reviewCount ?? 0) > 0 ? html`<a class="button" href="/review">Review ${ctx.reviewCount} waiting</a>` : ""}
+      actions: html`${waitingCount > 0 ? html`<a class="button" href="/inbox">Review ${waitingCount} waiting</a>` : ""}
         <a class="button primary" href="/vaults/new">New vault</a>`,
     })}
     <p class="lede">Shared context your agents read and propose to. Changes to canon files wait for your approval.</p>
     ${gone}
-    ${vaults.length === 0
-      ? ""
-      : html`<h2>Needs your review</h2>
     ${waiting.length
-      ? html`<ul class="rows">${waiting.map((p) => reviewRow(ctx, p, true))}</ul>
-        ${(ctx.reviewCount ?? 0) > waiting.length ? html`<p class="small"><a href="/review">All ${ctx.reviewCount} waiting</a></p>` : ""}`
-      : html`<div class="empty">Nothing is waiting on you.</div>`}`}
+      ? html`<h2>Needs your review</h2>
+        <ul class="rows">${waiting.map((p) => reviewRow(ctx, p, true))}</ul>
+        ${waitingCount > waiting.length ? html`<p class="small"><a href="/inbox">All ${waitingCount} waiting</a></p>` : ""}`
+      : ""}
     <h2>Your vaults</h2>
     <p class="small muted plan-line"><a href="/account">${planLine(plan)}</a></p>
     ${vaults.length === 0
@@ -370,7 +375,8 @@ async function home(ctx: Ctx): Promise<Reply> {
           <p>A vault holds the files you and your agents share: notes, briefs, decisions. You choose which of them are canon, so an agent can only propose changes and you approve them.</p>
           <p>Start blank, or from a template: a client engagement, personal projects or a product team, with folders, rules and a README that tells agents how to work there.</p>
           <p><a class="button" href="/vaults/new">Create your first vault</a></p>
-          <p class="small">Joining someone else’s vault? Open the invite link they sent you. It works once you’re signed in with the address it was sent to.</p></div>`
+          <p class="small">Joining someone else’s vault? Open the invite link they sent you. It works once you’re signed in with the address it was sent to.${
+            invites ? html` You have ${invites === 1 ? "an invite" : `${invites} invites`} waiting: <a href="/inbox#invites">see your inbox</a>.` : ""}</p></div>`
       : html`<ul class="rows">${vaults.map(
           (v) => html`<li>
             <span><a class="name" href="${vaultPath(v.id)}">${v.name}</a>
@@ -449,9 +455,39 @@ async function createVault(ctx: Ctx): Promise<Reply> {
   }
 }
 
-async function review(ctx: Ctx): Promise<Reply> {
-  const { waiting, revising, snoozed } = await asPerson(ctx.userId, async (c) => ({
-    waiting: (await c.query(waitingSql("q.vault, q.created_at"), [ctx.userId])).rows,
+// The Inbox: everything that needs this person, across their vaults. The
+// top bar's counts (ctx.shell) say which sections have anything, so a
+// section with nothing in it costs no query. Deletion notices are shown
+// here and so taken, as on Home.
+async function inbox(ctx: Ctx): Promise<Reply> {
+  const counts = ctx.shell?.counts;
+  const has = (n: number | undefined) => (n ?? 1) > 0;
+  const { waiting, revising, snoozed, mine, invites, gone } = await asPerson(ctx.userId, async (c) => ({
+    gone: has(counts?.notices) ? await deletionNotices(c) : html``,
+    invites: has(counts?.invites)
+      ? ((await c.query(`select vault_name, role, invited_by_email, expires_at from public.my_invites()`)).rows as {
+          vault_name: string;
+          role: string;
+          invited_by_email: string | null;
+          expires_at: Date;
+        }[])
+      : [],
+    // Your own proposals (yours or your agents'), sent back with changes requested.
+    mine: has(counts?.revise)
+      ? (
+          await c.query(
+            withQuorums(`select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
+                    p.revision, p.body, cur.body as current_body, 0 as approvals,
+                    row_number() over (order by p.created_at desc) as ord
+               from public.proposals p join public.vaults v on v.id = p.vault_id
+               left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
+               left join public.file_versions cur on cur.id = f.current_version_id
+              where p.status = 'changes_requested' and p.proposed_by = $1`),
+            [ctx.userId],
+          )
+        ).rows
+      : [],
+    waiting: has(ctx.reviewCount) ? (await c.query(waitingSql("q.vault, q.created_at"), [ctx.userId])).rows : [],
     snoozed: await snoozedList(c, ctx.userId),
     revising: (
       await c.query(
@@ -470,18 +506,34 @@ async function review(ctx: Ctx): Promise<Reply> {
   }));
   // Environment variables sent with `reliquary env push` that this person
   // may apply (docs/variables.md, "Imports").
-  const pushes = (await pendingPushes(ctx.userId)).filter((p) => p.mayApply);
+  const pushes = has(counts?.imports) ? (await pendingPushes(ctx.userId)).filter((p) => p.mayApply) : [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const byVault = new Map<string, any[]>();
   for (const p of waiting) byVault.set(p.vault, [...(byVault.get(p.vault) ?? []), p]);
+  const nothing = !waiting.length && !pushes.length && !mine.length && !invites.length && !gone.html.trim();
+  const days = (d: Date) => Math.max(1, Math.ceil((d.getTime() - Date.now()) / 86_400_000));
   return render(
     ctx,
-    "Review",
-    html`${pageHeader({ title: "Review" })}
-    <p class="lede">Every change waiting on your approval, across your vaults. Read the change itself before the reason. Not now? Snooze one: it comes back when its time is up or it changes.</p>
+    "Inbox",
+    html`${pageHeader({ title: "Inbox" })}
+    <p class="lede">What needs you, across your vaults: changes to review, your proposals sent back for changes, .env imports to apply and invites. Read a change itself before its reason. Not now? Snooze a review: it comes back when its time is up or it changes.</p>
+    ${gone.html.trim() ? html`<div id="notices">${gone}</div>` : ""}
+    ${invites.length
+      ? html`<h2 id="invites">Invites</h2>
+        <p class="muted small">Someone invited your address to a vault. To join, open the invite link they sent you while you’re signed in as this address. Can’t find it? Ask them to send a new one.</p>
+        <ul class="rows">${invites.map(
+          (i) => html`<li><span><span class="name">${i.vault_name}</span>
+            <span class="muted small"> · as ${i.role} · from ${i.invited_by_email ?? "an owner"} · expires in ${days(new Date(i.expires_at))} ${days(new Date(i.expires_at)) === 1 ? "day" : "days"}</span></span></li>`,
+        )}</ul>`
+      : ""}
     ${pushes.length ? pendingList(ctx, pushes, true) : ""}
-    ${waiting.length === 0 && pushes.length === 0
-      ? html`<div class="empty"><strong>Nothing is waiting on you.</strong> When an agent proposes a change to a canon file, it shows up here.</div>`
+    ${mine.length
+      ? html`<h2 id="revise">Changes requested on your proposals</h2>
+        <p class="muted small">A reviewer asked for changes. Open one to read their note and revise it; it comes back to them when you do.</p>
+        <ul class="rows">${mine.map((p) => reviewRow(ctx, p, true))}</ul>`
+      : ""}
+    ${nothing
+      ? html`<div class="empty"><strong>Nothing needs you.</strong> When an agent proposes a change to a canon file, someone asks for changes on your proposal, a .env import waits to be applied or someone invites you, it shows up here.</div>`
       : [...byVault.entries()].map(
           ([name, items]) => html`<h2>${name}</h2><ul class="rows review-rows">${items.map((p) => reviewRow(ctx, p, false, true))}</ul>`,
         )}
@@ -491,7 +543,7 @@ async function review(ctx: Ctx): Promise<Reply> {
         <ul class="rows">${revising.map((p) => reviewRow(ctx, p, true))}</ul>`
       : ""}
     ${snoozedSection(ctx, snoozed)}`,
-    "review",
+    "inbox",
   );
 }
 
@@ -1466,8 +1518,8 @@ async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
 
 // ---------------------------------------------------------------------------
 
-// A GET page runs in one transaction (db.ts, readOnlyRequest): the Review
-// badge's count below and every query the page makes. Not the OAuth
+// A GET page runs in one transaction (db.ts, readOnlyRequest): the top
+// bar's summary below and every query the page makes. Not the OAuth
 // consent page: it fetches the client's metadata over the network, and a
 // transaction mustn't stay open across that.
 export async function routes(ctx: Ctx): Promise<Reply> {
@@ -1484,11 +1536,20 @@ export async function routes(ctx: Ctx): Promise<Reply> {
 async function route(ctx: Ctx): Promise<Reply> {
   const p = ctx.url.pathname;
   const get = ctx.method === "GET";
-  // The Review badge is only drawn on pages: a POST almost always redirects,
-  // so it doesn't pay for the count.
-  if (get) ctx.reviewCount = await reviewCount(ctx.userId);
+  // The top bar (who you are, your vaults, the inbox) is only drawn on
+  // pages: a POST almost always redirects, so it doesn't pay for it. One
+  // call, in the page's transaction.
+  if (get) {
+    ctx.shell = await asPerson(ctx.userId, loadShell);
+    ctx.reviewCount = ctx.shell.counts.review;
+  }
   if (get && p === "/") return home(ctx);
-  if (get && p === "/review") return review(ctx);
+  if (get && p === "/inbox") return inbox(ctx);
+  // The Review page became the Inbox; old links and bookmarks land there.
+  if (get && p === "/review") return { redirect: `/inbox${ctx.url.search}` };
+  if (get && p === "/search") return searchAll(ctx);
+  if (get && p === "/settings") return accountSettings(ctx);
+  if (!get && p === "/settings/name") return saveDisplayName(ctx);
   if (get && p === "/activity") return allActivity(ctx);
   if (get && p === "/connect") return connect(ctx);
   if (get && p === "/tokens") return tokens(ctx);

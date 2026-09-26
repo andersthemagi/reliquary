@@ -24,6 +24,7 @@ import { errorBody } from "./errorpage.js";
 import { failure } from "./failure.js";
 import { csrfField, html, pageHeader, raw, when, type Raw } from "./html.js";
 import { deliverInvite, INVITE_TOKEN, inviteLink, maskEmail, peekInvite, ROLE_TEXT, type Peek } from "./invites.js";
+import { personRef } from "./people.js";
 import { limit, tooManyPage } from "./ratelimit.js";
 import { ago, message, notFound, render, UUID, vault, vaultPath, vaultShell, type Ctx, type Reply, type Vault } from "./pages.js";
 
@@ -46,7 +47,8 @@ type Conn = {
   expires_at: Date;
 };
 
-const label = (m: { email: string | null; user_id: string }) => m.email ?? `Account ${m.user_id.slice(0, 8)}`;
+// By email, with their display name when they gave one (people.ts fills it in).
+const label = (m: { email: string | null; user_id: string }) => (m.email ? personRef(m.user_id) : `Account ${m.user_id.slice(0, 8)}`);
 const kindText = (c: Conn) =>
   c.kind === "cli" ? "Reliquary CLI (environment variables)" : c.kind === "oauth" ? "MCP app" : "MCP token";
 

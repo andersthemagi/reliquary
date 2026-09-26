@@ -372,7 +372,7 @@ test("env push: it waits on the Variables page and in Review, and the review pag
   const h = await page(vp(V.push));
   assert.match(h, /A push is waiting for approval/);
   assert.match(h, new RegExp(`href="${vp(V.push, `/imports/${pasted.pushId}`)}">2 variables for development</a>`));
-  const rv = await page("/review");
+  const rv = await page("/inbox");
   assert.match(rv, /A push is waiting for approval/);
   assert.match(rv, /Imp Push · from you via the CLI/);
   assert.doesNotMatch(rv, /Nothing is waiting on you/);

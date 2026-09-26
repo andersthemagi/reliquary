@@ -155,6 +155,6 @@ export async function accountPage(ctx: Ctx): Promise<Reply> {
               peopleOver(v.usage) || storageOver(v.usage) ? html` <span class="badge attention">At a limit</span>` : ""}</span></li>`,
         )}</ul>`
       : html`<div class="empty">You haven’t created a vault yet. <a href="/vaults/new">New vault</a></div>`}`,
-    "home",
+    "account",
   );
 }

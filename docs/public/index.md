@@ -25,7 +25,7 @@ Reliquary is pre-alpha: things change and may break; data is backed up daily. Se
 - The website and these docs: `https://reliquary.redmage.cc`, with the docs at `/docs` and the roadmap at `/roadmap`. **Sign in** there takes you to the web app.
 - The MCP URL: `https://mcp.reliquary.redmage.cc/mcp`. Your Connect page in the web app always shows the one to use.
 - The CLI: `npx @reliquary-ai/cli`, or install it with `npm install -g @reliquary-ai/cli` and run `reliquary`.
-- The theme: Auto, Light or Dark, from the Account menu in the web app.
+- In the web app: what needs you in the **Inbox**, search across your vaults, and your display name, theme and tokens in the account menu, all in the top bar. See [The top bar, inbox and account](concepts/inbox-and-account.md).
 
 ## For agents
 

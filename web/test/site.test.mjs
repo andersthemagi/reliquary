@@ -132,7 +132,7 @@ test("site landing: a signed-in person at / still gets Home", async () => {
   const r = await fetchAs(A, "/", cookie);
   assert.equal(r.status, 200);
   const h = await r.text();
-  assert.match(h, /<nav aria-label="Main">/);
+  assert.match(h, /<nav class="app-nav" aria-label="Main">/);
   assert.doesNotMatch(h, /hero-title/);
 });
 
@@ -237,7 +237,7 @@ test("site headers: public pages carry the app's security headers unchanged", as
 });
 
 test("site indexing: app pages and sign-in say noindex; public pages don't", async () => {
-  for (const [base, path, cookie] of [[LOCAL, "/", localCookie], [LOCAL, "/review", localCookie], [A, "/signin", ""]]) {
+  for (const [base, path, cookie] of [[LOCAL, "/", localCookie], [LOCAL, "/inbox", localCookie], [A, "/signin", ""]]) {
     assert.match(await text(base, path, cookie), /<meta name="robots" content="noindex">/, path);
   }
   for (const path of ["/", ...LEGAL]) assert.doesNotMatch(await text(A, path), /noindex/, path);

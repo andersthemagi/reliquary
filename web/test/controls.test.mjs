@@ -23,9 +23,9 @@ const post = (path, fields, headers = {}) =>
     body: new URLSearchParams(fields).toString(),
   });
 const page = async (path) => (await get(path)).text();
-const csrf = async (path = "/review") => /name="csrf" value="([0-9a-f]+)"/.exec(await page(path))[1];
+const csrf = async (path = "/inbox") => /name="csrf" value="([0-9a-f]+)"/.exec(await page(path))[1];
 const follow = async (r) => page(r.headers.get("location"));
-const waiting = async () => Number(/aria-label="(\d+) waiting"/.exec(await page("/review"))?.[1] ?? 0);
+const waiting = async () => Number(/aria-label="Inbox, (\d+) waiting"/.exec(await page("/inbox"))?.[1] ?? 0);
 const at = (h, s) => {
   const i = h.indexOf(s);
   assert.ok(i >= 0, `missing ${s}`);
@@ -129,7 +129,7 @@ test("pages: file and folder actions are in the header; the rule form comes befo
 // Review list: per-row snooze ----------------------------------------------------
 
 test("review: every waiting row carries one Snooze menu with three choices", async () => {
-  const h = await page("/review");
+  const h = await page("/inbox");
   const row = new RegExp(
     `<details class="menu-wrap row-snooze-menu">\\s*<summary class="button small quiet" aria-label="Snooze Create canon/row\\.md">Snooze</summary>\\s*` +
       `<form method="post" action="${C}/proposals/${C_ROW}/snooze" class="menu row-snooze" aria-label="Snooze Create canon/row\\.md">\\s*` +
@@ -141,7 +141,7 @@ test("review: every waiting row carries one Snooze menu with three choices", asy
 });
 
 test("review: a row's risk badge names the first reason, not a bare count", async () => {
-  const h = await page("/review");
+  const h = await page("/inbox");
   assert.doesNotMatch(h, /\d+ to check/);
   assert.match(h, /<span class="badge attention risk-count" title="[^"]+">(Deletes the file|Removes \d+ of \d+ lines|Revised [^<]+|First proposal [^<]+)( \+\d+ more)?<\/span>/);
   // Creating a file is not a risk: a neutral label, never the amber badge.
@@ -157,7 +157,7 @@ test("review: snoozing a row needs the form token and a same-origin post", async
   assert.equal((await post(url, { csrf: "0".repeat(token.length), for: "week" })).status, 403);
   assert.equal((await post(url, { csrf: token, for: "week" }, { origin: "https://evil.example" })).status, 403);
   assert.equal(await waiting(), before);
-  assert.match(await page("/review"), new RegExp(`${C_ROW}/snooze`));
+  assert.match(await page("/inbox"), new RegExp(`${C_ROW}/snooze`));
 });
 
 test("review: snoozing a row hides it and returns to Review; unsnooze brings it back", async () => {
@@ -165,14 +165,14 @@ test("review: snoozing a row hides it and returns to Review; unsnooze brings it 
   const token = await csrf();
   const r = await post(`${C}/proposals/${C_ROW}/snooze`, { csrf: token, for: "week" });
   assert.equal(r.status, 303);
-  assert.equal(r.headers.get("location"), "/review");
+  assert.equal(r.headers.get("location"), "/inbox");
   const h = await follow(r);
   assert.match(h, /Snoozed for a week, or until it changes\./);
   assert.doesNotMatch(h, new RegExp(`${C_ROW}/snooze`));
   assert.equal(await waiting(), before - 1);
-  assert.match(await page("/review?snoozed=1"), /Create canon\/row\.md<\/a>\s*<span class="muted small"> · Controls · [^<]*until \d{4}-/);
+  assert.match(await page("/inbox?snoozed=1"), /Create canon\/row\.md<\/a>\s*<span class="muted small"> · Controls · [^<]*until \d{4}-/);
   const un = await post(`${C}/proposals/${C_ROW}/unsnooze`, { csrf: token, back: "review" });
-  assert.equal(un.headers.get("location"), "/review?snoozed=1");
+  assert.equal(un.headers.get("location"), "/inbox?snoozed=1");
   assert.equal(await waiting(), before);
 });
 

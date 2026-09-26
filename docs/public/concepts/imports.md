@@ -9,7 +9,7 @@ An import brings a whole `.env` file into a vault at once, and nothing is set un
 | How | Variables page, **Import .env**, paste the file, tick environments | `reliquary env push --file .env` from the CLI |
 | Who | an owner or editor, in the web app | you, or an agent running the CLI for you |
 | Waits as | a draft, only yours, for 30 minutes | a pending import, for 24 hours |
-| Applied by | you, from its preview | an owner or editor, from the Variables page's notice or Review |
+| Applied by | you, from its preview | an owner or editor, from the Variables page's notice or the Inbox |
 
 Either way the values are encrypted on arrival and held on the server. The preview names each variable, says whether it is new or replaces a value (and which version), and lists the lines that weren't taken and why. It never shows a value. **Apply** sets them all, each logged; **Discard** or **Reject** drops them.
 

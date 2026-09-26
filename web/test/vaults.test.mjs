@@ -62,7 +62,7 @@ test("new vault: Home's header has New vault as its one primary action, after Re
   const h = header(await page("/"));
   assert.match(h, /<a class="button primary" href="\/vaults\/new">New vault<\/a>/);
   assert.equal((h.match(/class="button primary"|<button class="primary"/g) ?? []).length, 1, "one primary");
-  assert.ok(h.indexOf('href="/review"') < h.indexOf('href="/vaults/new"'), "primary last");
+  assert.ok(h.indexOf('href="/inbox"') < h.indexOf('href="/vaults/new"'), "primary last");
 });
 
 test("new vault: a name, and open or canon, each explained in a line", async () => {
