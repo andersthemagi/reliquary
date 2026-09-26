@@ -31,6 +31,8 @@
 --    tried again), at most 5 tries, and only for messages from the last 7
 --    days. Failing to notify never touches the message itself. Only the
 --    web app's role may claim.
+-- 5. Deleting an account deletes its feedback; deleting a vault keeps the
+--    feedback that named it, without the vault.
 
 -- ---------------------------------------------------------------------------
 -- 1. The table
@@ -274,11 +276,28 @@ language sql volatile security definer set search_path = '' as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- 5. Deleting an account (20260926140200_delete_account.sql)
+
+-- A person's feedback is theirs, not a vault's: it goes with their account,
+-- in the same transaction as public.delete_account, which records the
+-- deletion in private.deleted_accounts. (A notice already emailed to the
+-- operator can't be taken back.)
+create function private.forget_feedback() returns trigger
+language plpgsql volatile security definer set search_path = '' as $$
+begin
+  delete from public.feedback where user_id = new.user_id;
+  return new;
+end $$;
+create trigger deleted_accounts_forget_feedback after insert on private.deleted_accounts
+  for each row execute function private.forget_feedback();
+
+-- ---------------------------------------------------------------------------
 -- Grants
 
 revoke all on function private.feedback_rate(), private.feedback_status_label(text),
   private.feedback_list(text, int), private.feedback_show(uuid), private.set_feedback_status(uuid, text),
-  private.set_feedback_reply(uuid, text), private.claim_feedback_notices(int), private.feedback_notified(uuid)
+  private.set_feedback_reply(uuid, text), private.claim_feedback_notices(int), private.feedback_notified(uuid),
+  private.forget_feedback()
   from public, anon, authenticated, reliquary_web, reliquary_mcp, reliquary_ops;
 grant execute on function private.feedback_list(text, int), private.feedback_show(uuid),
   private.set_feedback_status(uuid, text), private.set_feedback_reply(uuid, text)

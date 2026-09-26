@@ -276,3 +276,18 @@ select t.expect('limits: feedback older than an hour frees its place',
 select t.run('ana', format($q$select public.delete_vault(%L, 'Gone')::text$q$, t.id('gone')));
 select t.expect('vault deleted: its feedback stays, without the vault',
   (select count(*)::text || ' ' || count(vault_id)::text from public.feedback where message = 'about gone'), '1 0');
+
+-- ---------------------------------------------------------------------------
+-- Deleting an account
+
+create table t.account (step text, n text);
+insert into t.account select 'before', count(*)::text from public.feedback where user_id = t.id('eve');
+insert into t.account select 'deleted', t.run('eve', $q$select (public.delete_account('eve@example.test') is not null)::text$q$);
+select t.expect('account deleted: their feedback goes with it, and nobody else''s',
+  (select n from t.account where step = 'before') || ' / ' || (select n from t.account where step = 'deleted') || ' / '
+  || (select count(*)::text from public.feedback where user_id = t.id('eve')) || ' / '
+  || (select (count(*) > 0)::text from public.feedback where user_id = t.id('ana')),
+  '21 / true / 0 / true');
+select t.expect('account deleted: the trigger isn''t callable',
+  t.run('ana', $q$select private.forget_feedback()::text$q$) || ' ' || t.run_role('reliquary_web', $q$select private.forget_feedback()::text$q$),
+  'ERR 42501 ERR 42501');

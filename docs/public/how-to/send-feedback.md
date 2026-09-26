@@ -46,3 +46,4 @@ The operator may also reply. The status and reply show on your **Feedback** page
 - A message is up to 5000 characters. For a long log, summarise it and give the reference instead.
 - You can send 20 an hour, from the web app and your agents together. Past that, the refusal says when you can send again. See [Limits](../reference/limits.md#feedback).
 - Feedback is kept when a vault it names is deleted; it just no longer names the vault.
+- Deleting your account deletes your feedback too. See [Delete your account](delete-your-account.md).

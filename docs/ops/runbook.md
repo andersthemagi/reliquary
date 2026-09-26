@@ -284,6 +284,9 @@ and answers with `scripts/feedback.sh` (psql as postgres, like
   (RLS); only postgres and `reliquary_ops` list, show, set a status or
   reply; only the web app's role claims notices (hostile tests in
   `supabase/tests/feedback_test.sql`).
+- **Deleted accounts.** Deleting an account deletes its feedback (a
+  trigger on `private.deleted_accounts`); notices already emailed stay in
+  the operator's mailbox, so delete those by hand when asked to erase.
 - **Self-hosted instances** send nothing to Red Mage: their feedback stays
   in their database, and notices go to their own `FEEDBACK_EMAIL` or
   nowhere.

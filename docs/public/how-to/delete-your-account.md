@@ -26,6 +26,7 @@ Deleted at once:
 - invites you made that are still waiting, which are withdrawn;
 - your email address, display name, plan, and your sign-in account itself;
 - `.env` files you pasted on a Variables page and didn't apply.
+- [feedback](send-feedback.md) you and your agents sent, with its status and replies (a notice already emailed to the operator stays in their mailbox).
 
 Kept, in each vault:
 
