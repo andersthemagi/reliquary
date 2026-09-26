@@ -43,5 +43,10 @@ while IFS= read -r row; do
   done <<< "$docs"
 done < <(grep -E '^\| F[0-9]+ \|' "$registry")
 
+# Feature ids are what Changes-behaviour trailers name: each must be unique.
+while IFS= read -r dup; do
+  fail "$dup is used by more than one row; give one of them a new id"
+done < <(grep -oE '^\| F[0-9]+ \|' "$registry" | tr -d '| ' | sort | uniq -d)
+
 [ $status = 0 ] && echo "registry: $(wc -l <<< "$refs") references ok, every test file mapped, $rows feature rows with docs pages"
 exit $status
