@@ -179,6 +179,9 @@ services:
       SITE_URL: ${SITE_URL:-}
       MCP_RESOURCE: ${MCP_RESOURCE:?set MCP_RESOURCE in .env}
       MCP_PUBLIC_URL: ${MCP_RESOURCE}
+      # Optional: vault invites by email through Resend (both, or neither).
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
       # Only true behind a proxy that overwrites X-Real-IP (caddy below does).
       TRUST_PROXY_IP: ${TRUST_PROXY_IP:-0}
     ports:

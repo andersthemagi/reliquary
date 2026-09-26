@@ -1,6 +1,6 @@
 # Invite someone
 
-Invite a person to a vault by email with a role, then send them the link yourself.
+Invite a person to a vault by email with a role. Reliquary emails them the link, or shows it to you to send yourself.
 
 Only an owner can invite, in the web app.
 
@@ -11,8 +11,11 @@ Only an owner can invite, in the web app.
    - **Viewer**: reads files and proposals, sees variable names.
    - **Editor**: also writes open files, proposes and approves changes, and sets variables outside owners-only environments.
    - **Owner**: everything, including rules, members, export and deletion.
-3. Choose **Create invite link**. The **Members** page shows the link once.
-4. Copy the link and send it to them yourself. Reliquary doesn't email invites yet.
+3. Choose **Create invite link**.
+4. If the server has an email sender (Reliquary's hosted service does), the **Members** page says "We emailed them the link" and you're done. The email comes from Reliquary, names the vault, the role and who it's for, and holds the link.
+5. Otherwise the **Members** page shows the link once, and says why it wasn't emailed. Copy it and send it to them yourself.
+
+If the email can't be sent (the email provider refused it or didn't answer), the invite is still made: the page shows the link to copy, what failed, why, and a reference. Send the link yourself; the reference is for the operator. See [Errors and reference IDs](../reference/errors.md).
 
 The link works once, for 7 days, and only for someone signed in with that email address. If they have no account yet, the sign-in page tells them what to do. Joining by invite also lets a new account create vaults of its own while Reliquary is [invite-only](../concepts/plans-and-limits.md#invite-only).
 

@@ -235,6 +235,8 @@ never a JWT, refresh token, code, token hash or email (`test.sh` checks).
 | `VARIABLES_KEY` | **yes** | 32 random bytes, base64url: encrypts environment variables (`src/secrets.ts`, docs/variables.md). Required on Vercel; keep a copy outside Vercel, since losing it loses every value. Never in the mcp project |
 | `PUBLIC_URL` | no | the app's https URL (required on Vercel) |
 | `SITE_URL` | no | optional: the public site's https origin, when it has its own host |
+| `RESEND_API_KEY` | **yes** | optional: a Resend API key with sending access only, to email vault invites (`src/mailer.ts`) |
+| `EMAIL_FROM` | no | optional, with `RESEND_API_KEY`: the sender, e.g. `Reliquary <no-reply@notify.redmage.cc>`, on a domain verified in Resend |
 
 The server refuses to start without these, naming the variable, never its
 value. It never uses a Supabase key that bypasses RLS.
@@ -280,19 +282,26 @@ value. It never uses a Supabase key that bypasses RLS.
   minutes": keep **Email OTP expiration** at 600 seconds, or change the
   words in `emails/build.mjs` (then `node emails/build.mjs`, in the node
   image, and paste again). `test/emails.test.mjs` checks them.
-- **Authentication, Emails, SMTP Settings**: custom SMTP (the built-in
-  sender reaches only the project team, 2 emails an hour); turn off link
-  tracking at the provider, which would rewrite the link.
+- **Authentication, Emails, SMTP Settings**: custom SMTP through Resend
+  (the built-in sender reaches only the project team, 2 emails an hour);
+  steps in `docs/ops/runbook.md`, "Email sender". Keep link tracking off at
+  the provider, which would rewrite the link.
 - **Project Settings, JWT Keys**: the current signing key must be
   asymmetric (ES256 or RS256); set `JWT_ALG` to match. Rotating keys is
   safe: new key ids are fetched on first sight.
 - **Authentication, Users**: with sign-ups off, add each invited person
   here before they accept (see above). Their user id is the `sub` their
   vault memberships use; the Members page shows their email from here.
-- **Email for invites**: none yet. An owner copies the invite link from the
-  Members page and sends it themself; `deliverInvite` in `src/invites.ts`
-  is where a sender goes once the product domain has SMTP. Its email is
-  ready: `vaultInviteEmail()` in `src/emails.ts` (`emails/vault-invite.html`).
+- **Email for invites**: the web app sends them itself (not Supabase),
+  through Resend's HTTP API (`src/mailer.ts`, `deliverInvite` in
+  `src/invites.ts`, the email `vaultInviteEmail()` in `src/emails.ts`), when
+  `RESEND_API_KEY` and `EMAIL_FROM` are set. Without both, or when Resend
+  refuses or doesn't answer (4 s a try, one retry on a timeout, 429 or 5xx,
+  with the same `Idempotency-Key`), the invite is still made and the
+  Members page shows the link to copy, with why (and a ref for a failure).
+  `RESEND_API_URL` points it at a fake in tests; it is ignored with
+  `VERCEL` or `SELF_HOSTED` set. `vercel.json` ships `emails/` with the
+  function for this.
 
 ### Tests
 

@@ -9,6 +9,7 @@ Self-hosting is a preview. The license for running Reliquary's server yourself h
 - A Linux server with Docker and its Compose plugin, or Podman with `podman compose`. 2 GB of memory is enough to start.
 - A checkout of Reliquary's source on that server.
 - An SMTP server that can send email: sign-in codes go out through it. What it sends: [Emails](../reference/emails.md).
+- Optional: a [Resend](https://resend.com) account, to email vault invites. Without one, owners copy invite links and send them themselves. See [Email for invites](#email-for-invites).
 - For HTTPS: two hostnames pointing at the server, one for the app and one for MCP (for example `app.example.com` and `mcp.example.com`), and ports 80 and 443 open.
 
 ## What runs
@@ -60,6 +61,15 @@ Everyone on a self-hosted instance has no plan limits: any number of vaults, peo
 6. Open your `PUBLIC_URL`, enter that address, and sign in with the code from the email.
 
 Reliquary is invite-only there too: add people from a vault's **Settings**, **Members**. See [Invite someone](invite-someone.md). The first account is admitted, so it can create vaults. An account made any other way (the `owner` command again, or signing up without an invite) can sign in and join vaults it's invited to, but can't create its own until someone invites it or you admit it with `scripts/plan.sh admit <email>`.
+
+## Email for invites
+
+Sign-in email goes through your SMTP server. Vault invites are sent by the web app itself, through Resend's API, and only if you set both of these in `deploy/compose/.env` (with an editor, like the SMTP password):
+
+- `RESEND_API_KEY`: a Resend API key with **Sending access** only.
+- `EMAIL_FROM`: the sender, on a domain you verified in Resend, for example `Reliquary <no-reply@notify.example.com>`.
+
+Then `docker compose up -d` again. Leave both empty to keep invites by link only. With only one set, or a malformed one, nothing is emailed and `docker compose logs web` says which setting is wrong. If an email can't be sent, the invite is still made and the owner sees the link to copy, with the reason and a reference.
 
 ## Connect your agents
 

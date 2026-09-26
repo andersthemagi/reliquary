@@ -21,8 +21,8 @@
 // invite and recovery tokens alike; a change of address is `email_change`.
 //
 // The vault invite is Reliquary's own (web/src/emails.ts renders it, with
-// every value escaped); nothing sends it until deliverInvite() in
-// web/src/invites.ts gets a sender.
+// every value escaped), and deliverInvite() in web/src/invites.ts sends it
+// through Resend when the server has an email sender.
 //
 // Email-client safe: tables, inline styles, a system font stack, no images,
 // fonts, scripts or remote anything; a <style> only for dark mode, which

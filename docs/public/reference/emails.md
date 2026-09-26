@@ -46,8 +46,12 @@ Sent after a change to your account, to tell you it happened. If it was you, the
 
 ## Vault invites
 
-Reliquary doesn't email invites yet: the vault owner copies the invite link from the **Members** page and sends it to you. See [Members and invites](../concepts/members.md). When invites are emailed, the subject will be "You're invited to *vault name* on Reliquary", with the vault, your role, the address it's for and when it expires.
+| Subject | When | What's in it |
+|---|---|---|
+| You're invited to *vault name* on Reliquary | A vault owner invited your address | The vault, your role, the address it's for, when it expires, and a button with the invite link, also written out. The link works once, only for someone signed in with that address. |
+
+Invites are emailed when the site has an email sender (the hosted service does). Otherwise, or if the email couldn't be sent, the owner copies the link from the **Members** page and sends it to you another way: it's the same link. See [Members and invites](../concepts/members.md).
 
 ## On a self-hosted instance
 
-The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. See [Self-host Reliquary](../how-to/self-host.md).
+The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites).

@@ -2,10 +2,11 @@
 // one source): Supabase Auth's, which the self-hosted instance serves to its
 // Auth server (selfhost.ts) and the hosted owner pastes into the Supabase
 // dashboard (scripts/email-templates.sh), and Reliquary's own vault invite,
-// rendered here for deliverInvite() once it has a sender (invites.ts).
+// rendered here for deliverInvite() (invites.ts), which sends it through
+// Resend (mailer.ts).
 //
-// Files are read on first use, never at import: the hosted app on Vercel
-// imports this module but serves none of them.
+// Files are read on first use, never at import. The hosted app on Vercel
+// reads only vault-invite.html and manifest.tsv (vercel.json's includeFiles).
 
 import { readFileSync } from "node:fs";
 
@@ -59,8 +60,8 @@ export function fill(template: string, values: Record<string, string>): string {
   });
 }
 
-// The vault invite email, for deliverInvite() (invites.ts) once there is a
-// sender. The link is a bearer secret: whatever sends this must never log it.
+// The vault invite email, for deliverInvite() (invites.ts). The link is a
+// bearer secret: whatever sends this must never log it.
 export function vaultInviteEmail(
   mail: { to: string; link: string; vaultName: string; role: string; expiresAt: Date },
   siteUrl: string,
