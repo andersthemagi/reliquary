@@ -1412,3 +1412,80 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   .readme-head { padding: var(--space-3) var(--space-4); }
   .file-more .action-list { min-width: 0; width: min(18rem, calc(100vw - 2 * var(--space-5))); }
 }
+/* Package G: vault admin and members */
+/* Settings tabs (vaultadmin.ts settingsHeader): the first h2 under the tabs
+   sits close, the rest keep the page rhythm. */
+.page-head.has-tabs + h2, .page-head.has-tabs + .section-head > h2 { margin-top: var(--space-2); }
+/* A section heading with a quiet line at its right: "People · 3 of 10 places". */
+.section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-5); margin: var(--space-8) 0 var(--space-4); }
+.section-head > h2 { margin: 0; }
+.section-meta { margin: 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.section-lede { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin-top: calc(-1 * var(--space-2)); }
+/* General, for editors and viewers: the facts, not a form. */
+.settings-facts { display: grid; gap: 0; margin: 0 0 var(--space-4); max-width: 40rem; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
+.settings-facts > div { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--space-4); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--border); align-items: baseline; }
+.settings-facts > div:first-child { border-top: 0; }
+.settings-facts dt { font-size: var(--text-sm); font-weight: 600; color: var(--fg-muted); }
+.settings-facts dd { margin: 0; overflow-wrap: anywhere; }
+/* Members: the role picker and Change line up at the small control height;
+   row actions stay on one line at the right. */
+.member-list .role-form select { min-height: var(--control-sm); min-width: 7rem; padding-top: 2px; padding-bottom: 2px; font-size: var(--text-sm); }
+.member-list .role-form { flex-wrap: nowrap; }
+td.row-actions { width: 1%; white-space: nowrap; }
+/* A cell's second line (the only owner, a tier's source, a connection's kind). */
+:is(.member-list, .usage-table, .plan-vaults) .token-client { display: block; color: var(--fg-muted); font-size: var(--text-sm); }
+.connection-list .conn-name { font-weight: 500; overflow-wrap: anywhere; }
+.invite-list td:first-child { overflow-wrap: anywhere; }
+.invite-form input[type="text"] { max-width: 28rem; }
+.reveal .callout-title strong { display: inline; }
+/* Danger zone: one bordered box, a row per action, the button at the end. */
+.danger-rows { border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); border-radius: var(--radius-lg); background: var(--bg); max-width: 80ch; }
+.danger-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); padding: var(--space-5); border-top: 1px solid var(--border); }
+.danger-row:first-child { border-top: 0; }
+.danger-row > div { flex: 1 1 22rem; min-width: 0; }
+.danger-row h2 { font-size: var(--text-md); line-height: var(--lh-md); margin: 0 0 var(--space-1); }
+.danger-row p { margin: 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.danger-rows + .hint { margin-top: var(--space-4); }
+.export-facts { max-width: var(--measure); padding-left: 1.25em; margin: 0; }
+.export-facts li + li { margin-top: var(--space-2); }
+/* Usage: a row per limit with a meter (plans.ts meter(): a <meter>, since
+   the CSP allows no inline width). */
+.usage-table { max-width: 44rem; }
+.usage-table th[scope="row"] { width: 8rem; background: var(--bg-subtle); vertical-align: top; padding-top: 12px; }
+.usage-table td { padding-top: 10px; padding-bottom: 10px; }
+.usage-table + .hint, .table-wrap:has(> .usage-table) + .hint { margin-top: var(--space-4); }
+.usage-meter {
+  display: block; width: 100%; max-width: 14rem; height: 6px; margin: var(--space-2) 0 var(--space-1);
+  -webkit-appearance: none; appearance: none; border: 0; border-radius: var(--radius-full); background: var(--bg-muted); overflow: hidden;
+}
+.usage-meter::-webkit-meter-bar { height: 6px; border: 0; border-radius: var(--radius-full); background: var(--bg-muted); }
+.usage-meter::-webkit-meter-optimum-value { background: var(--fg-muted); border-radius: var(--radius-full); }
+.usage-meter::-webkit-meter-suboptimum-value { background: var(--attention); border-radius: var(--radius-full); }
+.usage-meter::-webkit-meter-even-less-good-value { background: var(--danger); border-radius: var(--radius-full); }
+.usage-meter::-moz-meter-bar { background: var(--fg-muted); border-radius: var(--radius-full); }
+.usage-meter:-moz-meter-sub-optimum::-moz-meter-bar { background: var(--attention); }
+.usage-meter:-moz-meter-sub-sub-optimum::-moz-meter-bar { background: var(--danger); }
+/* Plan and usage (/account): the plan with its meter, then the vaults. */
+.plan-summary { max-width: 32rem; margin: 0 0 var(--space-4); }
+.plan-summary .usage-line { margin: 0; }
+.plan-summary .hint { margin-top: var(--space-2); }
+.plan-vaults td:first-child { min-width: 10rem; }
+.plan-vaults .usage-meter { max-width: 10rem; }
+.usage-status { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }
+.plan-note { margin-top: var(--space-6); }
+@media (max-width: 640px) {
+  .settings-facts > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .danger-row { padding: var(--space-4); }
+  .danger-row > .button { width: 100%; }
+  .usage-table th[scope="row"] { width: 6rem; padding-left: var(--space-4); }
+  .usage-table td { padding-right: var(--space-4); }
+  .table-stack .usage-meter { max-width: none; }
+  .member-list .role-form { flex-wrap: wrap; }
+  td.row-actions { width: auto; }
+  /* Stacked rows: the title cell reads as a line of text, a cell's second
+     line sits under its value (not its label), and actions start left. */
+  :is(.member-list, .invite-list, .connection-list, .plan-vaults) td:first-child { display: block; font-weight: 500; }
+  :is(.member-list, .invite-list, .connection-list, .plan-vaults) td:first-child .token-client { font-weight: 400; }
+  :is(.member-list, .connection-list, .plan-vaults) td[data-label] > :is(.token-client, .usage-meter, .usage-status) { grid-column: 2; }
+  .table-stack td.row-actions { display: block; text-align: left; padding-top: var(--space-2); }
+}

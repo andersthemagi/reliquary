@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { configureAuth } from "../dist/auth.js";
 import { poolConfig } from "../dist/db.js";
-import { NO_LIMIT_BYTES, NO_LIMIT_COUNT, planLine, usageLine } from "../dist/plans.js";
+import { NO_LIMIT_BYTES, NO_LIMIT_COUNT, planLine, planNote, usageLine } from "../dist/plans.js";
 import { configureRateLimits } from "../dist/ratelimit.js";
 import { configureVariables } from "../dist/secrets.js";
 import { emailTemplate, emailTemplatePaths, selfHosted } from "../dist/selfhost.js";
@@ -127,6 +127,17 @@ test("self-hosted plan: hosted plans read as before", () => {
   assert.equal(planLine({ plan: "free", planName: "Free", vaultsOwned: 3, maxVaults: 5 }), "Free plan · 3 of 5 vaults");
   const u = { tier: "standard", tierName: "Standard", plan: "free", planName: "Free", members: 4, invites: 0, maxMembers: 10, bytes: 12e6, maxBytes: 100e6 };
   assert.equal(usageLine(u), "Standard (Free) · 4 of 10 people · 12 MB of 100 MB");
+});
+
+test("self-hosted plan: Plan and usage never mentions billing on a self-hosted server, whatever the plan", () => {
+  const free = { plan: "free", planName: "Free", vaultsOwned: 3, maxVaults: 5 };
+  const own = { plan: "self_hosted", planName: "Self-hosted", vaultsOwned: 3, maxVaults: 2147483647 };
+  for (const [p, self] of [[free, true], [own, true], [own, false]]) {
+    const h = planNote(p, self).html;
+    assert.doesNotMatch(h, /billed|beta/i);
+    assert.match(h, /This Reliquary is self-hosted: its operator sets plans and tiers\./);
+  }
+  assert.match(planNote(free, false).html, /Nothing is billed during the beta\./);
 });
 
 // Email templates -----------------------------------------------------------------

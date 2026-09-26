@@ -21,6 +21,8 @@ const SUPER = `postgres://postgres:test@127.0.0.1:${PG_PORT}/postgres`;
 const WEB_DB = `postgres://reliquary_web:test@127.0.0.1:${PG_PORT}/postgres`;
 const PIA = "00000000-0000-0000-0000-0000000009a1";
 const QUINN = "00000000-0000-0000-0000-0000000009a2";
+const RHEA = "00000000-0000-0000-0000-0000000009a3"; // near her storage limit
+const REX = "00000000-0000-0000-0000-0000000009a4"; // on a plan with no limits, as self-hosted
 const KEY = randomBytes(32).toString("base64url");
 
 const servers = [];
@@ -121,8 +123,22 @@ before(async () => {
   await sql("select private.set_account_plan($1, 'web_small')", [PIA]);
   [{ id: V.one }] = await as({ user: PIA }, "select public.create_vault('Plans One') as id");
   await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.one, QUINN, PIA]);
+  await sql(
+    `insert into auth.users (id, email) values ($1, 'rhea@example.test'), ($2, 'rex@example.test') on conflict (id) do nothing`,
+    [RHEA, REX],
+  );
+  await sql(`insert into private.plans (id, name, max_vaults, max_members, max_storage_bytes)
+             values ('web_tiny', 'Web tiny', 2, 5, 100), ('web_boundless', 'Boundless', 2147483647, 2147483647, 9223372036854775807)
+             on conflict (id) do nothing`);
+  await sql("select private.set_account_plan($1, 'web_tiny')", [RHEA]);
+  await sql("select private.set_account_plan($1, 'web_boundless')", [REX]);
+  [{ id: V.rhea }] = await as({ user: RHEA }, "select public.create_vault('Plans Near') as id");
+  await as({ user: RHEA }, "select public.write_file($1, 'n.md', $2)", [V.rhea, "n".repeat(85)]);
+  [{ id: V.rex }] = await as({ user: REX }, "select public.create_vault('Plans Boundless') as id");
   S.pia = await startAs(PIA);
   S.quinn = await startAs(QUINN);
+  S.rhea = await startAs(RHEA);
+  S.rex = await startAs(REX);
 });
 
 after(() => {
@@ -146,7 +162,10 @@ test("plans: Plan and usage shows the plan and each vault the person created, wi
   const h = await r.text();
   assert.match(h, /<h1>Plan and usage<\/h1>/);
   assert.match(h, /Web small plan · 1 of 2 vaults/);
-  assert.match(h, new RegExp(`<a class="name" href="/v/${V.one}">Plans One</a>\\s*<span class="muted small"> · Standard \\(Web small\\) · 2 of 2 people · 0 bytes of 400 bytes</span> <span class="badge attention">At a limit</span>`));
+  assert.match(h, new RegExp(`<td><a class="name" href="/v/${V.one}">Plans One</a><span class="muted token-client">Standard \\(Web small\\)</span></td>`));
+  assert.match(h, /<td data-label="People">2 of 2<meter class="usage-meter" min="0" max="2" low="1" high="2" optimum="0" value="2" aria-label="2 of 2 places filled">/);
+  assert.match(h, /<td data-label="Storage">0 bytes of 400 bytes<meter /);
+  assert.match(h, /<td data-label="Status"><span class="usage-status"><span class="badge attention" title="No place left to invite someone">People full<\/span><\/span><\/td>/);
   // Quinn created nothing: a vault he only belongs to isn't his.
   const q = await page("quinn", "/account");
   // The page itself: the top bar's vault switcher lists the vaults he is in.
@@ -154,13 +173,43 @@ test("plans: Plan and usage shows the plan and each vault the person created, wi
   assert.match(q, /You haven’t created a vault yet\./);
 });
 
-test("plans: Settings shows every member the vault's tier, people and storage; owners also see invites waiting", async () => {
-  const h = await page("pia", `/v/${V.one}/config`);
-  assert.match(h, /<h2>Plan and usage<\/h2>\s*<p class="usage-line">Standard \(Web small\) · 2 of 2 people · 0 bytes of 400 bytes<\/p>/);
-  assert.match(h, /This vault is at a limit\.[\s\S]*to invite someone, revoke an invite or remove a member first/);
-  assert.match(h, /Standard vaults take their limits from the Web small plan of the account that created them\./);
-  const q = await page("quinn", `/v/${V.one}/config`);
-  assert.match(q, /<p class="usage-line">Standard \(Web small\) · 2 of 2 people · 0 bytes of 400 bytes<\/p>/);
+test("plans: Settings' Usage tab shows every member the vault's tier, people and storage; owners also see invites waiting", async () => {
+  const h = await page("pia", `/v/${V.one}/config/usage`);
+  assert.match(h, /<th scope="row">Tier<\/th><td>Standard \(Web small\)<span class="muted token-client">Limits from the Web small plan of the account that created the vault\.<\/span>/);
+  assert.match(h, /<th scope="row">People<\/th><td>2 of 2<meter /);
+  assert.match(h, /<th scope="row">Storage<\/th><td>0 bytes of 400 bytes \(0%\)<meter /);
+  assert.match(h, /<strong>No places left<\/strong>[\s\S]*Plans One has 2 of 2 places filled: 2 members\. To invite someone, remove a member\./);
+  const q = await page("quinn", `/v/${V.one}/config/usage`);
+  assert.match(q, /<th scope="row">People<\/th><td>2 of 2<meter /);
+});
+
+test("full vault: Members disables Invite someone and says why and how to make room, before anyone fills in an invite", async () => {
+  const h = await page("pia", `/v/${V.one}/config/members`);
+  assert.match(h, /<button type="button" class="primary" disabled title="No places left: see below">Invite someone<\/button>/);
+  assert.doesNotMatch(h, /href="[^"]*\/config\/members\/invite"/);
+  assert.match(h, /<div class="callout warning" role="status" id="places-full"><p class="callout-title"><strong>No places left<\/strong><\/p><p>Plans One has 2 of 2 places filled: 2 members\. To invite someone, remove a member\. For more, ask the operator for a bigger plan or the Pro tier\. <a href="\/docs\/concepts\/plans-and-limits">Plans and limits<\/a><\/p><\/div>/);
+  assert.match(h, /<p class="section-meta">2 of 2 places filled: 2 members<\/p>/);
+});
+
+test("full vault: the invite page shows the reason and the way back instead of the form", async () => {
+  const r = await get("pia", `/v/${V.one}/config/members/invite`);
+  assert.equal(r.status, 200);
+  const h = await r.text();
+  assert.match(h, /<strong>No places left<\/strong>/);
+  assert.doesNotMatch(h, /name="email"|Create invite link/);
+  assert.match(h, new RegExp(`<a class="button secondary" href="/v/${V.one}/config/members">Back to Members</a>`));
+});
+
+test("full vault: an editor sees no invite button or note meant for owners", async () => {
+  const h = await page("quinn", `/v/${V.one}/config/members`);
+  assert.doesNotMatch(h, /Invite someone|No places left/);
+});
+
+test("plan note: hosted, Plan and usage says nothing is billed during the beta and how to get more", async () => {
+  const h = await page("pia", "/account");
+  assert.match(h, /<p class="page-desc">The Web small plan: up to 2 vaults you own, each with its tier’s limits on people and storage\.<\/p>/);
+  assert.match(h, /<meter class="usage-meter" min="0" max="2" low="1" high="2" optimum="0" value="1" aria-label="1 of 2 vaults owned">/);
+  assert.match(h, /Nothing is billed during the beta\. For a bigger plan, or the Pro tier for one vault, ask the operator: upgrades are given by hand\./);
 });
 
 // ---------------------------------------------------------------------------
@@ -168,7 +217,8 @@ test("plans: Settings shows every member the vault's tier, people and storage; o
 
 test("limits: an invite past the vault's people limit is refused with the database's reason, and nothing is stored", async () => {
   const r = await post("pia", `/v/${V.one}/config/members/invite`, { email: "someone@example.test", role: "viewer" });
-  assert.match(await flashAfter("pia", r),
+  assert.equal(r.status, 400);
+  assert.match(unescape(/<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(await r.text())?.[1] ?? ""),
     /^Plans One is at its 2-person limit on the Web small plan \(2 members and 0 invites waiting\): revoke an invite or remove someone first\. \(ref [0-9a-f]{8}\)$/);
   const [{ n }] = await sql("select count(*)::int as n from private.vault_invites where vault_id = $1", [V.one]);
   assert.equal(n, 0);
@@ -182,7 +232,7 @@ test("limits: a save that fits is counted; one past the storage limit is refused
     /^Plans One has 300 bytes of its 400 bytes storage limit on the Web small plan, and this needs 200 bytes more\. Erase files you no longer need \(deleting a file keeps its history\) or delete variables, then try again\. \(ref [0-9a-f]{8}\)$/);
   const [{ n }] = await sql("select count(*)::int as n from public.files where vault_id = $1 and path = 'notes/b.md'", [V.one]);
   assert.equal(n, 0);
-  assert.match(await page("pia", `/v/${V.one}/config`), /Standard \(Web small\) · 2 of 2 people · 300 bytes of 400 bytes/);
+  assert.match(await page("pia", `/v/${V.one}/config/usage`), /<th scope="row">Storage<\/th><td>300 bytes of 400 bytes \(75%\)<meter /);
 });
 
 test("limits: setting a variable past the storage limit is refused on the form with the reason, and nothing is set", async () => {
@@ -259,4 +309,29 @@ test("limits: New vault says when the plan is full, and creating one is refused 
   const [{ n }] = await sql("select count(*)::int as n from public.vaults where created_by = $1", [PIA]);
   assert.equal(n, 2);
   assert.match(await page("pia", "/account"), /You own 2 vaults, and the Web small plan allows 2/);
+});
+
+// ---------------------------------------------------------------------------
+// Before a limit, and with none
+
+test("near a limit: storage from 80% shows a warning on Usage and a badge on Plan and usage, before anything is refused", async () => {
+  const u = await page("rhea", `/v/${V.rhea}/config/usage`);
+  assert.match(u, /<strong>Storage nearly full<\/strong><\/p><p>Plans Near uses 85 bytes of its 100 bytes\. A save that doesn’t fit is refused and nothing is saved\./);
+  assert.match(u, /<th scope="row">Storage<\/th><td>85 bytes of 100 bytes \(85%\)<meter class="usage-meter" min="0" max="100" low="80" high="100" optimum="0" value="85"/);
+  const a = await page("rhea", "/account");
+  assert.match(a, /<span class="badge warning" title="A save that doesn’t fit is refused">Storage 85%<\/span>/);
+  assert.doesNotMatch(a, /People full|Storage full/);
+});
+
+test("plan note: with no limits (self-hosted), Plan and usage says so and nothing about billing or meters", async () => {
+  const h = await page("rex", "/account");
+  assert.match(h, /<p class="page-desc">The Boundless plan: no limit on the vaults you own, their people or their storage\.<\/p>/);
+  assert.match(h, /Boundless plan · 1 vault \(no limit\)/);
+  assert.match(h, /This Reliquary is self-hosted: its operator sets plans and tiers\./);
+  assert.doesNotMatch(h, /billed|<meter/);
+  assert.match(h, /<td data-label="Status"><span class="muted">Within limits<\/span><\/td>/);
+  const u = await page("rex", `/v/${V.rex}/config/usage`);
+  assert.match(u, /<th scope="row">People<\/th><td>1 \(no limit\)/);
+  assert.doesNotMatch(u, /<meter|No places left/);
+  assert.doesNotMatch(await page("rex", `/v/${V.rex}/config/members`), /No places left|class="primary" disabled/);
 });

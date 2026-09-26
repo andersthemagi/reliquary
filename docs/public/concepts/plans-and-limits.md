@@ -23,14 +23,15 @@ The operator can take admission back. The account keeps its vaults and membershi
 | People per vault | 10 | 25 |
 | Storage per vault | 100 MB | 1 GB |
 
-A vault's tier is **Standard** unless it has been upgraded. A Standard vault takes its people and storage limits from the plan of the account that created it, whoever else becomes an owner later. A vault can be upgraded on its own: the **Pro** tier holds 50 people and 5 GB, whatever its account's plan. Upgrades are given by hand during the beta; ask the operator.
+A vault's tier is **Standard** unless it has been upgraded. A Standard vault takes its people and storage limits from the plan of the account that created it, whoever else becomes an owner later. A vault can be upgraded on its own: the **Pro** tier holds 50 people and 5 GB, whatever its account's plan. Upgrades are given by hand during the beta; ask the operator. On a self-hosted server there is no billing: its operator sets plans and tiers, and the Self-hosted plan has no limits.
 
 Sizes are decimal: 1 MB is 1,000,000 bytes, 1 GB is 1,000 MB.
 
 ## Where you see them
 
-- **Account**, **Plan and usage** (`/account`): your plan, how many vaults you own of how many, and each of your vaults' people and storage. Home shows the plan and the count under **Your vaults**.
-- A vault's **Settings**, **Plan and usage**: its tier, people and storage, for every member. Owners also see the invites waiting.
+- **Account**, **Plan and usage** (`/account`): your plan, how many vaults you own of how many, and each of your vaults' people and storage, each with a bar and a status: **People full**, **Storage full**, or storage from 80% ("Storage 85%"). Home shows the plan and the count under **Your vaults**.
+- A vault's **Settings**, **Usage**: its tier, people and storage, for every member, with a warning from 80% of storage and when every place is filled. Owners also see the invites waiting.
+- A vault's **Settings**, **Members**: how many places are filled. When none is left, **Invite someone** is off and the page says how to make room, before anyone fills in an invite.
 - Agents: `list_vaults` notes a vault that is near or over a limit.
 
 ## What counts

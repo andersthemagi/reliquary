@@ -100,6 +100,11 @@ const flashAfter = async (who, r) => {
   // A refusal ends with its reference (failure.ts), different each time.
   return (/<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
 };
+// A refused form comes back (400) with the reason in a danger callout.
+const alertOf = async (r) => {
+  assert.equal(r.status, 400);
+  return (/<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(await r.text())?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
+};
 const members = (id) => `/v/${id}/config/members`;
 const roleOf = async (vault, user) =>
   (await sql("select role from public.vault_members where vault_id = $1 and user_id = $2", [vault, user]))[0]?.role ?? "none";
@@ -135,7 +140,8 @@ after(() => {
 test("members: Settings links to Members, which lists each member by email and role, never by id", async () => {
   assert.match(await page("olga", `/v/${V.team}/config`), new RegExp(`<a href="/v/${V.team}/config/members">Members</a>`));
   const h = await page("olga", members(V.team));
-  assert.match(h, /<h1>Members<\/h1>/);
+  assert.match(h, /<h1>Settings<\/h1>/);
+  assert.match(h, new RegExp(`<a href="/v/${V.team}/config/members" aria-current="page">Members</a>`));
   assert.match(h, new RegExp(`href="/v/${V.team}/config" aria-current="page">Settings`));
   assert.match(h, /<td>olga@example\.test <span class="badge">You<\/span><\/td>/);
   assert.match(h, /<td>paul@example\.test<\/td>/);
@@ -178,22 +184,22 @@ test("invite: the owner makes an invite and sees its link once, to copy and send
   assert.match(h, /only for someone signed in as <strong>ivan@example\.test<\/strong>/);
   const again = await page("olga", members(V.team));
   assert.equal(tokenOf(again), undefined, "shown once");
-  assert.match(again, /<tr><td>ivan@example\.test<\/td><td class="small">Viewer<\/td>/);
+  assert.match(again, /<tr><td>ivan@example\.test<\/td><td class="small" data-label="Role">Viewer<\/td>/);
   const [row] = await sql("select count(*)::int as n from private.vault_invites where vault_id = $1 and email = 'ivan@example.test'", [V.team]);
   assert.equal(row.n, 1);
 });
 
 test("invite: a bad address, an unknown role or a member's address is refused with the database's reason", async () => {
-  assert.equal(await flashAfter("olga", await post("olga", `${members(V.team)}/invite`, { email: "nope", role: "viewer" })),
+  assert.equal(await alertOf(await post("olga", `${members(V.team)}/invite`, { email: "nope", role: "viewer" })),
     "Enter an email address, like name@example.com.");
-  assert.equal(await flashAfter("olga", await post("olga", `${members(V.team)}/invite`, { email: "zoe@example.test", role: "admin" })),
+  assert.equal(await alertOf(await post("olga", `${members(V.team)}/invite`, { email: "zoe@example.test", role: "admin" })),
     "A role is owner, editor or viewer.");
-  assert.equal(await flashAfter("olga", await post("olga", `${members(V.team)}/invite`, { email: "PAUL@example.test", role: "viewer" })),
+  assert.equal(await alertOf(await post("olga", `${members(V.team)}/invite`, { email: "PAUL@example.test", role: "viewer" })),
     "That address already belongs to a member of this vault.");
 });
 
 test("invite: an editor's forged invite is refused by the database", async () => {
-  assert.equal(await flashAfter("paul", await post("paul", `${members(V.team)}/invite`, { email: "zoe@example.test", role: "owner" })),
+  assert.equal(await alertOf(await post("paul", `${members(V.team)}/invite`, { email: "zoe@example.test", role: "owner" })),
     "Only owners invite people.");
   const [row] = await sql("select count(*)::int as n from private.vault_invites where email = 'zoe@example.test'");
   assert.equal(row.n, 0);
@@ -204,6 +210,33 @@ test("invite: a post without the form token makes nothing", async () => {
   assert.equal(r.status, 403);
   const [row] = await sql("select count(*)::int as n from private.vault_invites where email = 'zoe@example.test'");
   assert.equal(row.n, 0);
+});
+
+test("invite form: the Members header's Invite someone opens the form on its own page, which Cancel leaves", async () => {
+  const m = await page("olga", members(V.team));
+  assert.match(m, new RegExp(`<div class="page-actions"><a class="button primary" href="/v/${V.team}/config/members/invite">Invite someone</a></div>`));
+  assert.doesNotMatch(m, /name="email"/, "the Members tab lists; the form is a page of its own");
+  const h = await page("olga", `${members(V.team)}/invite`);
+  assert.match(h, /<h1>Invite someone<\/h1>/);
+  assert.match(h, new RegExp(`<li><a href="/v/${V.team}/config/members">Members</a></li><li aria-current="page">Invite someone</li>`));
+  assert.match(h, new RegExp(`<form method="post" action="/v/${V.team}/config/members/invite" class="panel choice-form invite-form">`));
+  assert.match(h, /<input type="radio" name="role" value="editor" checked>/);
+  assert.match(h, new RegExp(`<button class="primary">Create invite link</button><a class="button quiet" href="/v/${V.team}/config/members">Cancel</a>`));
+});
+
+test("invite form: an editor gets no form, only who may invite", async () => {
+  const h = await page("paul", `${members(V.team)}/invite`);
+  assert.match(h, /Only owners invite people\./);
+  assert.doesNotMatch(h, /name="email"/);
+});
+
+test("invite form: a refused invite comes back with what was typed, the role chosen and the reason", async () => {
+  const r = await post("olga", `${members(V.team)}/invite`, { email: "PAUL@example.test", role: "owner" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<div class="callout danger" role="alert"><p>That address already belongs to a member of this vault\. \(ref [0-9a-f]{8}\)<\/p><\/div>/);
+  assert.match(h, /name="email" value="paul@example\.test"/);
+  assert.match(h, /<input type="radio" name="role" value="owner" checked>/);
 });
 
 test("invite page: someone signed in with another address is told whose it is, and can't join", async () => {
@@ -257,12 +290,37 @@ test("invite: revoking a pending invite kills its link", async () => {
   const h = await (await post("olga", `${members(V.team)}/invite`, { email: "zoe@example.test", role: "editor" })).text();
   tokens.zoe = tokenOf(h);
   const [{ id }] = await sql("select id from private.vault_invites where email = 'zoe@example.test' and revoked_at is null");
-  assert.match(await page("olga", members(V.team)), new RegExp(`action="/v/${V.team}/config/members/invites/${id}/revoke"`));
+  assert.match(await page("olga", members(V.team)), new RegExp(`href="/v/${V.team}/config/members/invites/${id}/revoke">Revoke</a>`));
   assert.equal(await flashAfter("olga", await post("olga", `${members(V.team)}/invites/${id}/revoke`, {})), "Invite revoked. Its link no longer works.");
   assert.match(await page("zoe", `/invite?token=${tokens.zoe}`), /This invite was withdrawn\./);
   assert.equal((await post("zoe", "/invite", { token: tokens.zoe })).status, 400);
   assert.equal(await roleOf(V.team, ZOE), "none");
-  assert.match(await page("olga", members(V.team)), /No invites waiting\./);
+  assert.match(await page("olga", members(V.team)), /<strong>No invites waiting<\/strong>/);
+});
+
+test("invite: revoking asks first, naming the address, and nothing changes until the post", async () => {
+  await post("olga", `${members(V.team)}/invite`, { email: "yara@example.test", role: "viewer" });
+  const [{ id }] = await sql("select id from private.vault_invites where email = 'yara@example.test' and revoked_at is null");
+  const h = await page("olga", `${members(V.team)}/invites/${id}/revoke`);
+  assert.match(h, /<h1>Revoke the invite for yara@example\.test<\/h1>/);
+  assert.match(h, /The link for <strong>yara@example\.test<\/strong> \(Viewer\) stops working at once/);
+  assert.match(h, /Its place is free again for another invite\./);
+  assert.match(h, new RegExp(`<form method="post" action="/v/${V.team}/config/members/invites/${id}/revoke" class="panel confirm">`));
+  assert.match(h, /<button class="danger solid">Revoke invite for yara@example\.test<\/button>/);
+  assert.match(h, new RegExp(`<a class="button quiet" href="/v/${V.team}/config/members">Cancel</a>`));
+  const [row] = await sql("select revoked_at from private.vault_invites where id = $1", [id]);
+  assert.equal(row.revoked_at, null, "nothing happens on GET");
+  assert.equal(await flashAfter("olga", await post("olga", `${members(V.team)}/invites/${id}/revoke`, {})), "Invite revoked. Its link no longer works.");
+});
+
+test("invite: an editor opening an invite's revoke page is told only owners revoke, and learns no address", async () => {
+  await post("olga", `${members(V.team)}/invite`, { email: "xena@example.test", role: "viewer" });
+  const [{ id }] = await sql("select id from private.vault_invites where email = 'xena@example.test' and revoked_at is null");
+  const h = await page("paul", `${members(V.team)}/invites/${id}/revoke`);
+  assert.match(h, /Only owners revoke invites\./);
+  assert.doesNotMatch(h, /xena@/);
+  assert.equal((await get("olga", `${members(V.team)}/invites/00000000-0000-0000-0000-000000000000/revoke`)).status, 404);
+  await post("olga", `${members(V.team)}/invites/${id}/revoke`, {});
 });
 
 // ---------------------------------------------------------------------------
@@ -302,7 +360,7 @@ test("members: removing asks first, saying what goes and what stays, then remove
 test("connections: the owner sees each member's connections to this vault, escaped, and none that don't reach it", async () => {
   const h = await page("olga", members(V.team));
   assert.match(h, /<h2>Agent connections<\/h2>/);
-  assert.match(h, /<td class="small">paul@example\.test<\/td>\s*<td>Paul laptop<span class="muted token-client">MCP token · Cursor &lt;b&gt;bold&lt;\/b&gt;<\/span><\/td>/);
+  assert.match(h, /<td><span class="conn-name">Paul laptop<\/span><span class="muted token-client">MCP token · from Cursor &lt;b&gt;bold&lt;\/b&gt;<\/span><\/td>\s*<td class="small" data-label="Member">paul@example\.test<\/td>/);
   assert.match(h, /Paul both/);
   assert.doesNotMatch(h, /Paul private/);
 });
@@ -323,6 +381,32 @@ test("connections: an editor's forged revoke is refused by the database", async 
     "Only owners revoke agent connections.");
   const [t] = await sql("select revoked_at from public.access_tokens where id = $1", [id]);
   assert.equal(t.revoked_at, null);
+});
+
+test("connections: revoking asks first on a page naming the connection, its member and this vault", async () => {
+  const [{ id }] = await sql("select id from public.access_tokens where name = 'Paul laptop'");
+  const h = await page("olga", `${members(V.team)}/connections/${id}/revoke`);
+  assert.match(h, /<h1>Revoke Paul laptop for Members Team<\/h1>/);
+  assert.match(h, /paul@example\.test’s <strong>Paul laptop<\/strong> \(MCP token · from Cursor &lt;b&gt;bold&lt;\/b&gt;\) stops reaching Members Team on its next request\./);
+  assert.match(h, /Only they can revoke it everywhere, on their Tokens page\./);
+  assert.match(h, new RegExp(`<form method="post" action="/v/${V.team}/config/members/connections/${id}/revoke" class="panel confirm">`));
+  assert.match(h, /<button class="danger solid">Revoke Paul laptop<\/button>/);
+  const [t] = await sql("select revoked_at, vault_ids from public.access_tokens where id = $1", [id]);
+  assert.equal(t.revoked_at, null, "nothing happens on GET");
+  assert.deepEqual(t.vault_ids, [V.team]);
+  assert.match(await page("paul", `${members(V.team)}/connections/${id}/revoke`), /Only owners revoke agent connections\./);
+});
+
+test("connections: a CLI sign-in reads as Reliquary CLI with what it does, never as the stored 'this computer'", async () => {
+  await sql(
+    `insert into public.access_tokens (user_id, name, kind, client_id, resource, expires_at, access, all_vaults, vault_ids, client_name)
+     values ($1, 'Reliquary CLI', 'cli', 'https://app.example/cli/oauth-client.json', 'https://app.example/api/env', now() + interval '30 days', 'read', false, array[$2]::uuid[], 'this computer')`,
+    [PAUL, V.team],
+  );
+  const h = await page("olga", members(V.team));
+  assert.match(h, /<td><span class="conn-name">Reliquary CLI<\/span><span class="muted token-client">Command-line sign-in<\/span><\/td>\s*<td class="small" data-label="Member">paul@example\.test<\/td>\s*<td class="small" data-label="Access">Environment variables<\/td>/);
+  assert.doesNotMatch(h, /this computer/);
+  assert.match(h, /<th>Created<\/th>/);
 });
 
 // ---------------------------------------------------------------------------

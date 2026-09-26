@@ -197,11 +197,12 @@ test("invites only: a forged role change for someone not in the vault is refused
 // ---------------------------------------------------------------------------
 // Leaving
 
-test("leave: Settings offers a member Leave, and tells the only owner why not", async () => {
-  const cy = await page("cy", `/v/${V.team}/config`);
-  assert.match(cy, /<h2>Leave<\/h2>/);
-  assert.match(cy, new RegExp(`<a href="/v/${V.team}/config/leave">Leave this vault</a>`));
-  const bea = await page("bea", `/v/${V.team}/config`);
+test("leave: Settings' Danger zone offers a member Leave, and tells the only owner why not", async () => {
+  const cy = await page("cy", `/v/${V.team}/config/danger`);
+  assert.match(cy, /<h2>Leave this vault<\/h2>/);
+  assert.match(cy, new RegExp(`<a class="button danger" href="/v/${V.team}/config/leave">Leave this vault</a>`));
+  assert.doesNotMatch(await page("cy", `/v/${V.team}/config`), /config\/leave"/, "not on General");
+  const bea = await page("bea", `/v/${V.team}/config/danger`);
   assert.match(bea, /You’re the only owner, so you can’t leave\./);
   assert.doesNotMatch(bea, /config\/leave"/);
   assert.match(await page("bea", `/v/${V.team}/config/leave`), /You’re the only owner of Polish Team\./);
@@ -222,8 +223,9 @@ test("leave: the confirm page says what goes, and the post leaves, logged", asyn
   const h = await page("cy", `/v/${V.team}/config/leave`);
   assert.match(h, /<h1>Leave Polish Team<\/h1>/);
   assert.match(h, /To come back, an owner has to invite you again\./);
-  assert.match(h, new RegExp(`<form method="post" action="/v/${V.team}/config/leave" class="actions">`));
-  assert.match(h, /<button class="danger">Leave Polish Team<\/button>/);
+  assert.match(h, new RegExp(`<form method="post" action="/v/${V.team}/config/leave" class="panel confirm">`));
+  assert.match(h, /<button class="danger solid">Leave Polish Team<\/button>/);
+  assert.match(h, new RegExp(`<a class="button quiet" href="/v/${V.team}/config/danger">Cancel</a>`));
   assert.equal(await roleOf(V.team, CY), "editor", "a GET changes nothing");
   const r = await post("cy", `/v/${V.team}/config/leave`, {});
   assert.equal(r.headers.get("location"), "/");

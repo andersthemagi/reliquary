@@ -27,11 +27,11 @@ What people and their agents can each do, where, and who may: every rule here is
 | Action | Web app | MCP tool | Who may |
 |---|---|---|---|
 | Set or remove a rule | **Settings**, **Rules** | none | person, owners |
-| Rename a vault or change its default policy | **Settings** | none | person, owners |
+| Rename a vault or change its default policy | **Settings**, **General** | none | person, owners |
 | See members (by email) | **Settings**, **Members** | none | person, any member |
 | Invite, change roles, remove members | **Members** | none | person, owners |
 | Accept an invite | the invite link | none | person, the invited address |
-| Leave a vault | **Settings**, **Leave this vault** | none | person, any member while another owner remains |
+| Leave a vault | **Settings**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains |
 | See and cut members' agent connections | **Members** | none | person, owners |
 | Create or revoke a token | **Tokens and connections** (the account menu) | none | person |
 | Set your display name | **Account settings** | none | person, for themself only |
