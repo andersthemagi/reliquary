@@ -22,14 +22,21 @@ test("connect: Claude Code connects by URL and browser sign-in, before any token
   const add = h.indexOf("claude mcp add --transport http --scope user reliquary http://127.0.0.1:8787/mcp");
   assert.ok(add > 0, "the claude mcp add command with the MCP URL");
   assert.match(h, /run <code>\/mcp<\/code>, choose <strong>reliquary<\/strong> and <strong>Authenticate<\/strong>/);
-  assert.ok(add < h.indexOf("RELIQUARY_TOKEN"), "sign-in comes before token setups");
-  assert.ok(add < h.indexOf("headersHelper"), "sign-in comes before the local helper");
+  const tabs = [...h.matchAll(/<nav class="tabs" aria-label="Clients">([\s\S]*?)<\/nav>/g)][0][1];
+  const order = [...tabs.matchAll(/href="\/connect\?client=([a-z-]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(order, ["claude-code", "chat", "cursor", "vscode", "other", "cli"], "sign-in clients come before token setups");
+  assert.doesNotMatch(h, /RELIQUARY_TOKEN|headersHelper/, "the default tab is sign-in only");
+  assert.match(await page("/connect?client=cursor"), /RELIQUARY_TOKEN/);
 });
 
 test("connect: Claude.ai and ChatGPT add the URL as a connector; the dev helper is only under Local development", async () => {
-  const h = await page("/connect");
-  assert.match(h, /Add custom connector/);
-  assert.match(h, /developer mode/);
-  assert.match(h, /<details><summary>Local development[^<]*<\/summary>[\s\S]*headersHelper[\s\S]*<\/details>/);
-  assert.doesNotMatch(h, /arrive with hosting/);
+  const chat = await page("/connect?client=chat");
+  assert.match(chat, /Add custom connector/);
+  assert.match(chat, /developer mode/);
+  const other = await page("/connect?client=other");
+  assert.match(other, /<details><summary>Local development[^<]*<\/summary>[\s\S]*headersHelper[\s\S]*<\/details>/);
+  for (const c of ["", "?client=chat", "?client=cursor", "?client=vscode", "?client=cli"]) {
+    assert.doesNotMatch(await page(`/connect${c}`), /headersHelper/, c);
+  }
+  assert.doesNotMatch(other, /arrive with hosting/);
 });

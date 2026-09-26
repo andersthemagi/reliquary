@@ -559,7 +559,7 @@ test("revoke: the grant is on the Tokens page with its scope, and revoking it th
 
   const h = await (await get("/tokens")).text();
   const tr = new RegExp(`<tr><td>Fixture Chat \\(127\\.0\\.0\\.1\\)</td>([\\s\\S]*?)</tr>`).exec(h)[1];
-  assert.match(tr, /<td class="small">Team<\/td>/);
+  assert.match(tr, /<td data-label="Vaults" class="small">Team<\/td>/);
   assert.match(tr, /Read and write/);
   assert.match(tr, /from app\.client\.test/);
   const r = await fetch(`${base}/tokens/${row.id}/revoke`, {

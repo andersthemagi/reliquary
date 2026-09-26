@@ -13,7 +13,7 @@ reliquary login
 Your browser opens Reliquary's consent page for the Reliquary CLI. Choose which vaults it may read and whether it may send `.env` files for approval, then **Allow**. The CLI lists the vaults and environments it can now read.
 
 - On a machine without a browser, `reliquary login --no-browser` prints the link to open elsewhere.
-- The sign-in shows on the **Tokens** page as Reliquary CLI. It can read variable values within your role; it can't read files or change anything else.
+- The sign-in shows on the **Connections** page as Reliquary CLI. It can read variable values within your role; it can't read files or change anything else.
 - Signing in again replaces the previous sign-in on this computer.
 
 ## Run a command with the variables
@@ -66,7 +66,7 @@ Commit a `.reliquary.json` at the project's root so nobody needs `--vault` or `-
 reliquary logout
 ```
 
-This revokes the sign-in on the server and forgets it. You can also revoke it on the **Tokens** page; the next command then asks you to run `reliquary login`.
+This revokes the sign-in on the server and forgets it. You can also revoke it on the **Connections** page; the next command then asks you to run `reliquary login`.
 
 ## Where the sign-in is kept
 

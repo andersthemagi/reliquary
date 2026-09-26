@@ -35,7 +35,7 @@ import {
   reviseProposal,
 } from "./proposals.js";
 import { rules, search, setRule } from "./rules.js";
-import { connect, createToken, revokeToken, tokens } from "./access.js";
+import { accessRoutes } from "./access.js";
 
 export type Ctx = {
   userId: string;
@@ -462,14 +462,11 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && p === "/settings") return accountSettings(ctx);
   if (!get && p === "/settings/name") return saveDisplayName(ctx);
   if (get && p === "/activity") return allActivity(ctx);
-  if (get && p === "/connect") return connect(ctx);
-  if (get && p === "/tokens") return tokens(ctx);
+  if (p === "/connect" || p === "/tokens" || p.startsWith("/tokens/")) return accessRoutes(ctx);
   if (get && p === "/account") return accountPage(ctx);
   if (get && p === "/vaults/new") return newVault(ctx);
   if (!get && p === "/vaults/new") return createVault(ctx);
-  if (!get && p === "/tokens/new") return createToken(ctx);
-  let m = /^\/tokens\/([^/]+)\/revoke$/.exec(p);
-  if (!get && m) return revokeToken(ctx, m[1]);
+  let m: RegExpExecArray | null;
   if (p === "/oauth/authorize") return authorize(ctx);
   if (p === "/invite") return inviteRoutes(ctx);
 

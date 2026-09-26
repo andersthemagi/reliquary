@@ -1,39 +1,51 @@
-# Tokens, connections and sign-ins
+# Connections
 
-Three kinds of credential let software act for you, and all of them are listed on your Tokens page, where you can revoke any of them.
+A connection is anything that can act as you: an agent, an app or the CLI. Every one of yours is on the **Connections** page (the account menu at the top right, then **Tokens and connections**), where you can revoke it.
 
-## The three kinds
+## The three types
 
-| | OAuth connection | Access token | CLI sign-in |
+The **Type** column on the Connections page shows which one each is.
+
+| | App | Token | Reliquary CLI |
 |---|---|---|---|
-| For | MCP clients that support sign-in: Claude Code, Claude.ai, ChatGPT | MCP clients that can only send a header: Cursor, VS Code, scripts, headless agents | the `reliquary` CLI on one computer |
-| Made by | signing in from the client and choosing **Allow** | **Tokens**, **Create token** in the web app | `reliquary login` and choosing **Allow** |
+| For | MCP clients that sign in: Claude Code, Claude.ai, ChatGPT | MCP clients that can only send a header: Cursor, VS Code, scripts, headless agents | the `reliquary` CLI on one computer |
+| Made by | signing in from the client and choosing **Allow** | **New token** on the Connections page, then **Create token** | `reliquary login` and choosing **Allow** |
 | Reaches | the MCP endpoint | the MCP endpoint | the env API only: variable values, never files |
 | Vaults | all yours, or the ones you tick | all yours, or the ones you tick | all yours, or the ones you tick |
 | Access | read only, or read and write | read only, or read and write | reads values; optionally sends a `.env` for approval |
-| Lifetime | 1-hour access tokens, refreshed by the client; the grant lasts at most a year | 7 days to a year, fixed when made | 1-hour access tokens, refreshed by the CLI; at most a year |
-| Shown as | the client's name, "from" its site | the name you gave it | "Reliquary CLI" |
+| Lifetime | 1-hour access tokens, refreshed by the client; at most a year | 7 days to a year, fixed when made | 1-hour access tokens, refreshed by the CLI; at most a year |
+| Named | the client's name, "from" its site | the name you gave it | "Reliquary CLI" |
 
-OAuth connections and CLI sign-ins are made by the web app at `https://app.reliquary.redmage.cc`, the issuer your client checks. The CLI uses that server unless you name another with `--server`.
+Apps and the CLI sign in through the web app at `https://app.reliquary.redmage.cc`, the issuer your client checks. The CLI uses that server unless you name another with `--server`.
 
-All three act as you, minus the [ceiling](agents.md). A connection or token can never do more than your role allows in a vault.
+Every connection acts as you, minus the [ceiling](agents.md). It can never do more than your role allows in a vault.
 
-## Prefer OAuth where the client supports it
+## Prefer an app where the client can sign in
 
-With OAuth there is no secret to copy: the client signs in through your browser and keeps its own refreshed tokens. Use an access token only for clients without sign-in, and keep it out of chats and config files that an agent can read: read it from an environment variable or a password prompt. See [Connect Cursor](../how-to/connect-cursor.md) and [Connect VS Code](../how-to/connect-vs-code.md).
+When a client signs in, there is no secret to copy: it signs in through your browser and keeps its own refreshed tokens. Make a token only for clients that can't sign in, and keep it out of chats and config files an agent can read: read it from an environment variable or a password prompt. See [Connect Cursor](../how-to/connect-cursor.md) and [Connect VS Code](../how-to/connect-vs-code.md).
+
+## Make a token
+
+1. On the Connections page, choose **New token**.
+2. Name it after the agent and machine, choose its vaults, **Read only** or **Read and write**, and when it expires.
+3. Choose **Create token**, copy the token, then **Done**. It is shown once.
 
 ## Scope is fixed
 
-A token's or connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.
+A connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.
 
 ## Revoking
 
-Revoke any of them on the **Tokens and connections** page (in the account menu, at the top right); the next request it makes is refused. Only you can revoke your own, in person: no agent, token or client can revoke one (an OAuth client can still end its own grant). A vault owner can also cut a member's connection off from their vault on **Members**, without touching the member's other vaults.
+On the Connections page, choose **Revoke** next to it. A confirm page shows its type, vaults, access and last use; choose **Revoke** with its name to confirm. It is refused on its next request.
 
-When you leave a vault, or are removed, tokens that reached only that vault are revoked, and the vault drops out of tokens that reached several.
+Only you can revoke your own, in person: no agent, token, app or CLI can revoke one (an app can still end its own sign-in). A vault owner can also cut a member's connection off from their vault on **Members**, without touching the member's other vaults.
 
-If a token leaked, see [Rotate a leaked token](../how-to/rotate-a-leaked-token.md).
+When you leave a vault, or are removed, connections that reached only that vault are revoked, and the vault drops out of connections that reached several.
 
-## What the Tokens page shows
+If one leaked, see [Rotate a leaked token](../how-to/rotate-a-leaked-token.md).
 
-Each entry shows its name, vaults, access, when it was last used and by which client (the name the client reports), and when it expires. Tokens themselves are stored only as hashes: a new token is shown once, when you create it, and never again.
+## What the Connections page shows
+
+Live connections come first. Each shows its name, type, vaults, access, when it was last used and by which client (the name the client reports), and when it expires. Expired and revoked ones are folded under **Expired and revoked**, with when each ended, so you can still see what had access.
+
+Tokens are stored only as hashes: a new token is shown once, when you create it, and never again.

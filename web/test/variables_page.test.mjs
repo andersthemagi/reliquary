@@ -506,8 +506,8 @@ test("variables page: without VARIABLES_KEY, names are listed and values can't b
 });
 
 test("variables page: the Connect page shows the CLI: login, run and env pull", async () => {
-  const h = await page("/connect");
-  assert.match(h, /<a href="#cli">Environment variables<\/a>/);
+  const h = await page("/connect?client=cli");
+  assert.match(h, /<a href="\/connect\?client=cli" aria-current="page">Environment variables<\/a>/);
   const cli = h.slice(h.indexOf('<section id="cli">'));
   assert.match(cli, /npx @reliquary-ai\/cli login/);
   assert.match(cli, /npx @reliquary-ai\/cli run --env development -- &lt;command&gt;/);

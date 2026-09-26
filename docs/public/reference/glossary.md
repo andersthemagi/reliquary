@@ -4,19 +4,19 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Access log.** A vault's append-only record of every set, rotate, delete, read, reveal and refused attempt on its environment variables. See [Environment variables](../concepts/variables.md#the-access-log).
 
-**Access token.** A secret an MCP client sends in a header (`Authorization: Bearer ...`) to act as you, for clients without sign-in. Scoped to vaults and access, always expiring. See [Tokens, connections and sign-ins](../concepts/connections.md).
+**Access token.** A secret an MCP client sends in a header (`Authorization: Bearer ...`) to act as you, for clients without sign-in; a connection of the type Token, made with **New token**. Scoped to vaults and access, always expiring. See [Connections](../concepts/connections.md).
 
 **Activity.** A vault's append-only log of every change: who, which agent, what and where. See [Activity](../concepts/activity.md).
 
-**Agent.** An AI tool or program acting for a person through a connection or token. It has its person's role, minus the ceiling. See [Agents and the ceiling](../concepts/agents.md).
+**Agent.** An AI tool or program acting for a person through a connection. It has its person's role, minus the ceiling. See [Agents and the ceiling](../concepts/agents.md).
 
 **Canon.** A file policy: the file changes only through a proposal approved by enough people. See [Canon, open and rules](../concepts/canon-and-rules.md).
 
 **Ceiling.** The actions no agent can do, however its person connected it: approving, rules, members, grants, secret values, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
 
-**CLI sign-in.** The `reliquary` CLI's OAuth grant on one computer. It reads variable values within your role, and may send `.env` files for approval. See [Use the CLI](../how-to/use-the-cli.md).
+**CLI sign-in.** The `reliquary` CLI's OAuth grant on one computer, a connection of the type Reliquary CLI. It reads variable values within your role, and may send `.env` files for approval. See [Use the CLI](../how-to/use-the-cli.md).
 
-**Connection.** An MCP client you allowed through OAuth sign-in, like Claude Code or ChatGPT. See [Tokens, connections and sign-ins](../concepts/connections.md).
+**Connection.** Anything that can act as you: an app (an MCP client you allowed through OAuth sign-in, like Claude Code or ChatGPT), a token, or the Reliquary CLI. All are listed, and revoked, on the Connections page. See [Connections](../concepts/connections.md).
 
 **Data fencing.** Wrapping text people and agents wrote in random markers when it goes to an agent, so it reads as data and can't pose as instructions. See [MCP tools](mcp-tools.md#data-fencing).
 

@@ -1375,3 +1375,39 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure-details > summary { cursor: pointer; width: fit-content; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .failure-details > summary:hover { color: var(--fg); }
 .failure-details[open] > summary { margin-bottom: var(--space-3); }
+
+/* Package D: access */
+/* Connections (/tokens, access.ts): the name leads each row, and on a phone
+   is the block's heading; the last use and its client share a line. */
+.token-list td:first-child { font-weight: 500; overflow-wrap: anywhere; min-width: 8rem; }
+.token-list td[data-label="Type"] { white-space: nowrap; }
+.token-list .token-client { display: inline; }
+.token-list td.num { width: 1%; white-space: nowrap; }
+/* Expired and revoked, folded under the live ones. */
+.connections-ended { margin-top: var(--space-6); }
+.connections-ended > summary {
+  cursor: pointer; width: fit-content; display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 32px; color: var(--fg-muted); font-size: var(--text-sm); font-weight: 500; line-height: var(--lh-sm);
+}
+.connections-ended > summary { list-style: none; }
+.connections-ended > summary::-webkit-details-marker { display: none; }
+.connections-ended > summary::before {
+  content: ""; width: 5px; height: 5px; flex: none; margin: 0 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); transition: transform 120ms ease-out;
+}
+.connections-ended[open] > summary::before { transform: rotate(45deg); }
+.connections-ended > summary:hover { color: var(--fg); }
+.connections-ended[open] > summary { margin-bottom: var(--space-2); }
+.connections-ended .hint { margin: 0 0 var(--space-3); }
+.new-token-hint { margin: 0 0 var(--space-4); }
+/* Connect (/connect): the URL in the header, one client per tab, and a
+   click selects a whole command. */
+.page-head .endpoint { margin: 0; }
+.endpoint code { overflow-wrap: anywhere; }
+.connect-panel section > h2:first-child { margin-top: 0; }
+.connect-panel pre.code { user-select: all; }
+.connect-panel .callout { margin-top: var(--space-4); max-width: 80ch; }
+@media (max-width: 639px) {
+  .token-list td.num { width: auto; }
+}

@@ -2,7 +2,7 @@
 
 Every tool the Reliquary MCP server offers, with its arguments, limits and who may call it, generated from the server's own tool contract.
 
-The MCP URL is `https://mcp.reliquary.redmage.cc/mcp` (Streamable HTTP; your Connect page shows the one to use). Connect with OAuth or an access token: see [Tokens, connections and sign-ins](../concepts/connections.md).
+The MCP URL is `https://mcp.reliquary.redmage.cc/mcp` (Streamable HTTP; your Connect page shows the one to use). Connect with OAuth or an access token: see [Connections](../concepts/connections.md).
 
 ## How calls work
 

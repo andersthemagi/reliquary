@@ -34,7 +34,7 @@ The account menu, at the right of the bar, shows who you're signed in as and lin
 
 - **Account settings** (`/settings`): your display name, your email, the theme, and sign out.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
-- **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Tokens, connections and sign-ins](connections.md).
+- **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Connections](connections.md).
 
 It also switches the theme (Auto, Light or Dark) and signs you out.
 

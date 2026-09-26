@@ -28,8 +28,8 @@ Ask Claude Code: `Using Reliquary, list my vaults.` It calls `list_vaults` and s
 
 ## Change or remove it
 
-- To change which vaults or access it has: revoke it on the **Tokens** page, then run `/mcp` and **Authenticate** again.
-- To remove it from Claude Code: `claude mcp remove --scope user reliquary`. Also revoke it on **Tokens**.
+- To change which vaults or access it has: revoke it on the **Connections** page, then run `/mcp` and **Authenticate** again.
+- To remove it from Claude Code: `claude mcp remove --scope user reliquary`. Also revoke it on **Connections**.
 
 ## Troubleshooting
 

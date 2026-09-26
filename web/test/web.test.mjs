@@ -244,12 +244,13 @@ test("isolation: someone else's vault, file or proposal looks missing", async ()
 // Connect, tokens, theme, copy --------------------------------------------------
 
 test("connect: per-client setup with the MCP URL and no token anywhere", async () => {
-  const h = await page("/connect");
-  assert.match(h, /http:\/\/127\.0\.0\.1:8787\/mcp/);
-  assert.match(h, /headersHelper/);
-  assert.match(h, /cursor:\/\/anysphere\.cursor-deeplink\/mcp\/install\?name=reliquary&amp;config=/);
-  assert.match(h, /\$\{input:reliquary-token\}/);
-  assert.doesNotMatch(h, /rlq_[0-9a-f]{64}/);
+  const h = ["", "?client=cursor", "?client=vscode", "?client=other"].map((c) => page(`/connect${c}`));
+  const all = (await Promise.all(h)).join("\n");
+  assert.match(all, /http:\/\/127\.0\.0\.1:8787\/mcp/);
+  assert.match(all, /headersHelper/);
+  assert.match(all, /cursor:\/\/anysphere\.cursor-deeplink\/mcp\/install\?name=reliquary&amp;config=/);
+  assert.match(all, /\$\{input:reliquary-token\}/);
+  assert.doesNotMatch(all, /rlq_[0-9a-f]{64}/);
 });
 
 test("tokens: minted in the browser, shown once, then revocable", async () => {
@@ -258,7 +259,7 @@ test("tokens: minted in the browser, shown once, then revocable", async () => {
   assert.match(made, /<p class="secret">rlq_[0-9a-f]{64}<\/p>/);
   const again = await page("/tokens");
   assert.doesNotMatch(again, /rlq_[0-9a-f]{64}/);
-  const id = /action="\/tokens\/([0-9a-f-]{36})\/revoke"/.exec(again)[1];
+  const id = /href="\/tokens\/([0-9a-f-]{36})\/revoke"/.exec(again)[1];
   await post(`/tokens/${id}/revoke`, { csrf: token });
   assert.match(await page("/tokens"), /Revoked/);
 });

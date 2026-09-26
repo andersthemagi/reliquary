@@ -4,7 +4,7 @@ VS Code connects with an access token that it asks for once and keeps in its sec
 
 ## Steps
 
-1. In Reliquary, open **Tokens** and create a token with the vaults and access you want. Copy it; it is shown once.
+1. In Reliquary, open the **Connections** page (the account menu, **Tokens and connections**), choose **New token** and create a token with the vaults and access you want. Copy it; it is shown once.
 2. In your project, create `.vscode/mcp.json`:
 
    ```json
@@ -35,4 +35,4 @@ The file holds no secret, so you can commit it; each person enters their own tok
 
 ## Change or remove it
 
-Revoke the token on Reliquary's **Tokens** page. To use a new one, clear the stored input in VS Code and start the server again; it asks for the token again.
+Revoke the token on Reliquary's **Connections** page. To use a new one, clear the stored input in VS Code and start the server again; it asks for the token again.

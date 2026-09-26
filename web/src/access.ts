@@ -1,133 +1,291 @@
-// Access: the Connect page (how each MCP client and the CLI connect) and
-// Tokens (create, list and revoke agent tokens). Token scope is enforced by
-// the database for every call a token makes.
+// Access: Connect (how each MCP client and the CLI connect, one client per
+// tab) and Connections (everything that can act as you: tokens, apps you
+// signed in to, the Reliquary CLI; create a token, revoke any of them).
+// Scope is enforced by the database for every call a connection makes.
+//
+// Words, the same on these pages and in the docs they cite
+// (docs/public/concepts/connections.md): a *connection* is anything that
+// acts as you; it is a *token* (made on New token, pasted into a client),
+// an *app* (a client you signed in to with OAuth) or the *Reliquary CLI*.
+// You *revoke* a connection.
 
 import { asPerson } from "./db.js";
-import { csrfField, html, pageHeader, raw, when } from "./html.js";
-import { ago, message, notFound, q, render, UUID, type Ctx, type Reply } from "./pages.js";
+import {
+  callout,
+  confirmPage,
+  csrfField,
+  emptyState,
+  html,
+  pageHeader,
+  raw,
+  time,
+  type Raw,
+  type Tab,
+} from "./html.js";
+import { message, notFound, q, render, UUID, type Ctx, type Reply } from "./pages.js";
+
+// The routes of these pages; pages.ts sends /connect and /tokens/* here.
+// URLs are kept from before the rename (/tokens is the Connections page).
+export function accessRoutes(ctx: Ctx): Promise<Reply> | Reply {
+  const p = ctx.url.pathname;
+  const get = ctx.method === "GET";
+  if (get && p === "/connect") return connect(ctx);
+  if (get && p === "/tokens") return tokens(ctx);
+  if (get && p === "/tokens/new") return newToken(ctx);
+  if (!get && p === "/tokens/new") return createToken(ctx);
+  const m = /^\/tokens\/([^/]+)\/revoke$/.exec(p);
+  if (get && m) return revokePage(ctx, m[1]);
+  if (!get && m) return revokeToken(ctx, m[1]);
+  return notFound(ctx);
+}
 
 // ---------------------------------------------------------------------------
 // Connect
 
+const CLIENTS = [
+  { id: "claude-code", label: "Claude Code" },
+  { id: "chat", label: "Claude.ai and ChatGPT" },
+  { id: "cursor", label: "Cursor" },
+  { id: "vscode", label: "VS Code" },
+  { id: "other", label: "Other clients" },
+  { id: "cli", label: "Environment variables" },
+] as const;
+type Client = (typeof CLIENTS)[number]["id"];
+
+const CEILING = "The agent acts as you, but can’t approve, change rules, manage members or read variable values.";
+const TOKEN_SAFETY =
+  "Keep the token out of config files and chats: anything an agent can read, it can leak. Read it from an environment variable or a password prompt, as below.";
+
 export function connect(ctx: Ctx): Reply {
   const url = ctx.mcpUrl;
-  const helper = JSON.stringify({ reliquary: { type: "http", url, headersHelper: "/path/to/reliquary/mcp/headers-helper.sh" } }, null, 2);
-  const cursorConfig = { url, headers: { Authorization: "Bearer ${env:RELIQUARY_TOKEN}" } };
-  const cursorJson = JSON.stringify({ mcpServers: { reliquary: cursorConfig } }, null, 2);
-  const cursorLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=reliquary&config=${q(
-    Buffer.from(JSON.stringify(cursorConfig)).toString("base64"),
-  )}`;
-  const vscodeJson = JSON.stringify(
-    {
-      inputs: [{ type: "promptString", id: "reliquary-token", description: "Reliquary access token", password: true }],
-      servers: { reliquary: { type: "http", url, headers: { Authorization: "Bearer ${input:reliquary-token}" } } },
-    },
-    null,
-    2,
-  );
+  const asked = ctx.url.searchParams.get("client");
+  const client: Client = CLIENTS.find((c) => c.id === asked)?.id ?? "claude-code";
   return render(
     ctx,
     "Connect",
-    html`${pageHeader({ title: "Connect an agent", actions: html`<a class="button primary" href="/tokens">Create a token</a>` })}
-    <p class="lede">Any MCP client can use your vaults through one URL. Clients that support sign-in (Claude Code, Claude.ai, ChatGPT) connect with your Reliquary account: you choose which vaults they reach and whether they can write. Others use a <a href="/tokens">token</a>. Either way the agent acts as you, but can never approve, change rules or manage members.</p>
-    <p class="endpoint"><span class="muted small">MCP URL</span><code>${url}</code></p>
-    <nav class="tabs" aria-label="Clients"><a href="#claude-code">Claude Code</a><a href="#chat">Claude.ai and ChatGPT</a><a href="#cursor">Cursor</a><a href="#vscode">VS Code</a><a href="#hermes">Hermes and others</a><a href="#cli">Environment variables</a></nav>
-
-    <section id="claude-code"><h2>Claude Code (app or CLI)</h2>
-      <p>On each computer, add Reliquary once for your user:</p>
-      <pre class="code">claude mcp add --transport http --scope user reliquary ${url}</pre>
-      <p>Then in Claude Code run <code>/mcp</code>, choose <strong>reliquary</strong> and <strong>Authenticate</strong>. Your browser opens Reliquary: sign in, pick the vaults and access, and approve. Claude Code keeps the connection and refreshes it by itself. Revoke it any time on the <a href="/tokens">Tokens</a> page.</p></section>
-
-    <section id="chat"><h2>Claude.ai and ChatGPT</h2>
-      <p><strong>Claude.ai:</strong> Settings, Connectors, <strong>Add custom connector</strong>. Name it Reliquary and paste the MCP URL. Claude sends you here to sign in and approve.</p>
-      <p><strong>ChatGPT:</strong> Settings, Apps and Connectors, turn on developer mode under Advanced, then create a connector with the MCP URL and OAuth authentication. ChatGPT sends you here to sign in and approve.</p></section>
-
-    <section id="cursor"><h2>Cursor</h2>
-      <p class="callout info">Tokens are for clients without sign-in. Keep them out of config files and chats: anything an agent can read, it can leak. The setups below read the token from an environment variable or a password prompt.</p>
-      <p>Create a token on the <a href="/tokens">Tokens</a> page, set it as <code>RELIQUARY_TOKEN</code> in the environment Cursor starts from, then <a href="${cursorLink}">add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:</p>
-      <pre class="code">${cursorJson}</pre></section>
-
-    <section id="vscode"><h2>VS Code</h2>
-      <p>Add this to <code>.vscode/mcp.json</code>. VS Code asks for a token from the <a href="/tokens">Tokens</a> page once and stores it securely.</p>
-      <pre class="code">${vscodeJson}</pre></section>
-
-    <section id="hermes"><h2>Hermes and other clients</h2>
-      <p>Use Streamable HTTP with the MCP URL and this header, reading the token from wherever the client keeps secrets:</p>
-      <pre class="code">Authorization: Bearer &lt;your token&gt;</pre>
-      <details><summary>Local development (a Reliquary checkout on this machine)</summary>
-        <p>With <code>./mcp/dev.sh token "Claude Code on Linux"</code> the token stays in a file, and Claude Code reads it through a helper at connect time. Add this under <code>mcpServers</code> in <code>~/.claude.json</code>:</p>
-        <pre class="code">${helper}</pre></details></section>
-
-    <section id="cli"><h2>Environment variables (the Reliquary CLI)</h2>
-      <p>Your programs get a vault’s variables through the CLI, never through an agent. Sign this computer in once; your browser opens Reliquary to choose which vaults it reads:</p>
-      <pre class="code">npx @reliquary-ai/cli login</pre>
-      <p>Then run a command with one environment’s variables, written nowhere on disk:</p>
-      <pre class="code">npx @reliquary-ai/cli run --env development -- &lt;command&gt;</pre>
-      <p>Or write them to a <code>.env</code> file, which the CLI only does where git ignores it:</p>
-      <pre class="code">npx @reliquary-ai/cli env pull --env development</pre>
-      <p>To add a project’s <code>.env</code> to the vault, send it; you apply it on the Variables page, where only names are shown. An agent can run this for you without ever seeing a value:</p>
-      <pre class="code">npx @reliquary-ai/cli env push --env development --file .env</pre>
-      <p class="small muted">Add <code>--vault &lt;name&gt;</code> if you belong to more than one vault. The sign-in is on the <a href="/tokens">Tokens</a> page as Reliquary CLI; revoke it there. Set values on a vault’s Variables page.</p></section>`,
+    html`${pageHeader({
+      title: "Connect",
+      description: "Connect any MCP client to your vaults with this URL.",
+      meta: html`<p class="endpoint"><span class="muted small">MCP URL</span><code>${url}</code></p>`,
+      secondary: html`<a class="button" href="/tokens">Your connections</a>`,
+      tabs: CLIENTS.map((c) => ({ href: `/connect?client=${c.id}`, label: c.label, current: c.id === client })) as Tab[],
+      tabsLabel: "Clients",
+    })}
+    <div class="connect-panel">${clientSection(ctx, client)}</div>`,
     "connect",
   );
 }
 
+function clientSection(ctx: Ctx, client: Client): Raw {
+  const url = ctx.mcpUrl;
+  switch (client) {
+    case "claude-code":
+      return html`<section id="claude-code"><h2>Claude Code (app or CLI)</h2>
+      <p>Claude Code signs in with your Reliquary account: no token to copy. On each computer, add Reliquary once for your user:</p>
+      <pre class="code" tabindex="0">claude mcp add --transport http --scope user reliquary ${url}</pre>
+      <p>Then in Claude Code run <code>/mcp</code>, choose <strong>reliquary</strong> and <strong>Authenticate</strong>. Your browser opens Reliquary: sign in, pick the vaults and access, and approve. Claude Code keeps the connection and refreshes it by itself. It shows on <a href="/tokens">Connections</a>, where you can revoke it.</p>
+      ${callout("info", CEILING)}</section>`;
+    case "chat":
+      return html`<section id="chat"><h2>Claude.ai and ChatGPT</h2>
+      <p>Both sign in with your Reliquary account: no token to copy.</p>
+      <p><strong>Claude.ai:</strong> Settings, Connectors, <strong>Add custom connector</strong>. Name it Reliquary and paste the MCP URL. Claude sends you here to sign in and approve.</p>
+      <p><strong>ChatGPT:</strong> Settings, Apps and Connectors, turn on developer mode under Advanced, then create a connector with the MCP URL and OAuth authentication. ChatGPT sends you here to sign in and approve.</p>
+      <p>Each shows on <a href="/tokens">Connections</a> under the app’s name, where you can revoke it.</p>
+      ${callout("info", CEILING)}</section>`;
+    case "cursor": {
+      const cursorConfig = { url, headers: { Authorization: "Bearer ${env:RELIQUARY_TOKEN}" } };
+      const cursorJson = JSON.stringify({ mcpServers: { reliquary: cursorConfig } }, null, 2);
+      const cursorLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=reliquary&config=${q(
+        Buffer.from(JSON.stringify(cursorConfig)).toString("base64"),
+      )}`;
+      return html`<section id="cursor"><h2>Cursor</h2>
+      <p>Cursor can’t sign in, so it uses a token. <a href="/tokens/new">Create a token</a>, set it as <code>RELIQUARY_TOKEN</code> in the environment Cursor starts from, then <a href="${cursorLink}">add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:</p>
+      <pre class="code" tabindex="0">${cursorJson}</pre>
+      ${callout("warning", TOKEN_SAFETY)}
+      ${callout("info", CEILING)}</section>`;
+    }
+    case "vscode": {
+      const vscodeJson = JSON.stringify(
+        {
+          inputs: [{ type: "promptString", id: "reliquary-token", description: "Reliquary access token", password: true }],
+          servers: { reliquary: { type: "http", url, headers: { Authorization: "Bearer ${input:reliquary-token}" } } },
+        },
+        null,
+        2,
+      );
+      return html`<section id="vscode"><h2>VS Code</h2>
+      <p>VS Code uses a token. <a href="/tokens/new">Create a token</a>, then add this to <code>.vscode/mcp.json</code>. VS Code asks for the token once and stores it securely.</p>
+      <pre class="code" tabindex="0">${vscodeJson}</pre>
+      ${callout("warning", TOKEN_SAFETY)}
+      ${callout("info", CEILING)}</section>`;
+    }
+    case "other": {
+      const helper = JSON.stringify({ reliquary: { type: "http", url, headersHelper: "/path/to/reliquary/mcp/headers-helper.sh" } }, null, 2);
+      return html`<section id="other"><h2>Other clients</h2>
+      <p>A client that supports MCP sign-in (OAuth) only needs the MCP URL: it sends you here to sign in and approve. Any other client that speaks Streamable HTTP uses a token: <a href="/tokens/new">create one</a> and send it in this header, read from wherever the client keeps secrets:</p>
+      <pre class="code" tabindex="0">Authorization: Bearer &lt;your token&gt;</pre>
+      ${callout("warning", TOKEN_SAFETY)}
+      ${callout("info", CEILING)}
+      <details><summary>Local development (a Reliquary checkout on this machine)</summary>
+        <p>With <code>./mcp/dev.sh token "Claude Code on Linux"</code> the token stays in a file, and Claude Code reads it through a helper at connect time. Add this under <code>mcpServers</code> in <code>~/.claude.json</code>:</p>
+        <pre class="code" tabindex="0">${helper}</pre></details></section>`;
+    }
+    case "cli":
+      return html`<section id="cli"><h2>Environment variables (the Reliquary CLI)</h2>
+      <p>Your programs get a vault’s variables through the CLI, never through an agent. Connect the CLI once on each computer; your browser opens Reliquary to choose which vaults it reads:</p>
+      <pre class="code" tabindex="0">npx @reliquary-ai/cli login</pre>
+      <p>Then run a command with one environment’s variables, written nowhere on disk:</p>
+      <pre class="code" tabindex="0">npx @reliquary-ai/cli run --env development -- &lt;command&gt;</pre>
+      <p>Or write them to a <code>.env</code> file, which the CLI only does where git ignores it:</p>
+      <pre class="code" tabindex="0">npx @reliquary-ai/cli env pull --env development</pre>
+      <p>To add a project’s <code>.env</code> to the vault, send it; you apply it on the Variables page, where only names are shown. An agent can run this for you without ever seeing a value:</p>
+      <pre class="code" tabindex="0">npx @reliquary-ai/cli env push --env development --file .env</pre>
+      <p class="small muted">Add <code>--vault &lt;name&gt;</code> if you belong to more than one vault. The CLI shows on <a href="/tokens">Connections</a> as Reliquary CLI; revoke it there. Set values on a vault’s Variables page.</p></section>`;
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Tokens
+// Connections
 
-// Scope (which vaults, read or read-write) is enforced by the database for
-// every call the token makes, and can't be edited: revoke and recreate. The
-// token itself is shown once, in this response only, and never logged.
-export async function tokens(ctx: Ctx, fresh?: { name: string; token: string }): Promise<Reply> {
-  const { rows, vaults } = await asPerson(ctx.userId, async (c) => ({
-    rows: (
-      await c.query(
-        `select t.id, t.name, t.created_at, t.expires_at, t.last_used_at, t.revoked_at,
-                t.all_vaults, t.access, t.kind, t.env_push, t.client_name, t.expires_at <= now() as expired,
-                cardinality(t.vault_ids) as n_vaults,
-                (select array_agg(v.name order by v.name) from public.vaults v
-                  where v.id = any(t.vault_ids)) as vault_names
-           from public.access_tokens t
-          order by t.revoked_at nulls first, (t.expires_at <= now()), t.created_at desc`,
-      )
-    ).rows,
-    vaults: (
-      await c.query(
-        `select v.id, v.name from public.vaults v
-           join public.vault_members m on m.vault_id = v.id and m.user_id = $1
-          order by v.name`,
-        [ctx.userId],
-      )
-    ).rows as { id: string; name: string }[],
-  }));
+type Row = {
+  id: string;
+  name: string;
+  created_at: Date;
+  expires_at: Date;
+  last_used_at: Date | null;
+  revoked_at: Date | null;
+  all_vaults: boolean;
+  access: string;
+  kind: string;
+  env_push: boolean;
+  client_name: string | null;
+  expired: boolean;
+  n_vaults: number;
+  vault_names: string[] | null;
+};
 
-  const scope = (t: { all_vaults: boolean; n_vaults: number; vault_names: string[] | null }) => {
-    if (t.all_vaults) return "All your vaults";
-    const names = t.vault_names ?? [];
-    const gone = t.n_vaults - names.length;
-    return names.join(", ") + (gone > 0 ? `${names.length ? ", and " : ""}${gone} you no longer belong to` : "");
-  };
-  const status = (t: { id: string; revoked_at: Date | null; expired: boolean }) =>
-    t.revoked_at
-      ? html`<span class="muted small">Revoked</span>`
-      : t.expired
-        ? html`<span class="muted small">Expired</span>`
-        : html`<form method="post" action="/tokens/${t.id}/revoke">${csrfField(ctx.csrf)}<button class="danger">Revoke</button></form>`;
+// Every connection of the person's, with its vaults by name (only the ones
+// they can see: RLS on vaults). One id, or all of them.
+const SELECT = `select t.id, t.name, t.created_at, t.expires_at, t.last_used_at, t.revoked_at,
+        t.all_vaults, t.access, t.kind, t.env_push, t.client_name, t.expires_at <= now() as expired,
+        cardinality(t.vault_ids) as n_vaults,
+        (select array_agg(v.name order by v.name) from public.vaults v
+          where v.id = any(t.vault_ids)) as vault_names
+   from public.access_tokens t`;
+
+const TYPE: Record<string, string> = { pat: "Token", oauth: "App", cli: "Reliquary CLI" };
+const typeOf = (t: Row) => TYPE[t.kind] ?? t.kind;
+
+const scopeOf = (t: Row) => {
+  if (t.all_vaults) return "All your vaults";
+  const names = t.vault_names ?? [];
+  const gone = t.n_vaults - names.length;
+  return names.join(", ") + (gone > 0 ? `${names.length ? ", and " : ""}${gone} you no longer belong to` : "");
+};
+
+const accessOf = (t: Row) =>
+  t.kind === "cli"
+    ? t.env_push
+      ? "Environment variables (reads; sends for approval)"
+      : "Environment variables"
+    : t.access === "write"
+      ? "Read and write"
+      : "Read only";
+
+// The client's name is kept from its last use, or for an app from sign-in.
+const lastUse = (t: Row) =>
+  html`${t.last_used_at ? time(t.last_used_at) : "Never"}${
+    t.client_name ? html`<span class="token-client"> · from ${t.client_name}</span>` : ""
+  }`;
+
+// Revoking is a person's act (the database refuses anything else) and the
+// Revoke link leads to a confirm page; scope can't be edited: revoke and
+// create another. A token is shown once, in createToken's answer only, and
+// never logged.
+export async function tokens(ctx: Ctx): Promise<Reply> {
+  const rows = await asPerson(
+    ctx.userId,
+    async (c) => (await c.query(`${SELECT} order by t.created_at desc`)).rows as Row[],
+  );
+  const live = rows.filter((t) => !t.revoked_at && !t.expired);
+  const ended = rows
+    .filter((t) => t.revoked_at || t.expired)
+    .sort((a, b) => +(b.revoked_at ?? b.expires_at) - +(a.revoked_at ?? a.expires_at));
+
+  const head = html`<thead><tr><th>Name</th><th>Type</th><th>Vaults</th><th>Access</th><th>Last used</th>`;
+  const cells = (t: Row) => html`<td>${t.name}</td>
+        <td data-label="Type" class="small">${typeOf(t)}</td>
+        <td data-label="Vaults" class="small">${scopeOf(t)}</td>
+        <td data-label="Access" class="small">${accessOf(t)}</td>
+        <td data-label="Last used" class="small"><span>${lastUse(t)}</span></td>`;
 
   return render(
     ctx,
-    "Tokens",
-    html`${pageHeader({ title: "Tokens", actions: html`<button class="primary" form="new-token">Create token</button>` })}
-    <p class="lede">A token lets one agent act as you over MCP, in the vaults you choose. A read-only agent can read, search and follow changes. A read-write agent can also write open files and propose changes. No agent can approve, change rules or manage members. <a href="/connect">How to connect an agent</a></p>
-    ${fresh
-      ? html`<div class="callout attention reveal" role="status"><strong>${fresh.name}</strong>
-          <p class="muted small">Copy it now. It won’t be shown again. Put it in your agent’s settings, never in a chat.</p>
-          <p class="secret">${fresh.token}</p></div>`
-      : ""}
+    "Connections",
+    html`${pageHeader({
+      title: "Connections",
+      description: "Everything that can act as you: tokens, apps you signed in to, and the Reliquary CLI.",
+      secondary: html`<a class="button" href="/connect">How to connect</a>`,
+      primary: html`<a class="button primary" href="/tokens/new">New token</a>`,
+    })}
+    ${live.length
+      ? html`<div class="table-wrap"><table class="token-list table-stack">${head}<th>Expires</th><th class="num"><span class="sr-only">Actions</span></th></tr></thead><tbody>
+    ${live.map(
+      (t) => html`<tr>${cells(t)}
+        <td data-label="Expires" class="small">${time(t.expires_at, { absolute: true })}</td>
+        <td class="num"><a class="button danger" href="/tokens/${t.id}/revoke" aria-label="Revoke ${t.name}">Revoke</a></td></tr>`,
+    )}</tbody></table></div>`
+      : emptyState({
+          title: "Nothing can act as you right now",
+          body: "Apps you sign in to from Claude Code, Claude.ai or ChatGPT, tokens you create, and the Reliquary CLI show here once connected.",
+          action: html`<a class="button" href="/connect">Connect an agent</a>`,
+        })}
+    ${ended.length
+      ? html`<details class="connections-ended"><summary>Expired and revoked <span class="count">${ended.length}</span></summary>
+      <p class="hint">These no longer work. They stay listed so you can see what had access, and when.</p>
+      <div class="table-wrap"><table class="token-list table-stack">${head}<th>Ended</th></tr></thead><tbody>
+    ${ended.map(
+      (t) => html`<tr class="inactive">${cells(t)}
+        <td data-label="Ended" class="small">${t.revoked_at ? html`Revoked ${time(t.revoked_at)}` : html`Expired ${time(t.expires_at)}`}</td></tr>`,
+    )}</tbody></table></div></details>`
+      : ""}`,
+    "tokens",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// New token
+
+const newCrumb = [{ label: "Connections", href: "/tokens" }, { label: "New token" }];
+
+export async function newToken(ctx: Ctx): Promise<Reply> {
+  const vaults = await asPerson(
+    ctx.userId,
+    async (c) =>
+      (
+        await c.query(
+          `select v.id, v.name from public.vaults v
+             join public.vault_members m on m.vault_id = v.id and m.user_id = $1
+            order by v.name`,
+          [ctx.userId],
+        )
+      ).rows as { id: string; name: string }[],
+  );
+  return render(
+    ctx,
+    "New token",
+    html`${pageHeader({
+      crumb: newCrumb,
+      title: "New token",
+      description: "A token lets one MCP client that can’t sign in, like Cursor, VS Code or a script, act as you.",
+      secondary: html`<a class="button quiet" href="/tokens">Cancel</a>`,
+      primary: html`<button class="primary" form="new-token">Create token</button>`,
+    })}
+    <p class="hint new-token-hint">Claude Code, Claude.ai and ChatGPT don’t need one: they sign in. See <a href="/connect">Connect</a>.</p>
     <form method="post" action="/tokens/new" class="panel token-form" id="new-token">
       ${csrfField(ctx.csrf)}
       <label for="tn">Name it after the agent and machine</label>
-      <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100">
+      <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100" autocomplete="off">
       <fieldset>
         <legend>Vaults</legend>
         <label class="choice"><input type="radio" name="scope" value="all" checked> All my vaults, including ones I join later</label>
@@ -148,23 +306,9 @@ export async function tokens(ctx: Ctx, fresh?: { name: string; token: string }):
       <select id="te" name="days" class="token-expiry">
         ${[7, 30, 90, 180, 366].map((d) => html`<option value="${d}"${d === 90 ? raw(" selected") : ""}>${d === 366 ? "1 year" : `${d} days`}</option>`)}
       </select>
-      <div class="actions"><button class="primary">Create token</button></div>
       <p class="hint">A token’s vaults and access can’t be changed later. To change them, revoke it and create another.</p>
-    </form>
-    <h2>Your tokens</h2>
-    ${rows.length === 0
-      ? html`<div class="empty">No tokens yet. <a href="/connect">Connect an agent</a> to get started.</div>`
-      : html`<div class="table-wrap"><table class="token-list"><tr><th>Name</th><th>Vaults</th><th>Access</th><th>Last used</th><th class="hide-sm">Expires</th><th></th></tr>
-    ${rows.map(
-      (t) => html`<tr${t.revoked_at || t.expired ? raw(' class="inactive"') : ""}><td>${t.name}</td>
-        <td class="small">${scope(t)}</td>
-        <td class="small">${t.kind === "cli" ? (t.env_push ? "Environment variables (reads; sends for approval)" : "Environment variables") : t.access === "write" ? "Read and write" : "Read only"}</td>
-        <td class="small">${t.last_used_at ? ago(t.last_used_at) : "Never"}${t.client_name
-          ? html`<span class="muted token-client">from ${t.client_name}</span>`
-          : ""}</td>
-        <td class="small hide-sm">${when(t.expires_at)}</td>
-        <td class="num">${status(t)}</td></tr>`,
-    )}</table></div>`}`,
+      <div class="actions"><button class="primary">Create token</button><a class="button quiet" href="/tokens">Cancel</a></div>
+    </form>`,
     "tokens",
   );
 }
@@ -178,12 +322,13 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
   const access = ctx.form.get("access") === "write" ? "write" : "read";
   const days = Number.parseInt(ctx.form.get("days") ?? "90", 10);
   if (some && ticked.length === 0) {
-    ctx.setFlash("Tick at least one vault, or choose all your vaults.");
-    return { redirect: "/tokens" };
+    ctx.setFlash("Tick at least one vault, or choose all your vaults.", "danger");
+    return { redirect: "/tokens/new" };
   }
   if (!ticked.every((v) => UUID.test(v))) return notFound(ctx);
+  let token: string;
   try {
-    const token = await asPerson(
+    token = await asPerson(
       ctx.userId,
       async (c) =>
         (
@@ -195,18 +340,80 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
           ])
         ).rows[0].t as string,
     );
-    return tokens(ctx, { name, token });
   } catch (err) {
     ctx.setFlash(message(err));
+    return { redirect: "/tokens/new" };
+  }
+  // The one time the token is shown: this answer only, never a redirect
+  // (it would have to be stored), and no form here inviting a second one.
+  return render(
+    ctx,
+    "Copy your token",
+    html`${pageHeader({
+      crumb: newCrumb,
+      title: "Copy your token",
+      primary: html`<a class="button primary" href="/tokens">Done</a>`,
+    })}
+    <div class="callout warning reveal" role="status"><strong>${name}</strong>
+      <p class="muted small">Copy it now. It won’t be shown again. Put it where your client reads secrets (an environment variable or a password prompt), never in a chat or a file an agent can read.</p>
+      <p class="secret">${token}</p></div>
+    <p>Next, set up the client: <a href="/connect?client=cursor">Cursor</a>, <a href="/connect?client=vscode">VS Code</a> or <a href="/connect?client=other">another client</a>.</p>`,
+    "tokens",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Revoke
+
+async function one(ctx: Ctx, tid: string): Promise<Row | undefined> {
+  return asPerson(ctx.userId, async (c) => (await c.query(`${SELECT} where t.id = $1`, [tid])).rows[0] as Row | undefined);
+}
+
+const again: Record<string, string> = {
+  pat: "To connect that client again, create a new token and put it where the client reads it.",
+  oauth: "To connect the app again, sign in from it again (in Claude Code: /mcp, then Authenticate).",
+  cli: "To use the CLI on that computer again, run reliquary login there.",
+};
+
+// What revoking stops, before it does: the connection by name, its type,
+// vaults, access and last use, and how to connect again.
+export async function revokePage(ctx: Ctx, tid: string): Promise<Reply> {
+  if (!UUID.test(tid)) return notFound(ctx);
+  const t = await one(ctx, tid);
+  if (!t) return notFound(ctx);
+  if (t.revoked_at || t.expired) {
+    ctx.setFlash(`${t.name} ${t.revoked_at ? "was already revoked" : "has already expired"}: it can’t act as you.`);
     return { redirect: "/tokens" };
   }
+  const who = t.kind === "pat" ? "Anything using it" : t.kind === "cli" ? "The CLI on that computer" : "The app";
+  return render(
+    ctx,
+    `Revoke ${t.name}`,
+    confirmPage({
+      crumb: [{ label: "Connections", href: "/tokens" }, { label: t.name }],
+      title: `Revoke ${t.name}?`,
+      lede: `${t.name} stops working on its next request.`,
+      consequences: [
+        `${typeOf(t)}. ${who} loses access to ${t.all_vaults ? "all your vaults" : scopeOf(t)} (${accessOf(t).toLowerCase()}).`,
+        html`Last used: ${lastUse(t)}.`,
+        again[t.kind] ?? again.pat,
+        "What it already did stays in Activity. This can’t be undone.",
+      ],
+      action: `/tokens/${t.id}/revoke`,
+      csrf: ctx.csrf,
+      button: `Revoke ${t.name}`,
+      cancel: "/tokens",
+    }),
+    "tokens",
+  );
 }
 
 export async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
   if (!UUID.test(tid)) return notFound(ctx);
   try {
+    const t = await one(ctx, tid);
     await asPerson(ctx.userId, (c) => c.query(`select public.revoke_access_token($1)`, [tid]));
-    ctx.setFlash("Token revoked. Any agent using it is cut off on its next request.");
+    ctx.setFlash(`Revoked ${t?.name ?? "the connection"}. Anything using it is cut off on its next request.`, "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
