@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { before, test } from "node:test";
 import pg from "pg";
 import { activityTable, EVENT_GROUPS, EVENT_LABELS, parseFilters } from "../dist/activity.js";
+import { describe as describeEvent } from "../dist/activity.js";
 
 const BASE = process.env.WEB_URL ?? "http://127.0.0.1:8791";
 const WEB = new URL(BASE);
@@ -164,4 +165,47 @@ test("activity labels: a row shows the label, never the stored code", () => {
     assert.ok(h.includes(`>${label}</td>`), label);
     assert.ok(!h.includes(event), `${event} shown as stored`);
   }
+});
+
+// Member and invite events in plain words (describe() in src/activity.ts).
+const ME = "00000000-0000-0000-0000-00000000000a";
+const CY = "00000000-0000-0000-0000-0000000000c1";
+const marker = (id) => new RegExp(`\\[\\[person:[0-9a-f]+:${id}\\]\\]`);
+
+test("activity members: a role change names the member and the role", () => {
+  const w = describeEvent(ME, { event: "member.set", subject: CY, role: "editor", has_role: true });
+  assert.match(w, /^Made \[\[person:[0-9a-f]+:[0-9a-f-]+\]\] an editor$/);
+  assert.match(w, marker(CY));
+  assert.equal(describeEvent(ME, { event: "member.set", subject: ME, role: "owner", has_role: true }), "Made you an owner");
+  assert.match(describeEvent(ME, { event: "member.set", subject: CY, role: "viewer", has_role: true }), / a viewer$/);
+});
+
+test("activity members: a removal says who was removed", () => {
+  const w = describeEvent(ME, { event: "member.set", subject: CY, role: null, has_role: true });
+  assert.match(w, /^Removed \[\[person:[0-9a-f]+:[0-9a-f-]+\]\] from the vault$/);
+});
+
+test("activity members: invites and cut-off connections say the role or the member", () => {
+  assert.equal(describeEvent(ME, { event: "invite.create", subject: null, role: "viewer", has_role: true }), "Invited someone as a viewer");
+  assert.equal(describeEvent(ME, { event: "invite.accept", subject: null, role: "editor", has_role: true }), "Joined by invite as an editor");
+  assert.match(describeEvent(ME, { event: "member.connection_revoke", subject: CY, role: null, has_role: false }), /^Cut off \[\[person:[^\]]+\]\]’s connection$/);
+  assert.equal(describeEvent(ME, { event: "member.connection_revoke", subject: ME, role: null, has_role: false }), "Cut off your connection");
+});
+
+test("activity members: missing or malformed detail falls back to the label, never to what the detail holds", () => {
+  const label = (e) => LABEL.get(e);
+  for (const r of [
+    { event: "member.set" },
+    { event: "member.set", subject: null, role: null, has_role: false },
+    { event: "member.set", subject: CY, role: null, has_role: false },
+    { event: "member.set", subject: "<b>x</b>", role: "editor", has_role: true },
+    { event: "member.set", subject: CY, role: "admin<script>", has_role: true },
+    { event: "invite.create", subject: null, role: "superuser", has_role: true },
+    { event: "member.connection_revoke", subject: "not-a-uuid", role: null, has_role: false },
+  ]) {
+    assert.equal(describeEvent(ME, r), label(r.event), JSON.stringify(r));
+  }
+  // Other events ignore subject and role even if a row carried them.
+  assert.equal(describeEvent(ME, { event: "file.write", subject: CY, role: "owner", has_role: true }), "Wrote");
+  assert.equal(describeEvent(ME, { event: "member.leave", subject: CY, role: "editor", has_role: true }), "Left the vault");
 });
