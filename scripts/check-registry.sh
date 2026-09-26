@@ -48,5 +48,11 @@ while IFS= read -r dup; do
   fail "$dup is used by more than one row; give one of them a new id"
 done < <(grep -oE '^\| F[0-9]+ \|' "$registry" | tr -d '| ' | sort | uniq -d)
 
+# Supabase keys migrations by the version before the first "_": two files
+# with one version would collide when pushed.
+while IFS= read -r dup; do
+  fail "two migrations share version $dup in supabase/migrations; renumber the newer one"
+done < <(ls supabase/migrations/*.sql | sed -E 's#.*/([0-9]+)_.*#\1#' | sort | uniq -d)
+
 [ $status = 0 ] && echo "registry: $(wc -l <<< "$refs") references ok, every test file mapped, $rows feature rows with docs pages"
 exit $status
