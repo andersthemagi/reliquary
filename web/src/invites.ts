@@ -13,7 +13,12 @@
 // (emails.ts, web/emails/vault-invite.html) to `to`, and return
 // { sent: true }. It must never log the link or the address.
 
+import { authMode } from "./auth.js";
 import { pool } from "./db.js";
+import { errorBody } from "./errorpage.js";
+import { failure } from "./failure.js";
+import { csrfField, html, pageHeader, when, type Raw } from "./html.js";
+import type { Ctx } from "./pages.js";
 
 export const INVITE_TOKEN = /^rli_[0-9a-f]{64}$/;
 
@@ -92,3 +97,46 @@ export const ROLE_TEXT: Record<string, string> = {
   editor: "Editor: read, write open files, propose and approve changes to canon",
   viewer: "Viewer: read only",
 };
+
+export const roleName = (r: string) => r.charAt(0).toUpperCase() + r.slice(1);
+
+// ---------------------------------------------------------------------------
+// The invite page (signed in: server.ts sends a signed-out visitor to sign
+// in and back here, and the sign-in page explains the invite). members.ts
+// inviteRoutes() serves it.
+
+export function invitePageBody(ctx: Ctx, token: string, p: Peek | undefined, me: string | null, error?: string): Raw {
+  const head = (title: string) => pageHeader({ title });
+  if (!p) {
+    // A failure like any other: what, where, why and a reference. Unknown,
+    // cut short and made-up links look the same.
+    const f = failure({ status: 404, where: "invites", why: "This link isn’t a valid invite: it may be cut short, or already replaced" });
+    return errorBody(f, { title: "Invite not found", lede: "This invite link isn’t valid. Check you copied all of it, or ask the person who invited you for a new one." });
+  }
+  if (p.state !== "pending") {
+    const why = {
+      accepted: "This invite has already been used.",
+      revoked: "This invite was withdrawn.",
+      expired: "This invite has expired: invites last 7 days.",
+    }[p.state];
+    return html`${head(`Invite to ${p.vaultName}`)}<p class="lede">${why} Ask the person who invited you for a new one.</p>
+      <p><a href="/">Your vaults</a></p>`;
+  }
+  const mine = me !== null && me === p.email;
+  return html`${head(`Join ${p.vaultName}`)}
+    ${error ? html`<p class="callout danger" role="alert">${error}</p>` : ""}
+    <p class="lede">You’ve been invited to <strong>${p.vaultName}</strong> as ${p.role === "owner" ? "an" : "a"} <strong>${roleName(p.role)}</strong>.</p>
+    <p>${ROLE_TEXT[p.role]}. The invite is valid until ${when(p.expiresAt)}.</p>
+    ${mine
+      ? html`<form method="post" action="/invite" class="actions">
+          ${csrfField(ctx.csrf)}<input type="hidden" name="token" value="${token}">
+          <button class="primary">Join ${p.vaultName}</button><a class="button quiet" href="/">Not now</a>
+        </form>`
+      : html`<div class="callout attention" role="alert">
+          <p>This invite is for <strong>${maskEmail(p.email)}</strong>, and you’re signed in as <strong>${me ?? "an account with no email"}</strong>.</p>
+          ${authMode() === "supabase"
+            ? html`<p>Sign out, then open the invite link again and sign in with the address it was sent to.</p>
+              <form method="post" action="/signout">${csrfField(ctx.csrf)}<button class="quiet">Sign out</button></form>`
+            : html`<p>Open the invite link while signed in with the address it was sent to.</p>`}
+        </div>`}`;
+}

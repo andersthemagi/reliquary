@@ -49,13 +49,13 @@ its final shape. Where a page finding touches the shell, it is marked
 | 1 | Give flash messages a tone: success, info, and **danger with `role="alert"`** for refusals, and show a refused form's error next to the form | Every message, including "Say why, so the proposer can act on it", renders as the same blue info box above the sidebar, far from the field that caused it | `html.ts` `page()`, `server.ts` (flash storage), every `ctx.setFlash(message(err))` |
 | 2 | Label every activity event; no raw codes | Activity shows `variable.set`, `variable.rotate`, `environment.create`, `proposal.comment` as they are stored, and they can't be filtered | `activity.ts` `EVENTS` |
 | 3 | Rebuild the Variables matrix: one compact status per cell and a `⋯` menu for Reveal / Rotate / Delete; Environments and Access log as tabs | 24 cells each carry three buttons and a reader sentence; the page is a wall of buttons and names break mid-word | `variablespage.ts` `list()`, `cell()` |
-| 4 | Put destructive file actions in one place: **More ▾ → Delete file… / Erase content…**, both through confirm pages; take the Delete section off the editor | Delete sits under the editor's Save; Erase sits in a More menu on another page; the difference is explained only on the Erase page | `pages.ts` `editView()`, `moreMenu()`, `vaultadmin.ts` `erasePage()` |
-| 5 | Tokens page: the list first, the form behind **New token** | The form fills the first screen; the tokens you came to check or revoke are below the fold, and the header "Create token" submits an empty form | `pages.ts` `tokens()` |
+| 4 | Put destructive file actions in one place: **More ▾ → Delete file… / Erase content…**, both through confirm pages; take the Delete section off the editor | Delete sits under the editor's Save; Erase sits in a More menu on another page; the difference is explained only on the Erase page | `files.ts` `editView()`, `moreMenu()`, `vaultadmin.ts` `erasePage()` |
+| 5 | Tokens page: the list first, the form behind **New token** | The form fills the first screen; the tokens you came to check or revoke are below the fold, and the header "Create token" submits an empty form | `access.ts` `tokens()` |
 | 6 | Show limits before the form, not after the post: disable New vault and Invite when at a limit, with the reason | At 3 of 3 vaults the New vault form is still offered and fails on submit with two messages saying the same; Members offers an invite the database will refuse | `pages.ts` `home()`, `newVault()`, `members.ts` `membersPage()` |
-| 7 | Fix the "Removes 2 of 4 lines" risk flag | Editing two lines is reported as removing them, so the one amber warning on most proposals is a false alarm and people learn to ignore it | `pages.ts` `risks()` |
+| 7 | Fix the "Removes 2 of 4 lines" risk flag | Editing two lines is reported as removing them, so the one amber warning on most proposals is a false alarm and people learn to ignore it | `proposals.ts` `risks()` |
 | 8 | Use `tabular-nums` only where numbers line up | On `body` it gives Inter's tabular hyphen, so "read-only", "Pre-alpha" and dates show a wide gap round every hyphen | `style.css` line 157 |
 | 9 | One time format: relative time with the exact UTC time in `title`, everywhere | Pages mix "6 min ago" with "2026-09-26 06:49 UTC"; the proposal meta wraps "UTC" onto its own line | `html.ts` `when()`, `pages.ts` `ago()`, `thread.ts` `ago()` (a copy) |
-| 10 | Breadcrumbs that always start at the vault, and name what you're in | The proposal page's crumb is just "Proposals"; Erase says "Acme consulting / Settings" though you came from a file; Home's title is "Reliquary" | `pages.ts` `crumbs()`, `proposalView()`, `vaultadmin.ts` `crumb()` |
+| 10 | Breadcrumbs that always start at the vault, and name what you're in | The proposal page's crumb is just "Proposals"; Erase says "Acme consulting / Settings" though you came from a file; Home's title is "Reliquary" | `files.ts` `crumbs()`, `proposals.ts` `proposalView()`, `vaultadmin.ts` `crumb()` |
 
 Ranking used below: **High** (misleads, blocks, or risks a mistake),
 **Medium** (friction a person notices), **Low** (polish). Effort **S**
@@ -166,7 +166,7 @@ The vault Activity lede ("This log can only be added to: nothing in it is
 ever edited or deleted") is a guarantee worth keeping, but as the page's
 meta line, not a paragraph.
 
-### Connect (`/connect`), `pages.ts` `connect()`
+### Connect (`/connect`), `access.ts` `connect()`
 
 **Purpose.** Hook up one specific client, quickly.
 
@@ -192,7 +192,7 @@ meta line, not a paragraph.
 | Low | S | Move "Local development" out of the product page into the docs (`docs/public/how-to/connect-other-clients.md` already exists). |
 | Low | S | Each `pre.code` gets `tabindex="0"` and `user-select: all` so one click selects the whole command. |
 
-### Tokens (`/tokens`), `pages.ts` `tokens()`, `createToken()`, `revokeToken()`
+### Tokens (`/tokens`), `access.ts` `tokens()`, `createToken()`, `revokeToken()`
 
 **Purpose.** See what can reach my vaults, revoke one, occasionally make one.
 
@@ -259,7 +259,7 @@ its content:
 | Medium | S | Rename the fieldset "Files without a rule are" with the two radios "Open (written directly)" and "Canon (changed by approved proposals)"; hint "Templates set rules for their folders; this applies to everything else." |
 | Low | M | Keep the typed name on a refused post (part of design-system step 10, form errors). |
 
-### Vault and folder pages (`/v/:id`, `/v/:id/tree?path=`), `pages.ts` `folder()`, `vaultShell()`, `crumbs()`, `ruleLine()`
+### Vault and folder pages (`/v/:id`, `/v/:id/tree?path=`), `files.ts` `folder()`, `vaultShell()`, `crumbs()`, `ruleLine()`
 
 **Purpose.** Find a file; understand the folder's rules; add something.
 
@@ -290,7 +290,7 @@ its content:
 | Medium | S | Empty state: if open proposals exist, "No files yet. 1 proposal waits to create one: Review it". |
 | Low | S | Replace "Connect an agent" on every vault with it only in the empty state; the header's secondary action becomes "Search" (a link to `/v/:id/search`) on phones where the sidebar search is hidden. |
 
-### File page (`/v/:id/file?path=`), `pages.ts` `fileView()`, `moreMenu()`
+### File page (`/v/:id/file?path=`), `files.ts` `fileView()`, `moreMenu()`
 
 **Purpose.** Read a file; know whether I can change it and how.
 
@@ -313,7 +313,7 @@ its content:
 | Low | M | Source tab: the unified diff's line-number gutter style (mono, numbers), no wrap, horizontal scroll inside the box. |
 | Low | S | History tab: no filter form when the file has fewer than 50 events. |
 
-### Edit / Propose a change (`/v/:id/edit?path=`), `pages.ts` `editView()`
+### Edit / Propose a change (`/v/:id/edit?path=`), `files.ts` `editView()`
 
 **Purpose.** Change the text and save (open) or propose (canon).
 
@@ -333,7 +333,7 @@ its content:
 | Medium | S | On canon files put "Why this change" above the textarea (one line input), so the required field is on screen with the header button. |
 | Low | S | Title "Edit ideas.md" stays; canon title "Propose a change to pricing.md" stays. |
 
-### New file (`/v/:id/new?dir=`), `pages.ts` `newFile()`
+### New file (`/v/:id/new?dir=`), `files.ts` `newFile()`
 
 - "Why (only used if this becomes a proposal)" with "New file" prefilled
   is confusing: the page knows the folder's rule.
@@ -343,7 +343,7 @@ its content:
 | Medium | S | Show the rule line for `dir` (reuse `ruleFor()`/`ruleLine()`); show the Why field only when that rule is canon, with the header button "Propose file" instead of "Create file". The path field can still move it; the post already handles either. |
 | Low | S | Placeholder `notes/standup.md` → the folder plus a name: `${dir}new-file.md`. |
 
-### Proposals list (`/v/:id/proposals`), `pages.ts` `proposalList()`
+### Proposals list (`/v/:id/proposals`), `proposals.ts` `proposalList()`
 
 **Purpose.** See this vault's proposals by state.
 
@@ -359,7 +359,7 @@ its content:
 | Medium | S | Closed rows show the outcome instead: "Applied by you · 2 days ago", "Rejected by you". |
 | Low | S | Merge "Rejected" and "Stale" into "Closed" with the state as a badge on each row; tabs become Open · Sent back · Applied · Closed. |
 
-### Proposal page (`/v/:id/proposals/:pid`), `pages.ts` `proposalView()`, `thread.ts`, `diffview.ts`
+### Proposal page (`/v/:id/proposals/:pid`), `proposals.ts` `proposalView()`, `thread.ts`, `diffview.ts`
 
 **Purpose.** Decide on a change with the evidence on screen.
 
@@ -393,7 +393,7 @@ under them, the unverified reason after. What remains:
 | Low | S | "Creates a new file" joins "New file" as a neutral badge on the page too. |
 | Low | S | Decided proposals: replace the Approvals section with the outcome line ("Rejected by you, 6 min ago") and hide the empty "No comments yet." for closed threads. |
 
-### Edit, then approve / Revise (`/proposals/:pid/edit`, `/revise`), `pages.ts` `proposalEdit()`, `proposalRevise()`
+### Edit, then approve / Revise (`/proposals/:pid/edit`, `/revise`), `proposals.ts` `proposalEdit()`, `proposalRevise()`
 
 - Crumb is "Back to the proposal", a different pattern from every other
   crumb; the title doesn't name the file.
@@ -404,7 +404,7 @@ under them, the unverified reason after. What remains:
 | Medium | S | Crumb "Acme consulting / Proposals / Change canon/pricing.md"; title "Edit, then approve pricing.md". |
 | Low | M | A collapsed `<details>` "Current file" above the editor, rendered read-only, so the approver can compare without leaving. |
 
-### Rules (`/v/:id/rules`), `pages.ts` `rules()`, `setRule()`
+### Rules (`/v/:id/rules`), `rules.ts` `rules()`, `setRule()`
 
 **Purpose.** Decide which paths are canon and how many approvals they need.
 
@@ -425,7 +425,7 @@ under them, the unverified reason after. What remains:
 | Medium | M | Remove through a confirm step listing what changes: "Files under clients/ become Open (the vault default). 2 proposals waiting there stay open." |
 | Medium | S | The table's "Set" column: "you · 6 min ago" (drop the comma). |
 
-### Search (`/v/:id/search`), `pages.ts` `search()`
+### Search (`/v/:id/search`), `rules.ts` `search()`
 
 - Good empty and no-results copy. Snippets are the file's start, not the
   match, so the query isn't visible in the result.
@@ -584,7 +584,7 @@ what can't be undone, with a typed confirmation where it matters.
 | Low | S | "blanks the text of its only version" when there is one; "all 3 versions" otherwise. |
 | Low | S | Export: drop the header button (the page is short), or the bottom one. |
 
-### Invite page (`/invite?token=`), `members.ts` `invitePageBody()`
+### Invite page (`/invite?token=`), `invites.ts` `invitePageBody()`
 
 - Invalid link: "Invite not found" and a "Your vaults" link. No reference
   code, unlike every other failure (AGENTS.md: never a failure without a
@@ -840,8 +840,10 @@ without touching the same files. Two constraints decide the order:
    now.** Package A (components) touches both, so it starts once the shell
    lands, and packages B to H use A's helpers. Packages that don't need A's
    helpers (marked *independent*) can start at once.
-2. **`pages.ts` is 1525 lines and holds six of the pages.** Package 0 splits
-   it first, as a pure refactor, so B, C and D don't collide.
+2. **`pages.ts` was 1525 lines and held six of the pages.** Package 0 split
+   it first, as a pure refactor, so B, C and D don't collide (done:
+   `files.ts`, `proposals.ts`, `access.ts`, `rules.ts`; the invite page's
+   body moved to `invites.ts`).
 
 Every package: copy changes break text assertions in `web/test`; update
 them with a `Changes-behaviour:` trailer and the `tests/features.md` row,
@@ -862,7 +864,7 @@ edit the same lines; shared component CSS is only in package A.
 | **F** | Variables: compact cells with `⋯` menu, nowrap names, sticky name column, sub-tabs, owners-only badge, import review actions at the top, badge copy, access log "—" and who cell, environment radios on Add | `web/src/variablespage.ts` | A | M |
 | **G** | Vault admin and members: settings sub-navigation, limit copy, Leave into Danger zone, invite form behind the button, full-vault state, connection rows (and the `'this computer'` client name, display-side), confirm pages for invite and connection revokes, Export single button | `web/src/vaultadmin.ts` (except `erasePage`, done in B), `web/src/members.ts`, `web/src/plans.ts` | A | M |
 | **H** | Vault creation and limits: Home as "Vaults" with the vault table and plan line, New vault at the limit, template cards, default-policy wording | `web/src/pages.ts` (`home()`, `newVault()`), `web/src/templates.ts` | 0, A; coordinate with C, which edits `review()` and the rows in `home()` (do C's `home()` change in H instead) | M |
-| **I** | Signed-out and errors: sign-in hint with request access, danger tone for bad code, "Link incomplete" and invalid invite through `errorPage()`, collapsible Copy details, landing pills and demo card | `web/src/signin.ts`, `web/src/errorpage.ts`, `web/src/landing.ts`, `web/src/members.ts` `invitePageBody()` only (coordinate with G, or move the function to `invites.ts` in package 0) | *independent* of A except the danger callout class, which exists | S |
+| **I** | Signed-out and errors: sign-in hint with request access, danger tone for bad code, "Link incomplete" and invalid invite through `errorPage()`, collapsible Copy details, landing pills and demo card | `web/src/signin.ts`, `web/src/errorpage.ts`, `web/src/landing.ts`, `web/src/invites.ts` `invitePageBody()` (moved there from `members.ts` in package 0, so G is not touched) | *independent* of A except the danger callout class, which exists | S |
 | **J** | Rules: order, number input with refusal, remove confirm, set column | `web/src/rules.ts` | 0, A; the database path validation is a separate fix (suggested as its own task) | S |
 
 **Suggested order.** Now: 0, E (labels only), I. After the shell merges: A.

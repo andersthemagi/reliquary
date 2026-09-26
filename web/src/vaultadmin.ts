@@ -15,7 +15,8 @@ import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
 import { csrfField, html, pageHeader, type Raw } from "./html.js";
-import { message, notFound, render, UUID, vault, vaultPath, vaultShell, type Ctx, type Reply, type Vault } from "./pages.js";
+import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
+import { vaultShell } from "./files.js";
 import { usageSection, vaultUsages } from "./plans.js";
 
 const q = encodeURIComponent;

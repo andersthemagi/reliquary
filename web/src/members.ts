@@ -18,19 +18,16 @@
 // and status only.
 
 import type pg from "pg";
-import { authMode } from "./auth.js";
 import { asPerson } from "./db.js";
-import { errorBody } from "./errorpage.js";
-import { failure } from "./failure.js";
 import { csrfField, html, pageHeader, raw, when, type Raw } from "./html.js";
-import { deliverInvite, INVITE_TOKEN, inviteLink, maskEmail, peekInvite, ROLE_TEXT, type Peek } from "./invites.js";
+import { deliverInvite, INVITE_TOKEN, invitePageBody, inviteLink, peekInvite, ROLE_TEXT, roleName } from "./invites.js";
 import { personRef } from "./people.js";
 import { limit, tooManyPage } from "./ratelimit.js";
-import { ago, message, notFound, render, UUID, vault, vaultPath, vaultShell, type Ctx, type Reply, type Vault } from "./pages.js";
+import { ago, message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
+import { vaultShell } from "./files.js";
 
 const ROLES = ["viewer", "editor", "owner"] as const;
 const membersPath = (id: string, rest = "") => vaultPath(id, `/config/members${rest}`);
-const roleName = (r: string) => r.charAt(0).toUpperCase() + r.slice(1);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 type Member = { user_id: string; email: string | null; role: string; added_at: Date };
@@ -364,43 +361,8 @@ export async function membersRoutes(ctx: Ctx, id: string, rest: string): Promise
 
 // ---------------------------------------------------------------------------
 // The invite page (signed in: server.ts sends a signed-out visitor to sign
-// in and back here, and the sign-in page explains the invite).
-
-function invitePageBody(ctx: Ctx, token: string, p: Peek | undefined, me: string | null, error?: string): Raw {
-  const head = (title: string) => pageHeader({ title });
-  if (!p) {
-    // A failure like any other: what, where, why and a reference. Unknown,
-    // cut short and made-up links look the same.
-    const f = failure({ status: 404, where: "invites", why: "This link isn’t a valid invite: it may be cut short, or already replaced" });
-    return errorBody(f, { title: "Invite not found", lede: "This invite link isn’t valid. Check you copied all of it, or ask the person who invited you for a new one." });
-  }
-  if (p.state !== "pending") {
-    const why = {
-      accepted: "This invite has already been used.",
-      revoked: "This invite was withdrawn.",
-      expired: "This invite has expired: invites last 7 days.",
-    }[p.state];
-    return html`${head(`Invite to ${p.vaultName}`)}<p class="lede">${why} Ask the person who invited you for a new one.</p>
-      <p><a href="/">Your vaults</a></p>`;
-  }
-  const mine = me !== null && me === p.email;
-  return html`${head(`Join ${p.vaultName}`)}
-    ${error ? html`<p class="callout danger" role="alert">${error}</p>` : ""}
-    <p class="lede">You’ve been invited to <strong>${p.vaultName}</strong> as ${p.role === "owner" ? "an" : "a"} <strong>${roleName(p.role)}</strong>.</p>
-    <p>${ROLE_TEXT[p.role]}. The invite is valid until ${when(p.expiresAt)}.</p>
-    ${mine
-      ? html`<form method="post" action="/invite" class="actions">
-          ${csrfField(ctx.csrf)}<input type="hidden" name="token" value="${token}">
-          <button class="primary">Join ${p.vaultName}</button><a class="button quiet" href="/">Not now</a>
-        </form>`
-      : html`<div class="callout attention" role="alert">
-          <p>This invite is for <strong>${maskEmail(p.email)}</strong>, and you’re signed in as <strong>${me ?? "an account with no email"}</strong>.</p>
-          ${authMode() === "supabase"
-            ? html`<p>Sign out, then open the invite link again and sign in with the address it was sent to.</p>
-              <form method="post" action="/signout">${csrfField(ctx.csrf)}<button class="quiet">Sign out</button></form>`
-            : html`<p>Open the invite link while signed in with the address it was sent to.</p>`}
-        </div>`}`;
-}
+// in and back here, and the sign-in page explains the invite). The page's
+// body is invites.ts invitePageBody().
 
 async function myEmail(ctx: Ctx): Promise<string | null> {
   return asPerson(ctx.userId, async (c) => (await c.query(`select public.my_email() as e`)).rows[0].e as string | null);

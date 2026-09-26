@@ -13,7 +13,8 @@
 
 import { asPerson } from "./db.js";
 import { csrfField, html, page, pageHeader, raw, when, type Raw } from "./html.js";
-import { ago, message, notFound, UUID, vault, vaultPath, vaultShell, who, type Ctx, type Reply, type Vault } from "./pages.js";
+import { ago, message, notFound, UUID, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
+import { vaultShell } from "./files.js";
 import { SecretsError, variablesConfigured } from "./secrets.js";
 import { failure } from "./failure.js";
 import { dotenvTooBig, parseDotenv, DOTENV_MAX_ENTRIES } from "./dotenv.js";
