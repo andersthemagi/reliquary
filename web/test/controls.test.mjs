@@ -77,7 +77,7 @@ test("proposal: the latest requested changes are shown at the top, escaped, and 
   assert.ok(feedback < at(h, 'class="diff'), "feedback before the diff");
   assert.match(h, /<blockquote class="claim">Add the &lt;b&gt;March&lt;\/b&gt; figures\.<\/blockquote>/);
   assert.doesNotMatch(h, /<b>March<\/b>/);
-  assert.match(h, /you · revision 1 · [^<]+ · <strong>revised since: this is revision 2<\/strong>/);
+  assert.match(h, /you · revision 1 · <time datetime="[^"]+" title="[^"]+ UTC">[^<]+<\/time> · <strong>revised since: this is revision 2<\/strong>/);
 });
 
 test("proposal: no feedback block when nobody asked for changes", async () => {

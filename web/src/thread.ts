@@ -8,7 +8,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
-import { csrfField, html, when, type Raw } from "./html.js";
+import { csrfField, html, time, when, type Raw } from "./html.js";
 import type { Ctx, Reply } from "./pages.js";
 import { personRef } from "./personref.js";
 
@@ -25,14 +25,6 @@ const message = refusalText;
 
 const who = (ctx: Ctx, id: string | null, agent: string | null) =>
   `${id === ctx.userId ? "you" : id ? personRef(id) : "system"}${agent ? ` via ${agent}` : ""}`;
-
-function ago(d: Date): string {
-  const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
-  if (s < 90) return "just now";
-  if (s < 5400) return `${Math.round(s / 60)} min ago`;
-  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
-  return `${Math.round(s / 86400)} days ago`;
-}
 
 const LABEL: Record<string, string> = {
   comment: "Comment",
@@ -63,7 +55,7 @@ export async function latestFeedback(c: pg.PoolClient, ctx: Ctx, p: { id: string
   if (!n) return html``;
   return html`<section class="feedback" aria-labelledby="feedback">
     <h2 id="feedback">Latest requested changes</h2>
-    <p class="small muted">${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${ago(n.at)}${
+    <p class="small muted">${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${time(n.at)}${
       p.revision > n.revision ? html` · <strong>revised since: this is revision ${p.revision}</strong>` : ""
     }</p>
     <blockquote class="claim">${n.body}</blockquote>
@@ -130,7 +122,7 @@ export async function threadSection(
 
   const timeline = entries.length
     ? html`<ol class="notes thread">${entries.map(
-        (n) => html`<li${n.agent ? html` class="by-agent"` : ""}><p class="small muted">${LABEL[n.kind] ?? n.kind} · ${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${ago(n.at)}</p>
+        (n) => html`<li${n.agent ? html` class="by-agent"` : ""}><p class="small muted">${LABEL[n.kind] ?? n.kind} · ${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${time(n.at)}</p>
           ${n.body ? html`<p>${n.body}</p>` : n.erased_at ? html`<p class="muted small">Erased.</p>` : ""}</li>`,
       )}</ol>`
     : html`<p class="muted">No comments yet.</p>`;
@@ -170,7 +162,7 @@ export async function postComment(ctx: Ctx, id: string, pid: string, notFound: (
       return true;
     });
     if (!found) return notFound();
-    ctx.setFlash("Comment added.");
+    ctx.setFlash("Comment added.", "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -192,7 +184,7 @@ export async function snooze(ctx: Ctx, id: string, pid: string, notFound: () => 
       return true;
     });
     if (!found) return notFound();
-    ctx.setFlash(choice.flash);
+    ctx.setFlash(choice.flash, "success");
     return { redirect: "/inbox" };
   } catch (err) {
     ctx.setFlash(message(err));
@@ -207,7 +199,7 @@ export async function unsnooze(ctx: Ctx, id: string, pid: string, notFound: () =
     return true;
   });
   if (!found) return notFound();
-  ctx.setFlash("Back in your inbox.");
+  ctx.setFlash("Back in your inbox.", "success");
   return { redirect: ctx.form.get("back") === "review" ? "/inbox?snoozed=1" : proposalPath(id, pid) };
 }
 
