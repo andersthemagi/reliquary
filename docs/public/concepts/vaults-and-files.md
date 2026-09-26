@@ -19,6 +19,15 @@ A file is text at a path, like `clients/acme/brief.md`. Folders are the paths' p
 - **Deleting** an open file keeps its versions and logs the deletion; the path can be used again. A canon file is deleted by an approved delete proposal.
 - **Erasing** a file blanks every version's text, for when something must be gone. Only an owner can, in person. See [Export, delete and erase](export-delete-erase.md).
 
+A path works the same on every system, so an exported vault opens safely on Windows too. A new path can't have:
+
+- a backslash (`\`): use `/` between folders;
+- any of `: * ? " < > |`;
+- a file or folder name ending in a dot or a space;
+- a file or folder named `CON`, `PRN`, `AUX`, `NUL`, `COM1` to `COM9` or `LPT1` to `LPT9`, with or without an extension (`con.md` too; `console.md` is fine).
+
+The refusal says which rule the path broke. A file saved before these rules keeps its path and can still be edited, proposed and deleted; an export puts it under `renamed/` (see [Export, delete and erase](export-delete-erase.md)).
+
 ## Reading and searching
 
 In the web app, a vault's page is its folder tree; **Search** finds files by their words and paths. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).

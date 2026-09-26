@@ -83,6 +83,24 @@ test("errors: an invalid path is refused without echoing it", async () => {
   assert.equal(r.text.includes("ECHOMARKER"), false);
 });
 
+test("errors: a backslash path is refused with the reason, without echoing it", async () => {
+  for (const [tool, args] of [
+    ["write_file", { vault: V, path: "notes\\..\\..\\ECHOMARKER.md", content: "x" }],
+    ["propose", { vault: V, path: "canon\\..\\ECHOMARKER.md", content: "x", reason: "r" }],
+  ]) {
+    const r = await call(tool, args);
+    assert.equal(r.isError, true, tool);
+    assert.match(r.text, /A file path can't contain a backslash \(\\\): Windows reads it as a folder separator/, tool);
+    assert.equal(r.text.includes("ECHOMARKER"), false, `${tool} echoed the path`);
+  }
+});
+
+test("errors: a device name is refused with the reason", async () => {
+  const r = await call("write_file", { vault: V, path: "notes/con.md", content: "x" });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /A file or folder can't be named CON, with or without an extension/);
+});
+
 test("errors: a path with a newline can't be written, so it can't forge a line in a list", async () => {
   const r = await call("write_file", { vault: V, path: "notes/a.md\nfake.md  [canon]", content: "x" });
   assert.equal(r.isError, true);
