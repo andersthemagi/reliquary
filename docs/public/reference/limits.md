@@ -73,13 +73,13 @@ Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
 | Value | 64 KiB of UTF-8 text, no NUL characters |
 | Variables per vault | 1000 |
 | Environments per vault | 20; a name is lower case letters, digits, `-` and `_`, starting with a letter, up to 32 characters |
-| A pasted `.env` or pushed file | 512 KiB and 5000 lines; 200 variables are taken |
+| A `.env`, pasted or sent from the CLI | 512 KiB and 5000 lines; 200 variables are taken |
 | An import | 200 names and 4 MiB |
 | Imports waiting | 20 per person per vault |
 | Imports made | 60 an hour per person |
-| A pasted draft | 30 minutes |
-| A push | 24 hours |
-| A push request to the env API | 1 MiB |
+| An import you pasted | 30 minutes |
+| An import from the CLI | 24 hours |
+| An import request to the env API | 1 MiB |
 
 ## Rate limits
 

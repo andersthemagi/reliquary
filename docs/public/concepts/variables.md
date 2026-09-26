@@ -4,7 +4,18 @@ A vault holds shared environment variables per environment, delivered to your pr
 
 ## Environments
 
-Every vault starts with three environments: `development`, `preview` and `production`. `production` is owners-only: only owners set or read its values. Owners can add environments (up to 20 a vault, owners-only or not), rename them, and delete them by typing the name, on the Variables page's **Environments** page. Deleting an environment destroys its values.
+Every vault starts with three environments: `development`, `preview` and `production`. `production` is owners-only: only owners set or read its values, and its column on the Variables page says **Owners only**. Owners can add environments (up to 20 a vault, owners-only or not) on the Variables page's **Environments** tab, and rename or delete one from the **⋯** menu on its row; deleting asks you to type the name, and destroys its values.
+
+## The Variables page
+
+A vault's **Variables** page has up to four tabs:
+
+- **Values**: a table with a row per variable and a column per environment. The name column stays in place while wide tables scroll sideways. On a phone each variable is a block with a line per environment.
+- **Environments** (owners): each environment, how many values it holds and who can set it.
+- **Access log** (owners and editors): see [The access log](#the-access-log).
+- **Imports** (owners and editors): imports from the CLI waiting to be applied, counted on the tab. See [Imports](imports.md).
+
+In the Values table a value reads **Set** and how long ago; hover it for who set it, the exact time and how many times it has been set. **Not set** cells offer **Set**. Each value has one **⋯** menu with **Reveal**, **Rotate** and **Delete**, for people whose role lets them.
 
 ## Who can do what
 
@@ -22,23 +33,23 @@ The database enforces this table, not the web app. See [Agents and the ceiling](
 
 Only two ways:
 
-1. **You reveal it** in the web app: **Reveal** next to one value. The value is in that one response, never in a URL, a redirect or a later page, and the reveal is logged.
+1. **You reveal it** in the web app: **Reveal** in one value's **⋯** menu. The value is in that one response, never in a URL, a redirect or a later page, and the reveal is logged.
 2. **The CLI reads it** for `reliquary run` (into one process's environment, nothing on disk) or `reliquary env pull` (into a `.env` file that git ignores, mode 600). Each read is logged, naming every variable read. See [Use the CLI](../how-to/use-the-cli.md).
 
 No MCP tool, log line, activity event, error message or email carries a value.
 
 ## Setting values
 
-On the vault's **Variables** page, **Add a variable**: a name, an environment and a value. **Rotate** replaces a value (its version goes up by one), and **Delete** removes it after a confirm step. To bring in many at once, paste a `.env` or push one from the CLI: see [Imports](imports.md).
+On the vault's **Variables** page, **Add a variable**: a name, an environment (environments your role can't set are shown but can't be chosen) and a value. **Rotate** replaces a value, and **Delete** removes it after a confirm step. To bring in many at once, paste a `.env` with **Import .env** or send one from the CLI with `reliquary env push`: see [Imports](imports.md).
 
 - Names are shell-style: a letter or `_`, then letters, digits or `_`, up to 128 characters. Names that change how programs start, like `PATH`, `NODE_OPTIONS`, anything starting `LD_` or `NPM_CONFIG_`, Windows' `COMSPEC` and `PATHEXT`, or trust settings like `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE`, are refused. A variable that already has such a name stays readable but can't be set again.
 - A value is text up to 64 KiB, without NUL characters. A vault holds at most 1000 variables.
 
 ## The access log
 
-**Variables**, **Access log** lists every set, rotate, delete, read, reveal and refused attempt: who, when, which variables, and from which client (the web app, the CLI, or an agent). Owners and editors can read it; viewers can't. Nobody can edit or delete a row, including the owner and Reliquary's operator. It is kept as long as the vault exists.
+The **Access log** tab on the Variables page lists every set, rotate, delete, read, reveal and refused attempt: when, who and from which client (the web app, the CLI, or an agent), what, which variables and which environment. Owners and editors can read it; viewers can't. Nobody can edit or delete a row, including the owner and Reliquary's operator. It is kept as long as the vault exists.
 
-Next to each value, the Variables page shows who has read or revealed it since it was last set, with a link to revoke their sign-in. When you rotate a leaked value, that tells you whose copies are old.
+A value that someone has read or revealed since it was last set is marked **Read since set** (or **Revealed since set**) in the Values table. Its **⋯** menu names who, and after a CLI read offers **Manage CLI sign-ins** to revoke one. When you rotate a leaked value, that tells you whose copies are old.
 
 ## Encryption
 

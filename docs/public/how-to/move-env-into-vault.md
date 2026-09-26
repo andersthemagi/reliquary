@@ -4,7 +4,7 @@ Bring a project's existing `.env` into a vault, by paste or with `reliquary env 
 
 You need to be an owner or editor of the vault (editors can't set owners-only environments like `production`).
 
-## Option A: push it from the project
+## Option A: send it from the project
 
 From the project's directory, after [signing the CLI in](use-the-cli.md#sign-in) with **Also let it send .env files here** ticked:
 
@@ -22,9 +22,9 @@ On the vault's **Variables** page, choose **Import .env**, paste the file's cont
 
 ## Apply it
 
-Open the approval link (or the notice on the Variables page, or your **Inbox**). The preview lists each name, whether it is new or replaces a value, and the lines not taken, never a value. Choose **Apply**. Each variable is set as you and logged.
+Open the approval link (or the Variables page's **Imports** tab, or your **Inbox**). The review page lists each name, **New** or **Replaces a value**, and the lines not taken, never a value. Choose **Apply** at the top of the page. Each variable is set as you and logged.
 
-A push waits 24 hours for a decision, a paste 30 minutes; after that it expires and nothing is set. See [Imports](../concepts/imports.md).
+An import from the CLI waits 24 hours for a decision, one you pasted 30 minutes; after that it expires and nothing is set. See [Imports](../concepts/imports.md).
 
 ## Switch the project over
 

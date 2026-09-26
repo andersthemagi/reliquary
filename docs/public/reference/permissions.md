@@ -46,12 +46,12 @@ What people and their agents can each do, where, and who may: every rule here is
 |---|---|---|---|
 | List names, environments, who set them | **Variables** | `list_variables` | both |
 | Set, rotate or delete a value | **Variables** | none | person: owners everywhere, editors outside owners-only environments |
-| Reveal one value | **Reveal** | none | person, same as setting |
+| Reveal one value | a value's **⋯** menu, **Reveal** | none | person, same as setting |
 | Use values in a process | none | none | person, through the CLI: `reliquary run`, `reliquary env pull` |
-| Import a `.env` | **Import .env** | none (an agent runs `reliquary env push`) | a person applies; a CLI sign-in allowed to push sends |
-| Apply or reject a push | the import's page | none | person, owners and editors |
-| Add, rename or delete environments | **Environments** | none | person, owners |
-| Read the access log | **Access log** | none | owners and editors |
+| Import a `.env` | **Import .env** | none (an agent runs `reliquary env push`) | a person applies; a CLI sign-in allowed to send `.env` files sends |
+| Apply or reject an import | the import's page (from the **Imports** tab) | none | person, owners and editors |
+| Add, rename or delete environments | the **Environments** tab | none | person, owners |
+| Read the access log | the **Access log** tab | none | owners and editors |
 
 ## Roles at a glance
 
