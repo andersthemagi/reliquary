@@ -6,7 +6,7 @@ All three are in the [ceiling](agents.md): no agent or token can do them.
 
 ## Export a vault
 
-On **Settings**, **Export**, an owner downloads the vault as a `.tar.gz`:
+On **Settings**, **Export**, an owner chooses **Download export** to get the vault as a `.tar.gz`:
 
 - `files/`: the current text of every live file, at its path.
 - `reliquary-export.json`: the vault, its default policy and rules, variable names with the environments that have a value, and each file's SHA-256 and size.
@@ -17,7 +17,7 @@ Not yet in the export: earlier versions, proposals and the log.
 
 ## Delete a vault
 
-On **Settings**, **Danger zone**, an owner deletes a vault by typing its name. Deletion is immediate and can't be undone: files, versions, proposals, comments, rules, members, invites, variables and both logs are gone. Only who deleted it, when, and counts are kept, without the vault's name.
+On **Settings**, **Danger zone**, an owner chooses **Delete vault** and deletes it by typing its name. Deletion is immediate and can't be undone: files, versions, proposals, comments, rules, members, invites, variables and both logs are gone. Only who deleted it, when, and counts are kept, without the vault's name.
 
 Every other member sees a one-time notice on Home ("<name> was deleted by <email> on <date>") within 30 days. Tokens that reached only that vault are revoked. Export first if you might need anything.
 
