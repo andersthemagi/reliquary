@@ -22,36 +22,19 @@ import {
   type Reply,
 } from "./pages.js";
 import { latestFeedback, rowSnooze, snoozeControl, threadSection } from "./thread.js";
+import { risks } from "./risk.js";
 
-// ---------------------------------------------------------------------------
-// Risk: facts about a change that deserve a closer look. Computed from the
-// change itself, never from what the agent says about it.
-
-export function risks(
-  p: { kind: string; body: string | null; current_body: string | null; revision: number },
-  extra: string[] = [],
-): string[] {
-  const out: string[] = [];
-  if (p.kind === "delete") out.push("Deletes the file");
-  const before = (p.current_body ?? "").split("\n").filter((l) => l.trim());
-  const after = new Set((p.kind === "delete" ? "" : p.body ?? "").split("\n"));
-  const removed = before.filter((l) => !after.has(l)).length;
-  if (p.kind !== "delete" && before.length >= 4 && removed / before.length >= 0.5)
-    out.push(`Removes ${removed} of ${before.length} lines`);
-  if (p.current_body === null && p.kind !== "delete") out.push("Creates a new file");
-  if (p.revision > 1) out.push(`Revised ${p.revision - 1} time${p.revision > 2 ? "s" : ""}; earlier approvals don’t count`);
-  return [...out, ...extra];
-}
+export { risks } from "./risk.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
   // A new file is shown as a neutral label; only real risks get the amber badge.
-  const r = risks(p).filter((x) => x !== "Creates a new file");
+  const r = risks(p);
   const verb = p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
   return html`<li>
     <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${verb} ${p.path}</a>
       <span class="muted small"> · ${showVault ? `${p.vault} · ` : ""}by ${who(ctx, p.proposed_by, p.agent)} · ${ago(p.created_at)}</span></span>
-    <span class="row-end small">${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${r.length ? html`<span class="badge attention risk-count" title="${r.join("; ")}">${r[0]}${r.length > 1 ? ` +${r.length - 1} more` : ""}</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
+    <span class="row-end small">${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${r.length ? html`<span class="badge attention risk-count" title="${r.map((x) => x.long).join(" ")}">${r[0].short}${r.length > 1 ? ` +${r.length - 1} more` : ""}</span> ` : ""}<span class="muted">${p.approvals} of ${p.quorum}</span>${
       snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : ""
     }</span>
   </li>`;
@@ -155,7 +138,10 @@ export async function proposalView(ctx: Ctx, id: string, pid: string): Promise<R
     const approvers = approvals.filter((a) => a.decision === "approve");
     const mine = approvals.some((a) => a.user_id === ctx.userId);
     const flags = p.status === "open" || p.status === "changes_requested"
-      ? risks(p, firstFromAgent ? [`First proposal from ${p.agent} in this vault`] : [])
+      ? risks(
+          p,
+          firstFromAgent ? [{ short: `First proposal from ${p.agent}`, long: `First proposal from ${p.agent} in this vault.` }] : [],
+        )
       : [];
     const decidable = canWrite(v) && p.status === "open" && !mine;
     const rejectable = canWrite(v) && (decidable || p.status === "changes_requested");
@@ -212,7 +198,11 @@ export async function proposalView(ctx: Ctx, id: string, pid: string): Promise<R
           ? html`<p class="callout info">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
           : ""}
         ${feedback}
-        ${flags.length ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map((f) => html`<li class="badge attention">${f}</li>`)}</ul>` : ""}
+        ${flags.length || verb === "Create"
+          ? html`<ul class="risks" aria-label="Worth a closer look">${verb === "Create" ? html`<li class="badge">New file</li>` : ""}${flags.map(
+              (f) => html`<li class="badge attention" title="${f.long}">${f.short}</li>`,
+            )}</ul>`
+          : ""}
         ${status}${controls}${snoozeForm}
       </div>
 

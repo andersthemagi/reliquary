@@ -143,7 +143,7 @@ test("review: every waiting row carries one Snooze menu with three choices", asy
 test("review: a row's risk badge names the first reason, not a bare count", async () => {
   const h = await page("/inbox");
   assert.doesNotMatch(h, /\d+ to check/);
-  assert.match(h, /<span class="badge attention risk-count" title="[^"]+">(Deletes the file|Removes \d+ of \d+ lines|Revised [^<]+|First proposal [^<]+)( \+\d+ more)?<\/span>/);
+  assert.match(h, /<span class="badge attention risk-count" title="[^"]+">(Deletes the file|Removes \d+ of \d+ lines|Rewrites \d+ of \d+ lines|Revised [^<]+|First proposal [^<]+)( \+\d+ more)?<\/span>/);
   // Creating a file is not a risk: a neutral label, never the amber badge.
   assert.match(h, /<span class="badge">New file<\/span>/);
   assert.doesNotMatch(h, /risk-count"[^>]*>Creates a new file/);
