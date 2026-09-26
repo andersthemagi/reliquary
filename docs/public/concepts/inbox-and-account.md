@@ -14,7 +14,7 @@ On a phone the links take a row of their own under the bar, and the search box f
 
 ## Search
 
-The search box looks through file names and text in every vault you're in, and nothing else. Results show each file's vault and whether it is canon or open. Use quotes for a phrase, or `or` between words. To search one vault, use the search in its sidebar. Agents search one vault at a time with the `search` tool; see [MCP tools](../reference/mcp-tools.md#search).
+The search box looks through file names and text in every vault you're in, and nothing else. Results show each file's vault and whether it is canon or open. Use quotes for a phrase, or `or` between words. To search one vault, use the search in its sidebar: its page says which vault it covers and has **Search all vaults** to look everywhere with the same words. Agents search one vault at a time with the `search` tool; see [MCP tools](../reference/mcp-tools.md#search).
 
 ## Inbox
 

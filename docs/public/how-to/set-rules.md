@@ -4,16 +4,22 @@ Make a folder or file canon (changes need approval) or open (written directly), 
 
 Only an owner can set rules, in the web app. What rules mean: [Canon, open and rules](../concepts/canon-and-rules.md).
 
+## See the rules
+
+Open the vault, then **Settings**, **Rules**. The table lists every rule in folder order: a folder's rule, then the rules inside it. Under each path it says whether the rule is on a folder or a file, and which rule it overrides. **Approvals needed** is shown for canon rules; **Set by** says who saved the rule and when (hover the time for the exact time).
+
 ## Add or change a rule
 
-1. Open the vault, then **Settings**, **Rules**.
+1. On **Rules**, choose **Add rule** at the top.
 2. Under **Add or change a rule**, fill in:
    - **Path or folder**: a folder ends in `/`, like `clients/`; a file is its full path, like `pricing.md`.
    - **Policy**: **Canon** or **Open**.
-   - **Approvals**: for canon, how many different people must approve a change, from 1 to 20.
+   - **Approvals needed**: for canon, how many different people must approve a change, a whole number from 1 to 20. Open rules don't use it.
 3. Choose **Save rule**.
 
-Saving a rule for a path that already has one replaces it. The change is logged.
+To change an existing rule, open the **⋯** menu on its row and choose **Change**: the form opens with the rule filled in. Saving a rule for a path that already has one replaces it. The change is logged.
+
+If **Approvals needed** isn't a whole number from 1 to 20, the form refuses it and says why, with a reference; nothing is saved.
 
 A rule's path is a path inside the vault, written the way files are. The form refuses, and says why, a path that:
 
@@ -30,7 +36,9 @@ Under **What applies to a path?**, type any path, like `clients/acme/brief.md`, 
 
 ## Remove a rule
 
-Choose **Remove** next to it. The path then follows the next rule up, or the vault default.
+1. Open the **⋯** menu on the rule's row and choose **Remove**.
+2. Read what changes: which rule the path follows next (the next rule up, or the vault default), how many files change policy, which rules inside it stay, and any proposals waiting there.
+3. Choose **Remove the rule on** followed by the path, or **Cancel**.
 
 A rule saved before paths were checked, on a path like `../x`, never applied to any file. You can still remove it.
 

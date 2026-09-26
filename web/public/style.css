@@ -1530,3 +1530,22 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
   table.activity .ev-vault::before, table.activity .path-cell::before { content: "·"; margin-right: var(--space-2); color: var(--fg-muted); }
   table.activity .ev-vault a, table.activity .path-cell a { font-weight: 500; }
 }
+
+/* Package J: rules */
+/* Rules table (rules.ts): the path in mono, with what it covers and the
+   rule it overrides on a quiet line under it; policy and actions keep one
+   width; "Set by" never breaks between the name and the time. */
+.rules-table .rule-path { overflow-wrap: anywhere; }
+.rules-table .rule-scope { display: block; margin-top: var(--space-1); color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.rules-table .rule-scope code { font-size: inherit; }
+.rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }
+.rules-table .rule-actions .action-list { min-width: 240px; }
+.rule-form { scroll-margin-top: var(--space-10); }
+.rule-form .hint + .hint { margin-top: var(--space-1); }
+.rule-check .result { margin: var(--space-3) 0 0; }
+.rules-help { margin-top: var(--space-5); }
+@media (max-width: 640px) {
+  .rules-table td:nth-child(2), .rules-table .rule-actions { width: auto; }
+  .rules-table .rule-actions { text-align: left; }
+  .rules-table .rule-actions .action-list { min-width: 0; width: min(16rem, calc(100vw - 2 * var(--space-5))); left: 0; right: auto; }
+}

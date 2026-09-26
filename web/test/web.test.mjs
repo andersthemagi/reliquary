@@ -202,7 +202,7 @@ test("rules: owner adds a rule, the checker explains it, and it can be removed",
   const token = await csrf(`${V}/rules`);
   await post(`${V}/rules`, { csrf: token, path: "clients/", policy: "canon", quorum: "2" });
   const checked = await page(`${V}/rules?check=clients%2Facme%2Fbrief.md`);
-  assert.match(checked, /is <span class="badge policy canon">Canon<\/span> from the rule on <code>clients\/<\/code>, and changes need 2 approvals/);
+  assert.match(checked, /is <span class="badge policy canon"[^>]*>Canon<\/span> from the rule on <code>clients\/<\/code>, and changes need 2 approvals/);
   await post(`${V}/rules`, { csrf: token, path: "clients/", policy: "" });
   assert.match(await page(`${V}/rules?check=clients%2Facme%2Fbrief.md`), /by the vault default/);
 });
@@ -217,7 +217,7 @@ test("rules: a path outside the vault is refused in the form, with the reason an
     /<p class="callout danger" role="alert" id="rule-error">The rule on &quot;..\/x&quot; has a .. segment, which points outside the vault: name the folder or file inside the vault, like clients\/\. \(ref [0-9a-f]{8}\)<\/p>/,
   );
   assert.match(h, /name="path" placeholder="clients\/" required value="..\/x" aria-invalid="true"/, "the typed path is kept");
-  assert.match(h, /name="quorum" value="3"/, "the typed approvals are kept");
+  assert.match(h, /name="quorum" min="1" max="20" step="1" required value="3"/, "the typed approvals are kept");
   assert.doesNotMatch(h, /is now canon/);
   assert.doesNotMatch(await page(`${V}/rules`), /<td><code>..\/x<\/code>/, "no rule was saved");
   for (const path of ["/x", "a//b/", "./a/"]) {
