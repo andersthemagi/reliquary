@@ -17,4 +17,4 @@ In a chat, turn the Reliquary connector on from the tools menu, then ask, for ex
 
 ## Change or remove it
 
-Revoke the connection on Reliquary's **Tokens** page; Claude shows it as disconnected and you can connect again with different vaults or access. To remove the connector, delete it in Claude's **Settings**, **Connectors**.
+Revoke the connection on Reliquary's **Connections** page; Claude shows it as disconnected and you can connect again with different vaults or access. To remove the connector, delete it in Claude's **Settings**, **Connectors**.

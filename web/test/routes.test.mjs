@@ -33,6 +33,8 @@ const pages = [
   ["/activity", "activity across my vaults"],
   ["/connect", "connect a client"],
   ["/tokens", "tokens"],
+  ["/tokens/new", "new token"],
+  ["/connect?client=cursor", "connect, one client's tab"],
   ["/vaults/new", "new vault"],
   [V, "vault root folder"],
   [`${V}/tree?path=notes`, "folder"],

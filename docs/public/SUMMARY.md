@@ -17,7 +17,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Proposals and review](concepts/proposals-and-review.md)
 - [The top bar, inbox and account](concepts/inbox-and-account.md)
 - [Agents and the ceiling](concepts/agents.md)
-- [Tokens, connections and sign-ins](concepts/connections.md)
+- [Connections](concepts/connections.md)
 - [Environment variables](concepts/variables.md)
 - [Imports](concepts/imports.md)
 - [Members and invites](concepts/members.md)

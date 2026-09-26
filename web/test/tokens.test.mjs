@@ -42,7 +42,7 @@ before(async () => {
 });
 
 test("form: name, my vaults to tick, read or read-write, and a required expiry", async () => {
-  const h = await page("/tokens");
+  const h = await page("/tokens/new");
   assert.match(h, /name="scope" value="all" checked/);
   assert.match(h, new RegExp(`type="checkbox" name="vault" value="${TEAM_VAULT}"> Team`));
   assert.doesNotMatch(h, /Dee private/);
@@ -60,7 +60,7 @@ test("create: a read-only token for one vault, shown once", async () => {
   const h = await page("/tokens");
   assert.doesNotMatch(h, /rlq_[0-9a-f]{64}/);
   const tr = row(h, "Scoped reader");
-  assert.match(tr, /<td class="small">Team<\/td>/);
+  assert.match(tr, /<td data-label="Vaults" class="small">Team<\/td>/);
   assert.match(tr, /Read only/);
   assert.match(tr, /Never/);
   const in30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
@@ -78,7 +78,7 @@ test("create: read and write, all vaults", async () => {
 test("create: a ticked vault narrows the token even if 'all' is still selected", async () => {
   await create([["name", "Mixed signals"], ["scope", "all"], ["vault", TEAM_VAULT], ["access", "read"], ["days", "30"]]);
   const tr = row(await page("/tokens"), "Mixed signals");
-  assert.match(tr, /<td class="small">Team<\/td>/);
+  assert.match(tr, /<td data-label="Vaults" class="small">Team<\/td>/);
   assert.doesNotMatch(tr, /All your vaults/);
 });
 
@@ -131,8 +131,8 @@ test("list: a vault the person has left drops out of the token's scope", async (
 
 test("revoke: a scoped token is revoked like any other", async () => {
   const h = await page("/tokens");
-  const id = new RegExp(`<td>Scoped reader</td>[\\s\\S]*?action="/tokens/([0-9a-f-]{36})/revoke"`).exec(h)[1];
+  const id = new RegExp(`<td>Scoped reader</td>[\\s\\S]*?href="/tokens/([0-9a-f-]{36})/revoke"`).exec(h)[1];
   const r = await post(`/tokens/${id}/revoke`, [["csrf", await csrf()]]);
-  assert.match(await follow(r), /Token revoked/);
+  assert.match(await follow(r), /Revoked Scoped reader\./);
   assert.match(row(await page("/tokens"), "Scoped reader"), /Revoked/);
 });

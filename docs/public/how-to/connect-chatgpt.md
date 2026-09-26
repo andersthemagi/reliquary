@@ -16,4 +16,4 @@ Turn the connector on in a chat and ask, for example: `Using Reliquary, list the
 
 ## Change or remove it
 
-Revoke the connection on Reliquary's **Tokens** page, and delete the connector in ChatGPT's settings. Connect again to choose different vaults or access.
+Revoke the connection on Reliquary's **Connections** page, and delete the connector in ChatGPT's settings. Connect again to choose different vaults or access.

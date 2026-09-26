@@ -32,7 +32,7 @@ Start Claude Code, run `/mcp`, choose **reliquary**, then **Authenticate**. Your
 2. Choose **Read and write**, so the agent can propose changes.
 3. Choose **Allow**.
 
-Claude Code keeps the connection and refreshes it by itself. It shows on your **Tokens** page, where you can revoke it at any time.
+Claude Code keeps the connection and refreshes it by itself. It shows on your **Connections** page, where you can revoke it at any time.
 
 ## 4. Let your agent propose a file
 

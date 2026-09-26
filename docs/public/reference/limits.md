@@ -47,7 +47,7 @@ Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
 | OAuth and CLI refresh tokens | 30 days, renewed on each use, never beyond a year from consent |
 | An OAuth authorization code | one use, within 60 seconds |
 | Web sign-in code | 6 digits, from an email |
-| "Last used" on the Tokens page | updated at most once a minute |
+| "Last used" on the Connections page | updated at most once a minute |
 
 ## Members
 

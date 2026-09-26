@@ -10,7 +10,7 @@ Reliquary identifies clients by a Client ID Metadata Document (an https URL); th
 
 ## With a token
 
-1. Create a token on the **Tokens** page with the vaults and access the client needs. Copy it; it is shown once.
+1. On the **Connections** page, choose **New token** and create a token with the vaults and access the client needs. Copy it; it is shown once.
 2. Configure the client with the MCP URL and this header, reading the token from wherever the client keeps secrets:
 
    ```text
