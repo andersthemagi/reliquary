@@ -2,7 +2,8 @@
 # (neither pasta nor slirp4netns is installed), so containers can't share a
 # network of their own: every service joins the host's network instead,
 # listening on loopback on the test slot's ports, and the names db, auth and
-# web become 127.0.0.1:<port>. Everything else is compose.yml as shipped.
+# web become 127.0.0.1:<port> (for the email templates, deploy/test.sh sets
+# EMAIL_TEMPLATES_URL). Everything else is compose.yml as shipped.
 # Used with compose.test.yml. CI (docker) runs the real, bridged network.
 
 services:
@@ -24,8 +25,6 @@ services:
       API_EXTERNAL_URL: http://127.0.0.1:${T_AUTH:?}
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${AUTH_DB_PASSWORD}@127.0.0.1:${T_PG:?}/postgres?sslmode=disable
       GOTRUE_JWT_ISSUER: http://127.0.0.1:${T_AUTH:?}
-      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://127.0.0.1:${T_WEB:?}/_selfhost/email/sign-in.html
-      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: http://127.0.0.1:${T_WEB:?}/_selfhost/email/confirm.html
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${T_AUTH:?}/health"]
   migrate:

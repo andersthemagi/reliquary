@@ -256,21 +256,30 @@ value. It never uses a Supabase key that bypasses RLS.
   Either way, only the account whose email is the invite's can accept it.
 - **Authentication, URL Configuration**: Site URL = `PUBLIC_URL` (e.g.
   `https://app.<domain>`); Redirect URLs: that origin only.
-- **Authentication, Emails, Templates, Magic link** (the template Supabase
-  uses for sign-in by email): include both the code and our link, e.g.
+- **Authentication, Emails** (every email Supabase sends): paste
+  Reliquary's templates, `emails/*.html`, written by `emails/build.mjs` (the
+  one source; self-hosted instances serve the same files, `src/selfhost.ts`).
+  `scripts/email-templates.sh` lists each with its place and subject;
+  `scripts/email-templates.sh <id>` copies one to the clipboard. For each:
+  1. **Templates** tab: Confirm sign up, Invite user, Magic link or OTP,
+     Change email address, Reset password, Reauthentication. Open it, set
+     **Subject** to the script's subject, switch the body to **Source**,
+     replace everything with the file, **Save changes**.
+  2. **Security notifications** (same page): Password changed, Email
+     address changed, Phone number changed, Sign-in method linked,
+     Sign-in method removed, Verification method added, Verification
+     method removed. Turn each on, then set its subject and body the same way.
 
-  ```html
-  <h2>Sign in to Reliquary</h2>
-  <p>Your code: <strong>{{ .Token }}</strong></p>
-  <p>Or <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">sign in on this device</a>.</p>
-  <p>If you didn't ask for this, ignore this email.</p>
-  ```
-
-  Not `{{ .ConfirmationURL }}`: that goes through Supabase's own verify
-  endpoint and returns tokens in a URL fragment, which a server can't read.
-  With sign-ups on, a new invitee's first email uses the **Confirm signup**
-  template instead: give it the same code and link (`type=email` verifies
-  both).
+  What they carry: the sign-in emails (Magic link, Confirm sign up) a
+  6-digit code and a link to our `/auth/confirm?token_hash={{ .TokenHash }}&type=email`;
+  Invite user and Reset password the same link (Reliquary has no
+  passwords, so a reset signs in); Change email address
+  `type=email_change`. Never `{{ .ConfirmationURL }}`: that goes through
+  Supabase's own verify endpoint and returns tokens in a URL fragment,
+  which a server can't read. The emails say a code works "within 10
+  minutes": keep **Email OTP expiration** at 600 seconds, or change the
+  words in `emails/build.mjs` (then `node emails/build.mjs`, in the node
+  image, and paste again). `test/emails.test.mjs` checks them.
 - **Authentication, Emails, SMTP Settings**: custom SMTP (the built-in
   sender reaches only the project team, 2 emails an hour); turn off link
   tracking at the provider, which would rewrite the link.
@@ -282,7 +291,8 @@ value. It never uses a Supabase key that bypasses RLS.
   vault memberships use; the Members page shows their email from here.
 - **Email for invites**: none yet. An owner copies the invite link from the
   Members page and sends it themself; `deliverInvite` in `src/invites.ts`
-  is where a sender goes once the product domain has SMTP.
+  is where a sender goes once the product domain has SMTP. Its email is
+  ready: `vaultInviteEmail()` in `src/emails.ts` (`emails/vault-invite.html`).
 
 ### Tests
 

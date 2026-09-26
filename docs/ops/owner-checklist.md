@@ -46,29 +46,33 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
      its `test` checks and releases trigger `deploy` and `publish-cli`
      directly; without it the `release` workflow starts them itself.
    - Cut v0.1.0 once, by hand (runbook, "The first release").
-3. **`reliquary login` again**, ticking "also let it send .env files", so
+3. **Email templates**: paste Reliquary's 13 templates into Supabase
+   (Authentication > Emails: the Templates tab and Security notifications,
+   turning those on). `scripts/email-templates.sh` lists them and copies
+   each; steps in `docs/ops/runbook.md`, "Email templates".
+4. **`reliquary login` again**, ticking "also let it send .env files", so
    `reliquary env push` works.
 
 ## Decide
 
-4. **CLI licence** (`cli/package.json` says `UNLICENSED`, which makes a
+5. **CLI licence** (`cli/package.json` says `UNLICENSED`, which makes a
    public package unusable), then publish: create the `@reliquary-ai` npm
    scope, add the `NPM_TOKEN` secret, then Actions > publish-cli > Run
    workflow from tag `cli-v0.1.0` (cut with v0.1.0). Later CLI versions
    publish when their "Release cli vX.Y.Z" pull request is merged. If the repo
    stays private, drop provenance (see `cli/README.md`).
-5. **Pricing**: keep "free for 1 to 10 people" or adopt
+6. **Pricing**: keep "free for 1 to 10 people" or adopt
    `docs/research/positioning.md` section 5. The landing page reads its
    numbers from `PRICING` in `web/src/site.ts`.
-6. **Sign-ups**: on (anyone can make an account; invites work by link) or
-   off (add each invitee in Supabase first). If on, edit the "Confirm
-   signup" email template like the magic link one (`web/README.md`).
-7. **Email sender** on a subdomain (e.g. `notify.redmage.cc`; an EU sender
+7. **Sign-ups**: on (anyone can make an account; invites work by link) or
+   off (add each invitee in Supabase first). Either way the "Confirm sign
+   up" template is one of the pasted ones (Do next, 3).
+8. **Email sender** on a subdomain (e.g. `notify.redmage.cc`; an EU sender
    keeps data in the EU), then SMTP in Supabase Auth and `deliverInvite()`
    in `web/src/invites.ts`; add it to `/subprocessors`.
-8. **Legal placeholders** in `OPERATOR` in `web/src/site.ts`, and a legal
+9. **Legal placeholders** in `OPERATOR` in `web/src/site.ts`, and a legal
    review before the "Draft" labels come off.
-9. **Milestone 3 (shared connections)**: starts after milestone 2's week of
+10. **Milestone 3 (shared connections)**: starts after milestone 2's week of
    real use (no local `.env` files; `reliquary run` instead), per
    `AGENTS.md`.
 

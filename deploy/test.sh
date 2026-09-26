@@ -104,6 +104,8 @@ PUBLIC_URL=http://127.0.0.1:$T_WEB MCP_RESOURCE=http://127.0.0.1:$T_MCP/mcp \
   echo "RELIQUARY_TAG=$tag"
   echo "GIT_COMMIT=$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo unknown)"
   for v in T_PG T_AUTH T_WEB T_MCP T_SMTP T_MAILAPI; do echo "$v=${!v}"; done
+  # On the host's network, Auth finds the web app's email templates on loopback.
+  if [ "$network" = host ]; then echo "EMAIL_TEMPLATES_URL=http://127.0.0.1:$T_WEB/_selfhost/email"; fi
 } >>"$envfile"
 
 echo "== build"

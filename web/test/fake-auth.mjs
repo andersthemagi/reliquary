@@ -3,7 +3,8 @@
 // web/test.sh runs it next to the servers.
 //
 //   POST /auth/v1/otp                            records a code and a token hash
-//   POST /auth/v1/verify                         { type: "email", email, token } or { type: "email", token_hash }
+//   POST /auth/v1/verify                         { type: "email", email, token } or { type: "email", token_hash },
+//                                                or { type: "email_change", token_hash }
 //   POST /auth/v1/token?grant_type=refresh_token rotates; reusing a used refresh token revokes the session
 //   POST /auth/v1/logout                         revokes the bearer's session
 //   GET  /auth/v1/.well-known/jwks.json          the public key (ES256, generated at start)
@@ -17,6 +18,11 @@
 //                                 makes an account for an unknown address (off at start,
 //                                 as in the hosted project)
 //   GET  /_user?email=...         { id } of that account, or null
+//   POST /_email_change           { email, new_email, both }: as if that account asked to
+//                                 change its address; the token hashes "emailed" to the
+//                                 new address and, with both (secure email change), the
+//                                 current one (an unknown address gets an account first).
+//                                 Verifying one of two answers a message only.
 //
 // /otp with create_user: true (sent only for an invited address) signs in an
 // existing account, or with sign-ups on makes one; otherwise it refuses as
@@ -53,6 +59,7 @@ function signJwt(header, claims) {
 }
 
 const pending = []; // { email, code, hash, used }
+const changes = []; // { pair, email, newEmail, hash, used }
 const lastEmail = new Map();
 const refreshTokens = new Map(); // token -> { sessionId, sub, email, used }
 const revoked = new Set(); // session ids
@@ -103,6 +110,18 @@ http
       const id = USERS.get(String(url.searchParams.get("email") ?? "").toLowerCase());
       return json(res, 200, id ? { id } : null);
     }
+    if (p === "/_email_change" && req.method === "POST") {
+      const { email, new_email, both } = await readJson(req);
+      if (!USERS.has(email)) USERS.set(email, randomUUID()); // a fresh account, so tests don't touch others
+      const pair = randomUUID();
+      const out = { token_hash_new: randomBytes(28).toString("hex") };
+      changes.push({ pair, email, newEmail: new_email, hash: out.token_hash_new, used: false });
+      if (both) {
+        out.token_hash_current = randomBytes(28).toString("hex");
+        changes.push({ pair, email, newEmail: new_email, hash: out.token_hash_current, used: false });
+      }
+      return json(res, 200, out);
+    }
     if (p === "/_mint" && req.method === "POST") {
       const { header = {}, claims = {}, sub, session_id } = await readJson(req);
       const now = Math.floor(Date.now() / 1000);
@@ -144,6 +163,19 @@ http
       return json(res, 200, {});
     }
 
+    if (p === "/auth/v1/verify" && body.type === "email_change") {
+      stats.verify++;
+      const hit = changes.find((c) => !c.used && c.hash === body.token_hash);
+      if (!hit) return json(res, 403, { code: 403, error_code: "otp_expired", msg: "Token has expired or is invalid" });
+      hit.used = true;
+      if (changes.some((c) => c.pair === hit.pair && !c.used)) {
+        return json(res, 200, { msg: "Confirmation link accepted. Please proceed to confirm link sent to the other email", code: 200 });
+      }
+      const id = USERS.get(hit.email);
+      USERS.delete(hit.email);
+      USERS.set(hit.newEmail, id);
+      return json(res, 200, session(id, hit.newEmail));
+    }
     if (p === "/auth/v1/verify") {
       stats.verify++;
       const hit = pending.find((o) =>

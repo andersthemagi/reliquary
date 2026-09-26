@@ -1,0 +1,15 @@
+# id	file	dashboard section	dashboard name	gotrue key	notification	subject
+sign-in	sign-in.html	Templates	Magic link or OTP	MAGIC_LINK	-	Your Reliquary sign-in code
+confirm-signup	confirm-signup.html	Templates	Confirm sign up	CONFIRMATION	-	Confirm your email for Reliquary
+invite-user	invite-user.html	Templates	Invite user	INVITE	-	You have a Reliquary account
+change-email	change-email.html	Templates	Change email address	EMAIL_CHANGE	-	Confirm the new email address for your Reliquary account
+reset-password	reset-password.html	Templates	Reset password	RECOVERY	-	Reliquary has no password to reset
+reauthentication	reauthentication.html	Templates	Reauthentication	REAUTHENTICATION	-	Your Reliquary confirmation code
+password-changed	password-changed.html	Security notifications	Password changed	PASSWORD_CHANGED_NOTIFICATION	PASSWORD_CHANGED	The password of your Reliquary account was changed
+email-changed	email-changed.html	Security notifications	Email address changed	EMAIL_CHANGED_NOTIFICATION	EMAIL_CHANGED	The email address of your Reliquary account was changed
+phone-changed	phone-changed.html	Security notifications	Phone number changed	PHONE_CHANGED_NOTIFICATION	PHONE_CHANGED	The phone number of your Reliquary account was changed
+identity-linked	identity-linked.html	Security notifications	Sign-in method linked	IDENTITY_LINKED_NOTIFICATION	IDENTITY_LINKED	A sign-in method was added to your Reliquary account
+identity-unlinked	identity-unlinked.html	Security notifications	Sign-in method removed	IDENTITY_UNLINKED_NOTIFICATION	IDENTITY_UNLINKED	A sign-in method was removed from your Reliquary account
+mfa-added	mfa-added.html	Security notifications	Verification method added	MFA_FACTOR_ENROLLED_NOTIFICATION	MFA_FACTOR_ENROLLED	A second sign-in step was added to your Reliquary account
+mfa-removed	mfa-removed.html	Security notifications	Verification method removed	MFA_FACTOR_UNENROLLED_NOTIFICATION	MFA_FACTOR_UNENROLLED	A second sign-in step was removed from your Reliquary account
+vault-invite	vault-invite.html	Reliquary	Vault invite	-	-	You're invited to {{ .VaultName }} on Reliquary

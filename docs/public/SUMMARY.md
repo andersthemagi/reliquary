@@ -48,6 +48,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Permissions](reference/permissions.md)
 - [Limits](reference/limits.md)
 - [Errors and reference IDs](reference/errors.md)
+- [Emails](reference/emails.md)
 - [Glossary](reference/glossary.md)
 
 ## Project

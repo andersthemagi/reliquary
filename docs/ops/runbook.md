@@ -245,6 +245,37 @@ names and counts only). The model and the numbers are in
   `PLAN_DB_CONTAINER=<a local postgres container with the migrations>`
   (and `PLAN_DB_NAME`).
 
+## Email templates
+
+Every email Supabase Auth sends uses Reliquary's templates, `web/emails/*.html`
+(the source is `web/emails/build.mjs`; public list: `docs/public/reference/emails.md`).
+Self-hosted instances serve them to their Auth server on their own
+(`deploy/compose`). The hosted project needs them pasted into the dashboard,
+once, and again whenever `web/emails/` changes (a release note or the diff
+says so).
+
+1. `scripts/email-templates.sh` lists all 13: dashboard place, subject, file.
+2. Supabase dashboard, project `bigonndpibguxuwtysnx`: **Authentication >
+   Emails**.
+3. **Templates** tab, for each of Confirm sign up, Invite user, Magic link or
+   OTP, Change email address, Reset password, Reauthentication:
+   - `scripts/email-templates.sh <id>` (e.g. `sign-in`): prints the subject
+     and copies the HTML to the clipboard (or prints it; `--print` forces that);
+   - open the template, set **Subject**, switch the body to **Source**, select
+     all, paste, **Save changes**.
+4. **Security notifications** (same page), for each of Password changed, Email
+   address changed, Phone number changed, Sign-in method linked, Sign-in
+   method removed, Verification method added, Verification method removed:
+   turn it on, then subject and body as above.
+5. Check: **Authentication > Sign In / Providers**, Email OTP expiration is
+   600 seconds (the emails say "within 10 minutes"). Then sign in to the app
+   once: the email has the big code, a **Sign in** button, and the link
+   written out, all to `https://app.reliquary.redmage.cc/auth/confirm`.
+
+A link to anything but the app's `/auth/confirm` (Supabase's
+`{{ .ConfirmationURL }}`, the default) breaks sign-in by link: it returns the
+tokens in a URL fragment the server never sees.
+
 ## Rotating secrets
 
 | Secret | Where it lives | How to rotate | Effect |
