@@ -6,6 +6,18 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.7.0](https://github.com/andersthemagi/reliquary/compare/v0.6.0...v0.7.0) (2026-09-26)
+
+
+### Features
+
+* **web:** a welcome tour for new accounts, and from the account menu ([f99ab5d](https://github.com/andersthemagi/reliquary/commit/f99ab5d1dfe261075babe61a793ae51860a96ae6))
+
+
+### Bug fixes
+
+* **deploy:** the self-hosting check expects the welcome tour on a new owner's first sign-in ([fe2fb55](https://github.com/andersthemagi/reliquary/commit/fe2fb55427c15fe9cbdb420c7ac12fa19aa41eca))
+
 ## [0.6.0](https://github.com/andersthemagi/reliquary/compare/v0.5.0...v0.6.0) (2026-09-26)
 
 
