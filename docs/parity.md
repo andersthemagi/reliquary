@@ -113,9 +113,9 @@ and, for the agent, its token's vaults and access.
   (read from Supabase Auth for co-members in person only), and owners
   invite by email with a single-use, hashed, 7-day link, change roles,
   remove people (a vault always keeps an owner) and cut members' agent
-  connections off from the vault. There is no email sender yet: the owner
-  copies the link and sends it (`deliverInvite` in `web/src/invites.ts` is
-  where a sender plugs in). All of it stays off MCP: managing members is in
+  connections off from the vault. Invites are emailed through Resend when
+  the server has a sender (`deliverInvite` in `web/src/invites.ts`,
+  `web/src/mailer.ts`); otherwise the owner copies the link and sends it. All of it stays off MCP: managing members is in
   the ceiling. Hostile tests: `supabase/tests/invites_test.sql`.
 
 ## Gaps left

@@ -48,6 +48,7 @@ import { routes, type Ctx, type Download, type Reply } from "./pages.js";
 import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
 import { pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
+import { configureMailer } from "./mailer.js";
 import { versionJson } from "./version.js";
 import { emailTemplate, selfHosted } from "./selfhost.js";
 import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
@@ -103,6 +104,7 @@ try {
   configureOAuth();
   configureVariables(process.env);
   configureRateLimits(process.env);
+  configureMailer(process.env);
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);

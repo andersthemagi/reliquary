@@ -180,7 +180,8 @@ test("invite: the owner makes an invite and sees its link once, to copy and send
   assert.ok(tokens.ivan, "the link is on the page");
   assert.match(h, new RegExp(`<p class="secret">${S.olga.origin.replace(/\./g, "\\.")}/invite\\?token=${tokens.ivan}</p>`));
   assert.match(h, /Invite for ivan@example\.test \(Viewer\)/);
-  assert.match(h, /Copy this link and send it to them yourself: Reliquary doesn’t email invites yet\./);
+  assert.match(h, /This link wasn’t emailed: no email sender is set up on this server/);
+  assert.match(h, /Copy this link and send it to them yourself\./);
   assert.match(h, /only for someone signed in as <strong>ivan@example\.test<\/strong>/);
   const again = await page("olga", members(V.team));
   assert.equal(tokenOf(again), undefined, "shown once");

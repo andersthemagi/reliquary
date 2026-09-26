@@ -18,7 +18,11 @@
 #   scripts/vercel-env.sh mcp https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc
 #
 # The web app also needs SUPABASE_PUBLISHABLE_KEY, from the Supabase dashboard
-# (Project Settings -> API Keys); it is printed as a placeholder.
+# (Project Settings -> API Keys); it is printed as a placeholder. So is
+# RESEND_API_KEY (optional: vault invites by email; from Resend -> API Keys,
+# sending access only), with EMAIL_FROM, the sender on the verified domain
+# (docs/ops/runbook.md, "Email sender"). Leave both out to keep invites by
+# link only; with the placeholder left in, nothing is emailed.
 #
 # The variables encryption keys (VARIABLES_KEYS, docs/variables.md "Key
 # rotation") come from supabase/.variables-keys-secret, one id:key per line,
@@ -91,6 +95,8 @@ SUPABASE_URL=https://$ref.supabase.co
 SUPABASE_PUBLISHABLE_KEY=<from Supabase: Project Settings -> API Keys>
 JWT_ALG=ES256
 SESSION_SECRET=$(cat "$secret")
+RESEND_API_KEY=<from Resend: API Keys, sending access only>
+EMAIL_FROM=Reliquary <no-reply@notify.redmage.cc>
 EOF
     ;;
   mcp)

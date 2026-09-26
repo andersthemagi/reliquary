@@ -245,6 +245,90 @@ names and counts only). The model and the numbers are in
   `PLAN_DB_CONTAINER=<a local postgres container with the migrations>`
   (and `PLAN_DB_NAME`).
 
+## Email sender
+
+All email goes out through Resend (resend.com) from one subdomain,
+`notify.redmage.cc`: Supabase Auth's (sign-in codes and links, account
+notices) over Resend's SMTP, and the web app's vault invites over Resend's
+HTTP API (`web/src/mailer.ts`). Until this is done, Supabase's built-in
+sender reaches only the project team (2 an hour) and owners copy invite
+links by hand. Values checked against the docs on 2026-09-26 (sources at the
+end of this section).
+
+1. **Account**: sign up at resend.com with the owner's address; turn on
+   two-factor sign-in (Settings).
+2. **Domain**: Domains > Add domain, `notify.redmage.cc`, region **Ireland
+   (eu-west-1)**. The region only sets where mail is sent from: Resend
+   stores account data, email metadata and logs in the US whatever the
+   region, which `/subprocessors` and `/privacy` say. Use a subdomain, not
+   `redmage.cc`, so its sending reputation is its own.
+3. **DNS, in Squarespace** (Domains > redmage.cc > DNS > Custom records):
+   add exactly the records Resend's domain page lists, copied from there
+   (values are per domain, so they aren't written here). They are:
+   - **DKIM**: a TXT record at `resend._domainkey.notify` (the public key);
+   - **SPF**: a TXT record at the return-path subdomain (`send.notify` by
+     default) allowing Amazon SES, and an **MX** record there for bounces
+     (`feedback-smtp.<region>.amazonses.com`, priority 10);
+   - **DMARC** (recommended, Resend shows it after verifying): a TXT record
+     at `_dmarc.notify` starting `v=DMARC1; p=none;`. Tighten to
+     `p=quarantine` once reports look clean. A `_dmarc.redmage.cc` record, if
+     there is one, covers the subdomain unless its `sp=` says otherwise.
+   Squarespace's Host field takes the name without `.redmage.cc` (e.g.
+   `resend._domainkey.notify`). Then **Verify DNS Records** in Resend: usually
+   within 15 minutes, up to 72 hours. Leave open and click tracking off (the
+   default): tracking rewrites links, which breaks sign-in and invite links.
+4. **API keys**: API Keys > Create API key, twice, each with permission
+   **Sending access** and domain `notify.redmage.cc` only: `supabase-smtp`
+   and `reliquary-web`. Two keys so either can be revoked alone. Resend shows
+   a key once: paste it straight into its place below (and a password
+   manager), never into a chat, a file in the repo or a terminal.
+5. **Supabase SMTP** (project `bigonndpibguxuwtysnx`): Authentication >
+   Emails > **SMTP Settings**, turn on **Enable custom SMTP**:
+   - Sender email `no-reply@notify.redmage.cc`, sender name `Reliquary`
+     (together `Reliquary <no-reply@notify.redmage.cc>`);
+   - Host `smtp.resend.com`, port `465` (implicit TLS; `587` with STARTTLS
+     also works);
+   - Username `resend`, password the `supabase-smtp` key;
+   - Minimum interval per user: leave at 60 seconds. **Save changes**.
+6. **Supabase email rate limit**: saving custom SMTP sets it to 30 emails an
+   hour. Authentication > **Rate Limits** > "Rate limit for sending emails":
+   raise it to what the Resend plan covers. Resend's free plan is 100 emails
+   a day and 3,000 a month, and a sign-in is one email; start at 100 an hour
+   on a paid plan, or leave 30 on the free one. Reliquary's own limits
+   (`docs/public/reference/limits.md`) sit in front of it.
+7. **Templates**: paste them, per "Email templates" below
+   (`scripts/email-templates.sh`), if not done yet.
+8. **Invites from the web app**: in Vercel, `reliquary-web` > Settings >
+   Environment Variables (Production), add `RESEND_API_KEY` = the
+   `reliquary-web` key (Sensitive) and `EMAIL_FROM` =
+   `Reliquary <no-reply@notify.redmage.cc>`. `scripts/vercel-env.sh web ...`
+   lists both (the key as a placeholder). Never in `reliquary-mcp`. Then
+   redeploy the live release (see "Redeploy or roll back").
+9. **Check**: sign out and sign in with a code (the email comes from
+   `no-reply@notify.redmage.cc`, and Resend > Emails lists it). Then invite
+   an address you own to a test vault: **Members** says "We emailed them the
+   link", and the email's link opens the invite. If it says it couldn't email
+   it, the reason and a ref are on the page; find the ref in the logs ("Finding
+   an error by its ref"): `where` is `email sender (Resend)` and `code` is
+   Resend's error name (`validation_error` for an unverified domain or a bad
+   sender, `restricted_api_key` for a key without sending access,
+   `daily_quota_exceeded`). The invite is kept either way; the owner can send
+   the shown link.
+
+Rotating a key: create the new one, put it in its place (Supabase or Vercel,
+then redeploy), check as in 9, then delete the old one in Resend.
+
+Sources: Resend, [SMTP](https://resend.com/docs/send-with-smtp),
+[send email API](https://resend.com/docs/api-reference/emails/send-email)
+(`Idempotency-Key`, up to 256 characters, kept 24 hours),
+[errors](https://resend.com/docs/api-reference/errors),
+[domains](https://resend.com/docs/dashboard/domains/introduction),
+[add a domain](https://resend.com/docs/add-a-domain),
+[regions](https://resend.com/docs/dashboard/domains/regions),
+[API keys](https://resend.com/docs/api-reference/api-keys/create-api-key),
+[quotas](https://resend.com/docs/knowledge-base/account-quotas-and-limits);
+Supabase, [custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
+
 ## Email templates
 
 Every email Supabase Auth sends uses Reliquary's templates, `web/emails/*.html`

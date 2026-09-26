@@ -132,6 +132,7 @@ ${operatorBlock()}
 
 <h2>Where it's stored, and who processes it</h2>
 <p>The database is in the EU (Frankfurt), and the app runs in Frankfurt. Some providers are US companies whose networks and logs are global; the <a href="/subprocessors">sub-processor list</a> names each one, what it does and where.</p>
+<p>Email (sign-in codes and links, account notices and vault invitations) is sent through Resend, a US company: it receives the recipient's address and the message, sends it from the EU, and keeps delivery records in the US for 30 days.</p>
 <p>AI tools you connect (Claude, ChatGPT, Cursor and others) receive what their agent reads through your account. They are not our sub-processors: you choose them, and they process that data under your agreement with them.</p>
 
 <h2>How long we keep it</h2>
@@ -139,6 +140,7 @@ ${operatorBlock()}
   <li>Account data: while you have an account, and deleted when you ask us to close it.</li>
   <li>Vault content: until an owner erases it or deletes the vault. Erasing a file blanks every version at once; deleting a vault removes everything in it at once, keeping only who deleted it, when, and counts.</li>
   <li>The activity log is append-only: it keeps the fact that something happened, but erased content is gone from it.</li>
+  <li>Sent email: our email provider keeps each message's record (address, subject, delivery status) for 30 days.</li>
   <li>Database backups keep deleted data until they age out, after ${fill("backupRetention", "backup retention")}.</li>
 </ul>
 
@@ -211,6 +213,13 @@ const SUBPROCESSORS: Sub[] = [
     data: "Requests in transit, request logs with IP addresses",
     link: ["https://vercel.com/legal/privacy-policy", "Vercel privacy policy"],
   },
+  {
+    name: "Resend",
+    what: "Sending email: sign-in codes and links, account notices, and vault invitations",
+    where: "Sent from the EU (Ireland, eu-west-1); account data, email metadata and logs stored in the US (US company)",
+    data: "Recipient email addresses and message content (codes, sign-in and invite links, vault names and roles); kept by Resend for 30 days",
+    link: ["https://resend.com/legal/privacy-policy", "Resend privacy policy"],
+  },
 ];
 
 function subprocessors(theme: Theme): string {
@@ -222,7 +231,6 @@ function subprocessors(theme: Theme): string {
     ${SUBPROCESSORS.map(
       (s) => html`<tr><td><strong>${s.name}</strong>${s.link ? html`<br><a href="${s.link[0]}">${s.link[1]}</a>` : ""}</td><td data-label="What it does">${s.what}</td><td data-label="Where">${s.where}</td><td data-label="Data">${s.data}</td></tr>`,
     )}
-    <tr><td><strong>Email provider</strong></td><td data-label="What it does">Sending sign-in codes and invitations</td><td colspan="2" data-label="Where and data"><mark class="placeholder">[to be added: provider, location and data (email addresses, message content)]</mark></td></tr>
     <tr><td><strong>Payment provider</strong></td><td data-label="What it does">Billing, once plans are paid</td><td colspan="2" data-label="Where and data">None yet: nothing is billed during the beta. Added here before billing starts.</td></tr>
   </tbody>
 </table></div>

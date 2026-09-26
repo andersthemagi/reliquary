@@ -21,7 +21,7 @@ An invite is a link for one email address, with a role:
 
 - It works once, for 7 days, and only for someone signed in with that address.
 - The address matches however it is typed: upper or lower case, and an accent typed as one character (é) or as a letter and a combining accent.
-- Reliquary doesn't email invites yet: the owner copies the link, shown once, and sends it.
+- Reliquary emails the link to the invited address when the server has an email sender. When it has none, or the email can't be sent, the owner copies the link, shown once, and sends it.
 - Inviting an address again replaces its earlier invite.
 - An owner can have at most 50 invites waiting in a vault, and one person can create 20 an hour.
 

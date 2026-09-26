@@ -22,7 +22,9 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { callout, confirmPage, csrfField, emptyState, html, pageHeader, raw, time, type Raw } from "./html.js";
-import { deliverInvite, INVITE_TOKEN, invitePageBody, inviteLink, peekInvite, ROLE_TEXT, roleName } from "./invites.js";
+import { deliverInvite, INVITE_TOKEN, type Delivery, invitePageBody, inviteLink, peekInvite, ROLE_TEXT, roleName } from "./invites.js";
+import { publicSiteOrigin } from "./hosts.js";
+import { mailerOn } from "./mailer.js";
 import { personRef } from "./people.js";
 import { limit, tooManyPage } from "./ratelimit.js";
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
@@ -85,7 +87,7 @@ const full = (u: VaultUsage | undefined) => !!u && peopleLimited(u) && peopleOve
 // ---------------------------------------------------------------------------
 // The Members tab
 
-type Fresh = { email: string; role: string; link: string; sent: boolean; expires: Date };
+type Fresh = { email: string; role: string; link: string; delivery: Delivery; expires: Date };
 
 async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> {
   return shell(ctx, id, "Members", async (c, v) => {
@@ -135,11 +137,14 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
         primary: invite,
       })}
       ${fresh
-        ? html`<div class="callout success reveal" role="status" id="invite-link">
+        ? html`<div class="callout ${fresh.delivery.sent || !fresh.delivery.failure ? "success" : "warning"} reveal" role="status" id="invite-link">
             <p class="callout-title"><strong>Invite for ${fresh.email} (${roleName(fresh.role)})</strong></p>
-            ${fresh.sent
+            ${fresh.delivery.sent
               ? html`<p>We emailed them the link. It works once, for that address, until ${time(fresh.expires, { absolute: true })}.</p>`
-              : html`<p>Copy this link and send it to them yourself: Reliquary doesn’t email invites yet. It works once, only for someone signed in as <strong>${fresh.email}</strong>, until ${time(fresh.expires, { absolute: true })}. It won’t be shown again.</p>
+              : html`${fresh.delivery.failure
+                  ? html`<p id="invite-email-failed"><strong>The invite is made, but we couldn’t email it.</strong> ${fresh.delivery.failure.what} failed: ${fresh.delivery.failure.why.replace(/\.$/, "")} (where: ${fresh.delivery.failure.where}; ref ${fresh.delivery.failure.ref}).</p>`
+                  : html`<p id="invite-not-emailed">This link wasn’t emailed: ${fresh.delivery.off ?? "no email sender is set up on this server"}.</p>`}
+                <p>Copy this link and send it to them yourself. It works once, only for someone signed in as <strong>${fresh.email}</strong>, until ${time(fresh.expires, { absolute: true })}. It won’t be shown again.</p>
                 <p class="secret">${fresh.link}</p>`}
           </div>`
         : ""}
@@ -240,7 +245,7 @@ async function invitePage(ctx: Ctx, id: string, d: InviteDraft = {}): Promise<Re
               (r) => html`<label class="choice"><input type="radio" name="role" value="${r}"${r === role ? raw(" checked") : ""}> <span>${ROLE_TEXT[r]}</span></label>`,
             )}
           </fieldset>
-          <p class="hint">You’ll get a link to send them. It works once, for that address only, for 7 days.${
+          <p class="hint">${mailerOn() ? "We’ll email them a link, and show it to you if the email can’t be sent." : "You’ll get a link to send them."} It works once, for that address only, for 7 days.${
             u && peopleLimited(u) ? ` ${v.name} has ${placesText(u)}.` : ""
           }</p>
           <div class="actions"><button class="primary">Create invite link</button><a class="button quiet" href="${membersPath(id)}">Cancel</a></div>
@@ -270,8 +275,8 @@ async function createInvite(ctx: Ctx, id: string): Promise<Reply> {
   if (!made) return notFound(ctx);
   const link = inviteLink(ctx.url.origin, made.token);
   const expires = new Date(Date.now() + 7 * 86400_000);
-  const { sent } = await deliverInvite({ to: email, link, vaultName: made.name, role, expiresAt: expires });
-  return membersPage(ctx, id, { email, role, link, sent, expires });
+  const delivery = await deliverInvite({ to: email, link, token: made.token, vaultName: made.name, role, expiresAt: expires }, publicSiteOrigin(new URL(link).origin));
+  return membersPage(ctx, id, { email, role, link, delivery, expires });
 }
 
 // ---------------------------------------------------------------------------

@@ -6,18 +6,21 @@
 // the server never logs (it logs the path only), and the Referrer-Policy
 // keeps it on this site.
 //
-// Delivery: there is no email sender yet, so deliverInvite() says it sent
-// nothing and the Members page shows the link for the owner to copy and send
-// themself. To send email later, replace the body of deliverInvite() (one
-// function; nothing else changes): send vaultInviteEmail(mail, origin)
-// (emails.ts, web/emails/vault-invite.html) to `to`, and return
-// { sent: true }. It must never log the link or the address.
+// Delivery: deliverInvite() emails the link (vaultInviteEmail() in
+// emails.ts, web/emails/vault-invite.html) through Resend (mailer.ts) when
+// the server has RESEND_API_KEY and EMAIL_FROM. Without them, or when Resend
+// refuses or doesn't answer, the invite stays made and the Members page
+// shows the link for the owner to copy and send themself, with why it wasn't
+// emailed (and a reference, for a failure). Neither the link nor the address
+// is ever logged.
 
 import { authMode } from "./auth.js";
 import { pool } from "./db.js";
+import { vaultInviteEmail } from "./emails.js";
 import { errorBody } from "./errorpage.js";
-import { failure } from "./failure.js";
+import { fail, failure, type Failure } from "./failure.js";
 import { csrfField, html, pageHeader, when, type Raw } from "./html.js";
+import { idempotencyKey, mailerOffReason, sendEmail } from "./mailer.js";
 import type { Ctx } from "./pages.js";
 
 export const INVITE_TOKEN = /^rli_[0-9a-f]{64}$/;
@@ -25,14 +28,38 @@ export const INVITE_TOKEN = /^rli_[0-9a-f]{64}$/;
 export type InviteMail = {
   to: string; // the invited address
   link: string; // the invite link; a bearer secret
+  token: string; // the link's token (for the idempotency key only)
   vaultName: string;
   role: string;
   expiresAt: Date;
 };
 
-// The one place an email sender plugs in.
-export async function deliverInvite(_mail: InviteMail): Promise<{ sent: boolean }> {
-  return { sent: false };
+export type Delivery = { sent: true } | { sent: false; off?: string; failure?: Failure };
+
+// Emails one invite. The idempotency key is derived from the token (never
+// equal to it, nor to the hash the database keeps), so mailer.ts's retry
+// never sends a second copy. `siteUrl` is what the email's footer links to.
+export async function deliverInvite(mail: InviteMail, siteUrl: string): Promise<Delivery> {
+  const off = mailerOffReason();
+  if (off) return { sent: false, off };
+  let subject: string;
+  let body: string;
+  try {
+    ({ subject, html: body } = vaultInviteEmail(mail, siteUrl));
+  } catch (err) {
+    // A deploy without web/emails/ (vercel.json's includeFiles): the link
+    // is still shown, with this reason and its ref.
+    return { sent: false, failure: fail(err, { where: "email template (web/emails/vault-invite.html)", what: "Emailing the invite", status: 500 }) };
+  }
+  const r = await sendEmail({
+    to: mail.to,
+    subject,
+    html: body,
+    idempotencyKey: idempotencyKey("vault-invite", mail.token),
+    tag: "vault-invite",
+    what: "Emailing the invite",
+  });
+  return r.sent ? { sent: true } : { sent: false, off: r.off, failure: r.failure };
 }
 
 // The site's own origin for links: PUBLIC_URL when hosted, else the
