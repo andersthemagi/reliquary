@@ -3,7 +3,7 @@
 // says something failed uses errorPage(); nothing says "something went
 // wrong" (docs/public/reference/errors.md).
 
-import { html, page, type Raw, type Theme } from "./html.js";
+import { html, page, type Raw, type Shell, type Theme } from "./html.js";
 import { siteHref } from "./hosts.js";
 import { fail, ownRaise, plainText, Refusal, type Failure } from "./failure.js";
 
@@ -59,6 +59,10 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   const pages: Record<string, string> = {
     "/": "Opening Home",
     "/review": "Opening Review",
+    "/inbox": "Opening your inbox",
+    "/search": "Searching your vaults",
+    "/settings": "Opening Account settings",
+    "/account": "Opening Plan and usage",
     "/activity": "Opening Activity",
     "/connect": "Opening Connect",
     "/tokens": "Opening Tokens",
@@ -71,6 +75,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (p === "/signin" || p === "/signin/code") return say("Signing in");
   if (p === "/signout") return say("Signing out");
   if (p === "/theme") return say("Changing the theme");
+  if (p === "/settings/name") return say("Saving your display name");
   if (p === "/vaults/new") return say(`Creating vault ${typed(form.get("name")) || "(no name)"}`.trim());
   if (p === "/tokens/new") return say("Creating an agent token");
   if (/^\/tokens\/[^/]+\/revoke$/.test(p)) return say("Revoking an agent token");
@@ -133,7 +138,7 @@ export type ErrorPageOpts = {
   user?: string;
   csrf?: string;
   flash?: string;
-  reviewCount?: number;
+  shell?: Shell;
   path?: string;
 };
 
@@ -160,7 +165,7 @@ export function errorPage(f: Failure, o: ErrorPageOpts = {}): string {
     user: o.user,
     csrf: o.csrf,
     flash: o.flash,
-    reviewCount: o.reviewCount,
+    shell: o.shell,
     path: o.path,
   });
 }

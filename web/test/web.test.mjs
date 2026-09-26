@@ -64,8 +64,9 @@ test("assets: fonts, icon and a versioned stylesheet are served from here only",
 // Review --------------------------------------------------------------------
 
 test("review: nav count and the cross-vault list show what waits on me", async () => {
-  const h = await page("/review");
-  assert.match(h, /aria-label="4 waiting">4</);
+  assert.match(await page("/"), /<a class="button" href="\/inbox">Review 4 waiting<\/a>/);
+  const h = await page("/inbox");
+  assert.match(h, /<summary class="button quiet icon-button" aria-label="Inbox, [1-9]\d* waiting"[^>]*>/);
   assert.match(h, /Change canon\/pricing\.md/);
   assert.match(h, /Create canon\/terms\.md/);
   assert.doesNotMatch(h, /Dee private/);
@@ -115,7 +116,7 @@ test("request changes: refused without a note, then kept alive with one", async 
   assert.match(h, /Requested changes · you · revision 1/);
   assert.match(h, /<p>Keep 800 until January\.<\/p>/);
   assert.doesNotMatch(h, /value="approve"/);
-  assert.match(await page("/review"), /Waiting on the proposer/);
+  assert.match(await page("/inbox"), /Waiting on the proposer/);
 });
 
 test("approve: applies the change, credited to the agent", async () => {

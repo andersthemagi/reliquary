@@ -145,6 +145,12 @@
   status: shipped
   docs: concepts/plans-and-limits
 
+- title: Inbox, search and account settings
+  summary: A top bar with a vault switcher, search across your vaults, an inbox of what needs you, and display names in Account settings.
+  status: shipped
+  milestone: M1
+  docs: concepts/inbox-and-account
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core

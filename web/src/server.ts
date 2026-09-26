@@ -206,6 +206,7 @@ const FIELD_LIMITS: Record<string, { max: number; bytes?: boolean; message?: str
   confirm_path: { max: 1024 },
   name: { max: 200 },
   confirm_name: { max: 200 },
+  display_name: { max: 80, message: "A display name is at most 80 characters. Nothing was saved." },
 };
 function codePoints(s: string): number {
   let n = 0;

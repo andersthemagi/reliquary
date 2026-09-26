@@ -337,7 +337,7 @@ type AuthRequest = {
 const shell = (ctx: Ctx, title: string, body: ReturnType<typeof html>, status = 200, formAction?: string): Reply => ({
   status,
   formAction,
-  html: page(title, body, { user: ctx.userId, theme: ctx.theme, csrf: ctx.csrf, path: "/", reviewCount: ctx.reviewCount }),
+  html: page(title, body, { user: ctx.userId, theme: ctx.theme, csrf: ctx.csrf, path: "/", shell: ctx.shell }),
 });
 
 // Problems with the client or its redirect are shown here and never sent

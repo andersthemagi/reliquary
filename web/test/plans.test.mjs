@@ -137,7 +137,7 @@ test("plans: Home shows the plan and the vaults owned, linking to Plan and usage
 });
 
 test("plans: the Account menu links Plan and usage", async () => {
-  assert.match(await page("quinn", "/"), /<p class="menu-links"><a href="\/account">Plan and usage<\/a><\/p>/);
+  assert.match(await page("quinn", "/"), /<li><a href="\/account">Plan and usage<\/a><\/li>/);
 });
 
 test("plans: Plan and usage shows the plan and each vault the person created, with its people and storage", async () => {
@@ -149,7 +149,8 @@ test("plans: Plan and usage shows the plan and each vault the person created, wi
   assert.match(h, new RegExp(`<a class="name" href="/v/${V.one}">Plans One</a>\\s*<span class="muted small"> · Standard \\(Web small\\) · 2 of 2 people · 0 bytes of 400 bytes</span> <span class="badge attention">At a limit</span>`));
   // Quinn created nothing: a vault he only belongs to isn't his.
   const q = await page("quinn", "/account");
-  assert.doesNotMatch(q, /Plans One/);
+  // The page itself: the top bar's vault switcher lists the vaults he is in.
+  assert.doesNotMatch(/<main id="main">[\s\S]*<\/main>/.exec(q)[0], /Plans One/);
   assert.match(q, /You haven’t created a vault yet\./);
 });
 

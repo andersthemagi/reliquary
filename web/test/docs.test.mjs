@@ -298,7 +298,7 @@ test("stage: the landing page, the docs, the roadmap and the app say pre-alpha",
   assert.match(docs, badge);
   assert.ok(docs.includes(`<strong>Pre-alpha:</strong> ${PRE_ALPHA}`), "the docs say it in full");
   assert.ok((await html("/roadmap")).includes(`Pre-alpha: ${PRE_ALPHA}`), "the roadmap says it in full");
-  const app = await (await get("/review", BASE, { cookie })).text();
+  const app = await (await get("/inbox", BASE, { cookie })).text();
   assert.match(app, badge);
   assert.ok(app.includes(`Pre-alpha: ${PRE_ALPHA}`), "the Account menu says it in full");
 });

@@ -22,9 +22,9 @@ const post = (path, fields, headers = {}) =>
     body: new URLSearchParams(fields).toString(),
   });
 const page = async (path) => (await get(path)).text();
-const csrf = async (path = "/review") => /name="csrf" value="([0-9a-f]+)"/.exec(await page(path))[1];
+const csrf = async (path = "/inbox") => /name="csrf" value="([0-9a-f]+)"/.exec(await page(path))[1];
 const follow = async (r) => page(r.headers.get("location"));
-const waiting = async () => Number(/aria-label="(\d+) waiting"/.exec(await page("/review"))?.[1] ?? 0);
+const waiting = async () => Number(/aria-label="Inbox, (\d+) waiting"/.exec(await page("/inbox"))?.[1] ?? 0);
 
 before(async () => {
   const r = await fetch(readFileSync(LOGIN_FILE, "utf8").trim(), { redirect: "manual" });
@@ -113,20 +113,20 @@ test("snooze: for a day hides it from Review and the count, until unsnoozed", as
   const before = await waiting();
   const token = await csrf(`${T}/proposals/${TW_SNOOZE}`);
   const r = await post(`${T}/proposals/${TW_SNOOZE}/snooze`, { csrf: token, for: "day" });
-  assert.equal(r.headers.get("location"), "/review");
+  assert.equal(r.headers.get("location"), "/inbox");
   const review = await follow(r);
   assert.match(review, /Snoozed for a day, or until it changes\./);
   assert.equal(await waiting(), before - 1);
   assert.doesNotMatch(review, /canon\/later\.md/);
-  assert.match(review, /<a href="\/review\?snoozed=1">Show snoozed \(1\)<\/a>/);
+  assert.match(review, /<a href="\/inbox\?snoozed=1">Show snoozed \(1\)<\/a>/);
 
-  const shown = await page("/review?snoozed=1");
+  const shown = await page("/inbox?snoozed=1");
   assert.match(shown, /Create canon\/later\.md<\/a>\s*<span class="muted small"> · Threads · by 00000000 via Hermes on Linux · until \d{4}-\d\d-\d\d \d\d:\d\d UTC/);
   assert.match(await page(`${T}/proposals/${TW_SNOOZE}`), /Snoozed in your Review until [^,]+, or until it changes\./);
 
   const un = await post(`${T}/proposals/${TW_SNOOZE}/unsnooze`, { csrf: token, back: "review" });
-  assert.equal(un.headers.get("location"), "/review?snoozed=1");
-  assert.match(await follow(un), /Back in your Review\./);
+  assert.equal(un.headers.get("location"), "/inbox?snoozed=1");
+  assert.match(await follow(un), /Back in your inbox\./);
   assert.equal(await waiting(), before);
 });
 
@@ -135,7 +135,7 @@ test("snooze: until it changes, then unsnoozed from the proposal page", async ()
   const token = await csrf(`${T}/proposals/${TW_COMMENT}`);
   assert.match(await follow(await post(`${T}/proposals/${TW_COMMENT}/snooze`, { csrf: token, for: "change" })), /Snoozed until it changes\./);
   assert.equal(await waiting(), before - 1);
-  assert.match(await page("/review?snoozed=1"), /Create canon\/brief\.md<\/a>\s*<span class="muted small">[^<]*until it changes/);
+  assert.match(await page("/inbox?snoozed=1"), /Create canon\/brief\.md<\/a>\s*<span class="muted small">[^<]*until it changes/);
   const h = await page(`${T}/proposals/${TW_COMMENT}`);
   assert.match(h, /Snoozed in your Review until it changes\./);
   assert.doesNotMatch(h, /value="week"/);
@@ -157,7 +157,7 @@ test("copy: no em dashes or straight apostrophes in the thread and snooze text",
   const token = await csrf();
   await post(`${T}/proposals/${TW_SNOOZE}/snooze`, { csrf: token, for: "week" });
   for (const path of [`${T}/proposals/${TW_COMMENT}`, `${T}/proposals/${TW_SNOOZE}`, `${T}/proposals/${TW_CLOSED}`,
-    `/v/${SHOP_VAULT}/proposals/${TW_VIEW}`, "/review", "/review?snoozed=1"]) {
+    `/v/${SHOP_VAULT}/proposals/${TW_VIEW}`, "/inbox", "/inbox?snoozed=1"]) {
     const visible = (await page(path)).replace(/<pre[\s\S]*?<\/pre>/g, "").replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'");
     assert.doesNotMatch(visible, /—/, `em dash on ${path}`);
     assert.doesNotMatch(visible, /[a-z]'[a-z]/i, `straight apostrophe on ${path}`);

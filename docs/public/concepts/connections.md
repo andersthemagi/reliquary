@@ -28,7 +28,7 @@ A token's or connection's vaults and access are fixed when it is made. To change
 
 ## Revoking
 
-Revoke any of them on the **Tokens** page; the next request it makes is refused. Only you can revoke your own, in person: no agent, token or client can revoke one (an OAuth client can still end its own grant). A vault owner can also cut a member's connection off from their vault on **Members**, without touching the member's other vaults.
+Revoke any of them on the **Tokens and connections** page (in the account menu, at the top right); the next request it makes is refused. Only you can revoke your own, in person: no agent, token or client can revoke one (an OAuth client can still end its own grant). A vault owner can also cut a member's connection off from their vault on **Members**, without touching the member's other vaults.
 
 When you leave a vault, or are removed, tokens that reached only that vault are revoked, and the vault drops out of tokens that reached several.
 

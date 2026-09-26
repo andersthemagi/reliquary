@@ -103,7 +103,7 @@ test("sign-in: by 6-digit code lands on the page asked for, signed in", async ()
   assert.equal(done.headers.get("location"), "/review");
   assert.equal((await stats()).lastCreateUser, false, "sign-in must not create users");
   assert.equal((await stats()).otp, before.otp + 1);
-  const h = await (await get(A, "/review", jar)).text();
+  const h = await (await get(A, "/inbox", jar)).text();
   assert.match(h, /Signed in as <strong>00000000<\/strong>/);
   assert.doesNotMatch(h, /\(local\)/);
   assert.match(h, /action="\/signout"/);
@@ -260,7 +260,7 @@ test("session: an expired access token is refreshed once, with new cookies", asy
   assert.equal((await stats()).refresh, n + 1);
   // No access cookie at all (the browser dropped it at Max-Age): refreshed too.
   jar.c.delete(AT);
-  assert.equal((await get(A, "/review", jar)).status, 200);
+  assert.equal((await get(A, "/inbox", jar)).status, 200);
   assert.equal((await stats()).refresh, n + 2);
 });
 

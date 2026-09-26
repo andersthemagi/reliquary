@@ -94,7 +94,7 @@ async function shell(ctx: Ctx, v: Vault, title: string, body: Raw, status = 200,
       csrf: ctx.csrf,
       path: path ?? ctx.url.pathname + ctx.url.search,
       nav: "vaults",
-      reviewCount: ctx.reviewCount,
+      shell: ctx.shell,
     }),
   };
 }

@@ -98,7 +98,7 @@ test("split site: / on the site host is the landing page, signed out or not", as
     const r = await site("/", { headers: cookie ? { cookie } : {} });
     assert.equal(r.status, 200);
     assert.match(r.body, /id="hero-title"/);
-    assert.doesNotMatch(r.body, /<nav aria-label="Main">/);
+    assert.doesNotMatch(r.body, /<nav class="app-nav" aria-label="Main">/);
   }
 });
 
@@ -155,7 +155,7 @@ test("split app: / on the app host is sign-in signed out, and Home signed in", a
   assert.doesNotMatch(out.body, /hero-title/);
   const home = await app("/", { headers: { cookie: ana.header } });
   assert.equal(home.status, 200);
-  assert.match(home.body, /<nav aria-label="Main">/);
+  assert.match(home.body, /<nav class="app-nav" aria-label="Main">/);
 });
 
 test("split app: the OAuth metadata's issuer and endpoints, and the CLI's client, are the app origin", async () => {

@@ -6,7 +6,7 @@ A token has leaked if it was pasted into a chat, committed, printed where an age
 
 ## 1. Revoke it
 
-1. In the web app, open **Tokens**.
+1. In the web app, open the account menu at the top right, then **Tokens and connections**.
 2. Find it by name, vaults and last use, and choose **Revoke**.
 
 It stops working on its next request. Only you can revoke your own tokens, in person; a vault owner can also cut any member's connection off from their vault on **Settings**, **Members**.

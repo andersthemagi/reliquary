@@ -32,25 +32,28 @@ and, for the agent, its token's vaults and access.
 | List files | `/v/:v`, `/v/:v/tree?path=` | `list_files` | both | |
 | Read a file | `/v/:v/file?path=` | `read_file` | both | |
 | Search a vault | `/v/:v/search?q=` | `search` | both | |
+| Search every vault you're in at once | `/search?q=` (the top bar) | none; `search` takes one vault, and `list_vaults` names them | person | **Gap**, left on purpose: an agent calls `search` per vault; the web page runs the same `public.search` per vault in one query |
 | Write an open file | `/v/:v/new`, `/v/:v/edit`, POST `/v/:v/file` (`write`, `create`) | `write_file` | both | |
 | Delete an open file | `/v/:v/edit` (Delete this file), POST `/v/:v/file` (`delete`) | `delete_file` | both | |
 | Propose a write | POST `/v/:v/file` (`propose`, or `create` under canon) | `propose` | both | |
 | Propose a delete | POST `/v/:v/file` (`propose-delete`) | `propose` with `delete: true` | both | |
 | Propose a stale proposal again | POST `/v/:v/proposals/:p/repropose` | `propose` (same text) | both | |
-| List proposals | `/v/:v/proposals`, `/review` | `list_proposals` | both | |
+| List proposals | `/v/:v/proposals`, `/inbox` (`/review` redirects there) | `list_proposals` | both | |
 | Read a proposal and its thread | `/v/:v/proposals/:p` | `read_proposal` | both | |
 | Revise your own proposal | `/v/:v/proposals/:p/revise` (POST) | `revise_proposal` | both | Only the proposer (the person whose agent proposed it counts as the proposer) |
 | Comment on a proposal | POST `/v/:v/proposals/:p/comment` | `comment_on_proposal` | both | |
 | Approve, request changes, reject | POST `/v/:v/proposals/:p/decide` | none | person | **Ceiling**: approving needs the person present |
 | Edit, then approve | `/v/:v/proposals/:p/edit` (POST) | none | person | **Ceiling**: it approves. An agent revises its own proposal instead |
 | Set or remove a rule (canon/open, quorum) | `/v/:v/rules` (POST; linked from Settings) | none | person (owner) | **Ceiling**: rules are policy. An agent picks a new vault's default policy when it creates one, and nothing after |
-| Snooze a proposal in Review | POST `/v/:v/proposals/:p/snooze` | none | person | **Ceiling**: an agent that could snooze could hide its own proposals from its person's inbox |
+| Snooze a proposal in the Inbox | POST `/v/:v/proposals/:p/snooze` | none | person | **Ceiling**: an agent that could snooze could hide its own proposals from its person's inbox |
 | Unsnooze | POST `/v/:v/proposals/:p/unsnooze` | none | person (the database allows the agent) | **Gap**, and not worth closing: an agent has no inbox to bring things back into |
 | Changes feed / activity | `/activity`, `/v/:v/activity`, a file's History tab | `changes_since` | both | The web pages are for reading; `changes_since` is a cursor feed for agents. Same log. The web pages name people by email where the reader shares a vault with them (`co_member_emails`, `require_human`, `20260925160000_membership_polish.sql`); `changes_since` gives ids only, so no address reaches a model |
 | Create a token | `/tokens` (POST `/tokens/new`) | none | person | **Ceiling**: grants are the person's (design: "managing grants") |
 | Revoke a token | POST `/tokens/:id/revoke` | none | person | **Ceiling**: revoking is grant management. `revoke_access_token` is `require_human` (`20260925110000_hardening.sql`), so no token, OAuth client or CLI grant can revoke; an OAuth client still ends its own grant through the token endpoint (RFC 7009) |
 | Approve an OAuth client (consent) | `/oauth/authorize` | none | person | **Ceiling**: consent is a grant, and must be a person |
 | Connect an agent (setup help) | `/connect` | none | person | Not an action; there is nothing to do over MCP |
+| See your inbox (counts and items: reviews waiting, your proposals sent back, imports to apply, invites to your address, deletion notices) | the top bar's **Inbox**, `/inbox` | none; `list_proposals` lists what's open | person | **Ceiling** in part: `shell_summary`, `my_invites` and `my_deletion_notices` refuse any `act` claim (`20260926100000_shell_inbox.sql`). Invites are made out to an address, and addresses never reach a model; snoozes are the person's own. An agent learns what waits on its person from `list_proposals` |
+| Set your display name | `/settings` (POST `/settings/name`) | none | person, for themself only | **Ceiling** (managing your profile, like managing members): `public.profiles` lets a person write only their own row and refuses any `act` claim, and `set_display_name` does the same, so no agent, token, OAuth client or CLI grant can set or read it. Names are shown to co-members next to their email through `co_member_people` (`require_human`), so a name, like an address, never reaches a model. The roadmap's "Member names over MCP" would change that on purpose |
 | See a vault's members (by email) | `/v/:v/config/members` | none | person (any member) | **Ceiling**, on purpose: `list_members` is `require_human`, so members' addresses never reach a model (`20260925140000_invites.sql`) |
 | Invite someone (email and role), list or revoke invites | `/v/:v/config/members` (POST `/invite`, `/invites/:id/revoke`) | none | person (owner) | **Ceiling** (managing members). `create_invite`, `list_invites` and `revoke_invite` are `require_human`, owners only; at most 20 invites an hour per person and 50 waiting per vault. Invites are the only way in: `set_member` never adds anyone (`20260925160000_membership_polish.sql`) |
 | Accept an invite | `/invite?token=` (POST `/invite`) | none | person (the invited address) | **Ceiling**: joining is the person's own act. `accept_invite` is `require_human` and checks the signed-in account's email against the invite's |

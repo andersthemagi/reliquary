@@ -35,4 +35,4 @@ Leaving, removal and role changes are logged, by id, never by email.
 
 ## How people are shown
 
-Where the web app names a person (Activity, proposals, threads, Review), it shows their email if they share a vault with you now. Anyone else, like a former member, shows as a short id.
+Where the web app names a person (Activity, proposals, threads, the Inbox, Members), it shows their email if they share a vault with you now, with their display name before it if they set one ("Ana Ruiz (ana@example.com)"; see [Display name](inbox-and-account.md#display-name)). Anyone else, like a former member, shows as a short id.

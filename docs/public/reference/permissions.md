@@ -10,16 +10,16 @@ What people and their agents can each do, where, and who may: every rule here is
 |---|---|---|---|
 | List vaults | Home | `list_vaults` | both |
 | Create a vault | Home, **New vault** | `create_vault` | both, once the account is [admitted](../concepts/plans-and-limits.md#invite-only); an agent needs a read-write connection to all its person's vaults |
-| List, read and search files | a vault's pages, **Search** | `list_files`, `read_file`, `search` | both |
+| List, read and search files | a vault's pages, its **Search**, the top bar's search (every vault at once) | `list_files`, `read_file`, `search` | both |
 | Write or delete an open file | the file's **Edit** page | `write_file`, `delete_file` | both, owners and editors |
 | Propose a write or a delete | the file's page, or saving a canon file | `propose` | both, owners and editors |
 | Propose a stale proposal again | **Propose again** | `propose` with the same text | both |
-| List proposals, read one and its thread | **Review**, a vault's **Proposals** | `list_proposals`, `read_proposal` | both |
+| List proposals, read one and its thread | **Inbox**, a vault's **Proposals** | `list_proposals`, `read_proposal` | both |
 | Revise your own proposal | **Revise** | `revise_proposal` | both, the proposer |
 | Comment on a proposal | the proposal's page | `comment_on_proposal` | both, owners and editors |
 | Approve, request changes, reject | the proposal's page | none | person, owners and editors |
 | Edit, then approve | the proposal's page | none | person, owners and editors |
-| Snooze or unsnooze in Review | the proposal's page or row | none | person |
+| Snooze or unsnooze in the Inbox | the proposal's page or row | none | person |
 | Follow changes | **Activity**, a file's **History** | `changes_since` | both |
 
 ## Vault settings, members and access
@@ -33,7 +33,8 @@ What people and their agents can each do, where, and who may: every rule here is
 | Accept an invite | the invite link | none | person, the invited address |
 | Leave a vault | **Settings**, **Leave this vault** | none | person, any member while another owner remains |
 | See and cut members' agent connections | **Members** | none | person, owners |
-| Create or revoke a token | **Tokens** | none | person |
+| Create or revoke a token | **Tokens and connections** (the account menu) | none | person |
+| Set your display name | **Account settings** | none | person, for themself only |
 | Allow an OAuth client or the CLI | the consent page | none | person |
 | Erase a file | the file's **More**, **Erase** | none | person, owners |
 | Export a vault | **Settings**, **Export** | none | person, owners |

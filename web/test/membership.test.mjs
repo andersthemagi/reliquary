@@ -167,14 +167,14 @@ test("people: a proposal page, its thread and the review list name the proposer 
   const p = await page("bea", `/v/${V.team}/proposals/${proposal}`);
   assert.match(p, /<span>By cy@example\.test<\/span>/);
   assert.match(p, /Comment · cy@example\.test · revision 1/);
-  assert.match(await page("bea", "/review"), /by cy@example\.test · /);
+  assert.match(await page("bea", "/inbox"), /by cy@example\.test · /);
   assert.match(await page("bea", "/"), /by cy@example\.test · /);
 });
 
 test("people: text a member wrote can't pass for a person, and no marker reaches a page", async () => {
   const p = await page("bea", `/v/${V.team}/proposals/${proposal}`);
   assert.match(p, new RegExp(`\\[\\[person:0:${BEA}\\]\\] &lt;b&gt;not bold&lt;/b&gt;`));
-  for (const path of ["/", "/review", "/activity", `/v/${V.team}/activity`, `/v/${V.team}/proposals/${proposal}`, `/v/${V.team}/file?path=notes/cy.md`]) {
+  for (const path of ["/", "/inbox", "/activity", `/v/${V.team}/activity`, `/v/${V.team}/proposals/${proposal}`, `/v/${V.team}/file?path=notes/cy.md`]) {
     assert.doesNotMatch(await page("bea", path), /\[\[person:[0-9a-f]{24}:/, path);
   }
 });

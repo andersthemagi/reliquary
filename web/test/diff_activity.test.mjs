@@ -147,11 +147,11 @@ test("proposal: an unknown view falls back to unified", async () => {
 
 // Activity ------------------------------------------------------------------------------
 
-test("nav: Vaults, Review, Activity, Connect, Tokens, with Activity current on /activity", async () => {
+test("nav: Home, the vault switcher, Activity, Connect, Docs, with Activity current on /activity", async () => {
   const h = await page("/activity");
-  const nav = /<nav aria-label="Main">([\s\S]*?)<\/nav>/.exec(h)[1];
+  const nav = /<nav class="app-nav" aria-label="Main">([\s\S]*?)<\/nav>/.exec(h)[1].replace(/<details[\s\S]*?<\/details>/, '<a href="switcher"');
   const order = [...nav.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(order, ["/", "/review", "/activity", "/connect", "/tokens"]);
+  assert.deepEqual(order, ["/", "switcher", "/activity", "/connect", "/docs"]);
   assert.match(nav, /<a href="\/activity" aria-current="page">Activity<\/a>/);
 });
 
