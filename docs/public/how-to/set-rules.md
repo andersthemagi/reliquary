@@ -15,6 +15,15 @@ Only an owner can set rules, in the web app. What rules mean: [Canon, open and r
 
 Saving a rule for a path that already has one replaces it. The change is logged.
 
+A rule's path is a path inside the vault, written the way files are. The form refuses, and says why, a path that:
+
+- starts with `/` (write `clients/`, not `/clients/`);
+- has a `..` or `.` segment, like `../x` or `./clients/`;
+- has an empty folder name, like `clients//`;
+- has a control character, such as a tab or a line break, or is longer than 1024 characters.
+
+The message shows in the form with a reference; what you typed stays in it to correct.
+
 ## Check what applies
 
 Under **What applies to a path?**, type any path, like `clients/acme/brief.md`, and choose **Check**. The page says whether it is canon or open, which rule decides (or the vault default), and how many approvals a change needs.
@@ -22,6 +31,8 @@ Under **What applies to a path?**, type any path, like `clients/acme/brief.md`, 
 ## Remove a rule
 
 Choose **Remove** next to it. The path then follows the next rule up, or the vault default.
+
+A rule saved before paths were checked, on a path like `../x`, never applied to any file. You can still remove it.
 
 ## Change the vault default
 

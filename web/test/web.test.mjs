@@ -204,6 +204,26 @@ test("rules: owner adds a rule, the checker explains it, and it can be removed",
   assert.match(await page(`${V}/rules?check=clients%2Facme%2Fbrief.md`), /by the vault default/);
 });
 
+test("rules: a path outside the vault is refused in the form, with the reason and a ref", async () => {
+  const token = await csrf(`${V}/rules`);
+  const r = await post(`${V}/rules`, { csrf: token, path: "../x", policy: "canon", quorum: "3" });
+  assert.equal(r.status, 400);
+  const h = await text(r);
+  assert.match(
+    h,
+    /<p class="callout danger" role="alert" id="rule-error">The rule on &quot;..\/x&quot; has a .. segment, which points outside the vault: name the folder or file inside the vault, like clients\/\. \(ref [0-9a-f]{8}\)<\/p>/,
+  );
+  assert.match(h, /name="path" placeholder="clients\/" required value="..\/x" aria-invalid="true"/, "the typed path is kept");
+  assert.match(h, /name="quorum" value="3"/, "the typed approvals are kept");
+  assert.doesNotMatch(h, /is now canon/);
+  assert.doesNotMatch(await page(`${V}/rules`), /<td><code>..\/x<\/code>/, "no rule was saved");
+  for (const path of ["/x", "a//b/", "./a/"]) {
+    const again = await post(`${V}/rules`, { csrf: token, path, policy: "canon", quorum: "1" });
+    assert.equal(again.status, 400, path);
+    assert.match(await text(again), /role="alert" id="rule-error">The rule on .+\(ref [0-9a-f]{8}\)<\/p>/, path);
+  }
+});
+
 test("isolation: someone else's vault, file or proposal looks missing", async () => {
   // The same request for a vault that doesn't exist, byte for byte, but for
   // the vault id the URL itself names and the error's reference and time,
