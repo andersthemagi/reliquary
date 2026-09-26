@@ -46,6 +46,8 @@ The account menu, at the right of the bar, shows who you're signed in as and lin
 - **Account settings** (`/settings`): your display name, your email address, the theme, sign out, sign out everywhere and delete account.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
 - **Connections** (`/connections`): everything that can act as you (tokens, apps and the Reliquary CLI), each with **Revoke**. See [Connections](connections.md).
+- **Send feedback** (`/feedback`), as above.
+- **Welcome tour** (`/welcome`): the short slideshow that opens the first time you sign in. See [Take the welcome tour](../how-to/take-the-welcome-tour.md).
 
 It also switches the theme (Auto, Light or Dark) and signs you out.
 

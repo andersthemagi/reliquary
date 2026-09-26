@@ -13,6 +13,7 @@ import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
 import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, signOutEverywhere } from "./settings.js";
 import { feedbackRoutes } from "./feedback.js";
+import { welcomeLanding, welcomeRoutes } from "./welcome.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure } from "./failure.js";
 import type { Flash, Tone } from "./flash.js";
@@ -55,6 +56,7 @@ export type Ctx = {
   // refusal (message(err), ending in its ref) is danger without saying so.
   setFlash: (message: string, tone?: Tone) => void;
   ip: string; // the client's address, for rate limits only (ratelimit.ts)
+  fresh?: boolean; // the request carries the fresh-sign-in cookie (signin.ts, welcome.ts)
   // The browser session behind the request (auth.ts), for what Account
   // settings asks of Supabase Auth: sign out everywhere, change of email. Absent where a
   // page is built without a request (tests).
@@ -540,6 +542,10 @@ async function route(ctx: Ctx): Promise<Reply> {
     ctx.shell = await asPerson(ctx.userId, loadShell);
     ctx.reviewCount = ctx.shell.counts.review;
   }
+  // A person who has not seen the Welcome tour, right after signing in, is
+  // sent to it once (the cookie is cleared by this landing: server.ts).
+  if (get && ctx.fresh && ctx.shell?.welcome_unseen && welcomeLanding(p)) return { redirect: "/welcome" };
+  if (p === "/welcome" || p.startsWith("/welcome/")) return welcomeRoutes(ctx);
   if (get && p === "/") return home(ctx);
   if (get && p === "/inbox") return inbox(ctx);
   if (!get && p === "/inbox/invites/join") return inboxInviteRoutes(ctx, "join");

@@ -535,3 +535,13 @@ test("config: AUTH_MODE=supabase refuses to start without its settings, naming t
     assert.doesNotMatch(r.stderr, /short-secret-value|secret-db-password|sb_publishable_x/);
   }
 });
+
+test("welcome: a brand-new account's sign-in leaves the fresh-sign-in cookie for the Welcome tour's first landing, for half an hour; an older account's leaves none", async () => {
+  await fake("/_users", { method: "POST", body: JSON.stringify({ email: "new-wren@example.test" }) });
+  const fresh = await signInByCode(A, "new-wren@example.test", "/");
+  const c = fresh.done.headers.getSetCookie().find((x) => x.startsWith("__Host-rlq_fresh="));
+  assert.ok(c, "a new account's sign-in sets the cookie");
+  assert.match(c, /^__Host-rlq_fresh=1; HttpOnly; SameSite=Lax; Path=\/; Max-Age=1800; Secure$/);
+  const old = await signInByCode(A, "ana@example.test", "/");
+  assert.equal(old.done.headers.getSetCookie().some((x) => x.startsWith("__Host-rlq_fresh=")), false, "an existing account's sign-in sets none");
+});

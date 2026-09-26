@@ -87,6 +87,12 @@ export function safeNext(value: string | null | undefined): string {
 export const signinUrl = (next: string) => (safeNext(next) === "/" ? "/signin" : `/signin?next=${encodeURIComponent(safeNext(next))}`);
 
 const NEXT = "rlq_next";
+// Set for half an hour by the sign-in of a brand-new account (auth.ts
+// newAccount), so the first landing on Home or on a
+// vault (where accepting an invite ends) can send a
+// person who has not seen the Welcome tour to it, once (welcome.ts).
+export const FRESH_SIGNIN = "rlq_fresh";
+const freshCookie = () => setCookie(FRESH_SIGNIN, "1", 1800);
 export const EMAIL = /^[^\s@<>()",;:\\]{1,64}@[^\s@<>()",;:\\]{1,190}\.[^\s@<>()",;:\\]{1,63}$/;
 const CODE = /^[0-9]{6,10}$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{16,256}$/;
@@ -308,7 +314,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     if (limited) return out(limited);
     const r = await verifySignin({ email, code });
     if (!r.ok) return out(r.unavailable ? unavailable(i.theme) : { status: 400, html: codeForm(pre(), email, next, i.theme, bad) });
-    cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT));
+    cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT), ...(r.newAccount ? [freshCookie()] : []));
     return out({ redirect: next });
   }
 
@@ -352,6 +358,6 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   } catch {
     back = "/";
   }
-  cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT));
+  cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT), ...(r.newAccount ? [freshCookie()] : []));
   return out({ redirect: back });
 }

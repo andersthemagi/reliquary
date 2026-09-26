@@ -41,6 +41,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Rotate a leaked token](how-to/rotate-a-leaked-token.md)
 - [Delete your account](how-to/delete-your-account.md)
 - [Send feedback or report a bug](how-to/send-feedback.md)
+- [Take the welcome tour](how-to/take-the-welcome-tour.md)
 - [Self-host Reliquary](how-to/self-host.md)
 
 ## Reference

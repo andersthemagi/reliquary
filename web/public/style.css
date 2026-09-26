@@ -1817,3 +1817,17 @@ td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
 
 /* Access log: who, then the client, on one line. */
 table.env-log td[data-label="Environment"] { white-space: nowrap; }
+
+/* The Welcome tour (welcome.ts): one card, one slide at a time. */
+.welcome { max-width: 34rem; margin: var(--space-6) auto; padding: var(--space-5); border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); }
+.welcome h1 { margin: 0 0 var(--space-3); }
+.welcome-sub { margin: 0 0 var(--space-3); font-size: var(--text-lg, 1.125rem); }
+.welcome-step { margin: 0 0 var(--space-2); color: var(--fg-muted); font-size: var(--text-sm); }
+.welcome-body p { margin: 0 0 var(--space-3); max-width: 60ch; }
+.welcome-dots ol { display: flex; gap: var(--space-3); justify-content: center; list-style: none; margin: var(--space-5) 0 var(--space-4); padding: 0; }
+.welcome-dot { display: block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-strong); background: transparent; }
+.welcome-dot[aria-current="step"] { background: var(--primary-bg); border-color: var(--primary-bg); }
+.welcome-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+.welcome-actions form { margin: 0; }
+.welcome-skip { margin: var(--space-4) 0 0; text-align: center; }
+@media (max-width: 640px) { .welcome { margin: var(--space-3) 0; padding: var(--space-4); } }

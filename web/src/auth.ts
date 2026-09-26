@@ -502,7 +502,7 @@ function tokensOf(status: number, json: any): Tokens | undefined {
 
 // otherAddress: a change of address was confirmed at one address, and waits
 // for the other (Supabase's secure email change); no session yet.
-export type SigninResult = { ok: true; cookies: string[] } | { ok: false; unavailable: boolean; otherAddress?: boolean };
+export type SigninResult = { ok: true; cookies: string[]; newAccount: boolean } | { ok: false; unavailable: boolean; otherAddress?: boolean };
 
 // Step 1: ask Supabase to email a code and link. Never tells the caller
 // whether the address has an account: any 4xx (no such user, signups off,
@@ -551,7 +551,9 @@ export async function verifySignin(
       console.info(`auth: new access token refused (${r.reason})`);
       return { ok: false, unavailable: false };
     }
-    return { ok: true, cookies: sessionCookies(t) };
+    // A brand-new account (made in the last day): its first sign-in gets the Welcome tour (welcome.ts).
+    const made = Date.parse(String(json?.user?.created_at ?? ""));
+    return { ok: true, cookies: sessionCookies(t), newAccount: Number.isFinite(made) && Date.now() - made < 86_400_000 };
   } catch (err) {
     if (err instanceof Unavailable) return { ok: false, unavailable: true };
     throw err;

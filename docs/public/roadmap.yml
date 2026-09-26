@@ -171,6 +171,11 @@
   status: shipped
   docs: how-to/send-feedback
 
+- title: Welcome tour
+  summary: A six-step slideshow the first time you sign in, and any time from the account menu.
+  status: shipped
+  docs: how-to/take-the-welcome-tour
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core

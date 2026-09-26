@@ -88,7 +88,8 @@ export type Nav =
   | "search"
   | "settings"
   | "account"
-  | "feedback";
+  | "feedback"
+  | "welcome";
 
 // What the top bar shows, from one call per page (inbox.ts, loadShell;
 // public.shell_summary in 20260926100000_shell_inbox.sql).
@@ -112,6 +113,7 @@ export type Shell = {
   more_vaults: boolean;
   counts: { review: number; revise: number; imports: number; invites: number; notices: number };
   total: number;
+  welcome_unseen?: boolean; // no Welcome tour seen yet (welcome.ts)
   items: ShellItem[];
 };
 
@@ -236,6 +238,7 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
           <li><a href="/account"${current("account")}>Plan and usage</a></li>
           <li><a href="/connections"${current("connections")}>Connections</a></li>
           <li><a href="/feedback?from=${encodeURIComponent(path)}"${current("feedback")}>Send feedback</a></li>
+          <li><a href="/welcome"${current("welcome")}>Welcome tour</a></li>
         </ul>
         <p class="menu-links"><a href="${siteHref("/docs")}">Docs</a><a href="${siteHref("/roadmap")}">Roadmap</a></p>
         <p class="menu-meta">${PRE_ALPHA}</p>

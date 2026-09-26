@@ -94,7 +94,7 @@ function accessToken(sub, email, sessionId) {
 function session(sub, email, sessionId = randomUUID()) {
   const refresh = `rt${randomBytes(9).toString("hex")}`;
   refreshTokens.set(refresh, { sessionId, sub, email, used: false });
-  return { access_token: accessToken(sub, email, sessionId), token_type: "bearer", expires_in: TTL, expires_at: Math.floor(Date.now() / 1000) + TTL, refresh_token: refresh, user: { id: sub, email } };
+  return { access_token: accessToken(sub, email, sessionId), token_type: "bearer", expires_in: TTL, expires_at: Math.floor(Date.now() / 1000) + TTL, refresh_token: refresh, user: { id: sub, email, ...(email.startsWith("new-") ? { created_at: new Date().toISOString() } : {}) } };
 }
 
 const json = (res, status, body) => res.writeHead(status, { "content-type": "application/json" }).end(body === undefined ? "" : JSON.stringify(body));

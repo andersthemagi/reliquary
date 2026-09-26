@@ -33,7 +33,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import http from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { configureAuth, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
+import { clearCookie, configureAuth, cookieName, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
 import { describe, errorPage } from "./errorpage.js";
 import { doing, fail, failure, withRequest } from "./failure.js";
@@ -53,7 +53,8 @@ import { configureMailer } from "./mailer.js";
 import { feedbackTick, flushFeedbackNotices, noticeTarget } from "./feedback.js";
 import { versionJson } from "./version.js";
 import { emailTemplate, selfHosted } from "./selfhost.js";
-import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
+import { welcomeLanding } from "./welcome.js";
+import { FRESH_SIGNIN, safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8790);
@@ -555,6 +556,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       setFlash: (m, tone) => session.setFlash(toFlash(m, tone)),
       ip: clientIp(req),
       session,
+      fresh: readCookie(req, cookieName(FRESH_SIGNIN)) !== undefined,
     };
     let reply: Reply;
     try {
@@ -576,7 +578,9 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       console.info(`${req.method} ${url.pathname} ${res.destroyed && !res.writableFinished ? "aborted" : 200}`);
       return;
     }
-    send(res, reply, {}, auth.cookies);
+    // The fresh-sign-in cookie is good for one landing (welcome.ts).
+    const landed = ctx.fresh && req.method === "GET" && welcomeLanding(url.pathname);
+    send(res, reply, landed ? { "set-cookie": clearCookie(FRESH_SIGNIN) } : {}, auth.cookies);
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
     // Feedback notices waiting (an agent's, or one whose email failed):
     // at most once a minute per instance, after the page has gone out.
