@@ -4,13 +4,14 @@
 
 import type { Writable } from "node:stream";
 import type pg from "pg";
+import type { Session } from "./auth.js";
 import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
 import { callout, csrfField, emptyState, html, page, pageHeader, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
-import { accountSettings, saveDisplayName } from "./settings.js";
+import { accountSettings, saveDisplayName, signOutEverywhere } from "./settings.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure } from "./failure.js";
 import type { Flash, Tone } from "./flash.js";
@@ -53,6 +54,10 @@ export type Ctx = {
   // refusal (message(err), ending in its ref) is danger without saying so.
   setFlash: (message: string, tone?: Tone) => void;
   ip: string; // the client's address, for rate limits only (ratelimit.ts)
+  // The browser session behind the request (auth.ts), for what Account
+  // settings asks of Supabase Auth: sign out everywhere. Absent where a
+  // page is built without a request (tests).
+  session?: Pick<Session, "signOutEverywhere" | "signOut">;
 };
 // formAction: one more origin the page's forms may submit (and redirect) to.
 // download: a file streamed as the response (no-store, as an attachment).
@@ -539,6 +544,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && p === "/search") return searchAll(ctx);
   if (get && p === "/settings") return accountSettings(ctx);
   if (!get && p === "/settings/name") return saveDisplayName(ctx);
+  if (!get && p === "/settings/sign-out-everywhere") return signOutEverywhere(ctx);
   if (get && p === "/activity") return allActivity(ctx);
   if (p === "/connect" || p === "/tokens" || p.startsWith("/tokens/")) return accessRoutes(ctx);
   if (get && p === "/account") return accountPage(ctx);

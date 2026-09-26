@@ -32,7 +32,7 @@ A proposal you snoozed leaves the count and the list until the snooze ends. **Sh
 
 The account menu, at the right of the bar, shows who you're signed in as and links to:
 
-- **Account settings** (`/settings`): your display name, your email, the theme, and sign out.
+- **Account settings** (`/settings`): your display name, your email, the theme, sign out and sign out everywhere.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
 - **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Connections](connections.md).
 
@@ -49,3 +49,11 @@ On **Account settings**, you can give yourself a display name. People who share 
 Only you can set your name, signed in to the web app. An agent can't set or read it, over any tool: it's your profile, like your memberships. See [Agents and the ceiling](agents.md).
 
 Your email is how you sign in and how invites find you. It can't be changed in the web app; ask the operator of your Reliquary.
+
+## Sign out everywhere
+
+**Sign out** on **Account settings** ends your session in this browser. **Sign out everywhere** ends every session of your account at once: in every browser and on every device, this one included. Use it if you signed in on a computer you no longer use, or lost a phone. Pages open elsewhere go to the sign-in page on their next click. Signing in again works right away.
+
+Connections are not sessions. Agent tokens, connected apps (Claude, ChatGPT, Cursor and others) and Reliquary CLI sign-ins keep working after you sign out everywhere, unless you tick **Also revoke all my connections**. That revokes every one of them at once; to revoke them one at a time, use **Tokens and connections**. See [Connections](connections.md).
+
+Only you can sign out everywhere, signed in to the web app. An agent can't do it for you. If Reliquary can't reach its sign-in service, nothing is ended and the page says so, with a reference (see [Errors](../reference/errors.md)).

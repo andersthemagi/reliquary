@@ -439,7 +439,7 @@ test("jwt: refused when tampered, from an unknown key id, anonymous, or without 
 
 // Claims in the database -------------------------------------------------------
 
-test("claims: the database gets only sub and role, so an act claim in the JWT doesn't make the session an agent", async () => {
+test("claims: the database gets only sub, role and the session's iat, so an act claim in the JWT doesn't make the session an agent", async () => {
   // Agents may not mint tokens (supabase/tests/access_tokens_test.sql). If the
   // JWT's act claim reached the database, this would be refused.
   const jar = new Jar({ [AT]: await mint({ sub: EVE, session_id: "eve-1", claims: { act: { sub: "tok", name: "Sneaky agent" }, app_metadata: { role: "owner" } } }) });

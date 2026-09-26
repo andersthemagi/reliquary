@@ -6,7 +6,8 @@
 //   POST /auth/v1/verify                         { type: "email", email, token } or { type: "email", token_hash },
 //                                                or { type: "email_change", token_hash }
 //   POST /auth/v1/token?grant_type=refresh_token rotates; reusing a used refresh token revokes the session
-//   POST /auth/v1/logout                         revokes the bearer's session
+//   POST /auth/v1/logout                         revokes the bearer's session; ?scope=global every
+//                                                session of the bearer's account
 //   GET  /auth/v1/.well-known/jwks.json          the public key (ES256, generated at start)
 //
 // Test-only (never in Supabase):
@@ -18,6 +19,9 @@
 //                                 makes an account for an unknown address (off at start,
 //                                 as in the hosted project)
 //   GET  /_user?email=...         { id } of that account, or null
+//   POST /_users                  { email }: makes that account if it has none; { id }
+//   POST /_fail_global_logout     { status }: answer global logouts with that status
+//                                 (0: as normal)
 //   POST /_email_change           { email, new_email, both }: as if that account asked to
 //                                 change its address; the token hashes "emailed" to the
 //                                 new address and, with both (secure email change), the
@@ -63,7 +67,8 @@ const changes = []; // { pair, email, newEmail, hash, used }
 const lastEmail = new Map();
 const refreshTokens = new Map(); // token -> { sessionId, sub, email, used }
 const revoked = new Set(); // session ids
-const stats = { otp: 0, verify: 0, refresh: 0, logout: 0, jwks: 0, lastCreateUser: undefined };
+const stats = { otp: 0, verify: 0, refresh: 0, logout: 0, logoutGlobal: 0, jwks: 0, lastCreateUser: undefined };
+const failGlobal = { status: 0 }; // /_fail_global_logout: answer global logouts with this status instead
 const TTL = 3600;
 const signups = { on: false };
 
@@ -109,6 +114,15 @@ http
     if (p === "/_user") {
       const id = USERS.get(String(url.searchParams.get("email") ?? "").toLowerCase());
       return json(res, 200, id ? { id } : null);
+    }
+    if (p === "/_users" && req.method === "POST") {
+      const email = String((await readJson(req)).email ?? "").toLowerCase();
+      if (!USERS.has(email)) USERS.set(email, randomUUID());
+      return json(res, 200, { id: USERS.get(email) });
+    }
+    if (p === "/_fail_global_logout" && req.method === "POST") {
+      failGlobal.status = Number((await readJson(req)).status) || 0;
+      return json(res, 200, failGlobal);
     }
     if (p === "/_email_change" && req.method === "POST") {
       const { email, new_email, both } = await readJson(req);
@@ -202,12 +216,19 @@ http
     if (p === "/auth/v1/logout") {
       stats.logout++;
       const token = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+      let claims;
       try {
-        const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
-        revoked.add(claims.session_id);
+        claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
       } catch {
         return json(res, 401, { msg: "bad token" });
       }
+      if (url.searchParams.get("scope") === "global") {
+        stats.logoutGlobal++;
+        if (failGlobal.status) return json(res, failGlobal.status, { msg: "fake refusal" });
+        // Every session of the account: all its refresh tokens stop working.
+        for (const rt of refreshTokens.values()) if (rt.sub === claims.sub) revoked.add(rt.sessionId);
+      }
+      revoked.add(claims.session_id);
       return json(res, 204);
     }
     return json(res, 404, { msg: "not found" });

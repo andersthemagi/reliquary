@@ -10,8 +10,10 @@
 //    in server memory, so any instance accepts any other's cookies. CSRF is
 //    HMAC(SESSION_SECRET, session_id). docs/research/hosting.md, section 3.
 //
-// Either way the database learns only { sub, role: "authenticated" } (see
-// asPerson in db.ts): never an `act`, never any other claim from the JWT.
+// Either way the database learns only { sub, role: "authenticated" } and,
+// with Supabase, the JWT's `iat` (see asPerson in db.ts; the database uses
+// it to end sessions its person signed out everywhere): never an `act`,
+// never any other claim from the JWT.
 //
 // Never log a JWT, refresh token, code, token hash or email. Log lines here
 // name a fixed reason, nothing from the request.
@@ -189,10 +191,21 @@ const mac = (purpose: string, value: string) =>
 export type Session = {
   userId: string;
   csrf: string;
+  // When the session's access JWT was issued (its `iat`, seconds), passed to
+  // the database so it can refuse a session its person signed out
+  // everywhere after (db.ts, private.check_session). None for the local
+  // stand-in, which ends its sessions in memory.
+  issuedAt?: number;
   takeFlash(): Flash | undefined;
   setFlash(flash: Flash): void;
   // Ends the session: Supabase logout (this session only) and cleared cookies.
   signOut(): Promise<void>;
+  // Ends every session of the account at Supabase (logout with
+  // scope=global: every refresh token revoked) and clears this browser's
+  // cookies. "unavailable": Supabase couldn't be reached; "refused": it
+  // answered with a refusal. Either way nothing was ended and the cookies
+  // stay. The database's side (private.session_cutoffs) is the caller's.
+  signOutEverywhere(): Promise<"ok" | "unavailable" | "refused">;
 };
 
 // What a request carries. `cookies` are Set-Cookie values the response must
@@ -256,6 +269,10 @@ function localSession(req: http.IncomingMessage): Lookup {
       },
       signOut: async () => {
         localSessions.delete(sid!);
+      },
+      signOutEverywhere: async () => {
+        for (const [k, v] of localSessions) if (v.userId === s.userId) localSessions.delete(k);
+        return "ok";
       },
     },
     cookies: [],
@@ -338,6 +355,7 @@ function supabaseSessionFor(req: http.IncomingMessage, claims: Claims, accessTok
   return {
     userId: claims.sub,
     csrf: mac("csrf", claims.session_id),
+    issuedAt: typeof claims.iat === "number" && Number.isFinite(claims.iat) ? claims.iat : undefined,
     takeFlash: () => {
       const raw = readCookie(req, cookieName(FLASH));
       if (raw === undefined) return undefined;
@@ -355,6 +373,20 @@ function supabaseSessionFor(req: http.IncomingMessage, claims: Claims, accessTok
       // even if this call fails, but our cookies go either way.
       await gotrue("/logout?scope=local", {}, { authorization: `Bearer ${accessToken}` }).catch(() => undefined);
       cookies.push(...SESSION_COOKIES.map(clearCookie));
+    },
+    signOutEverywhere: async () => {
+      try {
+        const r = await gotrue("/logout?scope=global", {}, { authorization: `Bearer ${accessToken}` });
+        if (r.status < 200 || r.status > 299) {
+          noteUpstream("sign-out (Supabase Auth)", `POST /logout?scope=global answered ${r.status}: Supabase Auth refused to end the account's sessions`);
+          return "refused";
+        }
+      } catch (err) {
+        if (err instanceof Unavailable) return "unavailable";
+        throw err;
+      }
+      cookies.push(...SESSION_COOKIES.map(clearCookie));
+      return "ok";
     },
   };
 }

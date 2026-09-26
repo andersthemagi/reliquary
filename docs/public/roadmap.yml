@@ -151,6 +151,11 @@
   milestone: M1
   docs: concepts/inbox-and-account
 
+- title: Sign out everywhere
+  summary: End every browser session of your account at once from Account settings, and optionally revoke all your connections too.
+  status: shipped
+  docs: concepts/inbox-and-account
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
