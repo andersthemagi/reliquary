@@ -25,6 +25,6 @@ Backups age out on their own schedule after a deletion; see the [privacy policy]
 
 ## Erase a file
 
-For text that must be gone, like personal data or a pasted secret: on a file's page, **More**, **Erase**. The owner types the path to confirm. Every version's text is blanked, and so are the notes and comments on its proposals. The log keeps its entries (who did what, when) and gains one for the erasure. Erased text is never found by search, shown, exported or sent to agents.
+For text that must be gone, like personal data or a pasted secret: on a file's page, **More**, **Erase content**. The owner types the path to confirm. Every version's text is blanked, and so are the notes and comments on its proposals. The log keeps its entries (who did what, when) and gains one for the erasure. Erased text is never found by search, shown, exported or sent to agents.
 
 Deleting a file is different: it keeps the versions. See [Vaults, files and folders](vaults-and-files.md).

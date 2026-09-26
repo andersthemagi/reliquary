@@ -14,9 +14,9 @@ import type pg from "pg";
 import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
-import { csrfField, html, pageHeader, type Raw } from "./html.js";
+import { callout, confirmPage, csrfField, html, pageHeader, type Raw } from "./html.js";
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
-import { vaultShell } from "./files.js";
+import { crumbs as fileCrumbs, deletePath, vaultShell } from "./files.js";
 import { usageSection, vaultUsages } from "./plans.js";
 
 const q = encodeURIComponent;
@@ -261,43 +261,54 @@ async function deleteVault(ctx: Ctx, id: string): Promise<Reply> {
 // ---------------------------------------------------------------------------
 // Erase a file
 
+// Reached from a file page's More menu, so it sits under the file: the
+// crumb runs vault / folders / file / Erase, the tree marks the file, and
+// Cancel goes back to it.
 async function erasePage(ctx: Ctx, id: string, error?: string): Promise<Reply> {
   const path = (ctx.method === "GET" ? ctx.url.searchParams.get("path") : ctx.form.get("path")) ?? "";
-  return page(
-    ctx,
-    id,
-    `Erase ${path}`,
-    async (c, v) => {
-      const f = (
-        await c.query(
-          `select count(fv.id)::int as versions, bool_or(f.deleted_at is null) as live
-             from public.files f left join public.file_versions fv on fv.file_id = f.id and fv.erased_at is null
-            where f.vault_id = $1 and f.path = $2
-            group by f.id`,
-          [id, path],
-        )
-      ).rows[0];
-      if (!f) return null;
-      const head = pageHeader({ crumb: crumb(id, v, "erase"), title: `Erase ${path.split("/").pop()}`, path: true });
-      if (v.role !== "owner") return html`${head}<p class="callout info">Only owners erase a file.</p>`;
-      return html`${head}
-        ${error ? html`<p class="callout danger" role="alert">${error}</p>` : ""}
-        <p class="lede">Erasing <code>${path}</code> blanks the text of all ${plural(f.versions, "version")}, and of every proposal, review note and comment on it, then removes the file. Use it when text must be forgotten, for example on a request to erase personal data.</p>
-        <ul>
-          <li>The activity log keeps its entries, in order: who wrote, proposed or approved what, and when. None of them holds the text.</li>
-          <li>It can’t be undone. Backups hold the text until they age out.</li>
-          <li>To remove a file but keep its history, ${f.live ? html`<a href="${vaultPath(id, `/edit?path=${q(path)}`)}">delete it</a>` : "delete it"} instead.</li>
-        </ul>
-        <form method="post" action="${vaultPath(id, "/erase")}" class="panel">
-          ${csrfField(ctx.csrf)}<input type="hidden" name="path" value="${path}">
-          <label for="cp">Type <strong>${path}</strong> to confirm</label>
-          <input id="cp" type="text" name="confirm_path" required autocomplete="off" spellcheck="false">
-          <div class="actions"><button class="danger">Erase every version</button>
-            <a class="button quiet" href="${f.live ? filePath(id, path) : vaultPath(id)}">Cancel</a></div>
-        </form>`;
-    },
-    error ? 400 : undefined,
-  );
+  const out = await asPerson(ctx.userId, async (c) => {
+    const v = await vault(c, ctx, id);
+    if (!v) return null;
+    const f = (
+      await c.query(
+        `select count(fv.id)::int as versions, bool_or(f.deleted_at is null) as live
+           from public.files f left join public.file_versions fv on fv.file_id = f.id and fv.erased_at is null
+          where f.vault_id = $1 and f.path = $2
+          group by f.id`,
+        [id, path],
+      )
+    ).rows[0] as { versions: number; live: boolean } | undefined;
+    if (!f) return null;
+    const name = path.split("/").pop()!;
+    const where = f.live ? fileCrumbs(id, v, path, false, "Erase") : [{ label: v.name, href: vaultPath(id) }, { label: `Erase ${path}` }];
+    const body =
+      v.role !== "owner"
+        ? html`${pageHeader({ crumb: where, title: `Erase ${name}`, path: true })}${callout("info", "Only owners erase a file.")}`
+        : confirmPage({
+            title: `Erase ${name}`,
+            crumb: where,
+            lede: html`Erasing <code>${path}</code> blanks the text of ${
+              f.versions === 1 ? "its only version" : `all ${plural(f.versions, "version")}`
+            }, and of every proposal, review note and comment on it, then removes the file. Use it when text must be forgotten, for example on a request to erase personal data.`,
+            consequences: [
+              "The activity log keeps its entries, in order: who wrote, proposed or approved what, and when. None of them holds the text.",
+              "It can’t be undone. Backups hold the text until they age out.",
+              html`To remove a file but keep its history, ${
+                f.live ? html`<a href="${deletePath(id, path)}">delete it</a>` : "delete it"
+              } instead.`,
+            ],
+            action: vaultPath(id, "/erase"),
+            csrf: ctx.csrf,
+            fields: { path },
+            typed: { value: path, name: "confirm_path" },
+            button: `Erase ${name}`,
+            cancel: f.live ? filePath(id, path) : vaultPath(id),
+            error,
+          });
+    return vaultShell(c, ctx, v, f.live ? { path, section: "files" } : { section: "settings" }, body);
+  });
+  if (!out) return notFound(ctx);
+  return { ...render(ctx, `Erase ${path}`, out, "vaults"), status: error ? 400 : undefined };
 }
 
 async function eraseFile(ctx: Ctx, id: string): Promise<Reply> {

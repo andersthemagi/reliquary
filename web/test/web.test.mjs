@@ -137,7 +137,7 @@ test("edit, then approve: my edit lands, credited to me", async () => {
   assert.match(h, /Edited before approving · you · revision 2/);
   const f = await page(`${V}/file?path=canon%2Fscope.md`);
   assert.match(f, /Scope: the booking flow only\./);
-  assert.match(f, /Last written by you<\/span>/);
+  assert.match(f, /Last written by you · <time datetime=/);
 });
 
 // Files and folders --------------------------------------------------------
@@ -173,7 +173,7 @@ test("file: markdown renders, raw HTML stays text, unsafe links are dropped", as
 test("file: canon files offer a proposal, not an edit, and show open proposals", async () => {
   const h = await page(`${V}/file?path=canon%2Fpricing.md`);
   assert.match(h, />Propose a change</);
-  assert.match(h, /open proposal for this file/);
+  assert.match(h, /<div class="callout warning"><p>(?:A proposed change to this file is|\d+ proposed changes to this file are) waiting for review\. <a href="[^"]+">Review (?:it|them)<\/a>/);
   assert.match(await page(`${V}/edit?path=canon%2Fpricing.md`), /value="propose"/);
 });
 

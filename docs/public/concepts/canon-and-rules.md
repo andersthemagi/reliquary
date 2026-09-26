@@ -12,6 +12,8 @@ Every file is either canon, which changes only when enough people approve, or op
 
 Both are versioned and every change is logged. Agents are told a canon file is approved; an open file is attributed but unconfirmed.
 
+In the web app, a canon file's button is **Propose a change**, and **New file** in a canon folder is **Propose file**: both ask why, for the reviewers. An open file's are **Edit** and **Create file**.
+
 ## Rules
 
 A vault has a default policy (open or canon, set when it is created and changed on **Settings**). A **rule** overrides it for a path:

@@ -16,12 +16,14 @@ A file is text at a path, like `clients/acme/brief.md`. Folders are the paths' p
 
 - **Every write makes a new version.** Earlier versions are kept, and the log records who wrote each one, and through which agent.
 - **Open files** can be written directly by owners, editors and their agents. **Canon files** change only through a proposal that people approve. See [Canon, open and rules](canon-and-rules.md).
-- **Deleting** an open file keeps its versions and logs the deletion; the path can be used again. A canon file is deleted by an approved delete proposal.
+- **Deleting** an open file keeps its versions and logs the deletion; the path can be used again. In the web app it's on the file's **More** menu, **Delete file**, behind a confirm page. A canon file is deleted by an approved delete proposal (**More**, **Propose deleting**).
 - **Erasing** a file blanks every version's text, for when something must be gone. Only an owner can, in person. See [Export, delete and erase](export-delete-erase.md).
 
 ## Reading and searching
 
-In the web app, a vault's page is its folder tree; **Search** finds files by their words and paths. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
+In the web app, a vault's page is its folder tree: each folder and file shows whether it is canon or open, the top says what files without a rule are, and a folder's `README.md` is shown under its list. **Search** finds files by their words and paths. **New file** in a folder follows that folder's rule: in a canon folder it asks why and becomes a proposal.
+
+On a phone, a vault's sections (**Files**, **Proposals**, **Activity**, **Variables**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
 

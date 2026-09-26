@@ -1,6 +1,6 @@
-// Proposing to delete a canon file from the web UI: the file's edit page
-// (reached from the file page's "Propose a change") has a "Propose deleting
-// this file" form (action propose-delete in src/pages.ts). Posting it makes a
+// Proposing to delete a canon file from the web UI: the file page's More
+// menu has "Propose deleting…", a confirm page with a reason (action
+// propose-delete in src/files.ts). Posting it makes a
 // delete proposal and leaves the file; approving it removes the file. The
 // database rules are in supabase/tests/delete_test.sql.
 //
@@ -118,12 +118,17 @@ let proposal = "";
 
 test("propose-delete: from a canon file's page, a person proposes deleting it, and the file stays until approved", async () => {
   const file = await page(filePage());
-  assert.match(file, new RegExp(`href="/v/${vault}/edit\\?path=canon%2Fold-terms\\.md"`), "the file page links to its edit page");
-  const { action, fields } = formFields(await page(editPage()), "Propose deleting this file");
+  const confirm = `/v/${vault}/file?path=canon%2Fold-terms.md&amp;confirm=delete`;
+  assert.match(file, new RegExp(`<a class="menu-item" href="${confirm.replace(/[.?]/g, "\\$&")}"><span class="menu-item-title">Propose deleting…</span>`), "the file page's More menu links to the confirm page");
+  assert.doesNotMatch(await page(editPage()), /propose-delete|Propose deleting/, "the editor has no delete");
+  const confirmPage = await page(confirm.replace("&amp;", "&"));
+  assert.match(confirmPage, /<h1 class="path">Propose deleting old-terms\.md<\/h1>/);
+  assert.match(confirmPage, /<input id="why" type="text" name="reason" required value="Delete canon\/old-terms\.md">/);
+  const { action, fields } = formFields(confirmPage, "Propose deleting old-terms.md");
   assert.equal(fields.action, "propose-delete");
   assert.equal(fields.path, PATH);
 
-  const r = await post(action, fields);
+  const r = await post(action, { ...fields, reason: "Replaced by the new terms" });
   assert.equal(r.status, 303);
   const loc = r.headers.get("location");
   const m = new RegExp(`^/v/${vault}/proposals/([0-9a-f-]{36})$`).exec(loc);

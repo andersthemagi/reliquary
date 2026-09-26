@@ -1,17 +1,33 @@
-// Files and folders: the vault shell (sidebar, search box and folder tree),
-// folder and file pages, the editor, New file, and the file form's actions.
+// Files and folders: the vault shell (sidebar, search box and folder tree,
+// and the section tabs on phones), folder and file pages, the editor, New
+// file, deleting a file behind a confirm page, and the file form's actions.
 // Each handler runs its queries as the signed-in person through asPerson();
 // the database decides what they may see and do.
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { activityBody } from "./activity.js";
-import { csrfField, html, pageHeader, raw, when, type Raw } from "./html.js";
+import {
+  callout,
+  confirmPage,
+  csrfField,
+  emptyState,
+  html,
+  menu,
+  pageHeader,
+  policyBadge,
+  raw,
+  tabs,
+  time,
+  type CrumbPart,
+  type MenuItem,
+  type Raw,
+} from "./html.js";
+import { siteHref } from "./hosts.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage } from "./errorpage.js";
 import { failure } from "./failure.js";
 import {
-  ago,
   canWrite,
   filePath,
   message,
@@ -19,7 +35,6 @@ import {
   proposalPath,
   q,
   render,
-  tag,
   treePath,
   vault,
   vaultPath,
@@ -76,10 +91,20 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
       (f) => html`<li class="leaf"><a href="${filePath(v.id, f.path)}"${here === f.path ? raw(' aria-current="page"') : ""}>${f.name}</a></li>`,
     )}</ul>`;
 
-  const link = (section: Section, href: string, label: Raw | string) =>
-    html`<a href="${href}"${current.section === section ? raw(' aria-current="page"') : ""}>${label}</a>`;
+  // The vault's sections: the sidebar's links on wide screens, a row of tabs
+  // on phones (always visible, with the open proposals' count), so no
+  // section hides behind the folder tree.
+  const sections: { section: Section; href: string; label: string; count?: number }[] = [
+    { section: "files", href: vaultPath(v.id), label: "Files" },
+    { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined },
+    { section: "activity", href: vaultPath(v.id, "/activity"), label: "Activity" },
+    { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables" },
+    { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings" },
+  ];
   // Settings holds Rules, so the Rules page marks Settings as current.
-  const settingsLink = () => link(current.section === "rules" ? "rules" : "settings", vaultPath(v.id, "/config"), "Settings");
+  const isCurrent = (s: Section) => current.section === s || (s === "settings" && current.section === "rules");
+  const link = (s: (typeof sections)[number]) =>
+    html`<a href="${s.href}"${isCurrent(s.section) ? raw(' aria-current="page"') : ""}>${s.label}${s.count ? html`<span class="count">${s.count}</span>` : ""}</a>`;
   const tree = files.length ? renderNode(root, "") : html`<p class="muted small tree-empty">No files yet.</p>`;
   return html`<div class="vault">
     <aside class="side">
@@ -87,20 +112,15 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
       <form class="side-search" method="get" action="${vaultPath(v.id, "/search")}" role="search">
         <input type="search" name="q" placeholder="Search this vault" aria-label="Search this vault" value="${current.section === "search" ? ctx.url.searchParams.get("q") ?? "" : ""}">
       </form>
-      <nav class="side-links" aria-label="Vault">
-        ${link("files", vaultPath(v.id), "Files")}
-        ${link("proposals", vaultPath(v.id, "/proposals"), html`Proposals${open ? html`<span class="count">${open}</span>` : ""}`)}
-        ${link("activity", vaultPath(v.id, "/activity"), "Activity")}
-        ${link("variables", vaultPath(v.id, "/variables"), "Variables")}
-        ${settingsLink()}
-      </nav>
+      <nav class="side-links" aria-label="Vault">${sections.map(link)}</nav>
       <nav class="tree" aria-label="Files">${tree}</nav>
     </aside>
-    <details class="tree-mobile"><summary>Browse ${v.name}</summary>
-      <nav class="side-links" aria-label="Vault (mobile)">
-        ${link("files", vaultPath(v.id), "Files")}${link("proposals", vaultPath(v.id, "/proposals"), "Proposals")}${link("activity", vaultPath(v.id, "/activity"), "Activity")}${link("variables", vaultPath(v.id, "/variables"), "Variables")}${settingsLink()}
-      </nav>
-      <nav class="tree" aria-label="Files (mobile)">${tree}</nav></details>
+    <div class="vault-tabs">${tabs(
+      sections.map((s) => ({ href: s.href, label: s.label, count: s.count, current: isCurrent(s.section) })),
+      "Vault (phone)",
+    )}</div>
+    <details class="tree-mobile"><summary>Browse files</summary>
+      <nav class="tree" aria-label="Files (phone)">${tree}</nav></details>
     <div class="content">${body}</div>
   </div>`;
 }
@@ -131,23 +151,38 @@ export async function ruleFor(c: pg.PoolClient, id: string, path: string): Promi
 }
 
 export function ruleLine(ctx: Ctx, id: string, r: RuleInfo): Raw {
-  if (!r.rule) return html`<p class="rule">${tag(r.def)} <span>The vault default. <a href="${vaultPath(id, "/rules")}">Rules</a></span></p>`;
+  if (!r.rule) return html`<p class="rule">${policyBadge(r.def)} <span>The vault default. <a href="${vaultPath(id, "/rules")}">Rules</a></span></p>`;
   const needs = r.rule.policy === "canon" ? ` Changes need ${r.rule.quorum} approval${r.rule.quorum > 1 ? "s" : ""}.` : "";
-  return html`<p class="rule">${tag(r.rule.policy)} <span>From the rule on <a href="${vaultPath(id, "/rules")}"><code>${r.rule.path}</code></a>${
-    r.rule.set_at ? `, set by ${who(ctx, r.rule.set_by, null)} ${ago(r.rule.set_at)}` : ""
+  return html`<p class="rule">${policyBadge(r.rule.policy)} <span>From the rule on <a href="${vaultPath(id, "/rules")}"><code>${r.rule.path}</code></a>${
+    r.rule.set_at ? html`, set by ${who(ctx, r.rule.set_by, null)} ${time(r.rule.set_at)}` : ""
   }.${needs}</span></p>`;
 }
 
-export function crumbs(id: string, v: Vault, path: string, isDir: boolean): Raw {
-  const parts = path.split("/").filter(Boolean);
-  const links: Raw[] = [html`<a href="${vaultPath(id)}">${v.name}</a>`];
-  const upto = isDir ? parts.length : parts.length - 1;
-  for (let i = 0; i < upto; i++) {
-    const dir = parts.slice(0, i + 1).join("/") + "/";
-    links.push(html`<a href="${treePath(id, dir)}">${parts[i]}</a>`);
-  }
-  return html`<p class="crumb">${links.map((l, i) => html`${i ? html`<span aria-hidden="true"> / </span>` : ""}${l}`)}</p>`;
+// The vault root's rule line: what a file with no rule is, how many rules
+// there are, and where the terms are explained.
+function rootRuleLine(id: string, def: string, rules: number): Raw {
+  return html`<p class="rule root-rule"><span>Files without a rule are</span> ${policyBadge(def)} <span>${
+    rules ? `${rules} rule${rules === 1 ? "" : "s"} set` : "No rules set"
+  } · <a href="${vaultPath(id, "/rules")}">Rules</a> · <a href="${siteHref("/docs/concepts/canon-and-rules")}">What’s canon?</a></span></p>`;
 }
+
+// Breadcrumb parts from the vault down: vault / folder / … / the file or
+// folder, then `here` (Edit, Delete, Erase, New file) when the page is one
+// step further. The last part is the current page (crumb() in html.ts).
+export function crumbs(id: string, v: Vault, path: string, isDir: boolean, here?: string): CrumbPart[] {
+  const parts = path.split("/").filter(Boolean);
+  const out: CrumbPart[] = [{ label: v.name, href: vaultPath(id) }];
+  parts.forEach((name, i) => {
+    const file = !isDir && i === parts.length - 1;
+    out.push({ label: name, href: file ? filePath(id, path) : treePath(id, parts.slice(0, i + 1).join("/") + "/") });
+  });
+  if (here) out.push({ label: here });
+  return out;
+}
+
+export const deletePath = (id: string, path: string) => `${filePath(id, path)}&confirm=delete`;
+const erasePath = (id: string, path: string) => vaultPath(id, `/erase?path=${q(path)}`);
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // ---------------------------------------------------------------------------
 // Folders and files
@@ -184,29 +219,70 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         if (!prev || prev < f.updated_at) subdirs.set(name, f.updated_at);
       } else here.push(f);
     }
+    // Each subfolder's policy, as the tree shows it (the same rules_for()).
+    const dirPolicy = new Map<string, string>(
+      subdirs.size
+        ? (
+            await c.query(`select path, policy from private.rules_for($1, $2::text[])`, [id, [...subdirs.keys()].map((n) => `${dir}${n}/`)])
+          ).rows.map((r) => [r.path as string, r.policy as string])
+        : [],
+    );
+    // The root states the vault's default and its rules; an empty vault
+    // says whether a proposal waits to add the first file.
+    const info = dir
+      ? null
+      : ((
+          await c.query(
+            `select v.default_policy,
+                    (select count(*)::int from public.path_policies pp where pp.vault_id = v.id) as rules,
+                    (select count(*)::int from public.proposals p where p.vault_id = v.id and p.status = 'open') as open
+               from public.vaults v where v.id = $1`,
+            [id],
+          )
+        ).rows[0] as { default_policy: string; rules: number; open: number });
     const readme = here.find((f) => /^readme\.md$/i.test(f.path.slice(dir.length)));
+    const writer = canWrite(v);
+    const empty = () => {
+      if (info?.open) {
+        return emptyState({
+          title: "No files yet",
+          body: `${info.open === 1 ? "1 proposal waits" : `${info.open} proposals wait`} to add the first file${info.open === 1 ? "" : "s"}.`,
+          action: html`<a class="button" href="${vaultPath(id, "/proposals")}">Review ${info.open === 1 ? "it" : "them"}</a>`,
+        });
+      }
+      return writer
+        ? emptyState({
+            title: "No files yet",
+            body: "Create the first file, or connect an agent and ask it to write one.",
+            action: html`<a class="button" href="${vaultPath(id, "/new")}">New file</a> <a class="button ghost" href="/connect">Connect an agent</a>`,
+          })
+        : emptyState({ title: "No files yet", body: "Nothing has been shared here yet. Files appear here once a member writes one." });
+    };
     const body = html`
       ${pageHeader({
         crumb: dir ? crumbs(id, v, dir, true) : undefined,
         title: dir ? dir.slice(0, -1).split("/").pop()! : v.name,
         path: !!dir,
-        meta: rule ? ruleLine(ctx, id, rule) : undefined,
-        actions: html`${!dir ? html`<a class="button" href="/connect">Connect an agent</a>` : ""}
-          ${canWrite(v) ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : ""}`,
+        meta: rule ? ruleLine(ctx, id, rule) : info ? rootRuleLine(id, info.default_policy, info.rules) : undefined,
+        // On phones the sidebar's search box is hidden: the header offers it.
+        secondary: !dir ? html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a>` : "",
+        primary: writer ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : "",
       })}
       ${children.length === 0
-        ? html`<div class="empty"><strong>This vault is empty.</strong> ${canWrite(v) ? "Create the first file, or connect an agent and ask it to write one." : "Nothing has been shared here yet."}</div>`
-        : html`<div class="table-wrap"><table>
+        ? empty()
+        : html`<div class="table-wrap"><table class="folder-list">
           <tr><th>Name</th><th>Policy</th><th class="num hide-sm">Updated</th></tr>
           ${[...subdirs.entries()].map(
-            ([name, at]) => html`<tr><td><a class="dir" href="${treePath(id, `${dir}${name}/`)}">${name}/</a></td><td></td>
-              <td class="num small muted hide-sm">${ago(at)}</td></tr>`,
+            ([name, at]) => html`<tr><td><a class="dir" href="${treePath(id, `${dir}${name}/`)}">${name}/</a></td><td>${policyBadge(dirPolicy.get(`${dir}${name}/`) ?? "open")}</td>
+              <td class="num small muted hide-sm">${time(at)}</td></tr>`,
           )}
           ${here.map(
-            (f) => html`<tr><td><a href="${filePath(id, f.path)}">${f.path.slice(dir.length)}</a></td><td>${tag(f.policy)}</td>
-              <td class="num small muted hide-sm">${ago(f.updated_at)}</td></tr>`,
+            (f) => html`<tr><td><a href="${filePath(id, f.path)}">${f.path.slice(dir.length)}</a></td><td>${policyBadge(f.policy)}</td>
+              <td class="num small muted hide-sm">${time(f.updated_at)}</td></tr>`,
           )}</table></div>`}
-      ${readme?.body ? html`<h2>${readme.path.slice(dir.length)}</h2><div class="prose entry">${raw(renderMarkdown(readme.body))}</div>` : ""}`;
+      ${readme?.body
+        ? html`<section class="readme" aria-label="${readme.path.slice(dir.length)}"><p class="readme-head"><a href="${filePath(id, readme.path)}">${readme.path.slice(dir.length)}</a></p><div class="prose entry">${raw(renderMarkdown(readme.body))}</div></section>`
+        : ""}`;
     return { v, shell: await vaultShell(c, ctx, v, { path: dir, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -214,6 +290,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
 }
 
 export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
+  if (ctx.url.searchParams.get("confirm") === "delete") return deletePage(ctx, id);
   const path = ctx.url.searchParams.get("path") ?? "";
   const t = ctx.url.searchParams.get("tab");
   const tab = t === "source" || t === "history" ? t : "preview";
@@ -239,27 +316,30 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
         ? await activityBody(c, { me: ctx.userId, url: ctx.url, base: vaultPath(id, "/file"), keep: { path, tab }, scope: { vaultId: id, file: path } })
         : "";
     const canon = f.policy === "canon";
-    const tabLink = (name: string, label: string) =>
-      html`<a href="${filePath(id, path, name === "preview" ? undefined : name)}"${tab === name ? raw(' aria-current="page"') : ""}>${label}</a>`;
+    const writable = canWrite(v) && !f.erased_at;
+    const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
     const body = html`
       ${pageHeader({
         crumb: crumbs(id, v, path, false),
         title: path.split("/").pop()!,
         path: true,
         meta: html`${ruleLine(ctx, id, rule)}
-          <p class="meta"><span>Last written by ${who(ctx, f.author, f.agent)}</span><span>${when(f.created_at)}</span></p>`,
-        actions: html`${v.role === "owner" ? moreMenu(id, path) : ""}${
-          canWrite(v) && !f.erased_at
-            ? html`<a class="button${canon ? "" : " primary"}" href="${vaultPath(id, `/edit?path=${q(path)}`)}">${canon ? "Propose a change" : "Edit"}</a>`
-            : ""
-        }`,
+          <p class="meta file-meta">Last written by ${who(ctx, f.author, f.agent)} · ${time(f.created_at)}</p>`,
+        secondary: moreMenu(id, path, { canon, writable, owner: v.role === "owner" }),
+        primary: writable
+          ? html`<a class="button${canon ? "" : " primary"}" href="${vaultPath(id, `/edit?path=${q(path)}`)}">${canon ? "Propose a change" : "Edit"}</a>`
+          : "",
+        tabs: [tab_("preview", "Preview"), tab_("source", "Source"), tab_("history", "History")],
+        tabsLabel: "File view",
       })}
       ${pending.length
-        ? html`<p class="callout info">${pending.length === 1
-            ? html`There’s an open proposal for this file. <a href="${proposalPath(id, pending[0].id)}">Review it</a>`
-            : html`There are ${pending.length} open proposals for this file. <a href="${vaultPath(id, "/proposals")}">Review them</a>`}</p>`
+        ? callout(
+            canon ? "warning" : "info",
+            pending.length === 1
+              ? html`<p>A proposed change to this file is waiting for review. <a href="${proposalPath(id, pending[0].id)}">Review it</a></p>`
+              : html`<p>${pending.length} proposed changes to this file are waiting for review. <a href="${vaultPath(id, "/proposals")}">Review them</a></p>`,
+          )
         : ""}
-      <nav class="tabs" aria-label="File view">${tabLink("preview", "Preview")}${tabLink("source", "Source")}${tabLink("history", "History")}</nav>
       ${f.erased_at
         ? html`<div class="empty">This file’s content was erased.</div>`
         : tab === "preview"
@@ -273,11 +353,77 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
   return render(ctx, path, data.shell, "vaults");
 }
 
-// The file page's "More" menu: rare or irreversible actions, each through
-// its own confirm page.
-const moreMenu = (id: string, path: string) =>
-  html`<details class="menu-wrap more-menu"><summary class="button quiet">More</summary>
-    <div class="menu"><a class="danger" href="${vaultPath(id, `/erase?path=${q(path)}`)}">Erase this file…</a></div></details>`;
+// The file page's "More" menu: the rare and destructive actions, each through
+// its own confirm page. Writers delete (canon: propose deleting); owners also
+// erase. Nothing for a viewer.
+function moreMenu(id: string, path: string, o: { canon: boolean; writable: boolean; owner: boolean }): Raw | "" {
+  const items: MenuItem[] = [];
+  if (o.writable) {
+    items.push(
+      o.canon
+        ? { href: deletePath(id, path), label: "Propose deleting…", description: "A proposal: the file stays until it’s approved" }
+        : { href: deletePath(id, path), label: "Delete file…", description: "Removes the file; its history stays", danger: true },
+    );
+  }
+  if (o.owner) items.push({ href: erasePath(id, path), label: "Erase content…", description: "Blanks every version; for personal data", danger: true });
+  return items.length ? menu({ label: "More", items, className: "file-more" }) : "";
+}
+
+// Delete a file, or propose deleting a canon one, behind a confirm page
+// reached from the More menu (GET /v/:id/file?path=…&confirm=delete). The
+// post is the file form's delete or propose-delete; the database decides.
+async function deletePage(ctx: Ctx, id: string): Promise<Reply> {
+  const path = ctx.url.searchParams.get("path") ?? "";
+  const data = await asPerson(ctx.userId, async (c) => {
+    const v = await vault(c, ctx, id);
+    if (!v || !canWrite(v)) return null;
+    const f = (
+      await c.query(
+        `select (private.rule_for(f.vault_id, f.path)).policy,
+                (select count(*)::int from public.file_versions x where x.file_id = f.id) as versions
+           from public.files f join public.file_versions fv on fv.id = f.current_version_id
+          where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
+        [id, path],
+      )
+    ).rows[0] as { policy: string; versions: number } | undefined;
+    if (!f) return null;
+    const name = path.split("/").pop()!;
+    const canon = f.policy === "canon";
+    const body = canon
+      ? html`${pageHeader({ crumb: crumbs(id, v, path, false, "Propose deleting"), title: `Propose deleting ${name}`, path: true })}
+        <p class="lede confirm-lede">This file is canon, so deleting it is a proposal. The file stays, unchanged, until enough people approve it.</p>
+        <ul class="consequences">
+          <li>Once approved, <code>${path}</code> leaves the folder, search and agents’ reads. Its ${plural(f.versions, "version")} and the activity log stay.</li>
+          <li>Reviewers see your reason with the proposal.</li>
+        </ul>
+        <form method="post" action="${vaultPath(id, "/file")}" class="panel confirm">
+          ${csrfField(ctx.csrf)}<input type="hidden" name="path" value="${path}"><input type="hidden" name="action" value="propose-delete">
+          <label for="why">Why delete it</label>
+          <input id="why" type="text" name="reason" required value="Delete ${path}">
+          <div class="actions"><button class="danger">Propose deleting ${name}</button><a class="button quiet" href="${filePath(id, path)}">Cancel</a></div>
+        </form>`
+      : confirmPage({
+          title: `Delete ${name}`,
+          crumb: crumbs(id, v, path, false, "Delete"),
+          lede: html`Deleting <code>${path}</code> removes it from the vault: it leaves the folder, search and agents’ reads at once.`,
+          consequences: [
+            `Its ${plural(f.versions, "version")} and the activity log stay: who wrote what, and when.`,
+            "The path is free again: a file written there later starts fresh.",
+            v.role === "owner"
+              ? html`To blank the text as well, for example personal data, <a href="${erasePath(id, path)}">erase it</a> instead.`
+              : "To blank the text as well, ask an owner to erase it instead.",
+          ],
+          action: vaultPath(id, "/file"),
+          csrf: ctx.csrf,
+          fields: { path, action: "delete" },
+          button: `Delete ${name}`,
+          cancel: filePath(id, path),
+        });
+    return { v, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
+  });
+  if (!data) return notFound(ctx);
+  return render(ctx, `Delete ${path}`, data.shell, "vaults");
+}
 
 export async function editView(ctx: Ctx, id: string): Promise<Reply> {
   const path = ctx.url.searchParams.get("path") ?? "";
@@ -294,34 +440,29 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
     ).rows[0];
     if (!f) return null;
     const canon = f.policy === "canon";
+    // No delete here: it lives in the file page's More menu, behind a
+    // confirm page, away from Save. On canon the required "Why" comes before
+    // the text, so it's on screen with the header's button.
     const body = html`
       ${pageHeader({
-        crumb: crumbs(id, v, path, false),
+        crumb: crumbs(id, v, path, false, canon ? "Propose a change" : "Edit"),
         title: `${canon ? "Propose a change to" : "Edit"} ${path.split("/").pop()}`,
         path: true,
-        actions: html`<a class="button quiet" href="${filePath(id, path)}">Cancel</a>
-          <button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>`,
+        description: canon ? "This file is canon, so your edit becomes a proposal that people approve." : undefined,
+        secondary: html`<a class="button quiet" href="${filePath(id, path)}">Cancel</a>`,
+        primary: html`<button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>`,
       })}
-      ${canon ? html`<p class="lede">This file is canon, so your edit becomes a proposal that people approve.</p>` : ""}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="edit-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="path" value="${path}">
         <input type="hidden" name="action" value="${canon ? "propose" : "write"}">
+        ${canon ? html`<label for="r">Why this change</label>
+          <p class="hint" id="r-hint">Reviewers see this after the diff.</p>
+          <input id="r" type="text" name="reason" required aria-describedby="r-hint">` : ""}
         <label for="content">Text</label>
         <textarea id="content" name="content">${f.body}</textarea>
-        ${canon ? html`<label for="r">Why this change</label><input id="r" type="text" name="reason" required>
-          <p class="hint">Reviewers see this after the diff.</p>` : ""}
         <div class="actions"><button class="primary">${canon ? "Propose change" : "Save"}</button>
           <a class="button quiet" href="${filePath(id, path)}">Cancel</a></div>
-      </form>
-      <h2>Delete</h2>
-      <form method="post" action="${vaultPath(id, "/file")}" class="danger-zone">
-        ${csrfField(ctx.csrf)}
-        <input type="hidden" name="path" value="${path}">
-        <input type="hidden" name="action" value="${canon ? "propose-delete" : "delete"}">
-        ${canon ? html`<input type="hidden" name="reason" value="Delete ${path}">` : ""}
-        <p class="muted small">${canon ? "Deleting a canon file is a proposal too." : "The file’s history stays in the activity log."}</p>
-        <button class="danger">${canon ? "Propose deleting this file" : "Delete this file"}</button>
       </form>`;
     return { v, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
   });
@@ -330,26 +471,39 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
 }
 
 export async function newFile(ctx: Ctx, id: string): Promise<Reply> {
-  const dir = (ctx.url.searchParams.get("dir") ?? "").replace(/^\/+/, "");
+  const given = (ctx.url.searchParams.get("dir") ?? "").replace(/^\/+/, "");
+  const dir = given ? given.replace(/\/*$/, "/") : "";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v || !canWrite(v)) return null;
+    // The folder's rule decides the form: canon asks why and proposes; open
+    // creates. A path typed into another folder still follows that folder's
+    // rule when posted (fileAction), so the open form carries a reason too.
+    const rule = await ruleFor(c, id, dir);
+    const canon = (rule.rule?.policy ?? rule.def) === "canon";
+    const verb = canon ? "Propose file" : "Create file";
     const body = html`
       ${pageHeader({
-        crumb: dir ? crumbs(id, v, dir, true) : undefined,
+        crumb: dir ? crumbs(id, v, dir, true, "New file") : [{ label: v.name, href: vaultPath(id) }, { label: "New file" }],
         title: "New file",
-        actions: html`<a class="button quiet" href="${treePath(id, dir)}">Cancel</a>
-          <button class="primary" form="new-file">Create file</button>`,
+        description: canon ? "Files here are canon, so a new file becomes a proposal that people approve." : undefined,
+        meta: ruleLine(ctx, id, rule),
+        secondary: html`<a class="button quiet" href="${treePath(id, dir)}">Cancel</a>`,
+        primary: html`<button class="primary" form="new-file">${verb}</button>`,
       })}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="new-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="action" value="create">
-        <label for="p">Path</label><input id="p" type="text" name="path" value="${dir}" placeholder="notes/standup.md" required>
-        <p class="hint">Folders are part of the path. A path under a canon folder becomes a proposal.</p>
+        <label for="p">Path</label>
+        <p class="hint" id="p-hint">Folders are part of the path. A path under a canon folder becomes a proposal.</p>
+        <input id="p" type="text" name="path" value="${dir}" placeholder="${dir}new-file.md" required aria-describedby="p-hint">
+        ${canon
+          ? html`<label for="r">Why this file</label>
+            <p class="hint" id="r-hint">Reviewers see this with the proposal.</p>
+            <input id="r" type="text" name="reason" required aria-describedby="r-hint">`
+          : html`<input type="hidden" name="reason" value="New file">`}
         <label for="c">Text</label><textarea id="c" name="content"></textarea>
-        <label for="r">Why (only used if this becomes a proposal)</label>
-        <input id="r" type="text" name="reason" value="New file">
-        <div class="actions"><button class="primary">Create file</button>
+        <div class="actions"><button class="primary">${verb}</button>
           <a class="button quiet" href="${treePath(id, dir)}">Cancel</a></div>
       </form>`;
     return { v, shell: await vaultShell(c, ctx, v, { path: dir, section: "files" }, body) };
@@ -402,14 +556,14 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
       return { kind: "proposed", pid } as const;
     });
     if (outcome.kind === "delete") {
-      ctx.setFlash(`Deleted ${path}.`);
+      ctx.setFlash(`Deleted ${path}.`, "success");
       return { redirect: vaultPath(id) };
     }
     if (outcome.kind === "proposed") {
-      ctx.setFlash("Proposed. It applies once enough people approve it.");
+      ctx.setFlash("Proposed. It applies once enough people approve it.", "success");
       return { redirect: proposalPath(id, outcome.pid) };
     }
-    ctx.setFlash(`Saved ${path}.`);
+    ctx.setFlash(`Saved ${path}.`, "success");
     return { redirect: filePath(id, path) };
   } catch (err) {
     if ((err as { code?: string }).code === "RLV01") return notFound(ctx);

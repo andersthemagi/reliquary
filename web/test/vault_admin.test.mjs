@@ -168,8 +168,8 @@ after(async () => {
 
 test("vault settings: the sidebar links to Settings, which holds Rules, rename and default policy, Export and a Danger zone", async () => {
   const home = await page(`/v/${V.own}`);
-  assert.equal(home.split(`href="/v/${V.own}/config"`).length - 1, 2, "wide and narrow sidebars");
-  const sideLinks = home.match(/<nav class="side-links"[^>]*>[\s\S]*?<\/nav>/g);
+  assert.equal(home.split(`href="/v/${V.own}/config"`).length - 1, 2, "the wide sidebar and the phone tabs");
+  const sideLinks = home.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
   assert.equal(sideLinks.length, 2);
   for (const nav of sideLinks) assert.doesNotMatch(nav, /\/rules"/, "Rules moved under Settings");
   const h = await page(`/v/${V.own}/config`);
@@ -330,9 +330,9 @@ test("export: an editor gets no download; the database refuses a forged post", a
 
 test("erase: an owner's file page has a More menu with Erase; an editor's has none", async () => {
   const h = await page(`/v/${V.erase}/file?path=people/pat.md`);
-  assert.match(h, /<details class="menu-wrap more-menu"><summary class="button quiet">More<\/summary>/);
-  assert.match(h, new RegExp(`<a class="danger" href="/v/${V.erase}/erase\\?path=people%2Fpat\\.md">Erase this file…</a>`));
-  assert.doesNotMatch(await page(`/v/${V.walt}/file?path=walt.md`), /more-menu|\/erase\?/);
+  assert.match(h, /<details class="menu-wrap action-menu file-more">\s*<summary class="button">More<\/summary>/);
+  assert.match(h, new RegExp(`<a class="menu-item danger" href="/v/${V.erase}/erase\\?path=people%2Fpat\\.md"><span class="menu-item-title">Erase content…</span>`));
+  assert.doesNotMatch(await page(`/v/${V.walt}/file?path=walt.md`), /\/erase\?|Erase content/);
 });
 
 test("erase: the confirm page explains that every version is blanked and the log keeps its sequence, and asks for the path", async () => {
@@ -340,7 +340,7 @@ test("erase: the confirm page explains that every version is blanked and the log
   assert.match(h, /blanks the text of all 2 versions, and of every proposal, review note and comment on it/);
   assert.match(h, /The activity log keeps its entries, in order/);
   assert.match(h, /Type <strong>people\/pat\.md<\/strong> to confirm/);
-  assert.match(h, /<input id="cp" type="text" name="confirm_path" required/);
+  assert.match(h, /<input id="confirm-typed" type="text" name="confirm_path" required/);
   assert.equal((await get(`/v/${V.erase}/erase?path=nope.md`)).status, 404);
 });
 

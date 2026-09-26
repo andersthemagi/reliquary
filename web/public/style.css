@@ -1375,3 +1375,40 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure-details > summary { cursor: pointer; width: fit-content; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .failure-details > summary:hover { color: var(--fg); }
 .failure-details[open] > summary { margin-bottom: var(--space-3); }
+
+/* Package B: files and folders */
+/* A vault's sections as tabs on phones (files.ts vaultShell): the sidebar
+   holds them on wide screens, so the row shows only below 768px. The folder
+   tree stays behind "Browse files". */
+.vault-tabs { display: none; min-width: 0; }
+.vault-tabs > .tabs { margin: 0; }
+/* The root's Search button stands in for the sidebar's search box, which is
+   hidden on phones. */
+.vault-search-link { display: none; }
+@media (max-width: 767px) {
+  .vault-tabs { display: block; }
+  .vault-search-link { display: inline-flex; }
+  .tree-mobile > summary { width: 100%; justify-content: space-between; }
+}
+/* The root's rule line: the default, the rules, what canon means. */
+.root-rule .badge { margin: 0 calc(-1 * var(--space-1)); }
+/* Folder table: the policy column holds a badge, so rows keep one height. */
+.folder-list td:nth-child(2) { width: 1%; white-space: nowrap; }
+/* A folder's README, boxed under the list with its file name as the header
+   bar (not a second heading above the README's own). */
+.readme { margin-top: var(--space-6); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden; }
+.readme-head {
+  margin: 0; padding: var(--space-3) var(--space-5); background: var(--bg-subtle); border-bottom: 1px solid var(--border);
+  font: 500 var(--text-sm)/var(--lh-sm) var(--font-mono);
+}
+.readme-head a { color: var(--fg-muted); text-decoration: none; }
+.readme-head a:hover { color: var(--link); text-decoration: underline; }
+.readme > .prose { border: 0; border-radius: 0; }
+/* File page: "Last written by … · 6 min ago" on one line where it fits. */
+.file-meta { overflow-wrap: anywhere; }
+/* Delete and erase items say what they do under their label. */
+.file-more .action-list { min-width: 260px; }
+@media (max-width: 640px) {
+  .readme-head { padding: var(--space-3) var(--space-4); }
+  .file-more .action-list { min-width: 0; width: min(18rem, calc(100vw - 2 * var(--space-5))); }
+}
