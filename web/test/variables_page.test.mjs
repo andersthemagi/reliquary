@@ -430,7 +430,7 @@ test("variables log: next to a value, who read or revealed it since it was set, 
   noValues(h);
   const dev = /<td data-label="development">[\s\S]*?<\/td>/.exec(h.slice(h.indexOf("<code>API_KEY</code>")))[0];
   assert.match(dev, /Since then: .*read by you \(CLI\).*revealed by you|Since then: .*revealed by you.*read by you \(CLI\)/);
-  assert.match(dev, /href="\/tokens"><span class="menu-item-title">Manage CLI sign-ins<\/span>/);
+  assert.match(dev, /href="\/connections"><span class="menu-item-title">Manage connections<\/span>/);
   // Setting it again starts over.
   await post(vp(V.own, "/set"), { name: "API_KEY", environment: "development", value: value("own-dev-2") });
   const after = /<td data-label="development">[\s\S]*?<\/td>/.exec((await page(vp(V.own))).split("<code>API_KEY</code>")[1])[0];

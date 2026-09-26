@@ -254,6 +254,12 @@ test("authorize: the consent page names the client, the redirect host and the re
   assert.doesNotMatch(h, /loopback-warning/);
 });
 
+test("authorize: the consent page says the app shows on Connections, where it is revoked", async () => {
+  const h = await (await authorizeGet(authParams())).text();
+  assert.match(h, /It shows on your <a href="\/connections">Connections<\/a> page as an app, where you can revoke it any time\./);
+  assert.doesNotMatch(h, /Tokens<\/a> page|href="\/tokens/);
+});
+
 test("authorize: the page may send its form to the client's origin, and nowhere else", async () => {
   const csp = (await authorizeGet(authParams())).headers.get("content-security-policy");
   assert.match(csp, /form-action 'self' https:\/\/app\.client\.test;/);
@@ -557,12 +563,12 @@ test("revoke: the grant is on the Tokens page with its scope, and revoking it th
   assert.equal(row.resource, RESOURCE);
   assert.equal(row.token_hash, null);
 
-  const h = await (await get("/tokens")).text();
+  const h = await (await get("/connections")).text();
   const tr = new RegExp(`<tr><td>Fixture Chat \\(127\\.0\\.0\\.1\\)</td>([\\s\\S]*?)</tr>`).exec(h)[1];
   assert.match(tr, /<td data-label="Vaults" class="small">Team<\/td>/);
   assert.match(tr, /Read and write/);
   assert.match(tr, /from app\.client\.test/);
-  const r = await fetch(`${base}/tokens/${row.id}/revoke`, {
+  const r = await fetch(`${base}/connections/${row.id}/revoke`, {
     method: "POST",
     redirect: "manual",
     headers: { cookie, "content-type": "application/x-www-form-urlencoded", origin: base },

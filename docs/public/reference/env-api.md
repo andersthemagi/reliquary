@@ -2,7 +2,7 @@
 
 The HTTP API the Reliquary CLI uses to read environment variables and send imports, for anyone building their own client.
 
-The API lives on the web app, at `https://app.reliquary.redmage.cc/api/env`. It only accepts CLI sign-ins: an MCP token or connection is refused, and a CLI sign-in is refused at the MCP endpoint.
+The API lives on the web app, at `https://app.reliquary.redmage.cc/api/env`. It only accepts the Reliquary CLI's connections: a token or an app is refused here, and the Reliquary CLI is refused at the MCP endpoint.
 
 ## Signing in
 
@@ -16,7 +16,7 @@ OAuth 2.1 against the web app, as a public client:
 | Redirect | `http://127.0.0.1:<any port>/callback` or `http://[::1]:<any port>/callback` |
 | PKCE | S256 only |
 | Access token | starts `rle_`, lasts 1 hour |
-| Refresh token | starts `rlr_`, rotates on every use; presenting a used one revokes the whole sign-in. The sign-in lasts at most a year |
+| Refresh token | starts `rlr_`, rotates on every use; presenting a used one revokes the whole connection. The connection lasts at most a year |
 | Revoke | `POST /oauth/revoke` with `token` and `client_id`; always 200 |
 
 The answer to authorize carries `code`, `state` and `iss`; check that `state` is yours and `iss` is the server.
@@ -39,11 +39,11 @@ Every error carries its code in `error` (the codes below), and beside it `messag
   "where": "database (your role)", "ref": "7f3a2c9e" }
 ```
 
-Each sign-in may make 60 requests a minute and 5000 a day ([Limits](limits.md#rate-limits)). Past that, any route answers `429 {"error": "rate_limited"}` with `Retry-After` in seconds; wait that long and try again.
+Each Reliquary CLI connection may make 60 requests a minute and 5000 a day ([Limits](limits.md#rate-limits)). Past that, any route answers `429 {"error": "rate_limited"}` with `Retry-After` in seconds; wait that long and try again.
 
 ### GET /api/env/vaults
 
-The vaults the sign-in reaches, each with the environments your role may read (empty for a viewer). Reads no values, and isn't in the access log.
+The vaults the connection reaches, each with the environments your role may read (empty for a viewer). Reads no values, and isn't in the access log.
 
 ```json
 { "vaults": [ { "id": "<uuid>", "name": "My project", "role": "owner",
@@ -62,13 +62,13 @@ Every variable with a value in that environment, decrypted, in name order. Logge
 | Status | Body | When |
 |---|---|---|
 | 403 | `{"error": "forbidden"}` | your role can't read that environment (a viewer; an editor on an owners-only one). Logged as refused |
-| 404 | `{"error": "not_found"}` | the vault isn't reachable with this sign-in, or the environment doesn't exist |
+| 404 | `{"error": "not_found"}` | the vault isn't reachable with this connection, or the environment doesn't exist |
 | 500 | `{"error": "decrypt_failed"}` | a value didn't decrypt; nothing is delivered, not even the others |
 | 503 | `{"error": "not_configured"}` | the server has no key for variables |
 
 ### POST /api/env/`<vault id>`/`<environment>`/imports
 
-Sends variables for a person to apply (an import from the CLI). Needs a sign-in allowed to send `.env` files. JSON, at most 1 MiB:
+Sends variables for a person to apply (an import from the CLI). Needs a connection allowed to send `.env` files. JSON, at most 1 MiB:
 
 ```json
 { "variables": { "API_KEY": "...", "DATABASE_URL": "..." },

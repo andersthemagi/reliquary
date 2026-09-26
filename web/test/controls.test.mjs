@@ -103,7 +103,7 @@ test("proposal: closed or viewer pages show status at the top and no controls", 
 
 test("pages: the main action sits in the header, before the form it submits", async () => {
   const cases = [
-    ["/tokens/new", '<button class="primary" form="new-token">Create token</button>', 'id="new-token"'],
+    ["/connections/new", '<button class="primary" form="new-token">Create token</button>', 'id="new-token"'],
     [`${V}/edit?path=notes%2Fmd.md`, '<button class="primary" form="edit-file">Save</button>', 'id="edit-file"'],
     [`${V}/new`, '<button class="primary" form="new-file">Create file</button>', 'id="new-file"'],
     [`${C}/proposals/${C_REVISED}/edit`, '<button class="primary" form="edit-approve">Save edit and approve</button>', 'id="edit-approve"'],

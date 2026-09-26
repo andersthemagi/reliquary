@@ -84,7 +84,7 @@ export type Nav =
   | "vaults"
   | "activity"
   | "connect"
-  | "tokens"
+  | "connections"
   | "search"
   | "settings"
   | "account";
@@ -225,7 +225,7 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
   const label = who ?? personRef(user);
   const account = opts.csrf
     ? html`<details class="account menu-wrap">
-      <summary class="button quiet account-button" aria-label="Account menu"${current("settings", "account", "tokens")}><span class="avatar" aria-hidden="true">${who ? initial(who) : "?"}</span><span class="account-name">${label}</span></summary>
+      <summary class="button quiet account-button" aria-label="Account menu"${current("settings", "account", "connections")}><span class="avatar" aria-hidden="true">${who ? initial(who) : "?"}</span><span class="account-name">${label}</span></summary>
       <div class="menu account-menu">
         <p class="menu-who">Signed in as <strong>${label}</strong>${
           s?.me.name && s.me.email ? html`<span class="menu-meta">${s.me.email}</span>` : ""}${
@@ -233,7 +233,7 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
         <ul class="menu-list">
           <li><a href="/settings"${current("settings")}>Account settings</a></li>
           <li><a href="/account"${current("account")}>Plan and usage</a></li>
-          <li><a href="/tokens"${current("tokens")}>Tokens and connections</a></li>
+          <li><a href="/connections"${current("connections")}>Connections</a></li>
         </ul>
         <p class="menu-links"><a href="${siteHref("/docs")}">Docs</a><a href="${siteHref("/roadmap")}">Roadmap</a></p>
         <p class="menu-meta">${PRE_ALPHA}</p>

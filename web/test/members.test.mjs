@@ -155,7 +155,7 @@ test("members: an editor sees the members but no invite form, role controls, inv
   const h = await page("paul", members(V.team));
   assert.match(h, /<td>olga@example\.test<\/td>/);
   assert.match(h, /Only owners invite people, change roles or remove members\./);
-  assert.doesNotMatch(h, /Invite someone|<select name="role"|Pending invites|Agent connections|\/remove\?user=/);
+  assert.doesNotMatch(h, /Invite someone|<select name="role"|Pending invites|<h2>Connections<\/h2>|\/remove\?user=/);
 });
 
 test("members: an outsider gets not found, and no member's email", async () => {
@@ -345,7 +345,7 @@ test("members: an editor's forged role change is refused by the database", async
 test("members: removing asks first, saying what goes and what stays, then removes", async () => {
   const h = await page("olga", `${members(V.team)}/remove?user=${PAUL}`);
   assert.match(h, /<h1>Remove paul@example\.test<\/h1>/);
-  assert.match(h, /Their 2 agent connections to this vault stop working on the next request\./);
+  assert.match(h, /Their 2 connections to this vault stop working on the next request\./);
   assert.match(h, /What they wrote, proposed and approved stays/);
   assert.equal(await roleOf(V.team, PAUL), "editor", "nothing happens on GET");
   const r = await post("olga", `${members(V.team)}/remove`, { user: IVAN });
@@ -359,8 +359,8 @@ test("members: removing asks first, saying what goes and what stays, then remove
 
 test("connections: the owner sees each member's connections to this vault, escaped, and none that don't reach it", async () => {
   const h = await page("olga", members(V.team));
-  assert.match(h, /<h2>Agent connections<\/h2>/);
-  assert.match(h, /<td><span class="conn-name">Paul laptop<\/span><span class="muted token-client">MCP token · from Cursor &lt;b&gt;bold&lt;\/b&gt;<\/span><\/td>\s*<td class="small" data-label="Member">paul@example\.test<\/td>/);
+  assert.match(h, /<h2>Connections<\/h2>/);
+  assert.match(h, /<td><span class="conn-name">Paul laptop<\/span><span class="muted token-client">Token · from Cursor &lt;b&gt;bold&lt;\/b&gt;<\/span><\/td>\s*<td class="small" data-label="Member">paul@example\.test<\/td>/);
   assert.match(h, /Paul both/);
   assert.doesNotMatch(h, /Paul private/);
 });
@@ -378,7 +378,7 @@ test("connections: revoking one cuts it off from this vault only", async () => {
 test("connections: an editor's forged revoke is refused by the database", async () => {
   const [{ id }] = await sql("select id from public.access_tokens where name = 'Paul laptop'");
   assert.equal(await flashAfter("paul", await post("paul", `${members(V.team)}/connections/${id}/revoke`, {})),
-    "Only owners revoke agent connections.");
+    "Only owners revoke the connections members have to this vault.");
   const [t] = await sql("select revoked_at from public.access_tokens where id = $1", [id]);
   assert.equal(t.revoked_at, null);
 });
@@ -387,24 +387,24 @@ test("connections: revoking asks first on a page naming the connection, its memb
   const [{ id }] = await sql("select id from public.access_tokens where name = 'Paul laptop'");
   const h = await page("olga", `${members(V.team)}/connections/${id}/revoke`);
   assert.match(h, /<h1>Revoke Paul laptop for Members Team<\/h1>/);
-  assert.match(h, /paul@example\.test’s <strong>Paul laptop<\/strong> \(MCP token · from Cursor &lt;b&gt;bold&lt;\/b&gt;\) stops reaching Members Team on its next request\./);
-  assert.match(h, /Only they can revoke it everywhere, on their Tokens page\./);
+  assert.match(h, /paul@example\.test’s <strong>Paul laptop<\/strong> \(Token · from Cursor &lt;b&gt;bold&lt;\/b&gt;\) stops reaching Members Team on its next request\./);
+  assert.match(h, /Only they can revoke it everywhere, on their Connections page\./);
   assert.match(h, new RegExp(`<form method="post" action="/v/${V.team}/config/members/connections/${id}/revoke" class="panel confirm">`));
   assert.match(h, /<button class="danger solid">Revoke Paul laptop<\/button>/);
   const [t] = await sql("select revoked_at, vault_ids from public.access_tokens where id = $1", [id]);
   assert.equal(t.revoked_at, null, "nothing happens on GET");
   assert.deepEqual(t.vault_ids, [V.team]);
-  assert.match(await page("paul", `${members(V.team)}/connections/${id}/revoke`), /Only owners revoke agent connections\./);
+  assert.match(await page("paul", `${members(V.team)}/connections/${id}/revoke`), /Only owners revoke the connections members have to this vault\./);
 });
 
-test("connections: a CLI sign-in reads as Reliquary CLI with what it does, never as the stored 'this computer'", async () => {
+test("connections: the Reliquary CLI reads as Reliquary CLI with what it reaches, never as the stored 'this computer'", async () => {
   await sql(
     `insert into public.access_tokens (user_id, name, kind, client_id, resource, expires_at, access, all_vaults, vault_ids, client_name)
      values ($1, 'Reliquary CLI', 'cli', 'https://app.example/cli/oauth-client.json', 'https://app.example/api/env', now() + interval '30 days', 'read', false, array[$2]::uuid[], 'this computer')`,
     [PAUL, V.team],
   );
   const h = await page("olga", members(V.team));
-  assert.match(h, /<td><span class="conn-name">Reliquary CLI<\/span><span class="muted token-client">Command-line sign-in<\/span><\/td>\s*<td class="small" data-label="Member">paul@example\.test<\/td>\s*<td class="small" data-label="Access">Environment variables<\/td>/);
+  assert.match(h, /<td><span class="conn-name">Reliquary CLI<\/span><span class="muted token-client">Reliquary CLI · environment variables<\/span><\/td>\s*<td class="small" data-label="Member">paul@example\.test<\/td>\s*<td class="small" data-label="Access">Environment variables<\/td>/);
   assert.doesNotMatch(h, /this computer/);
   assert.match(h, /<th>Created<\/th>/);
 });

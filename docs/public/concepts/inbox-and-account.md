@@ -34,7 +34,7 @@ The account menu, at the right of the bar, shows who you're signed in as and lin
 
 - **Account settings** (`/settings`): your display name, your email, the theme, and sign out.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
-- **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Connections](connections.md).
+- **Connections** (`/connections`): everything that can act as you (tokens, apps and the Reliquary CLI), each with **Revoke**. See [Connections](connections.md).
 
 It also switches the theme (Auto, Light or Dark) and signs you out.
 

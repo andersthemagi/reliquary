@@ -1,5 +1,5 @@
 // Account settings (/settings): the person's display name, their email,
-// the theme, and links to Plan and usage, Tokens and connections, and
+// the theme, and links to Plan and usage, Connections, and
 // Connect. The name is the database's to keep and check
 // (public.set_display_name, public.profiles with RLS: your own row, in
 // person only; 20260926100000_shell_inbox.sql). An agent can't set it: it's
@@ -47,17 +47,17 @@ export function accountSettings(ctx: Ctx): Reply {
       </form>
     </section>
     <section aria-labelledby="more">
-      <h2 id="more">Plan, tokens and connections</h2>
+      <h2 id="more">Plan and connections</h2>
       <ul class="rows">
         <li><span><a class="name" href="/account">Plan and usage</a><span class="muted small"> · your plan, and the people and storage of the vaults you own</span></span></li>
-        <li><span><a class="name" href="/tokens">Tokens and connections</a><span class="muted small"> · agent tokens, connected apps and CLI sign-ins, with Revoke</span></span></li>
+        <li><span><a class="name" href="/connections">Connections</a><span class="muted small"> · everything that can act as you: tokens, apps and the Reliquary CLI, each with Revoke</span></span></li>
         <li><span><a class="name" href="/connect">Connect an agent</a><span class="muted small"> · set up Claude, ChatGPT, Cursor, VS Code or the CLI</span></span></li>
       </ul>
     </section>
     ${hosted
       ? html`<section aria-labelledby="signout">
       <h2 id="signout">Sign out</h2>
-      <p class="small muted">Ends your session in this browser. Your agents’ connections stay until you revoke them on Tokens and connections.</p>
+      <p class="small muted">Ends your session in this browser. Your connections stay until you revoke them on Connections.</p>
       <form method="post" action="/signout">${csrfField(ctx.csrf)}<button>Sign out</button></form>
     </section>`
       : ""}`,

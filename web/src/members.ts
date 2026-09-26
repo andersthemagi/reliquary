@@ -1,4 +1,4 @@
-// Members, invites and members' agent connections, the Members tab of the
+// Members, invites and members' connections to the vault, the Members tab of the
 // vault's Settings (/v/:id/config/members), and the invite page
 // (/invite?token=...). supabase/migrations/20260925140000_invites.sql
 // decides everything: every function it calls is an owner's (or, for
@@ -52,15 +52,17 @@ type Conn = {
 // By email, with their display name when they gave one (people.ts fills it in).
 const label = (m: { email: string | null; user_id: string }) => (m.email ? personRef(m.user_id) : `Account ${m.user_id.slice(0, 8)}`);
 
-// A connection as its owner's co-member sees it. The CLI's sign-in stores
-// the client name "this computer" (create_cli_grant), which is true for the
-// person who signed in and wrong for anyone else reading it, so it is never
-// shown here: the CLI is named once, with what it does.
-const CONN_KIND: Record<string, string> = { cli: "Command-line sign-in", oauth: "MCP app" };
+// A connection as its owner's co-member sees it: its type, the words of
+// the Connections page (access.ts), and the client it reported. The CLI
+// reports none (it is named Reliquary CLI, and grants made before
+// 20260926150000 stored "this computer", true only for its own person), so
+// its detail says what it reaches instead.
+const CONN_TYPE: Record<string, string> = { pat: "Token", oauth: "App", cli: "Reliquary CLI" };
 export function connectionDetail(c: Pick<Conn, "kind" | "name" | "client_name">): string {
-  const kind = CONN_KIND[c.kind] ?? "MCP token";
-  const client = c.kind === "cli" || !c.client_name || c.client_name === "this computer" || c.client_name === c.name ? null : c.client_name;
-  return client ? `${kind} · from ${client}` : kind;
+  if (c.kind === "cli") return "Reliquary CLI · environment variables";
+  const type = CONN_TYPE[c.kind] ?? "Token";
+  const client = !c.client_name || c.client_name === c.name ? null : c.client_name;
+  return client ? `${type} · from ${client}` : type;
 }
 const accessText = (c: Conn) => (c.kind === "cli" ? "Environment variables" : c.access === "write" ? "Read and write" : "Read only");
 
@@ -180,8 +182,8 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
                 title: "No invites waiting",
                 body: "An invite shows here until it is used, revoked, or expires after 7 days.",
               })}
-          <h2>Agent connections</h2>
-          <p class="section-lede">The tokens, apps and command-line sign-ins each member has that reach this vault. Revoking one here cuts it off from ${v.name} only; the member’s other vaults keep it.</p>
+          <h2>Connections</h2>
+          <p class="section-lede">Each member’s connections that reach this vault: tokens, apps and the Reliquary CLI. Revoking one here cuts it off from ${v.name} only; the member’s other vaults keep it.</p>
           ${conns.length
             ? html`<div class="table-wrap"><table class="table-stack token-list connection-list">
                 <thead><tr><th>Connection</th><th>Member</th><th>Access</th><th>Created</th><th>Last used</th><th><span class="sr-only">Actions</span></th></tr></thead>
@@ -197,8 +199,8 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
                 )}</tbody>
               </table></div>`
             : emptyState({
-                title: "No agent connections",
-                body: "When a member connects an agent or the CLI with access to this vault, it shows here.",
+                title: "No connections",
+                body: "When a member connects a token, an app or the Reliquary CLI with access to this vault, it shows here.",
               })}`
         : ""}`;
   });
@@ -307,7 +309,7 @@ async function removePage(ctx: Ctx, id: string): Promise<Reply> {
       crumb: membersCrumb(id, v, "Remove"),
       lede: `${label(m)} (${roleName(m.role)}) loses access to ${v.name} at once: its files, proposals and variables.`,
       consequences: [
-        n ? `Their ${plural(n, "agent connection")} to this vault stop working on the next request.` : "They have no agent connected to this vault.",
+        n ? `Their ${plural(n, "connection")} to this vault stop working on the next request.` : "They have no connections to this vault.",
         "What they wrote, proposed and approved stays, with their name on it, in the files and the activity log.",
         "To bring them back, invite them again.",
       ],
@@ -374,7 +376,7 @@ async function revokeInvite(ctx: Ctx, id: string, iid: string): Promise<Reply> {
 async function revokeConnectionPage(ctx: Ctx, id: string, tid: string): Promise<Reply> {
   return shell(ctx, id, "Revoke connection", async (c, v) => {
     if (v.role !== "owner") {
-      return html`${pageHeader({ crumb: membersCrumb(id, v, "Revoke connection"), title: "Revoke connection" })}${callout("info", "Only owners revoke agent connections.")}`;
+      return html`${pageHeader({ crumb: membersCrumb(id, v, "Revoke connection"), title: "Revoke connection" })}${callout("info", "Only owners revoke the connections members have to this vault.")}`;
     }
     const cn = (
       await c.query(
@@ -394,8 +396,8 @@ async function revokeConnectionPage(ctx: Ctx, id: string, tid: string): Promise<
       lede: html`${who}’s <strong>${cn.name}</strong> (${connectionDetail(cn)}) stops reaching ${v.name} on its next request.`,
       consequences: [
         cn.all_vaults
-          ? "It keeps working in their other vaults. Only they can revoke it everywhere, on their Tokens page."
-          : "If it reaches other vaults of theirs, it keeps working there. Only they can revoke it everywhere, on their Tokens page.",
+          ? "It keeps working in their other vaults. Only they can revoke it everywhere, on their Connections page."
+          : "If it reaches other vaults of theirs, it keeps working there. Only they can revoke it everywhere, on their Connections page.",
         "Nothing it wrote or proposed is undone.",
         "To reach this vault again, they connect again.",
       ],

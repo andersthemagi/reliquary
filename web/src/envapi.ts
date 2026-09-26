@@ -59,11 +59,11 @@ function send(res: http.ServerResponse, status: number, body: object, extra: Rec
 // "ref"}. The codes are the API's own, unchanged; the message says what was
 // being done and why, and never echoes the request.
 const REASONS: Record<string, [string, string]> = {
-  invalid_token: ["env API (sign-in)", "No live sign-in: the access token is missing, expired or revoked. Sign in again with `reliquary login`"],
+  invalid_token: ["env API (connection)", "No live connection: the access token is missing, expired or revoked. Connect the Reliquary CLI again with `reliquary login`"],
   forbidden: ["database (your role)", "Your role can’t use this environment’s values (a viewer, or an editor in an owners-only environment such as production)"],
-  not_found: ["database (only what’s shared with you is visible)", "There’s no such vault, environment or push for this sign-in"],
-  push_not_allowed: ["env API (sign-in)", "This sign-in wasn’t allowed to send values: “Also let it send .env files” wasn’t ticked when it was approved"],
-  rate_limited: ["rate limit", "Too many requests from this sign-in in a short time"],
+  not_found: ["database (only what’s shared with you is visible)", "There’s no such vault, environment or push for this connection"],
+  push_not_allowed: ["env API (connection)", "This connection wasn’t allowed to send values: “Also let it send .env files” wasn’t ticked when it was approved"],
+  rate_limited: ["rate limit", "Too many requests from this connection in a short time"],
   not_configured: ["encryption", "This server has no key for variables (VARIABLES_KEY), so it can’t deliver or seal values"],
   method_not_allowed: ["env API", "That method isn’t accepted on this path"],
   unsupported_media_type: ["env API", "A push must be sent as application/json"],
@@ -291,7 +291,7 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
     const wait = bearer ? await limitToken(hashOf(bearer[1]), [{ name: "env_grant_minute" }, { name: "env_grant_day" }]) : 0;
     if (wait) {
       req.resume();
-      sendError(res, 429, "rate_limited", { "retry-after": String(wait) }, `Too many requests from this sign-in in a short time; retry after ${wait} seconds`);
+      sendError(res, 429, "rate_limited", { "retry-after": String(wait) }, `Too many requests from this connection in a short time; retry after ${wait} seconds`);
       outcome = "rate_limited";
     } else if (method === "GET" && req.method === "GET") {
       // One checkout: the token is resolved inside the route's transaction.
