@@ -394,6 +394,10 @@ const REFRESH_TOKEN = /^[\x21-\x7e]{1,512}$/;
 // Unavailable on network failure or 5xx.
 async function tokenRequest(path: string, body: unknown): Promise<Tokens | undefined> {
   const { status, json } = await gotrue(path, body);
+  return tokensOf(status, json);
+}
+
+function tokensOf(status: number, json: any): Tokens | undefined {
   if (status !== 200) return undefined;
   const accessToken = typeof json?.access_token === "string" ? json.access_token : "";
   const refreshToken = typeof json?.refresh_token === "string" ? json.refresh_token : "";
@@ -406,7 +410,9 @@ async function tokenRequest(path: string, body: unknown): Promise<Tokens | undef
   return { accessToken, refreshToken, expiresIn };
 }
 
-export type SigninResult = { ok: true; cookies: string[] } | { ok: false; unavailable: boolean };
+// otherAddress: a change of address was confirmed at one address, and waits
+// for the other (Supabase's secure email change); no session yet.
+export type SigninResult = { ok: true; cookies: string[] } | { ok: false; unavailable: boolean; otherAddress?: boolean };
 
 // Step 1: ask Supabase to email a code and link. Never tells the caller
 // whether the address has an account: any 4xx (no such user, signups off,
@@ -435,12 +441,20 @@ export async function sendSigninEmail(email: string, createUser = false): Promis
   }
 }
 
-// Step 3: a 6-digit code (with its email) or a link's token hash. On success,
-// the session cookies to set.
-export async function verifySignin(p: { email: string; code: string } | { tokenHash: string }): Promise<SigninResult> {
-  const body = "tokenHash" in p ? { type: "email", token_hash: p.tokenHash } : { type: "email", email: p.email, token: p.code };
+// Step 3: a 6-digit code (with its email) or a link's token hash (`type`
+// email, or email_change for a new address). On success, the session
+// cookies to set.
+export async function verifySignin(
+  p: { email: string; code: string } | { tokenHash: string; type?: "email" | "email_change" },
+): Promise<SigninResult> {
+  const body = "tokenHash" in p ? { type: p.type ?? "email", token_hash: p.tokenHash } : { type: "email", email: p.email, token: p.code };
   try {
-    const t = await tokenRequest("/verify", body);
+    const { status, json } = await gotrue("/verify", body);
+    // A change of address's first of two confirmations: 200, a message, no tokens.
+    if (body.type === "email_change" && status === 200 && json?.access_token === undefined) {
+      return { ok: false, unavailable: false, otherAddress: true };
+    }
+    const t = tokensOf(status, json);
     if (!t) return { ok: false, unavailable: false };
     const r = await verifyAccessToken(t.accessToken);
     if (!r.ok) {

@@ -88,12 +88,45 @@ services:
       GOTRUE_MAILER_AUTOCONFIRM: "false"
       GOTRUE_MAILER_OTP_EXP: "600"
       GOTRUE_MAILER_OTP_LENGTH: "6"
+      # Every email Auth sends: web/emails/*.html (written by web/emails/build.mjs,
+      # the same files the hosted service's dashboard gets), fetched from the
+      # web app on the private network (web/src/selfhost.ts). Each carries a code
+      # or a link to the web app's /auth/confirm. EMAIL_TEMPLATES_URL is only for
+      # a web app that isn't the `web` service here (deploy/test.sh sets it).
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/sign-in.html
+      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/confirm-signup.html
+      GOTRUE_MAILER_TEMPLATES_INVITE: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/invite-user.html
+      GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/change-email.html
+      GOTRUE_MAILER_TEMPLATES_RECOVERY: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/reset-password.html
+      GOTRUE_MAILER_TEMPLATES_REAUTHENTICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/reauthentication.html
+      GOTRUE_MAILER_TEMPLATES_PASSWORD_CHANGED_NOTIFICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/password-changed.html
+      GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGED_NOTIFICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/email-changed.html
+      GOTRUE_MAILER_TEMPLATES_PHONE_CHANGED_NOTIFICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/phone-changed.html
+      GOTRUE_MAILER_TEMPLATES_IDENTITY_LINKED_NOTIFICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/identity-linked.html
+      GOTRUE_MAILER_TEMPLATES_IDENTITY_UNLINKED_NOTIFICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/identity-unlinked.html
+      GOTRUE_MAILER_TEMPLATES_MFA_FACTOR_ENROLLED_NOTIFICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/mfa-added.html
+      GOTRUE_MAILER_TEMPLATES_MFA_FACTOR_UNENROLLED_NOTIFICATION: ${EMAIL_TEMPLATES_URL:-http://web:8790/_selfhost/email}/mfa-removed.html
       GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: Your Reliquary sign-in code
-      GOTRUE_MAILER_SUBJECTS_CONFIRMATION: Your Reliquary sign-in code
-      # The templates carry the code and a link to the web app's
-      # /auth/confirm (web/src/selfhost.ts).
-      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://web:8790/_selfhost/email/sign-in.html
-      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: http://web:8790/_selfhost/email/confirm.html
+      GOTRUE_MAILER_SUBJECTS_CONFIRMATION: Confirm your email for Reliquary
+      GOTRUE_MAILER_SUBJECTS_INVITE: You have a Reliquary account
+      GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE: Confirm the new email address for your Reliquary account
+      GOTRUE_MAILER_SUBJECTS_RECOVERY: Reliquary has no password to reset
+      GOTRUE_MAILER_SUBJECTS_REAUTHENTICATION: Your Reliquary confirmation code
+      GOTRUE_MAILER_SUBJECTS_PASSWORD_CHANGED_NOTIFICATION: The password of your Reliquary account was changed
+      GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGED_NOTIFICATION: The email address of your Reliquary account was changed
+      GOTRUE_MAILER_SUBJECTS_PHONE_CHANGED_NOTIFICATION: The phone number of your Reliquary account was changed
+      GOTRUE_MAILER_SUBJECTS_IDENTITY_LINKED_NOTIFICATION: A sign-in method was added to your Reliquary account
+      GOTRUE_MAILER_SUBJECTS_IDENTITY_UNLINKED_NOTIFICATION: A sign-in method was removed from your Reliquary account
+      GOTRUE_MAILER_SUBJECTS_MFA_FACTOR_ENROLLED_NOTIFICATION: A second sign-in step was added to your Reliquary account
+      GOTRUE_MAILER_SUBJECTS_MFA_FACTOR_UNENROLLED_NOTIFICATION: A second sign-in step was removed from your Reliquary account
+      # Security notifications: sent only after that change to an account.
+      GOTRUE_MAILER_NOTIFICATIONS_PASSWORD_CHANGED_ENABLED: "true"
+      GOTRUE_MAILER_NOTIFICATIONS_EMAIL_CHANGED_ENABLED: "true"
+      GOTRUE_MAILER_NOTIFICATIONS_PHONE_CHANGED_ENABLED: "true"
+      GOTRUE_MAILER_NOTIFICATIONS_IDENTITY_LINKED_ENABLED: "true"
+      GOTRUE_MAILER_NOTIFICATIONS_IDENTITY_UNLINKED_ENABLED: "true"
+      GOTRUE_MAILER_NOTIFICATIONS_MFA_FACTOR_ENROLLED_ENABLED: "true"
+      GOTRUE_MAILER_NOTIFICATIONS_MFA_FACTOR_UNENROLLED_ENABLED: "true"
       GOTRUE_SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in .env}
       GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
       GOTRUE_SMTP_USER: ${SMTP_USER:-}

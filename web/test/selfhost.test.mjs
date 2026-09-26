@@ -12,7 +12,7 @@ import { poolConfig } from "../dist/db.js";
 import { NO_LIMIT_BYTES, NO_LIMIT_COUNT, planLine, usageLine } from "../dist/plans.js";
 import { configureRateLimits } from "../dist/ratelimit.js";
 import { configureVariables } from "../dist/secrets.js";
-import { EMAIL_TEMPLATES, emailTemplate, selfHosted } from "../dist/selfhost.js";
+import { emailTemplate, emailTemplatePaths, selfHosted } from "../dist/selfhost.js";
 
 const PASSWORD = "not-a-real-password-5c1e";
 const DB_URL = `postgres://reliquary_web:${PASSWORD}@db:5432/postgres`;
@@ -131,19 +131,22 @@ test("self-hosted plan: hosted plans read as before", () => {
 
 // Email templates -----------------------------------------------------------------
 
-test("self-hosted email templates: the code and a link to this site's /auth/confirm, served only when SELF_HOSTED=1", () => {
+test("self-hosted email templates: every Supabase Auth email (web/emails), each with Auth's placeholders, served only when SELF_HOSTED=1", () => {
   assert.equal(selfHosted({ SELF_HOSTED: "1" }), true);
   assert.equal(selfHosted({}), false);
-  for (const path of ["/_selfhost/email/sign-in.html", "/_selfhost/email/confirm.html"]) {
+  const paths = emailTemplatePaths();
+  assert.equal(paths.length, 13);
+  for (const { path } of paths) {
     const t = emailTemplate(path, { SELF_HOSTED: "1" });
     assert.ok(t, path);
-    assert.match(t, /\{\{ \.Token \}\}/);
-    assert.match(t, /\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}&type=email/);
+    assert.match(t, /\{\{ \.SiteURL \}\}/);
     assert.doesNotMatch(t, /ConfirmationURL/, "never Auth's own link (tokens in a fragment)");
     assert.equal(emailTemplate(path, {}), undefined);
   }
+  const signIn = emailTemplate("/_selfhost/email/sign-in.html", { SELF_HOSTED: "1" });
+  assert.match(signIn, /\{\{ \.Token \}\}/);
+  assert.match(signIn, /\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}&type=email/);
   assert.equal(emailTemplate("/_selfhost/email/other.html", { SELF_HOSTED: "1" }), undefined);
-  assert.equal(EMAIL_TEMPLATES.size, 2);
 });
 
 // Starting the server -------------------------------------------------------------

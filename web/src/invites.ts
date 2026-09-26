@@ -9,7 +9,8 @@
 // Delivery: there is no email sender yet, so deliverInvite() says it sent
 // nothing and the Members page shows the link for the owner to copy and send
 // themself. To send email later, replace the body of deliverInvite() (one
-// function; nothing else changes): send `link` to `to`, and return
+// function; nothing else changes): send vaultInviteEmail(mail, origin)
+// (emails.ts, web/emails/vault-invite.html) to `to`, and return
 // { sent: true }. It must never log the link or the address.
 
 import { pool } from "./db.js";

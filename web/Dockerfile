@@ -39,6 +39,8 @@ COPY --from=build /repo/web/dist ./dist
 COPY --from=build /repo/web/docs-build ./docs-build
 COPY --from=build /repo/web/public ./public
 COPY --from=build /repo/web/supabase-ca.crt ./
+# The email templates self-hosted Supabase Auth fetches (src/selfhost.ts).
+COPY web/emails/*.html web/emails/manifest.tsv ./emails/
 USER node
 EXPOSE 8790
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \

@@ -8,7 +8,7 @@ Self-hosting is a preview. The license for running Reliquary's server yourself h
 
 - A Linux server with Docker and its Compose plugin, or Podman with `podman compose`. 2 GB of memory is enough to start.
 - A checkout of Reliquary's source on that server.
-- An SMTP server that can send email: sign-in codes go out through it.
+- An SMTP server that can send email: sign-in codes go out through it. What it sends: [Emails](../reference/emails.md).
 - For HTTPS: two hostnames pointing at the server, one for the app and one for MCP (for example `app.example.com` and `mcp.example.com`), and ports 80 and 443 open.
 
 ## What runs

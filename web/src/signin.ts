@@ -11,6 +11,12 @@
 //                           link doesn't burn it
 //   POST /auth/confirm      token_hash -> session
 //
+// A link's `type` is `email` (sign-in, sign-up, an Auth invite, and the
+// "reset password" email, which signs in: there are no passwords) or
+// `email_change` (confirming a new address; with Supabase's secure email
+// change both addresses confirm, and the first only says so). The emails
+// are web/emails/*.html.
+//
 // The server has already checked Origin on POSTs. These forms carry the
 // double-submit token from auth.ts instead of a session CSRF token.
 // Nothing here logs; the server logs method, path and status only.
@@ -140,7 +146,24 @@ function codeForm(csrf: string, email: string, next: string, theme: Theme, error
   );
 }
 
-function confirmForm(csrf: string, tokenHash: string, theme: Theme): string {
+type LinkType = "email" | "email_change";
+const linkType = (v: string | null | undefined): LinkType | undefined => (v === "email" || v === "email_change" ? v : undefined);
+
+function confirmForm(csrf: string, tokenHash: string, type: LinkType, theme: Theme): string {
+  if (type === "email_change") {
+    return page(
+      "Confirm the new address",
+      html`<div class="signin">
+        <h1>Confirm the change of email address</h1>
+        <p class="lede">You opened a link to confirm a new email address for your account. Continue to confirm it on this device.</p>
+        <form method="post" action="/auth/confirm" class="actions">
+          ${hidden("csrf", csrf)}${hidden("token_hash", tokenHash)}${hidden("type", type)}
+          <button class="primary">Confirm the change</button>
+        </form>
+      </div>`,
+      { theme },
+    );
+  }
   return page(
     "Sign in",
     html`<div class="signin">
@@ -201,10 +224,11 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
 
   if (i.method === "GET" && p === "/auth/confirm") {
     const tokenHash = i.url.searchParams.get("token_hash") ?? "";
-    if (!TOKEN_HASH.test(tokenHash) || i.url.searchParams.get("type") !== "email") {
+    const type = linkType(i.url.searchParams.get("type"));
+    if (!TOKEN_HASH.test(tokenHash) || !type) {
       return out({ status: 400, html: notice("Link incomplete", html`This sign-in link is missing a part. Copy the whole link from the email, or <a href="/signin">send a new one</a>.`, i.theme) });
     }
-    return out({ html: confirmForm(pre(), tokenHash, i.theme) });
+    return out({ html: confirmForm(pre(), tokenHash, type, i.theme) });
   }
 
   if (i.method !== "POST") return out({ status: 405, html: "" });
@@ -267,11 +291,21 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
 
   // POST /auth/confirm
   const tokenHash = i.form.get("token_hash") ?? "";
+  const type = linkType(i.form.get("type") ?? "email") ?? "email";
   const limited = await signinLimit([{ name: "signin_code_ip", kind: "ip", value: i.ip }], i.theme);
   if (limited) return out(limited);
-  const r = TOKEN_HASH.test(tokenHash) ? await verifySignin({ tokenHash }) : ({ ok: false, unavailable: false } as const);
+  const r = TOKEN_HASH.test(tokenHash) ? await verifySignin({ tokenHash, type }) : ({ ok: false, unavailable: false } as const);
   if (!r.ok) {
     if (r.unavailable) return out(unavailable(i.theme));
+    if ("otherAddress" in r && r.otherAddress) {
+      return out({
+        html: notice(
+          "One address confirmed",
+          html`This address is confirmed. Now open the link in the email sent to the other address: the change happens once both are confirmed.`,
+          i.theme,
+        ),
+      });
+    }
     return out({
       status: 400,
       html: notice("Link expired", html`That sign-in link has expired or was already used. <a href="/signin">Send a new one</a>.`, i.theme),

@@ -2,32 +2,36 @@
 // there.
 //
 // Email templates for the self-hosted Supabase Auth server. On Supabase's
-// hosted service the owner pastes them into the dashboard (web/README.md,
-// "Supabase dashboard"); the standalone Auth server instead fetches each
-// template from a URL (GOTRUE_MAILER_TEMPLATES_MAGIC_LINK and
-// GOTRUE_MAILER_TEMPLATES_CONFIRMATION), and deploy/compose points those at
-// this app on the private network. Both carry the 6-digit code and a link to
-// /auth/confirm with the token hash (never Auth's own ConfirmationURL, which
-// returns tokens in a URL fragment a server can't read). A new invitee's
-// first email is the confirmation one; `type=email` verifies both.
+// hosted service the owner pastes the same files into the dashboard
+// (scripts/email-templates.sh, web/README.md "Supabase dashboard"); the
+// standalone Auth server instead fetches each template from a URL
+// (GOTRUE_MAILER_TEMPLATES_<type>), and deploy/compose points those at
+// /_selfhost/email/<id>.html on this app, over the private network. The
+// templates are web/emails/*.html (emails.ts; written by
+// web/emails/build.mjs): static text with Auth's placeholders, no secret and
+// nothing from the request. Links go to this app's /auth/confirm with the
+// token hash, never Auth's own ConfirmationURL (tokens in a URL fragment).
 //
-// They are static text with Auth's template placeholders, no secret and
-// nothing from the request, and are served on no other deployment.
+// Served on no other deployment, and only Supabase Auth's templates (not the
+// app's own vault invite).
 
-const SIGN_IN = `<h2>Sign in to Reliquary</h2>
-<p>Your code: <strong>{{ .Token }}</strong></p>
-<p>Or <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">sign in on this device</a>.</p>
-<p>If you didn't ask for this, ignore this email.</p>
-`;
+import { emailHtml, emailTemplates } from "./emails.js";
 
-export const EMAIL_TEMPLATES: ReadonlyMap<string, string> = new Map([
-  ["/_selfhost/email/sign-in.html", SIGN_IN],
-  ["/_selfhost/email/confirm.html", SIGN_IN],
-]);
+export const EMAIL_PATH_PREFIX = "/_selfhost/email/";
 
 export const selfHosted = (env: NodeJS.ProcessEnv = process.env): boolean => env.SELF_HOSTED === "1";
 
+// Every path the self-hosted app serves a template on, with the Auth type it's for.
+export function emailTemplatePaths(): { path: string; gotrue: string }[] {
+  return emailTemplates()
+    .filter((t) => t.gotrue)
+    .map((t) => ({ path: `${EMAIL_PATH_PREFIX}${t.id}.html`, gotrue: t.gotrue! }));
+}
+
 // The template at `pathname`, when this is a self-hosted instance.
 export function emailTemplate(pathname: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return selfHosted(env) ? EMAIL_TEMPLATES.get(pathname) : undefined;
+  if (!selfHosted(env) || !pathname.startsWith(EMAIL_PATH_PREFIX) || !pathname.endsWith(".html")) return undefined;
+  const id = pathname.slice(EMAIL_PATH_PREFIX.length, -".html".length);
+  const t = emailTemplates().find((x) => x.id === id);
+  return t?.gotrue ? emailHtml(id) : undefined;
 }

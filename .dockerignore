@@ -19,6 +19,8 @@
 !web/src/
 !web/public/
 !web/scripts/
+!web/emails/*.html
+!web/emails/manifest.tsv
 
 !mcp/package.json
 !mcp/package-lock.json
