@@ -115,15 +115,16 @@ test("pages: the main action sits in the header, before the form it submits", as
   }
 });
 
-test("pages: file and folder actions are in the header; the rule form comes before the rules list", async () => {
+test("pages: file and folder actions are in the header; Rules puts Add rule in the header and the rules list before the form", async () => {
   const folder = await page(V);
   assert.ok(at(folder, '<div class="page-actions">') < at(folder, ">New file</a>"));
   const file = await page(`${V}/file?path=canon%2Fpricing.md`);
   assert.ok(at(file, '<div class="page-actions">') < at(file, ">Propose a change</a>"));
   assert.ok(at(file, ">Propose a change</a>") < at(file, 'aria-label="File view"'));
   const rules = await page(`${V}/rules`);
+  assert.ok(at(rules, '<div class="page-actions">') < at(rules, 'href="#add-rule">Add rule</a>'));
   assert.ok(at(rules, 'id="add-rule"') < at(rules, "What applies to a path?"));
-  assert.ok(at(rules, 'id="add-rule"') < at(rules, "<table>"));
+  assert.ok(at(rules, '<table class="table-stack rules-table">') < at(rules, 'id="add-rule"'));
 });
 
 // Review list: per-row snooze ----------------------------------------------------

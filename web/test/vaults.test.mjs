@@ -86,7 +86,7 @@ test("new vault: creating one lands in it, owned by me, with the default I chose
   const h = await page(loc);
   assert.match(h, /Created Zephyr ledger\. You’re its owner\./);
   assert.match(h, /<a class="side-title" href="\/v\/[0-9a-f-]{36}">Zephyr ledger<\/a>/);
-  assert.match(await page(`${loc}/rules`), /Everything is <span class="badge policy canon">Canon<\/span> unless a rule says otherwise/);
+  assert.match(await page(`${loc}/rules`), /Everything is <span class="badge policy canon"[^>]*>Canon<\/span> unless a rule says otherwise/);
   assert.match(await page("/"), new RegExp(`href="${loc}">Zephyr ledger</a>\\s*<span class="muted small"> · owner · 0 files`));
   assert.match(await page(`${loc}/activity`), /Created the vault/);
 });
