@@ -461,6 +461,31 @@ Where the build differs from the plan above, and why:
   at 390px, except `overused-font` for Inter, which this design chooses on
   purpose (waived in `style.css`).
 
+### Components as built (2026-09-26, ui-audit.md package A)
+
+The shared helpers in `web/src/html.ts` (CSS in the "Components" section of
+`style.css`; tests in `web/test/components_unit.test.mjs`, registry F270
+and F271). Pages adopt them in packages B to J; nothing page-specific was
+migrated here except the flash, `thread.ts`'s times and `tabular-nums`.
+
+| Helper | Use it for | Notes |
+|---|---|---|
+| `pageHeader({title, crumb?, badge?, description?, meta?, secondary?, primary?, actions?, tabs?, tabsLabel?, path?})` | The top of every page | Secondary actions, then the one primary, last. `crumb` takes parts or Raw; `description` is one sentence; `tabs` sit flush under it. `actions` is the old slot (rendered first). Ends with the flash's placeholder |
+| `crumb(parts: {label, href?}[])` | Where a page sits, from the vault down | `<nav aria-label="Breadcrumb"><ol>`; the last part is `aria-current="page"`, never a link |
+| `tabs(list: {href, label, count?, current?}[], label?)` | Sub-pages | Usually through `pageHeader({tabs})` |
+| `time(d, {absolute?, now?})`, `relativeTime(d, now?)`, `utc(d)` | Every time shown | Relative with the UTC time in `title` and `datetime`; `absolute` for expiries and timestamps to copy. `<time>` never wraps. `when()` stays as text |
+| `ctx.setFlash(message, tone?)` | The message after a form | Tones `info`, `success`, `warning`, `danger`. Say `"success"` for something done; `message(err)` ends with a ref and is danger without saying so; anything else untoned is info. Shown under the page header (in a vault, the content column) by `page()`; stored in the signed cookie (hosted) or the session (local), `flash.ts` |
+| `callout(tone, body, {title?, id?})` | Boxed context on a page | `danger` gets `role="alert"`; a string body is one paragraph. `.callout.attention` still works as warning |
+| `policyBadge(policy)` | Canon / open anywhere | The `title` explains the term. Replaces `tag()` in `pages.ts` and `policyBadge` in `vaultadmin.ts` |
+| `menu({label, items, icon?: "more", heading?, align?, ghost?, className?})` | More, `⋯`, Snooze | `<details>` (Enter or Space on the summary, Tab through items; no script, no `role="menu"`). Items are `{href, label, description?, danger?, current?}` or `{action, csrf, fields?, label, description?, danger?}` (a one-button POST form). Danger items should lead to a confirm page |
+| `emptyState({title, body?, action?})` | A list with nothing in it | What's missing, when it appears, the action |
+| `confirmPage({title, crumb?, lede, consequences?, action, csrf, fields?, typed?, button, cancel, error?})` | Every destructive action | Returns the body. `typed: {value, name?, label?}` asks for a typed name (default field `confirm_name`); the button is `.danger.solid` and names the action; `error` re-renders as an alert (answer 400) |
+| `.table-stack` on a `<table>`, `data-label` on each `td` | Tables on phones | Rows become blocks with labelled lines below 640px instead of scrolling sideways |
+| Buttons | Hierarchy | `.primary` (one per page, last), default or `.secondary`, `.ghost` (= `.quiet`), `.danger` (outlined), `.danger.solid` (a confirm page's final step) |
+
+`tabular-nums` is now on `td, th, .num, time, .count, .diff-stat, .meter`
+only, not `body`.
+
 ### What to test after each step
 
 | Check | How | Pass |

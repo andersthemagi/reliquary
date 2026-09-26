@@ -106,7 +106,7 @@ const unescape = (s) => s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace
 const flashAfter = async (who, r) => {
   assert.equal(r.status, 303);
   const h = await page(who, r.headers.get("location"));
-  return unescape(/<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "");
+  return unescape(/<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "");
 };
 const alertOf = (h) => unescape(/<p class="callout danger" role="alert">([^<]*)<\/p>/.exec(h)?.[1] ?? "");
 const bytes = async (vault) => Number((await sql("select bytes from private.vault_storage where vault_id = $1", [vault]))[0].bytes);

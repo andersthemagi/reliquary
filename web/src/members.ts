@@ -193,7 +193,7 @@ async function setRole(ctx: Ctx, id: string): Promise<Reply> {
   if (!UUID.test(user)) return notFound(ctx);
   try {
     await asPerson(ctx.userId, (c) => c.query(`select public.set_member($1, $2, $3)`, [id, user, role]));
-    ctx.setFlash(`Role changed to ${roleName(role)}.`);
+    ctx.setFlash(`Role changed to ${roleName(role)}.`, "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -232,7 +232,7 @@ async function remove(ctx: Ctx, id: string): Promise<Reply> {
   if (!UUID.test(user)) return notFound(ctx);
   try {
     await asPerson(ctx.userId, (c) => c.query(`select public.set_member($1, $2, null)`, [id, user]));
-    ctx.setFlash("Removed. They can no longer open this vault, and nor can their agents.");
+    ctx.setFlash("Removed. They can no longer open this vault, and nor can their agents.", "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -252,7 +252,7 @@ async function createInvite(ctx: Ctx, id: string): Promise<Reply> {
     });
   } catch (err) {
     const e = err as { code?: string; message?: string };
-    ctx.setFlash(e.code === "54000" ? `${(e.message ?? "Too many invites").replace(/^./, (s) => s.toUpperCase())}.` : message(err));
+    ctx.setFlash(e.code === "54000" ? `${(e.message ?? "Too many invites").replace(/^./, (s) => s.toUpperCase())}.` : message(err), "danger");
     return { redirect: membersPath(id) };
   }
   if (!made) return notFound(ctx);
@@ -266,7 +266,7 @@ async function revokeInvite(ctx: Ctx, id: string, iid: string): Promise<Reply> {
   if (!UUID.test(iid)) return notFound(ctx);
   try {
     await asPerson(ctx.userId, (c) => c.query(`select public.revoke_invite($1)`, [iid]));
-    ctx.setFlash("Invite revoked. Its link no longer works.");
+    ctx.setFlash("Invite revoked. Its link no longer works.", "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -277,7 +277,7 @@ async function revokeConnection(ctx: Ctx, id: string, tid: string): Promise<Repl
   if (!UUID.test(tid)) return notFound(ctx);
   try {
     await asPerson(ctx.userId, (c) => c.query(`select public.revoke_member_connection($1, $2)`, [id, tid]));
-    ctx.setFlash("Connection cut off from this vault. It stops working here on its next request.");
+    ctx.setFlash("Connection cut off from this vault. It stops working here on its next request.", "success");
   } catch (err) {
     ctx.setFlash(message(err));
   }
@@ -318,7 +318,7 @@ async function leave(ctx: Ctx, id: string): Promise<Reply> {
       return v.name;
     });
     if (name === null) return notFound(ctx);
-    ctx.setFlash(`You left ${name}. You and your agents can no longer open it.`);
+    ctx.setFlash(`You left ${name}. You and your agents can no longer open it.`, "success");
     return { redirect: "/" };
   } catch (err) {
     ctx.setFlash(message(err));
@@ -385,7 +385,7 @@ export async function inviteRoutes(ctx: Ctx): Promise<Reply> {
       const v = (await c.query(`select public.accept_invite($1) as v`, [token])).rows[0].v as string;
       return (await vault(c, ctx, v))!;
     });
-    ctx.setFlash(`You’re a member of ${joined.name}, as ${joined.role === "owner" ? "an" : "a"} ${joined.role}.`);
+    ctx.setFlash(`You’re a member of ${joined.name}, as ${joined.role === "owner" ? "an" : "a"} ${joined.role}.`, "success");
     return { redirect: vaultPath(joined.id) };
   } catch (err) {
     const error = message(err);

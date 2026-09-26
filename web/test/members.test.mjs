@@ -98,7 +98,7 @@ const flashAfter = async (who, r) => {
   assert.equal(r.status, 303);
   const h = await page(who, r.headers.get("location"));
   // A refusal ends with its reference (failure.ts), different each time.
-  return (/<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
+  return (/<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "");
 };
 const members = (id) => `/v/${id}/config/members`;
 const roleOf = async (vault, user) =>

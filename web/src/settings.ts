@@ -69,7 +69,7 @@ export async function saveDisplayName(ctx: Ctx): Promise<Reply> {
   const name = ctx.form.get("display_name") ?? "";
   try {
     const kept = await asPerson(ctx.userId, async (c) => (await c.query(`select public.set_display_name($1) as n`, [name])).rows[0].n as string | null);
-    ctx.setFlash(kept ? `Saved. People who share a vault with you now see you as ${kept}.` : "Display name cleared. People see your email.");
+    ctx.setFlash(kept ? `Saved. People who share a vault with you now see you as ${kept}.` : "Display name cleared. People see your email.", "success");
   } catch (err) {
     ctx.setFlash(refusalText(err));
   }

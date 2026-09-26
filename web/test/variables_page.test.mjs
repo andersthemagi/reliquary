@@ -266,7 +266,7 @@ test("variables page: setting a value redirects with a flash naming it and its e
   assert.equal(r.status, 303);
   assert.equal(r.headers.get("location"), vp(V.own));
   const h = await page(r.headers.get("location"));
-  assert.match(h, /<p class="callout info flash" role="status">Set NEW_KEY in preview\.<\/p>/);
+  assert.match(h, /<p class="callout success flash" role="status">Set NEW_KEY in preview\.<\/p>/);
   noValues(h);
   assert.equal((await vars.revealVariable(PIA, V.own, "NEW_KEY", "preview")).value, v);
   // Again: a rotation.

@@ -21,6 +21,7 @@ import { writeFileSync } from "node:fs";
 import type http from "node:http";
 import { limit } from "./ratelimit.js";
 import { networkReason, noteUpstream } from "./failure.js";
+import { decodeFlash, encodeFlash, type Flash } from "./flash.js";
 
 export type AuthMode = "local" | "supabase";
 export type Alg = "ES256" | "RS256";
@@ -188,8 +189,8 @@ const mac = (purpose: string, value: string) =>
 export type Session = {
   userId: string;
   csrf: string;
-  takeFlash(): string | undefined;
-  setFlash(message: string): void;
+  takeFlash(): Flash | undefined;
+  setFlash(flash: Flash): void;
   // Ends the session: Supabase logout (this session only) and cleared cookies.
   signOut(): Promise<void>;
 };
@@ -208,7 +209,7 @@ export async function getSession(req: http.IncomingMessage): Promise<Lookup> {
 
 // Local stand-in --------------------------------------------------------------
 
-type LocalSession = { userId: string; csrf: string; expires: number; flash?: string };
+type LocalSession = { userId: string; csrf: string; expires: number; flash?: Flash };
 const localSessions = new Map<string, LocalSession>();
 const LOCAL_SESSION_HOURS = 12;
 let loginCode = "";
@@ -343,10 +344,10 @@ function supabaseSessionFor(req: http.IncomingMessage, claims: Claims, accessTok
       cookies.push(clearCookie(FLASH));
       const [body = "", sig = ""] = raw.split(".");
       if (!sameSecret(sig, mac("flash", body))) return undefined;
-      return Buffer.from(body, "base64url").toString("utf8");
+      return decodeFlash(body);
     },
-    setFlash: (m) => {
-      const body = Buffer.from(m, "utf8").toString("base64url");
+    setFlash: (f) => {
+      const body = encodeFlash(f);
       cookies.push(setCookie(FLASH, `${body}.${mac("flash", body)}`, 300));
     },
     signOut: async () => {

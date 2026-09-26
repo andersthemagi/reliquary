@@ -56,7 +56,7 @@ test("comment: Ana comments and it joins the timeline", async () => {
   assert.match(r.headers.get("location"), /#discussion$/);
   const h = await follow(r);
   assert.match(h, /Comment added\./);
-  assert.match(h, /<li><p class="small muted">Comment · you · revision 1 · just now<\/p>\s*<p>Can you add the deadline\?\nThanks\.<\/p><\/li>/);
+  assert.match(h, /<li><p class="small muted">Comment · you · revision 1 · <time datetime="[0-9T:.-]+Z" title="[0-9-]+ [0-9:]+ UTC">just now<\/time><\/p>\s*<p>Can you add the deadline\?\nThanks\.<\/p><\/li>/);
 });
 
 test("comment: empty and over-long comments are refused with a reason", async () => {
@@ -102,7 +102,7 @@ test("viewer: reads the thread, agent words escaped and marked, and can't commen
 
 test("closed: the reject note is in the timeline and the discussion is closed", async () => {
   const h = await page(`${T}/proposals/${TW_CLOSED}`);
-  assert.match(h, /Rejected · you · revision 1 · [^<]+<\/p>\s*<p>Not needed\.<\/p>/);
+  assert.match(h, /Rejected · you · revision 1 · <time datetime="[^"]+" title="[^"]+ UTC">[^<]+<\/time><\/p>\s*<p>Not needed\.<\/p>/);
   assert.match(h, /This proposal is decided, so its discussion is closed\./);
   assert.doesNotMatch(h, /name="body"/);
 });

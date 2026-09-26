@@ -297,6 +297,23 @@ test("session: a notice after a form shows once, on either instance, and can't b
   assert.doesNotMatch(await (await get(A, "/tokens", jar)).text(), /locked/);
 });
 
+test("session: a notice keeps its tone on either instance, and the tone is signed with it", async () => {
+  const { jar } = await signInByCode(A);
+  const csrf = csrfOf(await (await get(A, "/settings", jar)).text());
+  const tooLong = { csrf, display_name: "x".repeat(81) };
+  const r = await post(A, "/settings/name", tooLong, jar);
+  assert.equal(r.status, 303);
+  assert.match(await (await get(B, r.headers.get("location"), jar)).text(),
+    /<p class="callout danger flash" role="alert">A display name is at most 80 characters\. Nothing was saved\.<\/p>/);
+  // The same message, its tone changed to success, under the old signature.
+  await post(A, "/settings/name", tooLong, jar);
+  const [body, sig] = jar.c.get("__Host-rlq_flash").split(".");
+  const f = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+  assert.equal(f.t, "danger");
+  jar.c.set("__Host-rlq_flash", `${Buffer.from(JSON.stringify({ ...f, t: "success" })).toString("base64url")}.${sig}`);
+  assert.doesNotMatch(await (await get(B, "/", jar)).text(), /display name is at most/);
+});
+
 test("session: an expired access token is refreshed once, with new cookies", async () => {
   const { jar } = await signInByCode(A);
   const oldRt = jar.c.get(RT);

@@ -73,7 +73,7 @@ const post = (path, fields) =>
     headers: { cookie: s.cookie, "content-type": "application/x-www-form-urlencoded", origin: s.origin },
     body: new URLSearchParams(fields).toString(),
   });
-const flash = (h) => /<p class="callout info flash" role="status">([^<]*)<\/p>/.exec(h)?.[1] ?? "";
+const flash = (h) => /<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "";
 const filePage = () => `/v/${vault}/file?path=${encodeURIComponent(PATH)}`;
 const editPage = () => `/v/${vault}/edit?path=${encodeURIComponent(PATH)}`;
 
