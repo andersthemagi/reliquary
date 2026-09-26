@@ -2,6 +2,7 @@
   "name": "@reliquary-ai/web",
   "version": "0.4.0",
   "private": true,
+  "license": "FSL-1.1-ALv2",
   "description": "Reliquary's web UI: browse, edit, and approve",
   "type": "module",
   "scripts": {

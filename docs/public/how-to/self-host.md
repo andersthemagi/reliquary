@@ -2,7 +2,7 @@
 
 Run Reliquary on your own server with Docker Compose: the web app, the MCP endpoint, Postgres and Supabase Auth, with HTTPS from Caddy.
 
-Self-hosting is a preview. The license for running Reliquary's server yourself hasn't been published yet: until it is, ask Red Mage before running it for anything but a trial. The CLI is MIT.
+Self-hosting is a preview. Reliquary's server is under the Functional Source License (FSL-1.1-ALv2): you may run it yourself for any purpose, at any size, except offering it to others as a competing product or service, and each version becomes Apache 2.0 two years after its release. Hosting Reliquary for others needs a commercial license: write to andres@redmage.cc. The CLI is MIT.
 
 ## What you need
 

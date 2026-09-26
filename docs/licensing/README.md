@@ -1,9 +1,9 @@
 # Licensing (DRAFT, not in force)
 
-**Status: DRAFT pending the owner's decision and a legal review.** Nothing in
-this folder is a license anyone has been granted. Until the owner decides,
-the server (`web/`, `mcp/`, `supabase/`, `deploy/`) has no open-source or
-source-available license: all rights are reserved by Red Mage. The CLI (`cli/`) is MIT, as `cli/LICENSE` says; that
+**Status:** the owner chose FSL-1.1-ALv2 for the server on 2026-09-26; its
+canonical text, unedited except the notice, is the root `LICENSE.md`. The
+commercial license below is still a DRAFT pending a legal review, and so are
+the open questions (entity name, CLA, trademark). The CLI (`cli/`) is MIT, as `cli/LICENSE` says; that
 doesn't change.
 
 Internal: this folder is not public docs. Never link it from `docs/public`

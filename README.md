@@ -31,8 +31,7 @@ the research behind it is in [docs/research/](docs/research/).
 
 - `docs/design.md`: the design (v3 draft).
 - `docs/research/`: landscape, SWOT, the gate analysis, pricing.
-- `deploy/`: self-hosting with Docker Compose (a preview; the server's license
-  is undecided, drafts in `docs/licensing/`). Guide:
+- `deploy/`: self-hosting with Docker Compose (a preview). Guide:
   `docs/public/how-to/self-host.md`; smoke test: `deploy/test.sh`.
 - `spikes/gate/`: the audience gate and session minting, with hostile tests.
 - `pilot/`: a Telegram bot on the gate. Research, not the product.
@@ -48,3 +47,13 @@ personal routine infrastructure with the product; v3 separates them.
 
 Supabase (Postgres with RLS, Auth, Vault, `pg_cron`, `pgmq`, `pg_net`, Edge
 Functions), Next.js for the web UI, MCP endpoint and REST, and a small CLI.
+
+## License
+
+The server (everything outside `cli/`) is under the Functional Source
+License, version 1.1, with the Apache 2.0 future license (FSL-1.1-ALv2):
+[LICENSE.md](LICENSE.md). You may use, change and self-host it for any
+purpose except offering it to others as a competing product or service;
+each version also becomes Apache 2.0 two years after its release. Hosting
+Reliquary for others needs a commercial license from Red Mage
+(andres@redmage.cc). The CLI in `cli/` is MIT ([cli/LICENSE](cli/LICENSE)).
