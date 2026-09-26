@@ -78,6 +78,9 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (p === "/signout") return say("Signing out");
   if (p === "/theme") return say("Changing the theme");
   if (p === "/settings/name") return say("Saving your display name");
+  if (p === "/settings/sign-out-everywhere") return say("Signing out everywhere");
+  if (p === "/settings/email") return say("Changing your email address");
+  if (p === "/settings/delete") return say(get ? "Opening Delete account" : "Deleting your account");
   if (p === "/vaults/new") return say(`Creating vault ${typed(form.get("name")) || "(no name)"}`.trim());
   if (p === "/tokens/new") return say("Creating an agent token");
   if (/^\/tokens\/[^/]+\/revoke$/.test(p)) return say("Revoking an agent token");

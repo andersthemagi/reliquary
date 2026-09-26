@@ -6,7 +6,15 @@
 //   POST /auth/v1/verify                         { type: "email", email, token } or { type: "email", token_hash },
 //                                                or { type: "email_change", token_hash }
 //   POST /auth/v1/token?grant_type=refresh_token rotates; reusing a used refresh token revokes the session
-//   POST /auth/v1/logout                         revokes the bearer's session
+//   GET  /auth/v1/user                           the bearer's account, with new_email and
+//                                                email_change_sent_at while a change waits
+//   PUT  /auth/v1/user                           { email }: asks to change the address; the token
+//                                                hashes go to /_last_email of the new address and,
+//                                                with secure email change on (the default), the
+//                                                current one; another account's address is refused
+//                                                (422 email_exists)
+//   POST /auth/v1/logout                         revokes the bearer's session; ?scope=global every
+//                                                session of the bearer's account
 //   GET  /auth/v1/.well-known/jwks.json          the public key (ES256, generated at start)
 //
 // Test-only (never in Supabase):
@@ -18,6 +26,11 @@
 //                                 makes an account for an unknown address (off at start,
 //                                 as in the hosted project)
 //   GET  /_user?email=...         { id } of that account, or null
+//   POST /_users                  { email }: makes that account if it has none; { id }
+//   POST /_fail_global_logout     { status }: answer global logouts with that status
+//                                 (0: as normal)
+//   POST /_secure_email_change    { on }: whether PUT /user emails both addresses (on at start)
+//   POST /_fail_user_update       { status, body }: answer PUT /user with that (0: as normal)
 //   POST /_email_change           { email, new_email, both }: as if that account asked to
 //                                 change its address; the token hashes "emailed" to the
 //                                 new address and, with both (secure email change), the
@@ -63,7 +76,11 @@ const changes = []; // { pair, email, newEmail, hash, used }
 const lastEmail = new Map();
 const refreshTokens = new Map(); // token -> { sessionId, sub, email, used }
 const revoked = new Set(); // session ids
-const stats = { otp: 0, verify: 0, refresh: 0, logout: 0, jwks: 0, lastCreateUser: undefined };
+const stats = { otp: 0, verify: 0, refresh: 0, logout: 0, logoutGlobal: 0, userUpdate: 0, jwks: 0, lastCreateUser: undefined };
+const pendingChanges = new Map(); // account id -> { newEmail, sentAt }, from PUT /user
+const secureEmailChange = { on: true }; // /_secure_email_change: both addresses confirm (Supabase's default)
+const failUserUpdate = { status: 0, body: {} }; // /_fail_user_update: answer PUT /user with this instead
+const failGlobal = { status: 0 }; // /_fail_global_logout: answer global logouts with this status instead
 const TTL = 3600;
 const signups = { on: false };
 
@@ -110,6 +127,25 @@ http
       const id = USERS.get(String(url.searchParams.get("email") ?? "").toLowerCase());
       return json(res, 200, id ? { id } : null);
     }
+    if (p === "/_users" && req.method === "POST") {
+      const email = String((await readJson(req)).email ?? "").toLowerCase();
+      if (!USERS.has(email)) USERS.set(email, randomUUID());
+      return json(res, 200, { id: USERS.get(email) });
+    }
+    if (p === "/_secure_email_change" && req.method === "POST") {
+      secureEmailChange.on = (await readJson(req)).on !== false;
+      return json(res, 200, secureEmailChange);
+    }
+    if (p === "/_fail_user_update" && req.method === "POST") {
+      const b = await readJson(req);
+      failUserUpdate.status = Number(b.status) || 0;
+      failUserUpdate.body = b.body ?? {};
+      return json(res, 200, { status: failUserUpdate.status });
+    }
+    if (p === "/_fail_global_logout" && req.method === "POST") {
+      failGlobal.status = Number((await readJson(req)).status) || 0;
+      return json(res, 200, failGlobal);
+    }
     if (p === "/_email_change" && req.method === "POST") {
       const { email, new_email, both } = await readJson(req);
       if (!USERS.has(email)) USERS.set(email, randomUUID()); // a fresh account, so tests don't touch others
@@ -136,6 +172,43 @@ http
       stats.jwks++;
       return json(res, 200, { keys: [JWK] });
     }
+    if (p === "/auth/v1/user" && (req.method === "GET" || req.method === "PUT")) {
+      // The bearer's account; a revoked session, or no account, is refused as Auth does.
+      let claims;
+      try {
+        claims = JSON.parse(Buffer.from((req.headers.authorization ?? "").replace(/^Bearer /, "").split(".")[1], "base64url").toString("utf8"));
+      } catch {
+        return json(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
+      }
+      const email = [...USERS].find(([, id]) => id === claims.sub)?.[0];
+      if (!email || revoked.has(claims.session_id)) return json(res, 403, { code: 403, error_code: "session_not_found", msg: "Session from session_id claim in JWT does not exist" });
+      const user = () => {
+        const w = pendingChanges.get(claims.sub);
+        return { id: claims.sub, email, ...(w ? { new_email: w.newEmail, email_change_sent_at: w.sentAt } : {}) };
+      };
+      if (req.method === "GET") return json(res, 200, user());
+      stats.userUpdate++;
+      if (failUserUpdate.status) return json(res, failUserUpdate.status, failUserUpdate.body);
+      const newEmail = String((await readJson(req)).email ?? "").toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return json(res, 400, { code: 400, error_code: "validation_failed", msg: "Unable to validate email address: invalid format" });
+      if (USERS.has(newEmail) && USERS.get(newEmail) !== claims.sub) {
+        return json(res, 422, { code: 422, error_code: "email_exists", msg: "A user with this email address has already been registered" });
+      }
+      // Asking again replaces the links waiting, as Auth does.
+      for (const c of changes) if (c.email === email && !c.used) c.used = true;
+      const pair = randomUUID();
+      const hashNew = randomBytes(28).toString("hex");
+      changes.push({ pair, email, newEmail, hash: hashNew, used: false });
+      lastEmail.set(newEmail, { token_hash: hashNew, type: "email_change" });
+      if (secureEmailChange.on) {
+        const hashCurrent = randomBytes(28).toString("hex");
+        changes.push({ pair, email, newEmail, hash: hashCurrent, used: false });
+        lastEmail.set(email, { token_hash: hashCurrent, type: "email_change" });
+      }
+      pendingChanges.set(claims.sub, { newEmail, sentAt: new Date().toISOString() });
+      return json(res, 200, user());
+    }
+
     if (req.method !== "POST") return json(res, 405, { msg: "method" });
     const body = await readJson(req);
 
@@ -174,6 +247,7 @@ http
       const id = USERS.get(hit.email);
       USERS.delete(hit.email);
       USERS.set(hit.newEmail, id);
+      pendingChanges.delete(id);
       return json(res, 200, session(id, hit.newEmail));
     }
     if (p === "/auth/v1/verify") {
@@ -202,12 +276,19 @@ http
     if (p === "/auth/v1/logout") {
       stats.logout++;
       const token = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+      let claims;
       try {
-        const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
-        revoked.add(claims.session_id);
+        claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
       } catch {
         return json(res, 401, { msg: "bad token" });
       }
+      if (url.searchParams.get("scope") === "global") {
+        stats.logoutGlobal++;
+        if (failGlobal.status) return json(res, failGlobal.status, { msg: "fake refusal" });
+        // Every session of the account: all its refresh tokens stop working.
+        for (const rt of refreshTokens.values()) if (rt.sub === claims.sub) revoked.add(rt.sessionId);
+      }
+      revoked.add(claims.session_id);
       return json(res, 204);
     }
     return json(res, 404, { msg: "not found" });

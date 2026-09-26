@@ -39,7 +39,7 @@ A proposal you snoozed leaves the count and the list until the snooze ends. **Sh
 
 The account menu, at the right of the bar, shows who you're signed in as and links to:
 
-- **Account settings** (`/settings`): your display name, your email, the theme, and sign out.
+- **Account settings** (`/settings`): your display name, your email address, the theme, sign out, sign out everywhere and delete account.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
 - **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Connections](connections.md).
 
@@ -55,4 +55,32 @@ On **Account settings**, you can give yourself a display name. People who share 
 
 Only you can set your name, signed in to the web app. An agent can't set or read it, over any tool: it's your profile, like your memberships. See [Agents and the ceiling](agents.md).
 
-Your email is how you sign in and how invites find you. It can't be changed in the web app; ask the operator of your Reliquary.
+## Your email address
+
+Your email is how you sign in and how invites find you. To change it, enter the new address under **Email** on **Account settings** and choose **Send confirmation link**.
+
+1. Reliquary's sign-in service emails a link to the new address, and one to your current address too if this site asks both (it does by default). Nothing changes yet: you keep signing in with your current address, and **Account settings** shows the change waiting for confirmation.
+2. Open the link (or both links). With two, the first one you open says to open the other. Then the change is made, and you land on **Account settings**, signed in.
+3. From then on you sign in with the new address.
+
+What changes and what stays:
+
+- Your vaults, roles, connections, plan and display name stay as they are. They belong to your account, not your address.
+- People who share a vault with you see the new address, in Members, Activity and proposals.
+- Invites are matched to the address your account has when you open one. An invite made out to your old address stops working: ask the owner for a new one. An invite made out to your new address works with its link.
+- Until you confirm, a change grants nothing: invites made out to the new address don't show in your Inbox and can't be accepted.
+- Your old address is free again. Someone who later signs up with it gets the invites made out to it, but nothing of yours.
+
+If the new address already belongs to another Reliquary account, the change is refused. Only you can change your address, signed in to the web app; an agent can't. A confirmation link expires after a while: if yours did, send a new one.
+
+## Sign out everywhere
+
+**Sign out** on **Account settings** ends your session in this browser. **Sign out everywhere** ends every session of your account at once: in every browser and on every device, this one included. Use it if you signed in on a computer you no longer use, or lost a phone. Pages open elsewhere go to the sign-in page on their next click. Signing in again works right away.
+
+Connections are not sessions. Agent tokens, connected apps (Claude, ChatGPT, Cursor and others) and Reliquary CLI sign-ins keep working after you sign out everywhere, unless you tick **Also revoke all my connections**. That revokes every one of them at once; to revoke them one at a time, use **Tokens and connections**. See [Connections](connections.md).
+
+Only you can sign out everywhere, signed in to the web app. An agent can't do it for you. If Reliquary can't reach its sign-in service, nothing is ended and the page says so, with a reference (see [Errors](../reference/errors.md)).
+
+## Delete your account
+
+**Delete account** on **Account settings** deletes your account at once: you leave every vault, your connections are deleted, and Reliquary forgets your email address, display name and plan. What you wrote in vaults stays there, and people see it as written by **a deleted account**. You can't delete your account while you're the only owner of a vault. See [Delete your account](../how-to/delete-your-account.md).

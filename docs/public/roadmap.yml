@@ -151,6 +151,21 @@
   milestone: M1
   docs: concepts/inbox-and-account
 
+- title: Sign out everywhere
+  summary: End every browser session of your account at once from Account settings, and optionally revoke all your connections too.
+  status: shipped
+  docs: concepts/inbox-and-account
+
+- title: Change your email address
+  summary: Move your account to another address from Account settings, confirmed by a link; your vaults, roles and connections stay.
+  status: shipped
+  docs: concepts/inbox-and-account
+
+- title: Delete your account
+  summary: Delete your account yourself from Account settings; what you wrote stays in its vaults, shown as a deleted account.
+  status: shipped
+  docs: how-to/delete-your-account
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core

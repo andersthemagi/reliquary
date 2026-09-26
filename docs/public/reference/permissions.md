@@ -35,6 +35,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | See and cut members' agent connections | **Members** | none | person, owners |
 | Create or revoke a token | **Tokens and connections** (the account menu) | none | person |
 | Set your display name | **Account settings** | none | person, for themself only |
+| Change your email address, sign out everywhere or delete your account | **Account settings** | none | person, for themself only |
 | Allow an OAuth client or the CLI | the consent page | none | person |
 | Erase a file | the file's **More**, **Erase content** | none | person, owners |
 | Export a vault | **Settings**, **Export** | none | person, owners |

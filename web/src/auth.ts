@@ -10,8 +10,10 @@
 //    in server memory, so any instance accepts any other's cookies. CSRF is
 //    HMAC(SESSION_SECRET, session_id). docs/research/hosting.md, section 3.
 //
-// Either way the database learns only { sub, role: "authenticated" } (see
-// asPerson in db.ts): never an `act`, never any other claim from the JWT.
+// Either way the database learns only { sub, role: "authenticated" } and,
+// with Supabase, the JWT's `iat` (see asPerson in db.ts; the database uses
+// it to end sessions its person signed out everywhere): never an `act`,
+// never any other claim from the JWT.
 //
 // Never log a JWT, refresh token, code, token hash or email. Log lines here
 // name a fixed reason, nothing from the request.
@@ -189,11 +191,40 @@ const mac = (purpose: string, value: string) =>
 export type Session = {
   userId: string;
   csrf: string;
+  // When the session's access JWT was issued (its `iat`, seconds), passed to
+  // the database so it can refuse a session its person signed out
+  // everywhere after (db.ts, private.check_session). None for the local
+  // stand-in, which ends its sessions in memory.
+  issuedAt?: number;
   takeFlash(): Flash | undefined;
   setFlash(flash: Flash): void;
   // Ends the session: Supabase logout (this session only) and cleared cookies.
   signOut(): Promise<void>;
+  // Ends every session of the account at Supabase (logout with
+  // scope=global: every refresh token revoked) and clears this browser's
+  // cookies. "unavailable": Supabase couldn't be reached; "refused": it
+  // answered with a refusal. Either way nothing was ended and the cookies
+  // stay. The database's side (private.session_cutoffs) is the caller's.
+  signOutEverywhere(): Promise<"ok" | "unavailable" | "refused">;
+  // The account's change of address waiting for confirmation, as Supabase
+  // Auth has it (GET /user): the new address and when its link was sent,
+  // or null when none waits. "unavailable": Auth couldn't be asked. The
+  // local stand-in has none.
+  pendingEmail(): Promise<{ email: string; sentAt: Date | null } | null | "unavailable">;
+  // Asks Supabase Auth to change the account's address (PUT /user). Auth
+  // emails a link to the new address (and, with its secure email change,
+  // one to the current address too); nothing changes until it is opened.
+  // "taken": another account has that address; "invalid": Auth won't take
+  // it as an address; "limited": Auth's email rate limit.
+  changeEmail(email: string): Promise<"sent" | "taken" | "invalid" | "limited" | "refused" | "unavailable">;
 };
+
+// A signed notice for the next page, set where there is no session to
+// carry it yet (a sign-in link that just made one). Supabase mode only.
+export function flashCookie(f: Flash): string {
+  const body = encodeFlash(f);
+  return setCookie(FLASH, `${body}.${mac("flash", body)}`, 300);
+}
 
 // What a request carries. `cookies` are Set-Cookie values the response must
 // send (a refreshed session, cleared cookies, a flash): send them even when
@@ -257,6 +288,12 @@ function localSession(req: http.IncomingMessage): Lookup {
       signOut: async () => {
         localSessions.delete(sid!);
       },
+      signOutEverywhere: async () => {
+        for (const [k, v] of localSessions) if (v.userId === s.userId) localSessions.delete(k);
+        return "ok";
+      },
+      pendingEmail: async () => null,
+      changeEmail: async () => "refused",
     },
     cookies: [],
     unavailable: false,
@@ -338,6 +375,7 @@ function supabaseSessionFor(req: http.IncomingMessage, claims: Claims, accessTok
   return {
     userId: claims.sub,
     csrf: mac("csrf", claims.session_id),
+    issuedAt: typeof claims.iat === "number" && Number.isFinite(claims.iat) ? claims.iat : undefined,
     takeFlash: () => {
       const raw = readCookie(req, cookieName(FLASH));
       if (raw === undefined) return undefined;
@@ -347,14 +385,60 @@ function supabaseSessionFor(req: http.IncomingMessage, claims: Claims, accessTok
       return decodeFlash(body);
     },
     setFlash: (f) => {
-      const body = encodeFlash(f);
-      cookies.push(setCookie(FLASH, `${body}.${mac("flash", body)}`, 300));
+      cookies.push(flashCookie(f));
     },
     signOut: async () => {
       // Best effort: the JWT stays valid until it expires (at most an hour)
       // even if this call fails, but our cookies go either way.
       await gotrue("/logout?scope=local", {}, { authorization: `Bearer ${accessToken}` }).catch(() => undefined);
       cookies.push(...SESSION_COOKIES.map(clearCookie));
+    },
+    signOutEverywhere: async () => {
+      try {
+        const r = await gotrue("/logout?scope=global", {}, { authorization: `Bearer ${accessToken}` });
+        if (r.status < 200 || r.status > 299) {
+          noteUpstream("sign-out (Supabase Auth)", `POST /logout?scope=global answered ${r.status}: Supabase Auth refused to end the account's sessions`);
+          return "refused";
+        }
+      } catch (err) {
+        if (err instanceof Unavailable) return "unavailable";
+        throw err;
+      }
+      cookies.push(...SESSION_COOKIES.map(clearCookie));
+      return "ok";
+    },
+    pendingEmail: async () => {
+      try {
+        const r = await gotrue("/user", undefined, { authorization: `Bearer ${accessToken}` }, "GET");
+        if (r.status !== 200) {
+          noteUpstream("account (Supabase Auth)", `GET /user answered ${r.status}`);
+          return "unavailable";
+        }
+        const email = typeof r.json?.new_email === "string" ? r.json.new_email.trim() : "";
+        if (!email) return null;
+        const at = typeof r.json?.email_change_sent_at === "string" ? new Date(r.json.email_change_sent_at) : null;
+        return { email, sentAt: at && !Number.isNaN(+at) ? at : null };
+      } catch (err) {
+        if (err instanceof Unavailable) return "unavailable";
+        throw err;
+      }
+    },
+    changeEmail: async (email) => {
+      try {
+        const r = await gotrue("/user", { email }, { authorization: `Bearer ${accessToken}` }, "PUT");
+        if (r.status === 200) return "sent";
+        const code = String(r.json?.error_code ?? "");
+        const msg = String(r.json?.msg ?? r.json?.message ?? "");
+        // What Auth said, never the address, goes to the request's error.
+        noteUpstream("change of email (Supabase Auth)", `PUT /user answered ${r.status}${code ? ` (${code})` : ""}`);
+        if (code === "email_exists" || /already (been )?registered/i.test(msg)) return "taken";
+        if (r.status === 429 || code.startsWith("over_email_send_rate_limit") || code === "over_request_rate_limit") return "limited";
+        if (code === "validation_failed" || code === "email_address_invalid" || /invalid format|validate email/i.test(msg)) return "invalid";
+        return "refused";
+      } catch (err) {
+        if (err instanceof Unavailable) return "unavailable";
+        throw err;
+      }
     },
   };
 }
@@ -370,21 +454,26 @@ export function sessionCookies(t: Tokens): string[] {
 
 const TIMEOUT_MS = 8000;
 
-async function gotrue(path: string, body: unknown, headers: Record<string, string> = {}): Promise<{ status: number; json: any }> {
+async function gotrue(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+  method: "POST" | "PUT" | "GET" = "POST",
+): Promise<{ status: number; json: any }> {
   const c = conf();
   let res: Response;
   try {
     res = await fetch(`${c.issuer}${path}`, {
-      method: "POST",
+      method,
       headers: { apikey: c.apiKey, "content-type": "application/json", accept: "application/json", ...headers },
-      body: JSON.stringify(body),
+      body: method === "GET" ? undefined : JSON.stringify(body),
       redirect: "error",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
-    throw unreachable(`POST ${path}`, err);
+    throw unreachable(`${method} ${path}`, err);
   }
-  if (res.status >= 500) throw new Unavailable(`POST ${path} answered ${res.status}`);
+  if (res.status >= 500) throw new Unavailable(`${method} ${path} answered ${res.status}`);
   const json = await res.json().catch(() => ({}));
   return { status: res.status, json };
 }
