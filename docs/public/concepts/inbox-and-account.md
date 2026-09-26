@@ -32,7 +32,7 @@ A proposal you snoozed leaves the count and the list until the snooze ends. **Sh
 
 The account menu, at the right of the bar, shows who you're signed in as and links to:
 
-- **Account settings** (`/settings`): your display name, your email address, the theme, sign out and sign out everywhere.
+- **Account settings** (`/settings`): your display name, your email address, the theme, sign out, sign out everywhere and delete account.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
 - **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Connections](connections.md).
 
@@ -73,3 +73,7 @@ If the new address already belongs to another Reliquary account, the change is r
 Connections are not sessions. Agent tokens, connected apps (Claude, ChatGPT, Cursor and others) and Reliquary CLI sign-ins keep working after you sign out everywhere, unless you tick **Also revoke all my connections**. That revokes every one of them at once; to revoke them one at a time, use **Tokens and connections**. See [Connections](connections.md).
 
 Only you can sign out everywhere, signed in to the web app. An agent can't do it for you. If Reliquary can't reach its sign-in service, nothing is ended and the page says so, with a reference (see [Errors](../reference/errors.md)).
+
+## Delete your account
+
+**Delete account** on **Account settings** deletes your account at once: you leave every vault, your connections are deleted, and Reliquary forgets your email address, display name and plan. What you wrote in vaults stays there, and people see it as written by **a deleted account**. You can't delete your account while you're the only owner of a vault. See [Delete your account](../how-to/delete-your-account.md).

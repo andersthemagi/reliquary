@@ -71,6 +71,16 @@ Done so far:
   back, imports, invites, deletion notices; `/review` redirects to
   `/inbox`) and an account menu, drawn from one `shell_summary` call per
   page; Account settings with a display name, the person's own, in person.
+- account self-service on Account settings, each the person's own, in
+  person only: sign out everywhere (`20260926140000_sign_out_everywhere.sql`:
+  Supabase's global logout, then a cutoff that `private.check_session`, run
+  with the claims at the start of every web transaction, holds sessions to;
+  `RLA01`), change of email through Supabase Auth (nothing in the database:
+  invites match the address at acceptance), and deleting the account
+  (`20260926140200_delete_account.sql`; the model is in the design's
+  "Deleting an account"), with hostile tests in
+  `supabase/tests/sign_out_everywhere_test.sql`, `email_change_test.sql` and
+  `delete_account_test.sql`, and `web/test/account.test.mjs`.
 
 Milestone 2: **environment variables**. Done so far (phase 1, the core;
 interface and phase 2's work in [docs/variables.md](docs/variables.md)):

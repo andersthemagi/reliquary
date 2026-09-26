@@ -64,6 +64,7 @@ ${operatorBlock()}
 <h2>Leaving, suspension and deletion</h2>
 <ul>
   <li>You can export a vault and delete it whenever you like. Deletion is immediate; backups age out as the <a href="/privacy">privacy policy</a> says.</li>
+  <li>You can delete your account whenever you like, on Account settings, once no vault has you as its only owner. It is immediate: you leave every vault, and what you wrote in a vault stays with that vault (<a href="/docs/how-to/delete-your-account">Delete your account</a>).</li>
   <li>We may suspend access that breaks these terms or puts the service or other customers at risk. Where we can, we'll tell you first and give you the chance to export.</li>
   <li>If we ever close Reliquary, we'll give you ${fill("closureNotice", "notice period")} and a way to export first.</li>
 </ul>
@@ -136,14 +137,14 @@ ${operatorBlock()}
 
 <h2>How long we keep it</h2>
 <ul>
-  <li>Account data: while you have an account, and deleted when you ask us to close it.</li>
+  <li>Account data: while you have an account. Deleting your account (on Account settings, or by asking us) deletes your email address, display name, plan and sign-in at once. The logs of vaults you were in keep a random account id, shown as "a deleted account", never your address.</li>
   <li>Vault content: until an owner erases it or deletes the vault. Erasing a file blanks every version at once; deleting a vault removes everything in it at once, keeping only who deleted it, when, and counts.</li>
   <li>The activity log is append-only: it keeps the fact that something happened, but erased content is gone from it.</li>
   <li>Database backups keep deleted data until they age out, after ${fill("backupRetention", "backup retention")}.</li>
 </ul>
 
 <h2>Your rights</h2>
-<p>You can ask for access to, correction of, or deletion of your personal data, ask us to restrict or stop processing it, and take it with you (vault owners can export a vault themselves). Email ${mail(OPERATOR.contactEmail)}. For data in a vault, we'll pass your request to the vault's owner, who decides as controller. You can also complain to a data protection authority; ours is ${fill("supervisoryAuthority", "supervisory authority")}.</p>
+<p>You can change your email address and delete your account yourself, on Account settings. You can also ask for access to, correction of, or deletion of your personal data, ask us to restrict or stop processing it, and take it with you (vault owners can export a vault themselves). Email ${mail(OPERATOR.contactEmail)}. For data in a vault, we'll pass your request to the vault's owner, who decides as controller. You can also complain to a data protection authority; ours is ${fill("supervisoryAuthority", "supervisory authority")}.</p>
 
 <h2>Security and breaches</h2>
 <p>See the <a href="/security">security page</a>. If a breach affects your personal data, we'll tell the vault owners and, where required, the authority within 72 hours of becoming aware of it.</p>

@@ -1,8 +1,9 @@
 // Account settings with Supabase Auth (src/settings.ts, src/auth.ts):
-// signing out everywhere and changing the email address. Against
-// web/test.sh's AUTH_MODE=supabase instance A and the fake Auth
-// (test/fake-auth.mjs). The database rules are in
-// supabase/tests/sign_out_everywhere_test.sql and email_change_test.sql.
+// signing out everywhere, changing the email address and deleting the
+// account. Against web/test.sh's AUTH_MODE=supabase instance A and the fake
+// Auth (test/fake-auth.mjs). The database rules are in
+// supabase/tests/sign_out_everywhere_test.sql, email_change_test.sql and
+// delete_account_test.sql.
 //
 // Everyone here is made by this file (acct-*@example.test, in the fake Auth
 // and in auth.users) and used by no other. Every sign-in code, token hash
@@ -332,4 +333,97 @@ test("change email: needs the form token and this site's origin", async () => {
   });
   assert.equal(r.status, 403);
   assert.equal((await stats()).userUpdate, n);
+});
+
+// ---------------------------------------------------------------------------
+// Delete account
+//
+// Wes created "Acct Shared" (Xia is its other owner) and owns "Acct Wes
+// Solo" alone; he wrote a file in Acct Shared and has a token.
+
+const W = {};
+const main = (h) => /<main id="main">[\s\S]*<\/main>/.exec(h)[0];
+const exists = async (id) => (await sql("select count(*)::int as n from auth.users where id = $1", [id]))[0].n === 1;
+
+test("delete account: Account settings links to it, saying what goes and what stays", async () => {
+  W.wes = await account("acct-wes@example.test");
+  W.xia = await account("acct-xia@example.test");
+  [{ id: W.shared }] = await as(W.wes, "select public.create_vault('Acct Shared') as id");
+  [{ id: W.solo }] = await as(W.wes, "select public.create_vault('Acct Wes Solo') as id");
+  await sql("select test_support.add_member($1, $2, 'owner', $3)", [W.shared, W.xia, W.wes]);
+  await as(W.wes, "select public.write_file($1, 'notes/wes.md', 'Wes was here')", [W.shared]);
+  await as(W.wes, "select public.create_access_token('wes laptop', 30)");
+  const jar = await signIn("acct-wes@example.test");
+  const h = await (await get("/settings", jar)).text();
+  assert.match(h, /<h2 id="delete-account">Delete account<\/h2>/);
+  assert.match(h, /Deletes your account now: you leave every vault, your connections are deleted, and Reliquary forgets your email address and name\. What you wrote in vaults stays there, shown as written by a deleted account\. This can’t be undone\./);
+  assert.match(h, /<a class="button danger" href="\/settings\/delete">Delete account<\/a>/);
+});
+
+test("delete account: while I'm the only owner of a vault, the page lists it with Members and Delete vault, and offers no form", async () => {
+  const jar = await signIn("acct-wes@example.test");
+  const h = main(await (await get("/settings/delete", jar)).text());
+  assert.match(h, /Your account can’t be deleted yet/);
+  assert.match(h, /You’re the only owner of this vault, and a vault always keeps an owner\. Before you can delete your account, for each one make someone else an owner on its Members page, or delete the vault\./);
+  assert.match(h, new RegExp(`<li><span><strong>Acct Wes Solo</strong></span><span class="actions"><a href="/v/${W.solo}/config/members">Members</a> <a href="/v/${W.solo}/config/danger">Delete vault</a></span></li>`));
+  assert.doesNotMatch(h, /Acct Shared/);
+  assert.doesNotMatch(h, /action="\/settings\/delete"/);
+});
+
+test("delete account: the confirm page says which vaults I leave, what goes and what stays, and asks for my address", async () => {
+  await as(W.wes, "select public.delete_vault($1, 'Acct Wes Solo')", [W.solo]);
+  const jar = await signIn("acct-wes@example.test");
+  const h = await (await get("/settings/delete", jar)).text();
+  assert.match(h, /<h1>Delete your account<\/h1>/);
+  assert.match(h, /This deletes your account now\. You leave one vault: <strong>Acct Shared<\/strong> \(owner\)\. 1 connection \(agent tokens, connected apps and CLI sign-ins\) is deleted and stops working\. This can’t be undone\./);
+  assert.match(h, /What you wrote in vaults stays there: files, proposals, comments and the activity log belong to each vault and its owners\. It shows as written by a deleted account\./);
+  assert.match(h, /You can sign up again later with the same address\. That is a new account: it has none of your vaults\./);
+  assert.match(h, /<label for="confirm-typed">Type your email address, <strong>acct-wes@example\.test<\/strong>, to confirm<\/label>\s*<input id="confirm-typed" type="text" name="confirm_email" required/);
+  assert.match(h, /<button class="danger solid">Delete my account<\/button><a class="button quiet" href="\/settings">Cancel<\/a>/);
+});
+
+test("delete account: a wrong address deletes nothing", async () => {
+  const jar = await signIn("acct-wes@example.test");
+  const r = await post("/settings/delete", { csrf: await settingsCsrf(jar), confirm_email: "acct-xia@example.test" }, jar);
+  assert.equal(r.status, 400);
+  assert.match(await r.text(), /That isn’t your email address as it is on this account\. Nothing was deleted\./);
+  assert.ok(await exists(W.wes));
+  assert.equal((await get("/", jar)).status, 200);
+});
+
+test("delete account: typing my address deletes it, signs every browser out, and co-members see a deleted account", async () => {
+  const here = await signIn("acct-wes@example.test");
+  const there = await signIn("acct-wes@example.test");
+  const r = await post("/settings/delete", { csrf: await settingsCsrf(here), confirm_email: " ACCT-WES@example.test " }, here);
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /<h1>Account deleted<\/h1>\s*<p class="lede">Your account is deleted\. You left 1 vault, 1 connection was deleted\. What you wrote in vaults stays there, shown as written by a deleted account\.<\/p>/);
+  assert.ok(!here.c.has(AT) && !here.c.has(RT), "this browser's cookies are cleared");
+  const other = await get("/settings", there);
+  assert.equal(other.status, 303, "another browser's session is refused");
+  assert.equal(other.headers.get("location"), `/signin?next=${encodeURIComponent("/settings")}`);
+  assert.ok(!(await exists(W.wes)), "the sign-in account is gone from auth.users");
+  // Even a fresh token for the old id (the fake Auth still knows it) gets nowhere.
+  const again = await signIn("acct-wes@example.test");
+  assert.equal((await get("/", again)).status, 303);
+  const xia = await signIn("acct-xia@example.test");
+  const activity = await (await get(`/v/${W.shared}/activity`, xia)).text();
+  assert.match(activity, /a deleted account/);
+  assert.doesNotMatch(activity, /acct-wes@example\.test/);
+  const members = await (await get(`/v/${W.shared}/config/members`, xia)).text();
+  assert.doesNotMatch(members, /acct-wes/);
+  assert.match(await (await get(`/v/${W.shared}/file?path=notes%2Fwes.md`, xia)).text(), /Wes was here/);
+});
+
+test("delete account: needs the form token and this site's origin", async () => {
+  const id = await account("acct-yuri@example.test");
+  const jar = await signIn("acct-yuri@example.test");
+  assert.equal((await post("/settings/delete", { confirm_email: "acct-yuri@example.test" }, jar)).status, 403);
+  const r = await fetch(A + "/settings/delete", {
+    method: "POST",
+    redirect: "manual",
+    headers: { cookie: jar.header, "content-type": "application/x-www-form-urlencoded", origin: "https://evil.example" },
+    body: new URLSearchParams({ csrf: await settingsCsrf(jar), confirm_email: "acct-yuri@example.test" }).toString(),
+  });
+  assert.equal(r.status, 403);
+  assert.ok(await exists(id));
 });

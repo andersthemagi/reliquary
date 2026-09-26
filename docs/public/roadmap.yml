@@ -161,6 +161,11 @@
   status: shipped
   docs: concepts/inbox-and-account
 
+- title: Delete your account
+  summary: Delete your account yourself from Account settings; what you wrote stays in its vaults, shown as a deleted account.
+  status: shipped
+  docs: how-to/delete-your-account
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core

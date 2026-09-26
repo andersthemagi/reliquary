@@ -31,11 +31,19 @@
 // made out to the old address stop matching and those made out to the new
 // one (whose inbox the person has just proved they hold) can be accepted
 // with their links (supabase/tests/email_change_test.sql).
+//
+// Delete account (GET /settings/delete, a confirm page; POST deletes) is
+// public.delete_account, in person, with the address typed, which the
+// database checks too (20260926140200_delete_account.sql). While the
+// person is a vault's only owner the page lists those vaults and offers no
+// form. Afterwards this browser's session ends here; the database refuses
+// any other (private.check_session), and Supabase Auth has no account left
+// to renew one for.
 
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
 import { Refusal } from "./failure.js";
-import { callout, csrfField, html, notice, pageHeader, signsOut, themeButtons, time } from "./html.js";
+import { callout, confirmPage, csrfField, html, notice, pageHeader, signsOut, themeButtons, time } from "./html.js";
 import { EMAIL } from "./signin.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 import { shortId } from "./personref.js";
@@ -115,7 +123,16 @@ export async function accountSettings(ctx: Ctx): Promise<Reply> {
         <div class="actions"><button class="danger">Sign out everywhere</button></div>
       </form>
     </section>`
-      : ""}`,
+      : ""}
+    <section aria-labelledby="delete-account">
+      <h2 id="delete-account">Delete account</h2>
+      <div class="danger-rows">
+        <div class="danger-row">
+          <div><p>Deletes your account now: you leave every vault, your connections are deleted, and Reliquary forgets your email address and name. What you wrote in vaults stays there, shown as written by a deleted account. This can’t be undone.</p></div>
+          <a class="button danger" href="/settings/delete">Delete account</a>
+        </div>
+      </div>
+    </section>`,
     "settings",
   );
 }
@@ -186,4 +203,105 @@ export async function changeEmail(ctx: Ctx): Promise<Reply> {
   if (r === "refused") return refuse("The sign-in service refused the change, so no link was sent. Sign out, sign in again and retry. Nothing was changed", auth);
   ctx.setFlash("We sent a confirmation link to the new address. Open it to finish the change; until then you sign in with your current address.", "success");
   return { redirect: "/settings" };
+}
+
+// ---------------------------------------------------------------------------
+// Delete account
+
+type DeletionSummary = {
+  email: string | null;
+  sole_owner: { id: string; name: string }[];
+  vaults: { id: string; name: string; role: string }[];
+  connections: number;
+  invites: number;
+};
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const NO_EMAIL_PHRASE = "delete my account";
+const crumb = [{ label: "Account settings", href: "/settings" }, { label: "Delete account" }];
+
+export async function deleteAccountPage(ctx: Ctx, error?: string): Promise<Reply> {
+  const s = await asPerson(ctx.userId, async (c) => (await c.query(`select public.account_deletion_summary() as s`)).rows[0].s as DeletionSummary);
+  if (s.sole_owner.length) {
+    return render(
+      ctx,
+      "Delete account",
+      html`${pageHeader({ crumb, title: "Delete account" })}
+      ${error ? callout("danger", error) : ""}
+      ${callout(
+        "warning",
+        html`<p>You’re the only owner of ${s.sole_owner.length === 1 ? "this vault" : `these ${s.sole_owner.length} vaults`}, and a vault always keeps an owner. Before you can delete your account, for each one make someone else an owner on its Members page, or delete the vault.</p>`,
+        { title: "Your account can’t be deleted yet" },
+      )}
+      <ul class="rows">
+        ${s.sole_owner.map(
+          (v) => html`<li><span><strong>${v.name}</strong></span><span class="actions"><a href="/v/${v.id}/config/members">Members</a> <a href="/v/${v.id}/config/danger">Delete vault</a></span></li>`,
+        )}
+      </ul>
+      <p><a class="button quiet" href="/settings">Back to Account settings</a></p>`,
+      "settings",
+    );
+  }
+  const typed = s.email ?? NO_EMAIL_PHRASE;
+  const left = s.vaults.length
+    ? html`You leave ${s.vaults.length === 1 ? "one vault" : `${s.vaults.length} vaults`}: ${s.vaults.map((v, i) => html`${i ? ", " : ""}<strong>${v.name}</strong> (${v.role})`)}.`
+    : html`You’re in no vault.`;
+  return render(
+    ctx,
+    "Delete account",
+    confirmPage({
+      title: "Delete your account",
+      crumb,
+      lede: html`This deletes your account now. ${left} ${s.connections ? `${plural(s.connections, "connection")} (agent tokens, connected apps and CLI sign-ins) ${s.connections === 1 ? "is" : "are"} deleted and stop${s.connections === 1 ? "s" : ""} working.` : "You have no connections to delete."} This can’t be undone.`,
+      consequences: [
+        "Reliquary forgets your email address, your display name and your plan, and signs you out everywhere.",
+        ...(s.invites ? [`${plural(s.invites, "invite")} you made that ${s.invites === 1 ? "is" : "are"} still waiting ${s.invites === 1 ? "is" : "are"} withdrawn.`] : []),
+        "What you wrote in vaults stays there: files, proposals, comments and the activity log belong to each vault and its owners. It shows as written by a deleted account. To remove something you wrote, erase it or ask an owner to, before you delete your account.",
+        "Backups keep your data until they age out, then it is gone everywhere.",
+        "You can sign up again later with the same address. That is a new account: it has none of your vaults.",
+      ],
+      action: "/settings/delete",
+      csrf: ctx.csrf,
+      typed: {
+        value: typed,
+        name: "confirm_email",
+        label: s.email ? html`Type your email address, <strong>${s.email}</strong>, to confirm` : html`Type <strong>${NO_EMAIL_PHRASE}</strong> to confirm`,
+      },
+      button: "Delete my account",
+      cancel: "/settings",
+      error,
+    }),
+    "settings",
+  );
+}
+
+export async function deleteAccount(ctx: Ctx): Promise<Reply> {
+  const typed = ctx.form.get("confirm_email") ?? "";
+  let n: { vaults: number; connections: number; invites: number };
+  try {
+    n = await asPerson(ctx.userId, async (c) => (await c.query(`select public.delete_account($1) as n`, [typed])).rows[0].n);
+  } catch (err) {
+    const e = err as { code?: string };
+    if (e.code === "22023") {
+      const r = await deleteAccountPage(ctx, "That isn’t your email address as it is on this account. Nothing was deleted.");
+      return { ...r, status: 400 };
+    }
+    // Only owner of a vault now (a role changed since the page was drawn):
+    // the page again, listing them, with the database's reason.
+    if (e.code === "55000") {
+      const r = await deleteAccountPage(ctx, refusalText(err));
+      return { ...r, status: 409 };
+    }
+    throw err;
+  }
+  // The account is gone: end this browser's session too. Supabase Auth has
+  // no account left to refresh it for, and the database refuses its access
+  // token from now on.
+  await ctx.session?.signOut().catch(() => undefined);
+  return {
+    html: notice(
+      "Account deleted",
+      html`Your account is deleted. You left ${plural(n.vaults, "vault")}, ${plural(n.connections, "connection")} ${n.connections === 1 ? "was" : "were"} deleted${n.invites ? `, and ${plural(n.invites, "waiting invite")} ${n.invites === 1 ? "was" : "were"} withdrawn` : ""}. What you wrote in vaults stays there, shown as written by a deleted account.`,
+      ctx.theme,
+    ),
+  };
 }
