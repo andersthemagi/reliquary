@@ -14,7 +14,10 @@ import { personRef } from "./personref.js";
 
 export const PAGE_SIZE = 50;
 
-const EVENTS: [string, string][] = [
+// Every event the database writes to the log, in plain words, and a filter
+// choice for each. web/test/activity_labels.test.mjs reads the migrations
+// and the log, and fails on an event missing here.
+export const EVENT_LABELS: readonly [string, string][] = [
   ["file.write", "Wrote"],
   ["file.delete", "Deleted"],
   ["file.erase", "Erased"],
@@ -25,6 +28,7 @@ const EVENTS: [string, string][] = [
   ["proposal.revise", "Revised a proposal"],
   ["proposal.edit", "Edited a proposal"],
   ["proposal.stale", "Went stale"],
+  ["proposal.comment", "Commented on a proposal"],
   ["policy.set", "Changed a rule"],
   ["member.set", "Changed members"],
   ["member.leave", "Left the vault"],
@@ -36,11 +40,20 @@ const EVENTS: [string, string][] = [
   ["vault.rename", "Renamed the vault"],
   ["vault.default_policy", "Changed the default policy"],
   ["vault.export", "Exported the vault"],
+  ["variable.set", "Set a variable"],
+  ["variable.rotate", "Rotated a variable"],
+  ["variable.delete", "Deleted a variable"],
+  ["environment.create", "Added an environment"],
+  ["environment.rename", "Renamed an environment"],
+  ["environment.delete", "Deleted an environment"],
 ];
-const GROUPS: [string, string][] = [
+export const EVENT_GROUPS: readonly [string, string][] = [
   ["file.", "Any file change"],
   ["proposal.", "Any proposal event"],
+  ["variable.", "Any variable change"],
 ];
+const EVENTS = EVENT_LABELS;
+const GROUPS = EVENT_GROUPS;
 const LABEL = new Map(EVENTS);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

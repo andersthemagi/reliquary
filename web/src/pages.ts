@@ -1112,7 +1112,11 @@ async function repropose(ctx: Ctx, id: string, pid: string): Promise<Reply> {
 // ---------------------------------------------------------------------------
 // Rules, search, activity
 
-async function rules(ctx: Ctx, id: string): Promise<Reply> {
+// `form` is the Add form as it was sent, when saving it was refused: the
+// refusal is shown in the form, with its reference, and the typed values kept.
+type RuleForm = { path: string; policy: string; quorum: string; error: string };
+
+async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Reply> {
   const check = (ctx.url.searchParams.get("check") ?? "").trim();
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
@@ -1138,10 +1142,11 @@ async function rules(ctx: Ctx, id: string): Promise<Reply> {
         ? html`<form method="post" action="${vaultPath(id, "/rules")}" class="panel" id="add-rule" aria-labelledby="add-rule-title">
             <h2 id="add-rule-title" class="form-title">Add or change a rule</h2>
             ${csrfField(ctx.csrf)}
+            ${form ? html`<p class="callout danger" role="alert" id="rule-error">${form.error}</p>` : ""}
             <div class="fields">
-              <div><label for="pp">Path or folder</label><input id="pp" type="text" name="path" placeholder="clients/" required></div>
-              <div><label for="pol">Policy</label><select id="pol" name="policy"><option value="canon">Canon</option><option value="open">Open</option></select></div>
-              <div><label for="qq">Approvals</label><input id="qq" class="narrow" type="text" name="quorum" value="1" inputmode="numeric"></div>
+              <div><label for="pp">Path or folder</label><input id="pp" type="text" name="path" placeholder="clients/" required value="${form?.path ?? ""}"${form ? html` aria-invalid="true" aria-describedby="rule-error"` : ""}></div>
+              <div><label for="pol">Policy</label><select id="pol" name="policy"><option value="canon">Canon</option><option value="open"${form?.policy === "open" ? " selected" : ""}>Open</option></select></div>
+              <div><label for="qq">Approvals</label><input id="qq" class="narrow" type="text" name="quorum" value="${form?.quorum ?? "1"}" inputmode="numeric"></div>
             </div>
             <div class="actions"><button class="primary">Save rule</button></div>
           </form>`
@@ -1178,7 +1183,7 @@ async function rules(ctx: Ctx, id: string): Promise<Reply> {
     return { v, shell: await vaultShell(c, ctx, v, { section: "rules" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, "Rules", data.shell, "vaults");
+  return { ...render(ctx, "Rules", data.shell, "vaults"), ...(form ? { status: 400 } : {}) };
 }
 
 async function setRule(ctx: Ctx, id: string): Promise<Reply> {
@@ -1189,6 +1194,12 @@ async function setRule(ctx: Ctx, id: string): Promise<Reply> {
     await asPerson(ctx.userId, (c) => c.query(`select public.set_policy($1, $2, $3, $4)`, [id, path, policy, quorum]));
     ctx.setFlash(policy ? `${path} is now ${policy}.` : `Rule on ${path} removed.`);
   } catch (err) {
+    // A path the database won't take (22023, 20260926120000_rule_paths.sql):
+    // the page again, with the reason in the form and what was typed kept.
+    // Other refusals (not an owner) come back as a notice, as before.
+    if (policy && (err as { code?: string }).code === "22023") {
+      return rules(ctx, id, { path, policy, quorum: String(quorum), error: message(err) });
+    }
     ctx.setFlash(message(err));
   }
   return { redirect: vaultPath(id, "/rules") };
