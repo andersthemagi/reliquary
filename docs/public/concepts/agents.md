@@ -15,7 +15,7 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - approve, request changes on or reject a proposal (and edit, then approve);
 - set or remove rules (canon or open, quorum);
 - invite people, change roles, remove members, or see members' email addresses;
-- create or revoke tokens and connections;
+- create a token or revoke a connection;
 - set, rotate, delete or reveal a variable's value, or apply an import;
 - rename a vault or change its default policy;
 - erase a file, export a vault, or delete one;

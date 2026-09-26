@@ -262,16 +262,16 @@ test("search: no query shows the form; no match says so", async () => {
 // ---------------------------------------------------------------------------
 // Account settings
 
-test("settings: the page shows my email, the theme, and links to Plan and usage, Tokens and connections and Connect", async () => {
+test("settings: the page shows my email, the theme, and links to Plan and usage, Connections and Connect", async () => {
   const h = await page("dora", "/settings");
   assert.match(h, /<h1>Account settings<\/h1>/);
   assert.match(h, /<strong>dora@example\.test<\/strong>/);
   assert.match(h, /<input id="display-name" type="text" name="display_name" value="" maxlength="80"/);
   assert.match(h, /<form method="post" action="\/theme" class="theme" aria-label="Theme">/);
-  for (const href of ["/account", "/tokens", "/connect"]) assert.match(h, new RegExp(`<a class="name" href="${href}">`));
+  for (const href of ["/account", "/connections", "/connect"]) assert.match(h, new RegExp(`<a class="name" href="${href}">`));
   const menu = accountMenu(h);
   assert.match(menu, /Signed in as <strong>dora@example\.test<\/strong>/);
-  for (const [href, label] of [["/settings", "Account settings"], ["/account", "Plan and usage"], ["/tokens", "Tokens and connections"]]) {
+  for (const [href, label] of [["/settings", "Account settings"], ["/account", "Plan and usage"], ["/connections", "Connections"]]) {
     assert.match(menu, new RegExp(`<li><a href="${href}"[^>]*>${label}</a></li>`));
   }
 });

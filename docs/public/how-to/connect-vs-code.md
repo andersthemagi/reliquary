@@ -4,7 +4,7 @@ VS Code connects with an access token that it asks for once and keeps in its sec
 
 ## Steps
 
-1. In Reliquary, open the **Connections** page (the account menu, **Tokens and connections**), choose **New token** and create a token with the vaults and access you want. Copy it; it is shown once.
+1. In Reliquary, open the **Connections** page (the account menu, then **Connections**), choose **New token** and create a token with the vaults and access you want. Copy it; it is shown once.
 2. In your project, create `.vscode/mcp.json`:
 
    ```json

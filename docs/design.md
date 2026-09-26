@@ -515,6 +515,45 @@ write that table, a row from another transaction unlocks nothing, and
 `TRUNCATE` is always refused, so outside a deletion append-only holds as
 before, even for the table owner.
 
+**Deleting an account.** Immediate, by one database function,
+`delete_account`: the person, in person (no agent or token of any kind),
+with their email address typed (checked by the database too). It is
+refused while they are the only owner of a vault, naming those vaults: a
+vault always keeps an owner, so they make someone else an owner or delete
+the vault first. Then, in one transaction: they leave every vault (a
+`member.leave` log entry each, marked `account_deleted`); vaults they
+created count against the longest-standing remaining owner; every
+connection is deleted; invites they made that are waiting are withdrawn,
+and invites they accepted are deleted (the only rows of Reliquary's own
+that tied the account to an address); their display name, plan, admission,
+snoozes, notices, sign-out cutoff and unapplied pasted imports are deleted;
+and the `auth.users` row itself, so Supabase Auth forgets the address and
+every session. A row in `private.deleted_accounts` keeps the id and when;
+`check_session` refuses that id from then on and `co_member_people` names
+it "a deleted account" (`20260926140200_delete_account.sql`).
+
+What they wrote stays: versions, proposals, approvals, comments, notes and
+both logs belong to the vaults (the owner is the controller), and hold only
+the account id, which nothing maps back to an address any more. The log is
+not touched, so this needs no path around append-only. To remove text they
+wrote, it is erased like any other (above), before or after.
+
+The Auth user is deleted from the database, not through Supabase's admin
+API: that needs the project's secret key, which the web app never holds.
+The function's owner (the migration role) deletes the `auth.users` row, and
+Auth's own tables (identities, sessions, refresh tokens) follow by cascade.
+If that privilege were ever missing, the whole deletion fails and nothing
+changes. Invites other people made out to the address stay theirs, and a
+new account with that address later starts fresh.
+
+**Sessions.** Signing out everywhere revokes every refresh token of the
+account at Supabase Auth, then records a cutoff in
+`private.session_cutoffs`; the web app runs `check_session` with the
+claims (now including the JWT's `iat`) at the start of every transaction,
+so access tokens already handed out stop working at once rather than
+within the hour (`20260926140100_sign_out_everywhere.sql`). Connections are
+not sessions and are revoked separately.
+
 **GDPR, from the start:**
 
 - **Hosting:** EU region (Supabase `eu-central-1`) for the hosted instance.

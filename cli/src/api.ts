@@ -42,7 +42,7 @@ async function request(server: Server, path: string, init: { method?: string; bo
     r = await once(token);
     if (r.status === 401) {
       await forget(server);
-      throw new NotSignedIn(server.issuer, "The server no longer accepts your sign-in");
+      throw new NotSignedIn(server.issuer, "The server no longer accepts the Reliquary CLI's connection");
     }
   }
   const limited = rateLimited(r.status, r.body, r.headers.get("retry-after"));
@@ -56,7 +56,7 @@ export function rateLimited(status: number, body: unknown, retryAfter: string | 
   if (status !== 429 || (body as { error?: unknown } | null)?.error !== "rate_limited") return null;
   const secs = /^\d{1,5}$/.test(retryAfter ?? "") ? Number(retryAfter) : NaN;
   const wait = secs > 0 && secs < 86_400 ? `in ${secs} second${secs === 1 ? "" : "s"}` : "later";
-  return `Too many requests from this sign-in; the server asks to try again ${wait}.${serverSays(body)}`;
+  return `Too many requests from this connection; the server asks to try again ${wait}.${serverSays(body)}`;
 }
 const get = (server: Server, path: string) => request(server, path);
 
@@ -68,7 +68,7 @@ export function failureMessage(status: number, body: unknown, what: string, doin
   const code = (body as { error?: unknown } | null)?.error;
   const says = serverSays(body);
   if (status === 403) return `Your role can't read ${what}.${says}`;
-  if (status === 404) return `No such vault or environment for this sign-in (${what}). \`reliquary vaults\` lists what you can reach.${says}`;
+  if (status === 404) return `No such vault or environment for this connection (${what}). \`reliquary vaults\` lists what you can reach.${says}`;
   if (status === 503 && code === "not_configured") return `The server has no key for variables (VARIABLES_KEY), so it can't deliver values. Tell whoever runs it.${says}`;
   if (status === 500 && code === "decrypt_failed") {
     return `A value in ${what} can't be decrypted on the server; nothing was delivered. Ask an owner to set it again.${says}`;
@@ -100,18 +100,18 @@ export async function listVaults(server: Server): Promise<Vault[]> {
 export function pickVault(vaults: Vault[], wanted: string | undefined): Vault {
   if (!wanted) {
     if (vaults.length === 1) return vaults[0];
-    if (vaults.length === 0) throw new CliError("This sign-in reaches no vaults.");
+    if (vaults.length === 0) throw new CliError("This connection reaches no vaults.");
     throw new UsageError(`Choose a vault with --vault (or "vault" in .reliquary.json):\n${vaults.map((v) => `  ${v.name}  ${v.id}`).join("\n")}`);
   }
   if (UUID.test(wanted.toLowerCase())) {
     const v = vaults.find((x) => x.id === wanted.toLowerCase());
-    if (!v) throw new CliError(`No vault ${wanted} for this sign-in. \`reliquary vaults\` lists what you can reach.`);
+    if (!v) throw new CliError(`No vault ${wanted} for this connection. \`reliquary vaults\` lists what you can reach.`);
     return v;
   }
   let hits = vaults.filter((v) => v.name === wanted);
   if (hits.length === 0) hits = vaults.filter((v) => v.name.toLowerCase() === wanted.toLowerCase());
   if (hits.length === 1) return hits[0];
-  if (hits.length === 0) throw new CliError(`No vault named "${wanted}" for this sign-in. \`reliquary vaults\` lists what you can reach.`);
+  if (hits.length === 0) throw new CliError(`No vault named "${wanted}" for this connection. \`reliquary vaults\` lists what you can reach.`);
   throw new UsageError(`More than one vault is named "${wanted}"; pass its id with --vault:\n${hits.map((v) => `  ${v.name}  ${v.id}`).join("\n")}`);
 }
 
@@ -148,7 +148,7 @@ export type PushStatus = "pending" | "applied" | "rejected" | "expired";
 function pushFail(status: number, body: unknown, what: string): never {
   const code = (body as { error?: unknown } | null)?.error;
   if (status === 403 && code === "push_not_allowed") {
-    throw new CliError("This sign-in wasn't allowed to send values. Run `reliquary login` again and leave \"Also let it send .env files\" ticked.");
+    throw new CliError("This connection wasn't allowed to send values. Run `reliquary login` again and leave \"Also let it send .env files\" ticked.");
   }
   if (status === 403) throw new CliError(`Your role can't set values in ${what}.${serverSays(body)}`);
   if (status === 413) throw new CliError(`That's too much to send at once (the limit is 1 MiB). Split the file.${serverSays(body)}`);

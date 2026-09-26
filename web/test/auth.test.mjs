@@ -287,14 +287,14 @@ test("session: the form token differs per session and only works with its own", 
 
 test("session: a notice after a form shows once, on either instance, and can't be forged", async () => {
   const { jar } = await signInByCode(A);
-  const csrf = csrfOf(await (await get(A, "/tokens", jar)).text());
-  const r = await post(A, "/tokens/new", { csrf, name: "x", scope: "some", access: "read", days: "7" }, jar);
+  const csrf = csrfOf(await (await get(A, "/connections", jar)).text());
+  const r = await post(A, "/connections/new", { csrf, name: "x", scope: "some", access: "read", days: "7" }, jar);
   assert.equal(r.status, 303);
-  assert.match(await (await get(B, "/tokens", jar)).text(), /Tick at least one vault/);
-  assert.doesNotMatch(await (await get(A, "/tokens", jar)).text(), /Tick at least one vault/);
+  assert.match(await (await get(B, "/connections", jar)).text(), /Tick at least one vault/);
+  assert.doesNotMatch(await (await get(A, "/connections", jar)).text(), /Tick at least one vault/);
   const forged = Buffer.from("Your account is locked: call +1 555 0100").toString("base64url");
   jar.c.set("__Host-rlq_flash", `${forged}.${"0".repeat(64)}`);
-  assert.doesNotMatch(await (await get(A, "/tokens", jar)).text(), /locked/);
+  assert.doesNotMatch(await (await get(A, "/connections", jar)).text(), /locked/);
 });
 
 test("session: a notice keeps its tone on either instance, and the tone is signed with it", async () => {
@@ -439,13 +439,13 @@ test("jwt: refused when tampered, from an unknown key id, anonymous, or without 
 
 // Claims in the database -------------------------------------------------------
 
-test("claims: the database gets only sub and role, so an act claim in the JWT doesn't make the session an agent", async () => {
+test("claims: the database gets only sub, role and the session's iat, so an act claim in the JWT doesn't make the session an agent", async () => {
   // Agents may not mint tokens (supabase/tests/access_tokens_test.sql). If the
   // JWT's act claim reached the database, this would be refused.
   const jar = new Jar({ [AT]: await mint({ sub: EVE, session_id: "eve-1", claims: { act: { sub: "tok", name: "Sneaky agent" }, app_metadata: { role: "owner" } } }) });
-  const page = await (await get(A, "/tokens", jar)).text();
+  const page = await (await get(A, "/connections", jar)).text();
   assert.match(page, /Signed in as <strong>00000000<\/strong>/);
-  const r = await post(A, "/tokens/new", { csrf: csrfOf(page), name: "auth test", scope: "all", access: "read", days: "7" }, jar);
+  const r = await post(A, "/connections/new", { csrf: csrfOf(page), name: "auth test", scope: "all", access: "read", days: "7" }, jar);
   assert.equal(r.status, 200);
   assert.match(await r.text(), /rlq_[A-Za-z0-9_-]{20,}/);
 });

@@ -256,28 +256,28 @@ test("connect: per-client setup with the MCP URL and no token anywhere", async (
 });
 
 test("tokens: minted in the browser, shown once, then revocable", async () => {
-  const token = await csrf("/tokens");
-  const made = await text(await post("/tokens/new", { csrf: token, name: "Hermes on Linux" }));
+  const token = await csrf("/connections");
+  const made = await text(await post("/connections/new", { csrf: token, name: "Hermes on Linux" }));
   assert.match(made, /<p class="secret">rlq_[0-9a-f]{64}<\/p>/);
-  const again = await page("/tokens");
+  const again = await page("/connections");
   assert.doesNotMatch(again, /rlq_[0-9a-f]{64}/);
-  const id = /href="\/tokens\/([0-9a-f-]{36})\/revoke"/.exec(again)[1];
-  await post(`/tokens/${id}/revoke`, { csrf: token });
-  assert.match(await page("/tokens"), /Revoked/);
+  const id = /href="\/connections\/([0-9a-f-]{36})\/revoke"/.exec(again)[1];
+  await post(`/connections/${id}/revoke`, { csrf: token });
+  assert.match(await page("/connections"), /Revoked/);
 });
 
 test("theme: the switcher sets a cookie, the page follows, off-site returns are ignored", async () => {
-  const token = await csrf("/tokens");
-  const r = await post("/theme", { csrf: token, theme: "dark", back: "/tokens" });
-  assert.equal(r.headers.get("location"), "/tokens");
+  const token = await csrf("/connections");
+  const r = await post("/theme", { csrf: token, theme: "dark", back: "/connections" });
+  assert.equal(r.headers.get("location"), "/connections");
   assert.match(r.headers.get("set-cookie"), /^rlq_theme=dark;/);
-  assert.match(await text(await get("/tokens", { cookie: `${cookie}; rlq_theme=dark` })), /<html lang="en" data-theme="dark">/);
+  assert.match(await text(await get("/connections", { cookie: `${cookie}; rlq_theme=dark` })), /<html lang="en" data-theme="dark">/);
   const off = await post("/theme", { csrf: token, theme: "light", back: "//evil.example/x" });
   assert.equal(off.headers.get("location"), "/");
 });
 
 test("copy: no em dashes or straight apostrophes in the interface text", async () => {
-  const paths = ["/", "/review", "/connect", "/tokens", V, `${V}/rules`, `${V}/proposals?status=stale`,
+  const paths = ["/", "/review", "/connect", "/connections", V, `${V}/rules`, `${V}/proposals?status=stale`,
     `${V}/proposals/${P_SOLO}`, `${V}/new`, `${V}/activity`, `${V}/search?q=zzzz`];
   for (const path of paths) {
     const visible = (await page(path)).replace(/<pre[\s\S]*?<\/pre>/g, "").replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'");

@@ -12,6 +12,7 @@ import { asPerson } from "./db.js";
 import { html, pageHeader, type Raw } from "./html.js";
 import { render, vaultPath, type Ctx, type Reply } from "./pages.js";
 import { selfHosted } from "./selfhost.js";
+import { biggerPlanHref } from "./site.js";
 
 export type Plan = { plan: string; planName: string; vaultsOwned: number; maxVaults: number };
 export type VaultUsage = {
@@ -189,7 +190,7 @@ export function planNote(p: Plan, selfHostedServer: boolean): Raw {
   if (selfHostedServer || p.maxVaults >= NO_LIMIT_COUNT) {
     return html`<p class="hint plan-note">This Reliquary is self-hosted: its operator sets plans and tiers. ${PLANS_DOC}</p>`;
   }
-  return html`<p class="hint plan-note">Nothing is billed during the beta. For a bigger plan, or the Pro tier for one vault, ask the operator: upgrades are given by hand. ${PLANS_DOC}</p>`;
+  return html`<p class="hint plan-note">Nothing is billed during the beta. For a bigger plan, or the Pro tier for one vault, ask the operator: upgrades are given by hand. <a href="${biggerPlanHref()}">Ask for a bigger plan</a> ${PLANS_DOC}</p>`;
 }
 
 // One vault against its limits, named: "People full", "Storage full",

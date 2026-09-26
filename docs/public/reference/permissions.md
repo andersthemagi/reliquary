@@ -32,9 +32,10 @@ What people and their agents can each do, where, and who may: every rule here is
 | Invite, change roles, remove members | **Members** | none | person, owners |
 | Accept an invite | the invite link | none | person, the invited address |
 | Leave a vault | **Settings**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains |
-| See and cut members' agent connections | **Members** | none | person, owners |
-| Create or revoke a token | **Tokens and connections** (the account menu) | none | person |
+| See and cut members' connections | **Members** | none | person, owners |
+| Create or revoke a token | **Connections** (the account menu) | none | person |
 | Set your display name | **Account settings** | none | person, for themself only |
+| Change your email address, sign out everywhere or delete your account | **Account settings** | none | person, for themself only |
 | Allow an OAuth client or the CLI | the consent page | none | person |
 | Erase a file | the file's **More**, **Erase content** | none | person, owners |
 | Export a vault | **Settings**, **Export** | none | person, owners |
@@ -56,7 +57,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | Set, rotate or delete a value | **Variables** | none | person: owners everywhere, editors outside owners-only environments |
 | Reveal one value | a value's **⋯** menu, **Reveal** | none | person, same as setting |
 | Use values in a process | none | none | person, through the CLI: `reliquary run`, `reliquary env pull` |
-| Import a `.env` | **Import .env** | none (an agent runs `reliquary env push`) | a person applies; a CLI sign-in allowed to send `.env` files sends |
+| Import a `.env` | **Import .env** | none (an agent runs `reliquary env push`) | a person applies; the Reliquary CLI, if allowed to send `.env` files, sends |
 | Apply or reject an import | the import's page (from the **Imports** tab) | none | person, owners and editors |
 | Add, rename or delete environments | the **Environments** tab | none | person, owners |
 | Read the access log | the **Access log** tab | none | owners and editors |

@@ -45,8 +45,9 @@ import { landing } from "./landing.js";
 import { publicRoute } from "./legal.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
+import { movedConnectionsPath } from "./access.js";
 import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
-import { pool } from "./db.js";
+import { inSession, pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { configureMailer } from "./mailer.js";
 import { feedbackTick, flushFeedbackNotices, noticeTarget } from "./feedback.js";
@@ -374,6 +375,13 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       console.info(`${req.method} ${url.pathname} 308 app->site`);
       return;
     }
+    // The Connections page's old URLs (/tokens/*): permanent, any method.
+    const moved = movedConnectionsPath(url.pathname);
+    if (moved) {
+      res.writeHead(308, { location: moved + url.search, "cache-control": "no-store" }).end();
+      console.info(`${req.method} ${url.pathname} 308 -> ${moved}`);
+      return;
+    }
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "text/plain" }).end("ok");
       return;
@@ -546,8 +554,23 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       mcpUrl: MCP_URL,
       setFlash: (m, tone) => session.setFlash(toFlash(m, tone)),
       ip: clientIp(req),
+      session,
     };
-    const reply = await routes(ctx);
+    let reply: Reply;
+    try {
+      reply = await inSession({ issuedAt: session.issuedAt }, () => routes(ctx));
+    } catch (err) {
+      // The database refused the session (SQLSTATE RLA01): its person signed
+      // out everywhere after it began, or the account was deleted. End it
+      // here too, and send the browser to sign in.
+      if ((err as { code?: unknown })?.code !== "RLA01") throw err;
+      await session.signOut().catch(() => undefined);
+      const cookies = auth.cookies;
+      if (MODE === "supabase" && req.method === "GET") send(res, { redirect: signinUrl(url.pathname + url.search) }, {}, cookies);
+      else send(res, { status: 401, html: notice("Signed out", MODE === "supabase" ? html`This session was ended: you (or someone signed in as you) chose Sign out everywhere, or the account was deleted. <a href="/signin">Sign in</a> again.` : html`This session was ended. Run <code>./mcp/dev.sh ui</code> to open a sign-in link.`, theme) }, {}, cookies);
+      console.info(`${req.method} ${url.pathname} ${res.statusCode} session ended`);
+      return;
+    }
     if (reply.download) {
       await sendDownload(res, reply.download, auth.cookies);
       console.info(`${req.method} ${url.pathname} ${res.destroyed && !res.writableFinished ? "aborted" : 200}`);

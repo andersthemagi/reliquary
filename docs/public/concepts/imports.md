@@ -19,7 +19,7 @@ Either way the values are encrypted on arrival and held on the server. The revie
 
 `reliquary env push` is how an agent can move a `.env` into a vault without the values passing through the conversation: the CLI reads the file and sends it straight to Reliquary. But anything an agent can run, injected text can try to run, so an import from the CLI can only ever wait for a person. Only a person applies it, in the web app. The review page says an agent may have sent it.
 
-A CLI sign-in can send imports only if you ticked **Also let it send .env files here** when you signed it in. Editors can't send to owners-only environments like `production`; the CLI says so before sending anything.
+The Reliquary CLI can send imports only if you ticked **Also let it send .env files here** when you connected it with `reliquary login`. Editors can't send to owners-only environments like `production`; the CLI says so before sending anything.
 
 Agents see imports from the CLI waiting (names, environments, who and when, never values) through `list_variables`. No MCP tool sends, applies or rejects one.
 

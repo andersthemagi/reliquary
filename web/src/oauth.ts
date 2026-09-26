@@ -430,7 +430,7 @@ export async function authorize(ctx: Ctx): Promise<Reply> {
   if (ctx.form.get("decision") !== "approve") {
     return { redirect: backTo(r.redirectUri, { error: "access_denied", state: r.state, iss }) };
   }
-  // Ticked vaults always narrow the grant, as on the Tokens page.
+  // Ticked vaults always narrow the grant, as on the Connections page.
   const ticked = ctx.form.getAll("vault");
   const some = ticked.length > 0 || ctx.form.get("reach") === "some";
   const access = ctx.form.get("access") === "write" ? "write" : "read";
@@ -497,9 +497,9 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
     // Our own CLI: environment variables only, on this computer.
     return shell(
       ctx,
-      "Sign in the Reliquary CLI",
-      html`<div class="page-head"><div class="page-title-row"><div class="page-title"><h1>Sign in the Reliquary CLI?</h1></div></div></div>
-      <p class="lede">The Reliquary CLI on a computer wants to read environment variables as you, for <code>reliquary run</code> and <code>reliquary env pull</code>. It gets the values you may use (as an editor, development and preview; as an owner, production too), in the vaults you choose. It can’t read files, write, propose or change anything, and it never sets a value. Every read is in the vault’s access log, and you can revoke it any time on the <a href="/tokens">Tokens</a> page.</p>
+      "Connect the Reliquary CLI",
+      html`<div class="page-head"><div class="page-title-row"><div class="page-title"><h1>Connect the Reliquary CLI?</h1></div></div></div>
+      <p class="lede">The Reliquary CLI on a computer wants to connect to your account and read environment variables as you, for <code>reliquary run</code> and <code>reliquary env pull</code>. It gets the values you may use (as an editor, development and preview; as an owner, production too), in the vaults you choose. It can’t read files, write, propose or change anything, and it never sets a value. Every read is in the vault’s access log. It shows on your <a href="/connections">Connections</a> page as Reliquary CLI, where you can revoke it any time.</p>
       ${problem ? html`<p class="callout attention" role="alert">${problem}</p>` : ""}
       <p class="callout attention loopback-warning"><strong>Only allow this if you just ran <code>reliquary login</code> on this computer yourself.</strong> It sends you back to ${back.host}, a program on this device, and any program here could have started this request.</p>
       <form method="post" action="/oauth/authorize" class="panel token-form">
@@ -510,7 +510,7 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
           <label class="choice"><input type="checkbox" name="push" value="yes" checked> Also let it send <code>.env</code> files here (<code>reliquary env push</code>). They wait for you, or another owner or editor, to apply them on the Variables page; it can’t apply them itself.</label>
         </fieldset>
         <div class="actions"><button name="decision" value="deny">Deny</button> <button class="primary" name="decision" value="approve">Allow</button></div>
-        <p class="hint">To change its vaults later, revoke it and sign in again.</p>
+        <p class="hint">To change its vaults later, revoke it and run <code>reliquary login</code> again.</p>
       </form>`,
       200,
       back.origin,
@@ -520,7 +520,7 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
     ctx,
     "Connect an app",
     html`<div class="page-head"><div class="page-title-row"><div class="page-title"><h1>Connect ${r.client.clientName}?</h1></div></div></div>
-    <p class="lede">An app that calls itself <strong>${r.client.clientName}</strong> wants to act as you in Reliquary, over MCP. It can never approve, change rules or manage members, and you can revoke it any time on the <a href="/tokens">Tokens</a> page.</p>
+    <p class="lede">An app that calls itself <strong>${r.client.clientName}</strong> wants to act as you in Reliquary, over MCP. It can never approve, change rules or manage members. It shows on your <a href="/connections">Connections</a> page as an app, where you can revoke it any time.</p>
     ${problem ? html`<p class="callout attention" role="alert">${problem}</p>` : ""}
     <div class="panel">
       <p><span class="muted small">After you answer, you go back to</span><br><strong class="redirect-host">${back.host}</strong></p>

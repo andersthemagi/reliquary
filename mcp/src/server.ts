@@ -293,7 +293,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
     return;
   }
 
-  // The client's self-reported name, for the Tokens page. Never logged.
+  // The client's self-reported name, for the Connections page. Never logged.
   const init = body as { method?: unknown; params?: { clientInfo?: { name?: unknown } } } | null;
   if (bearer && init?.method === "initialize" && typeof init.params?.clientInfo?.name === "string") {
     await recordClient(bearer[1], init.params.clientInfo.name);

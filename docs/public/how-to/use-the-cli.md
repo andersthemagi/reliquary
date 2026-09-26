@@ -1,10 +1,10 @@
 # Use the CLI
 
-Sign a computer in once, then run commands with a vault's variables, write them to a gitignored `.env`, or send a `.env` for approval.
+Connect the CLI to your account once, then run commands with a vault's variables, write them to a gitignored `.env`, or send a `.env` for approval.
 
 The CLI is `@reliquary-ai/cli`. It needs Node 20 or later. Run it with `npx @reliquary-ai/cli <command>`, or install it once with `npm install -g @reliquary-ai/cli` and run `reliquary <command>`. Every command and option is in the [CLI reference](../reference/cli.md).
 
-## Sign in
+## Connect
 
 ```bash
 reliquary login
@@ -13,8 +13,8 @@ reliquary login
 Your browser opens Reliquary's consent page for the Reliquary CLI. Choose which vaults it may read and whether it may send `.env` files for approval, then **Allow**. The CLI lists the vaults and environments it can now read.
 
 - On a machine without a browser, `reliquary login --no-browser` prints the link to open elsewhere.
-- The sign-in shows on the **Connections** page as Reliquary CLI. It can read variable values within your role; it can't read files or change anything else.
-- Signing in again replaces the previous sign-in on this computer.
+- It shows on the **Connections** page as a connection of the type Reliquary CLI. It can read variable values within your role; it can't read files or change anything else.
+- Running `reliquary login` again replaces the previous connection on this computer.
 
 ## Run a command with the variables
 
@@ -60,16 +60,16 @@ Commit a `.reliquary.json` at the project's root so nobody needs `--vault` or `-
 - **Environment:** `--env`, else `environment` in `.reliquary.json`, else `development`. Editors can't read owners-only environments like `production`; viewers read none.
 - **Server:** `--server`, else the `RELIQUARY_URL` environment variable, else `server` in `.reliquary.json`, else `https://app.reliquary.redmage.cc`.
 
-## Sign out
+## Disconnect
 
 ```bash
 reliquary logout
 ```
 
-This revokes the sign-in on the server and forgets it. You can also revoke it on the **Connections** page; the next command then asks you to run `reliquary login`.
+This revokes the connection on the server and forgets it. You can also revoke it on the **Connections** page; the next command then asks you to run `reliquary login`.
 
-## Where the sign-in is kept
+## Where the connection is kept
 
-In your system's keychain: the macOS Keychain, your Linux keyring (through `secret-tool`), or on Windows a file encrypted to your Windows account. Where there's none, in `credentials.json` in your config directory (`~/.config/reliquary` on Linux and macOS, `%APPDATA%\reliquary` on Windows, or `RELIQUARY_CONFIG_DIR`), readable only by you. `reliquary login` says which. To choose, set `RELIQUARY_CREDENTIALS` to `file` or `keychain`; details in [the reference](../reference/cli.md#where-sign-ins-are-kept).
+In your system's keychain: the macOS Keychain, your Linux keyring (through `secret-tool`), or on Windows a file encrypted to your Windows account. Where there's none, in `credentials.json` in your config directory (`~/.config/reliquary` on Linux and macOS, `%APPDATA%\reliquary` on Windows, or `RELIQUARY_CONFIG_DIR`), readable only by you. `reliquary login` says which. To choose, set `RELIQUARY_CREDENTIALS` to `file` or `keychain`; details in [the reference](../reference/cli.md#where-the-connection-is-kept).
 
-A sign-in from before the keychain keeps working and moves into it the next time it's refreshed. No command prints a token or a value.
+A connection from before the keychain keeps working and moves into it the next time it's refreshed. No command prints a token or a value.

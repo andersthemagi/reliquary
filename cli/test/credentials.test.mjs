@@ -179,7 +179,7 @@ test("no token in arguments: macOS Keychain errors name the exit code, never wha
   // A write the tool claims but that didn't land is an error, not a lost sign-in.
   const f = fakeSecurity();
   const broken = macosKeychain((file, args, opts) => (args[0] === "-i" ? ok() : f.exec(file, args, opts)));
-  assert.throws(() => broken.set(SERVER, credential()), /save your sign-in/);
+  assert.throws(() => broken.set(SERVER, credential()), /save your connection/);
 });
 
 test("no token in arguments: secret-tool store reads the sign-in from standard input", () => {
@@ -260,7 +260,7 @@ esac
   assert.equal(kc.get(SERVER), null);
   const argv = readFileSync(path.join(dir, "argv.log"), "utf8");
   assert.ok(!argv.includes(a.refreshToken) && !argv.includes(a.accessToken));
-  assert.match(argv, /^store --label=Reliquary CLI sign-in for https:\/\/app\.example\.test service reliquary-cli account https:\/\/app\.example\.test$/m);
+  assert.match(argv, /^store --label=Reliquary CLI connection for https:\/\/app\.example\.test service reliquary-cli account https:\/\/app\.example\.test$/m);
   assert.equal(readFileSync(path.join(dir, "stdin.log"), "utf8"), encodeCredential(a));
 });
 

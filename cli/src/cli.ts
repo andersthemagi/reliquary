@@ -19,8 +19,8 @@ import { runWith } from "./run.js";
 const HELP = `reliquary: a vault's environment variables on this computer
 
 Usage:
-  reliquary login [--no-browser]        sign in with your browser
-  reliquary logout                      revoke this computer's sign-in and forget it
+  reliquary login [--no-browser]        connect the Reliquary CLI to your account
+  reliquary logout                      revoke this connection and forget it
   reliquary vaults                      the vaults and environments you can read
   reliquary run [--vault V] [--env E] -- <command> [args...]
                                         run a command with the variables in its environment
@@ -45,8 +45,8 @@ Options:
   -h, --help       this help
   -v, --version    the version
 
-Values are never printed. Sign-ins are kept in the OS keychain when there is
-one (macOS Keychain, Secret Service, Windows DPAPI), else in
+Values are never printed. The connection is kept in the OS keychain when
+there is one (macOS Keychain, Secret Service, Windows DPAPI), else in
 ${credentialsFile()} (mode 600); RELIQUARY_CREDENTIALS=file or keychain
 chooses.`;
 
@@ -130,11 +130,11 @@ async function main(argv: string[]): Promise<number> {
       const server = await discover(serverOrigin(val(opts, "server"), project()));
       await login(server, { openBrowser: !opts["no-browser"] && !process.env.RELIQUARY_NO_BROWSER, print: say });
       const vaults = await listVaults(server);
-      say(`Signed in to ${server.issuer}. This computer can read:`);
+      say(`Connected the Reliquary CLI to ${server.issuer}. It can read:`);
       if (!vaults.length) say("  no vaults yet");
       for (const v of vaults) say(`  ${describe(v)}`);
-      say(`The sign-in is kept in ${credentialStore().where}.`);
-      say("Revoke it any time on the Tokens page, or with `reliquary logout`.");
+      say(`The connection is kept in ${credentialStore().where}.`);
+      say("It shows on the Connections page as Reliquary CLI. Revoke it there any time, or with `reliquary logout`.");
       return 0;
     }
     case "logout": {
@@ -143,9 +143,9 @@ async function main(argv: string[]): Promise<number> {
       if (positionals.length) throw new UsageError("logout takes no arguments.");
       const server = await discover(serverOrigin(val(opts, "server"), project()));
       const r = await logout(server);
-      if (!r.had) say(`You weren't signed in to ${server.issuer}.`);
-      else if (r.revoked) say(`Signed out of ${server.issuer}: the sign-in is revoked and forgotten.`);
-      else say(`Forgot the sign-in for ${server.issuer}, but the server didn't confirm revoking it; check the Tokens page.`);
+      if (!r.had) say(`The Reliquary CLI wasn't connected to ${server.issuer}.`);
+      else if (r.revoked) say(`Disconnected from ${server.issuer}: the connection is revoked and forgotten.`);
+      else say(`Forgot the connection to ${server.issuer}, but the server didn't confirm revoking it; check the Connections page.`);
       return 0;
     }
     case "vaults": {
@@ -154,7 +154,7 @@ async function main(argv: string[]): Promise<number> {
       if (positionals.length) throw new UsageError("vaults takes no arguments.");
       const server = await discover(serverOrigin(val(opts, "server"), project()));
       const vaults = await listVaults(server);
-      if (!vaults.length) say("This sign-in reaches no vaults.");
+      if (!vaults.length) say("This connection reaches no vaults.");
       for (const v of vaults) process.stdout.write(`${v.id}  ${describe(v)}\n`);
       return 0;
     }

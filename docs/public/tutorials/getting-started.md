@@ -65,7 +65,7 @@ The value is encrypted before it is stored. Your agent can see the name `GREETIN
 
 ## 7. Run a command with it
 
-Sign this computer in to the CLI. Your browser opens a consent page; choose the vaults it may read, then **Allow**:
+Connect the Reliquary CLI to your account. Your browser opens a consent page; choose the vaults it may read, then **Allow**:
 
 ```bash
 npx @reliquary-ai/cli login

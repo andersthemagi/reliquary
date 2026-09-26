@@ -39,7 +39,7 @@
   version: 0.1.0
 
 - title: Scoped, expiring access tokens
-  summary: Tokens and connections limited to chosen vaults, read-only or read-write, always expiring.
+  summary: Connections limited to chosen vaults, read-only or read-write, always expiring.
   status: shipped
   milestone: M1
   docs: concepts/connections
@@ -119,7 +119,7 @@
   docs: concepts/templates
 
 - title: OS keychain for the CLI
-  summary: CLI sign-ins in the macOS Keychain, the Secret Service on Linux or DPAPI on Windows, else a file.
+  summary: The Reliquary CLI's connection kept in the macOS Keychain, the Secret Service on Linux or DPAPI on Windows, else a file.
   status: shipped
   milestone: M2
   docs: reference/cli
@@ -131,7 +131,7 @@
   docs: reference/cli
 
 - title: Rate limits on sign-in and MCP
-  summary: Limits per address, email, session, client, token and CLI sign-in on sign-in, OAuth, invites, MCP, the env API and forms.
+  summary: Limits per address, email, session, client, token and Reliquary CLI connection on sign-in, OAuth, invites, MCP, the env API and forms.
   status: shipped
   docs: reference/limits
 
@@ -150,6 +150,21 @@
   status: shipped
   milestone: M1
   docs: concepts/inbox-and-account
+
+- title: Sign out everywhere
+  summary: End every browser session of your account at once from Account settings, and optionally revoke all your connections too.
+  status: shipped
+  docs: concepts/inbox-and-account
+
+- title: Change your email address
+  summary: Move your account to another address from Account settings, confirmed by a link; your vaults, roles and connections stay.
+  status: shipped
+  docs: concepts/inbox-and-account
+
+- title: Delete your account
+  summary: Delete your account yourself from Account settings; what you wrote stays in its vaults, shown as a deleted account.
+  status: shipped
+  docs: how-to/delete-your-account
 
 - title: Feedback and bug reports
   summary: Send a bug, an idea or a question from the top bar's Feedback button or through your agent, and see its status and the reply.

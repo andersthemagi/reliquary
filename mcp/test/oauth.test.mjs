@@ -275,10 +275,10 @@ test("revoke: revoking the grant on the Tokens page cuts the client off on its n
       [BEN],
     )).rows,
   );
-  const tokensPage = await (await fetch(`${WEB}/tokens`, { headers: { cookie } })).text();
-  assert.ok(tokensPage.includes(`/tokens/${id}/revoke`), "the grant is listed with a Revoke button");
+  const tokensPage = await (await fetch(`${WEB}/connections`, { headers: { cookie } })).text();
+  assert.ok(tokensPage.includes(`/connections/${id}/revoke`), "the grant is listed with a Revoke button");
   const csrf = /name="csrf" value="([0-9a-f]+)"/.exec(tokensPage)[1];
-  const r = await fetch(`${WEB}/tokens/${id}/revoke`, {
+  const r = await fetch(`${WEB}/connections/${id}/revoke`, {
     method: "POST",
     redirect: "manual",
     headers: { cookie, origin: WEB, "content-type": "application/x-www-form-urlencoded" },

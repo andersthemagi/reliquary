@@ -7,7 +7,9 @@
 // public.co_member_people: the emails and display names of people who
 // share a vault with the reader now, and the reader's own
 // (20260925160000_membership_polish.sql, 20260926100000_shell_inbox.sql).
-// Anyone else (a former member, say) keeps the short id pages showed before.
+// A deleted account is written as "a deleted account", to anyone
+// (20260926140200_delete_account.sql). Anyone else (a former member, say)
+// keeps the short id pages showed before.
 //
 // The marker holds a random per-process nonce, so text a member wrote (a
 // file, a comment, a vault name) can't forge one: nothing on a page carries
@@ -20,6 +22,7 @@ import { PERSON_MARK, shortId } from "./personref.js";
 export { personRef, shortId } from "./personref.js";
 
 // co_member_people takes at most 500 ids a call.
+export const DELETED_ACCOUNT = "a deleted account";
 const BATCH = 500;
 
 // How a person is written: their name with their email ("Ana Ruiz
@@ -37,8 +40,8 @@ export async function fillPeople(userId: string, html: string): Promise<string> 
   try {
     await asPerson(userId, async (c) => {
       for (let i = 0; i < ids.length; i += BATCH) {
-        const { rows } = await c.query(`select user_id, email, display_name from public.co_member_people($1::uuid[])`, [ids.slice(i, i + BATCH)]);
-        for (const r of rows) emails.set(r.user_id, personLabel(r.email, r.display_name));
+        const { rows } = await c.query(`select user_id, email, display_name, deleted from public.co_member_people($1::uuid[])`, [ids.slice(i, i + BATCH)]);
+        for (const r of rows) emails.set(r.user_id, r.deleted ? DELETED_ACCOUNT : personLabel(r.email, r.display_name));
       }
     });
   } catch {

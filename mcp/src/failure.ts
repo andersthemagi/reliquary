@@ -167,6 +167,7 @@ const OWN_CODES: Record<string, string> = {
   RLV01: "no such vault for you",
   RLP01: "plan limit reached",
   RLP02: "account not admitted",
+  RLA01: "session ended",
 };
 
 export function sqlstateName(code: string, message = ""): string {
@@ -188,6 +189,9 @@ export function sqlstateStatus(code: string): number {
   // An account not admitted while Reliquary is invite-only
   // (20260925240000_admission.sql): signed in, but not let in.
   if (code === "RLP02") return 403;
+  // A session its person signed out everywhere after, or a deleted
+  // account's (20260926140100_sign_out_everywhere.sql): sign in again.
+  if (code === "RLA01") return 401;
   if (code === "57014" || code === "55P03") return 504;
   if (code === "40001" || code === "40P01") return 503;
   if (code === "25006") return 503;

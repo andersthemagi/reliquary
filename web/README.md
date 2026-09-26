@@ -47,7 +47,8 @@ is a stand-in: the server acts only as the one local person `dev.sh`
 created, and refuses to start on Vercel. `supabase` is the hosted one: see
 "Sign-in with Supabase Auth" below.
 
-Tokens (`/tokens`) are scoped to chosen vaults or all of yours, read-only or
+Tokens (made on Connections, `/connections/new`; the old `/tokens` URLs
+redirect) are scoped to chosen vaults or all of yours, read-only or
 read-write, with an expiry of 7 days to a year. The form defaults to all
 vaults, read-only; ticking any vault narrows the token to those vaults. Scope
 can't be edited: revoke and create another. The list shows last use and the

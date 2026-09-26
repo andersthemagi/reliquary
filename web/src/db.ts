@@ -83,21 +83,38 @@ export function usePool(p: pg.Pool): void {
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Begins a transaction as the person, in one round trip: begin and the
-// role and claims (set_config('role', ..., true) is SET LOCAL ROLE) as one
-// simple query, the claims inlined as an escaped literal, since a
-// parameterised query can't carry two statements. A user id that isn't a
-// UUID (sessions always carry one) takes two round trips with a parameter.
+// The browser session a request runs for (server.ts sets it around a
+// request's pages): when its access JWT was issued. begin() passes it to
+// the database with the claims, and private.check_session() refuses the
+// transaction (SQLSTATE RLA01) if the person has signed out everywhere
+// since (20260926140100_sign_out_everywhere.sql). Outside a request (the
+// OAuth token endpoint, tests) there is none, and nothing is checked.
+const sessionStore = new AsyncLocalStorage<{ issuedAt?: number }>();
+export function inSession<T>(s: { issuedAt?: number }, fn: () => Promise<T>): Promise<T> {
+  return sessionStore.run(s, fn);
+}
+const CHECK_SESSION = "select private.check_session()";
+
+// Begins a transaction as the person, in one round trip: begin, the role
+// and claims (set_config('role', ..., true) is SET LOCAL ROLE) and the
+// session check as one simple query, the claims inlined as an escaped
+// literal, since a parameterised query can't carry several statements. A
+// user id that isn't a UUID (sessions always carry one) takes three round
+// trips with a parameter.
 async function begin(client: pg.PoolClient, userId: string): Promise<void> {
-  const claims = JSON.stringify({ sub: userId, role: "authenticated" });
+  const iat = sessionStore.getStore()?.issuedAt;
+  const claims = JSON.stringify(
+    Number.isInteger(iat) ? { sub: userId, role: "authenticated", iat } : { sub: userId, role: "authenticated" },
+  );
   if (UUID_SHAPE.test(userId)) {
     await client.query(
-      `begin; select set_config('role', 'authenticated', true), set_config('request.jwt.claims', ${client.escapeLiteral(claims)}, true)`,
+      `begin; select set_config('role', 'authenticated', true), set_config('request.jwt.claims', ${client.escapeLiteral(claims)}, true); ${CHECK_SESSION}`,
     );
     return;
   }
   await client.query("begin");
   await client.query("select set_config('role', 'authenticated', true), set_config('request.jwt.claims', $1, true)", [claims]);
+  await client.query(CHECK_SESSION);
 }
 
 // One page, one transaction (docs/research/server-load.md, "Second pass").

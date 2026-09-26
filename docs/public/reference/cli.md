@@ -14,7 +14,7 @@ The CLI's own help, generated from its source:
 
 ### reliquary login
 
-Signs this computer in with your browser. Opens the consent page (and prints its link), where you choose the vaults the CLI may read and whether it may send `.env` files for approval. Waits up to 5 minutes, then lists the vaults and environments it can read. Signing in again revokes the previous sign-in on this computer.
+Connects the Reliquary CLI on this computer to your account, as a connection of the type Reliquary CLI. Opens the consent page in your browser (and prints its link), where you choose the vaults the CLI may read and whether it may send `.env` files for approval. Waits up to 5 minutes, then lists the vaults and environments it can read. Running it again revokes the previous connection on this computer and makes a new one.
 
 | Option | Does |
 |---|---|
@@ -23,11 +23,11 @@ Signs this computer in with your browser. Opens the consent page (and prints its
 
 ### reliquary logout
 
-Revokes this computer's sign-in on the server, then forgets it. Takes `--server <url>`.
+Revokes this computer's connection on the server, then forgets it. Takes `--server <url>`.
 
 ### reliquary vaults
 
-Prints each vault the sign-in reaches, one per line: its id, name, your role, and the environments you may read. Takes `--server <url>`.
+Prints each vault the connection reaches, one per line: its id, name, your role, and the environments you may read. Takes `--server <url>`.
 
 ### reliquary run
 
@@ -69,7 +69,7 @@ Also takes `--vault`, `--env` and `--server`.
 reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]
 ```
 
-Sends a `.env` file's variables to the vault for approval. Nothing is set until an owner or editor applies it in the web app, within 24 hours. Lines it can't take are listed with their reasons and not sent. Prints the names (new, or replacing a value) on stderr and the approval link on stdout, never a value. The sign-in must have been allowed to send `.env` files; an editor can't push to an owners-only environment.
+Sends a `.env` file's variables to the vault for approval. Nothing is set until an owner or editor applies it in the web app, within 24 hours. Lines it can't take are listed with their reasons and not sent. Prints the names (new, or replacing a value) on stderr and the approval link on stdout, never a value. The connection must have been allowed to send `.env` files; an editor can't push to an owners-only environment.
 
 | Option | Does |
 |---|---|
@@ -96,7 +96,7 @@ Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected o
 | Setting | First of |
 |---|---|
 | Server | `--server`, `RELIQUARY_URL`, `server` in `.reliquary.json`, `https://app.reliquary.redmage.cc` |
-| Vault | `--vault`, `vault` in `.reliquary.json`, the only vault the sign-in reaches |
+| Vault | `--vault`, `vault` in `.reliquary.json`, the only vault the connection reaches |
 | Environment | `--env`, `environment` in `.reliquary.json`, `development` |
 
 A vault name that two of your vaults share is an error listing their ids.
@@ -116,13 +116,13 @@ All three keys are optional.
 | Variable | Does |
 |---|---|
 | `RELIQUARY_URL` | the server, when `--server` isn't given |
-| `RELIQUARY_CONFIG_DIR` | where sign-ins are kept, instead of the default config directory |
+| `RELIQUARY_CONFIG_DIR` | where the connection is kept, instead of the default config directory |
 | `RELIQUARY_NO_BROWSER` | when set, `login` prints the link without opening a browser |
-| `RELIQUARY_CREDENTIALS` | `file` or `keychain`: where sign-ins are kept, instead of choosing by itself |
+| `RELIQUARY_CREDENTIALS` | `file` or `keychain`: where the connection is kept, instead of choosing by itself |
 
-## Where sign-ins are kept
+## Where the connection is kept
 
-One sign-in per server, in the operating system's keychain when there is one:
+One connection per server, in the operating system's keychain when there is one:
 
 | System | Where |
 |---|---|
@@ -130,13 +130,13 @@ One sign-in per server, in the operating system's keychain when there is one:
 | Linux | your keyring through the Secret Service (GNOME Keyring, KWallet), with `secret-tool` from libsecret, when it's installed and a keyring answers |
 | Windows | `credentials.dpapi` in the config directory, encrypted with DPAPI so only your Windows account on this computer can read it |
 
-Without one (a server, a container, Linux without `secret-tool`), sign-ins are kept in `credentials.json` in the config directory, mode 600 in a mode 700 directory. `reliquary login` says which it used. The config directory is `RELIQUARY_CONFIG_DIR`, else `%APPDATA%\reliquary` on Windows, else `$XDG_CONFIG_HOME/reliquary`, else `~/.config/reliquary`; it also holds the lock file that keeps two commands from refreshing at once.
+Without one (a server, a container, Linux without `secret-tool`), connections are kept in `credentials.json` in the config directory, mode 600 in a mode 700 directory. `reliquary login` says which it used. The config directory is `RELIQUARY_CONFIG_DIR`, else `%APPDATA%\reliquary` on Windows, else `$XDG_CONFIG_HOME/reliquary`, else `~/.config/reliquary`; it also holds the lock file that keeps two commands from refreshing at once.
 
 `RELIQUARY_CREDENTIALS=file` always uses the file. `RELIQUARY_CREDENTIALS=keychain` always uses the keychain, and fails if none answers instead of falling back to the file.
 
 A token never goes into a command's arguments, where other programs could see it: the keychain tools get it on standard input.
 
-A sign-in made before the keychain, in `credentials.json`, keeps working. The next time it changes (a refresh within the hour, a new `login`, or `logout`), it moves into the keychain and out of the file.
+A connection made before the keychain, in `credentials.json`, keeps working. The next time it changes (a refresh within the hour, a new `login`, or `logout`), it moves into the keychain and out of the file.
 
 ## Exit codes and errors
 
@@ -148,4 +148,4 @@ A sign-in made before the keychain, in `credentials.json`, keeps working. The ne
 | 3 | `env push --wait` ran out of time |
 | other | `run` passes on its command's exit code |
 
-Common errors: your sign-in was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this sign-in; the server has no key for variables. No error prints a value, a token or a server response.
+Common errors: the connection was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this connection; the server has no key for variables. No error prints a value, a token or a server response.

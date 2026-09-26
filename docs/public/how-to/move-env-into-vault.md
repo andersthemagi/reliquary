@@ -6,7 +6,7 @@ You need to be an owner or editor of the vault (editors can't set owners-only en
 
 ## Option A: send it from the project
 
-From the project's directory, after [signing the CLI in](use-the-cli.md#sign-in) with **Also let it send .env files here** ticked:
+From the project's directory, after [connecting the CLI](use-the-cli.md#connect) with **Also let it send .env files here** ticked:
 
 ```bash
 npx @reliquary-ai/cli env push --vault "My project" --env development --file .env

@@ -212,6 +212,11 @@ test("plan note: hosted, Plan and usage says nothing is billed during the beta a
   assert.match(h, /Nothing is billed during the beta\. For a bigger plan, or the Pro tier for one vault, ask the operator: upgrades are given by hand\./);
 });
 
+test("plan note: hosted, Plan and usage links to ask the operator for a bigger plan, at the operator's address", async () => {
+  const h = await page("pia", "/account");
+  assert.match(h, /upgrades are given by hand\. <a href="mailto:andres@redmage\.cc\?subject=Reliquary%3A%20a%20bigger%20plan">Ask for a bigger plan<\/a> <a href="\/docs\/concepts\/plans-and-limits">Plans and limits<\/a><\/p>/);
+});
+
 // ---------------------------------------------------------------------------
 // Limits, refused where they happen
 

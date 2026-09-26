@@ -34,7 +34,7 @@ They appear on **Members** with their role. They can connect their own AI tools,
 
 - **Change their role** with the role picker on **Members**.
 - **Remove them** with **Remove**, after a confirm page. They and their agents lose access at once.
-- **Cut off one of their agent connections** from this vault with **Revoke** under **Agent connections**, then confirm.
+- **Cut off one of their connections** from this vault with **Revoke** under **Connections**, then confirm.
 
 ## Undo an invite
 
