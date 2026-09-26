@@ -69,20 +69,20 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
    up" template is one of the pasted ones (Do next, 3).
 8. **Email sender: Resend** (chosen; `docs/ops/runbook.md`, "Email
    sender", has every click):
-   - Resend account, domain `notify.redmage.cc` in region Ireland
+   - Resend account, domain `mail.reliquary.redmage.cc` in region Ireland
      (eu-west-1). Mail is sent from the EU, but Resend keeps account data
      and email logs in the US whatever the region; `/subprocessors` and
      `/privacy` already say so.
    - DNS in Squarespace: the DKIM, SPF, MX and DMARC records Resend lists,
      then Verify.
-   - Two API keys, Sending access, domain `notify.redmage.cc` only:
+   - Two API keys, Sending access, domain `mail.reliquary.redmage.cc` only:
      `supabase-smtp` and `reliquary-web`.
    - Supabase, Authentication > Emails > SMTP Settings: `smtp.resend.com`,
      port 465, user `resend`, password the first key, sender
-     `Reliquary <no-reply@notify.redmage.cc>`; then Rate Limits: raise the
+     `Reliquary <no-reply@mail.reliquary.redmage.cc>`; then Rate Limits: raise the
      30-an-hour email limit to what the Resend plan allows.
    - Vercel `reliquary-web`: `RESEND_API_KEY` (the second key, Sensitive)
-     and `EMAIL_FROM=Reliquary <no-reply@notify.redmage.cc>`, then redeploy.
+     and `EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>`, then redeploy.
      Invites are then emailed; without them owners keep copying the link.
    - Check: sign in by code, and invite an address you own.
 9. **Legal placeholders** in `OPERATOR` in `web/src/site.ts`, and a legal

@@ -96,7 +96,7 @@ SUPABASE_PUBLISHABLE_KEY=<from Supabase: Project Settings -> API Keys>
 JWT_ALG=ES256
 SESSION_SECRET=$(cat "$secret")
 RESEND_API_KEY=<from Resend: API Keys, sending access only>
-EMAIL_FROM=Reliquary <no-reply@notify.redmage.cc>
+EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>
 EOF
     ;;
   mcp)
