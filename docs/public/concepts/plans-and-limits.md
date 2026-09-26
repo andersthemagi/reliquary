@@ -11,7 +11,7 @@ During the alpha, Reliquary is invite-only. Anyone can sign in, but an account c
 
 The sign-in page says so. Without an invite, use its **request access** link to ask the operator.
 
-An account that isn't admitted belongs to no vault, so it sees nothing. **New vault** and **Plan and usage** say so, and creating a vault is refused with the reason (code `RLP02`), for the person and for their agent's `create_vault` alike. Over MCP the refusal reads `Not admitted:` and the message.
+An account that isn't admitted belongs to no vault, so it sees nothing. **New vault** and **Plan and usage** say so (New vault shows no form), and creating a vault is refused with the reason (code `RLP02`), for the person and for their agent's `create_vault` alike. Over MCP the refusal reads `Not admitted:` and the message.
 
 The operator can take admission back. The account keeps its vaults and memberships, and everything in them works as before, but it can't create another vault until it joins a vault by invite or is admitted again.
 
@@ -29,7 +29,7 @@ Sizes are decimal: 1 MB is 1,000,000 bytes, 1 GB is 1,000 MB.
 
 ## Where you see them
 
-- **Account**, **Plan and usage** (`/account`): your plan, how many vaults you own of how many, and each of your vaults' people and storage, each with a bar and a status: **People full**, **Storage full**, or storage from 80% ("Storage 85%"). Home shows the plan and the count under **Your vaults**.
+- **Account**, **Plan and usage** (`/account`): your plan, how many vaults you own of how many, and each of your vaults' people and storage, each with a bar and a status: **People full**, **Storage full**, or storage from 80% ("Storage 85%"). Home shows the plan and the count under **Your vaults**. Home shows the count under its title, like "You own 2 of 5 vaults on the Free plan", marked **At the limit** when you're there.
 - A vault's **Settings**, **Usage**: its tier, people and storage, for every member, with a warning from 80% of storage and when every place is filled. Owners also see the invites waiting.
 - A vault's **Settings**, **Members**: how many places are filled. When none is left, **Invite someone** is off and the page says how to make room, before anyone fills in an invite.
 - Agents: `list_vaults` notes a vault that is near or over a limit.
@@ -48,7 +48,7 @@ A request that would pass a limit is refused, and nothing is changed. The messag
 
 | Limit | Refused | Make room by |
 |---|---|---|
-| Vaults you own | **New vault**, and `create_vault` over MCP | deleting a vault you no longer need |
+| Vaults you own | **New vault**, and `create_vault` over MCP. At the limit New vault shows no form: it says how many vaults your plan allows, with **Plan and usage** and **Ask for a bigger plan** | deleting a vault you no longer need |
 | People | **Invite someone**; opening an invite link when the vault is already full | revoking invites, removing members, or members leaving |
 | Storage | saving a file, proposing, approving a proposal, setting a larger variable value, importing a `.env` | erasing files (deleting a file keeps its history, and its size), deleting variables, rejecting imports |
 

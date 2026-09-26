@@ -102,7 +102,7 @@ export const TEMPLATES: readonly Template[] = [
   {
     id: "client",
     name: "Client engagement",
-    summary: "For work you do for a client: the brief, decisions and agreed facts are canon, notes are open.",
+    summary: "Work for a client: their brief, what was decided, the agreed facts and your working notes.",
     files: [
       {
         path: "README.md",
@@ -168,7 +168,7 @@ Names only, like "the client's Stripe account". Credentials go in the vault's Va
   {
     id: "personal",
     name: "Personal projects",
-    summary: "For one person with several projects and agents: projects and notes are open.",
+    summary: "One person’s projects and notes, shared between their agents and machines.",
     files: [
       {
         path: "README.md",
@@ -208,7 +208,7 @@ An agent starting work reads the project's README first and updates its status b
   {
     id: "product",
     name: "Product team",
-    summary: "For a small team building a product: specs and decisions are canon, notes are open.",
+    summary: "A small team building a product: specs, decisions and working notes.",
     files: [
       {
         path: "README.md",
@@ -266,27 +266,29 @@ export async function applyTemplate(c: pg.ClientBase, name: string, policy: "can
   return id;
 }
 
-// The New vault form's "Start from" choices. Blank is checked, so a form
-// without the field (or an older page) still makes a blank vault. Each
-// template lists its folders' policies and its suggested variable names.
+// The New vault form's "Start from" choices, as cards: a radio inside each
+// label, so the whole card picks it and the checked one is marked in CSS
+// (:has(:checked); no script). Blank is checked, so a form without the
+// field (or an older page) still makes a blank vault. Each template's card
+// says what it is for in a line, then its folders' policies and its
+// suggested variable names.
 export function templateChoices(): Raw {
+  const folders = (t: Template, policy: "canon" | "open") => t.rules.filter((r) => r.policy === policy).map((r) => r.path).join(", ");
   const detail = (t: Template) => {
-    const canon = t.rules.filter((r) => r.policy === "canon").map((r) => r.path);
-    const open = t.rules.filter((r) => r.policy === "open").map((r) => r.path);
-    const parts = [
-      canon.length ? `Canon: ${canon.join(", ")}` : "",
-      open.length ? `Open: ${open.join(", ")}` : "",
-      "a README for agents",
-      t.variables.length ? `suggested variables: ${t.variables.join(", ")}` : "",
-    ].filter(Boolean);
-    return parts.join(" · ");
+    if (!t.files.length) return html``;
+    const canon = folders(t, "canon");
+    const open = folders(t, "open");
+    return html`<span class="choice-card-rules">${canon ? html`<span>Canon: <code>${canon}</code></span>` : ""}${
+      open ? html`<span>Open: <code>${open}</code></span>` : ""}<span>README for agents</span></span>${
+      t.variables.length ? html`<span class="choice-card-vars">Suggested variables: <code>${t.variables.join(", ")}</code></span>` : ""}`;
   };
-  return html`<fieldset>
+  return html`<fieldset class="choice-cards template-cards" aria-describedby="template-hint">
         <legend>Start from</legend>
-        ${TEMPLATES.map(
-          (t) => html`<label class="choice"><input type="radio" name="template" value="${t.id}"${t.id === "blank" ? html` checked` : ""}>
-          <span><strong>${t.name}:</strong> ${t.summary}${t.files.length ? html`<span class="template-detail">${detail(t)}.</span>` : ""}</span></label>`,
-        )}
-        <p class="hint">A template writes its starting files and sets its folders' rules. Suggested variables are names only: you set values later, on the vault's Variables page.</p>
+        <p class="hint" id="template-hint">A template writes its starting files and sets its folders’ rules. Suggested variables are names only: you set values later, on the vault’s Variables page.</p>
+        <div class="choice-card-grid">${TEMPLATES.map(
+          (t) => html`<label class="choice-card"><input type="radio" name="template" value="${t.id}"${t.id === "blank" ? html` checked` : ""}>
+          <span class="choice-card-body"><span class="choice-card-title">${t.name}</span>
+          <span class="choice-card-text">${t.summary}</span>${detail(t)}</span></label>`,
+        )}</div>
       </fieldset>`;
 }

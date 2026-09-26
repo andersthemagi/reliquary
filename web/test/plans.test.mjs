@@ -149,7 +149,7 @@ after(() => {
 // Usage where people look for it
 
 test("plans: Home shows the plan and the vaults owned, linking to Plan and usage", async () => {
-  assert.match(await page("pia", "/"), /<p class="small muted plan-line"><a href="\/account">Web small plan · 1 of 2 vaults<\/a><\/p>/);
+  assert.match(await page("pia", "/"), /<p class="meta plan-line"><span>You own 1 of 2 vaults on the Web small plan<\/span><span><a href="\/account">Plan and usage<\/a><\/span><\/p>/);
 });
 
 test("plans: the Account menu links Plan and usage", async () => {
@@ -300,12 +300,15 @@ test("limits: a push to the env API past the storage limit answers 507 storage_l
 
 test("limits: New vault says when the plan is full, and creating one is refused with the database's reason", async () => {
   const form = await page("pia", "/vaults/new");
-  assert.match(form, /Web small plan · 1 of 2 vaults\. <a href="\/account">Plan and usage<\/a>/);
+  assert.match(form, /You own 1 of 2 vaults on the Web small plan\. <a href="\/account">Plan and usage<\/a>/);
   assert.equal((await post("pia", "/vaults/new", { name: "Plans Two", default_policy: "open" })).status, 303);
   const full = await page("pia", "/vaults/new");
   assert.match(full, /You own 2 of the 2 vaults the Web small plan allows, so a new one can’t be created\./);
-  const flash = await flashAfter("pia", await post("pia", "/vaults/new", { name: "Plans Three", default_policy: "open" }));
-  assert.match(flash, /^You're at your 2-vault limit on the Web small plan \(you own 2\): delete a vault you no longer need, or ask for a bigger plan\. \(ref [0-9a-f]{8}\)$/);
+  const r = await post("pia", "/vaults/new", { name: "Plans Three", default_policy: "open" });
+  assert.equal(r.status, 303);
+  const [, ref] = /^\/vaults\/new\?refused=([0-9a-f]{8})$/.exec(r.headers.get("location")) ?? [];
+  assert.ok(ref, "back to New vault with the refusal's reference");
+  assert.match(log, new RegExp(`failure ref=${ref} [^\\n]*2-vault limit on the Web small plan \\(you own 2\\)`), "the reason is in the server log under the reference");
   const [{ n }] = await sql("select count(*)::int as n from public.vaults where created_by = $1", [PIA]);
   assert.equal(n, 2);
   assert.match(await page("pia", "/account"), /You own 2 vaults, and the Web small plan allows 2/);
@@ -334,4 +337,34 @@ test("plan note: with no limits (self-hosted), Plan and usage says so and nothin
   assert.match(u, /<th scope="row">People<\/th><td>1 \(no limit\)/);
   assert.doesNotMatch(u, /<meter|No places left/);
   assert.doesNotMatch(await page("rex", `/v/${V.rex}/config/members`), /No places left|class="primary" disabled/);
+});
+
+test("vault limit: at the limit New vault offers no form, only why and the way on", async () => {
+  const h = await page("pia", "/vaults/new");
+  assert.doesNotMatch(h, /<form method="post" action="\/vaults\/new"/);
+  assert.doesNotMatch(h, /name="default_policy"|name="template"|>Create vault</);
+  assert.match(h, /<div class="callout warning"><p class="callout-title"><strong>You’re at your plan’s vault limit<\/strong><\/p>/);
+  assert.match(h, /delete a vault you no longer need from its <strong>Settings<\/strong>/);
+  assert.match(h, /<p class="callout-actions"><a class="button" href="\/account">Plan and usage<\/a><a class="button ghost" href="mailto:[^"?]+\?subject=Reliquary%3A%20a%20bigger%20plan">Ask for a bigger plan<\/a><\/p>/);
+  assert.match(h, /<a class="button ghost" href="\/">Back to Home<\/a>/);
+});
+
+test("vault limit: a create refused at the limit says why once, with its reference, and no second message", async () => {
+  const r = await post("pia", "/vaults/new", { name: "Plans Four", default_policy: "open" });
+  const loc = r.headers.get("location");
+  const ref = /refused=([0-9a-f]{8})$/.exec(loc)[1];
+  const h = await page("pia", loc);
+  assert.equal((h.match(/can’t be created|can't be created|vault limit on/g) ?? []).length, 1, "the reason, once");
+  assert.doesNotMatch(h, /class="callout [a-z]+ flash"/, "no flash repeating it");
+  assert.match(h, new RegExp(`<p class="small refused-ref">Your vault wasn’t created, for this reason \\(ref <code>${ref}</code>\\)\\.</p>`));
+  // A reference that isn't one is never shown.
+  assert.doesNotMatch(await page("pia", "/vaults/new?refused=%3Cb%3E"), /refused-ref/);
+});
+
+test("vault limit: Home says the plan is full, and New vault is no longer the primary action", async () => {
+  const h = await page("pia", "/");
+  assert.match(h, /<p class="meta plan-line"><span>You own 2 of 2 vaults on the Web small plan <span class="badge warning">At the limit<\/span><\/span>/);
+  const head = /<div class="page-head">[\s\S]*?<\/div>\s*<\/div>/.exec(h)[0];
+  assert.match(head, /<a class="button" href="\/vaults\/new">New vault<\/a>/);
+  assert.doesNotMatch(head, /class="button primary"/);
 });

@@ -134,14 +134,27 @@ test("admission: New vault tells an account nobody admitted that it can't create
   assert.match(await page("ada", "/vaults/new"), NOTE);
 });
 
+test("admission: New vault offers no form to an account nobody admitted", async () => {
+  const h = await page("ada", "/vaults/new");
+  assert.doesNotMatch(h, /<form method="post" action="\/vaults\/new"/);
+  assert.doesNotMatch(h, /name="default_policy"|name="template"|>Create vault</);
+});
+
 test("admission: Plan and usage says the same", async () => {
   assert.match(await page("ada", "/account"), NOTE);
 });
 
 test("admission: creating a vault anyway is refused with the database's reason and a reference, and nothing is created", async () => {
-  const flash = await flashAfter("ada", await post("ada", "/vaults/new", { name: "Ada's own", default_policy: "open" }));
-  assert.match(flash,
-    /^Your account can't create vaults yet: Reliquary is invite-only during alpha\. Open an invite link someone sent you and join their vault \(that admits your account\), or ask the operator to admit you\. \(ref ([0-9a-f]{8})\)$/);
+  const r = await post("ada", "/vaults/new", { name: "Ada's own", default_policy: "open" });
+  assert.equal(r.status, 303);
+  const [, ref] = /^\/vaults\/new\?refused=([0-9a-f]{8})$/.exec(r.headers.get("location")) ?? [];
+  assert.ok(ref, "back to New vault with the refusal's reference");
+  assert.match(log, new RegExp(`failure ref=${ref} [^\\n]*invite-only during alpha`), "the database's reason is in the server log under the reference");
+  const h = await page("ada", r.headers.get("location"));
+  assert.match(h, NOTE);
+  assert.equal((h.match(/invite-only during/g) ?? []).length, 1, "the reason, once");
+  assert.doesNotMatch(h, /class="callout [a-z]+ flash"/, "no flash repeating it");
+  assert.match(h, new RegExp(`<p class="small refused-ref">Your vault wasn’t created, for this reason \\(ref <code>${ref}</code>\\)\\.</p>`));
   const [{ n }] = await sql("select count(*)::int as n from public.vaults where created_by = $1", [ADA]);
   assert.equal(n, 0);
 });

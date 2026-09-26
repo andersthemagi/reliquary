@@ -4,7 +4,7 @@ A template starts a new vault with folders, rules and a README that tells agents
 
 ## Choosing one
 
-On Home, choose **New vault**. Under **Start from**, pick a template, then choose the default policy and **Create vault**. You are the owner, as always.
+On Home, choose **New vault**. Under **Start from**, pick a template's card, then under **Files without a rule are** choose **Open** or **Canon**, and **Create vault**. You are the owner, as always.
 
 | Template | Folders | Suggested variables |
 |---|---|---|
@@ -13,7 +13,7 @@ On Home, choose **New vault**. Under **Start from**, pick a template, then choos
 | **Personal projects** | `projects/` and `notes/` are open | none |
 | **Product team** | `specs/` and `decisions/` are canon (1 approval); `notes/` is open | `DATABASE_URL`, `SENTRY_DSN` |
 
-The default policy you choose applies to everything the template's rules don't cover, such as the README at the top of the vault.
+What you choose under **Files without a rule are** is the vault's default policy: it applies to everything the template's rules don't cover, such as the README at the top of the vault.
 
 ## What a template creates
 

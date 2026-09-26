@@ -79,16 +79,37 @@ async function createFromForm(name, template, policy) {
 test("templates: the New vault form offers Blank, checked, then each template with its folders and suggested variable names", async () => {
   const h = await page("/vaults/new");
   assert.match(h, /<legend>Start from<\/legend>/);
-  assert.match(h, /<input type="radio" name="template" value="blank" checked>\s*<span><strong>Blank:<\/strong>/);
+  assert.match(h, /<input type="radio" name="template" value="blank" checked>\s*<span class="choice-card-body"><span class="choice-card-title">Blank<\/span>/);
   for (const id of ["client", "personal", "product"]) {
     const t = templateById(id);
-    assert.match(h, new RegExp(`<input type="radio" name="template" value="${id}">\\s*<span><strong>${t.name}:</strong>`));
+    assert.match(h, new RegExp(`<input type="radio" name="template" value="${id}">\\s*<span class="choice-card-body"><span class="choice-card-title">${t.name}</span>`));
   }
-  assert.match(h, /Canon: brief\/, decisions\/, canon\/ · Open: notes\/ · a README for agents · suggested variables: DATABASE_URL, STRIPE_SECRET_KEY/);
-  assert.match(h, /Canon: specs\/, decisions\/ · Open: notes\//);
+  assert.match(h, /<span>Canon: <code>brief\/, decisions\/, canon\/<\/code><\/span><span>Open: <code>notes\/<\/code><\/span><span>README for agents<\/span><\/span><span class="choice-card-vars">Suggested variables: <code>DATABASE_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SENTRY_DSN<\/code><\/span>/);
+  assert.match(h, /<span>Canon: <code>specs\/, decisions\/<\/code><\/span><span>Open: <code>notes\/<\/code><\/span>/);
   assert.match(h, /Suggested variables are names only/);
   assert.equal((h.match(/name="template"/g) ?? []).length, TEMPLATES.length);
   assert.doesNotMatch(h, /<script/i);
+});
+
+test("template cards: each choice is a card the whole of which picks it, saying what it is for in one line", async () => {
+  const h = await page("/vaults/new");
+  assert.match(h, /<fieldset class="choice-cards template-cards" aria-describedby="template-hint">\s*<legend>Start from<\/legend>\s*<p class="hint" id="template-hint">/);
+  const cards = [...h.matchAll(/<label class="choice-card"><input type="radio" name="template" value="([a-z]+)"[^>]*>[\s\S]*?<\/label>/g)];
+  assert.deepEqual(cards.map((c) => c[1]), TEMPLATES.map((t) => t.id));
+  for (const t of TEMPLATES) {
+    assert.ok(t.summary.length <= 100 && !/\n/.test(t.summary), `${t.id}: one line`);
+    const card = cards.find((c) => c[1] === t.id)[0];
+    assert.ok(card.includes(`<span class="choice-card-text">${t.summary}</span>`), `${t.id}: its summary`);
+  }
+  assert.doesNotMatch(cards.find((c) => c[1] === "blank")[0], /choice-card-rules/, "Blank has no folders to list");
+});
+
+test("template cards: the default policy is two cards, each explained in a line, with what it applies to", async () => {
+  const h = await page("/vaults/new");
+  assert.match(h, /<legend>Files without a rule are<\/legend>\s*<p class="hint" id="policy-hint">Templates set rules for their folders; this applies to everything else/);
+  assert.match(h, /<span class="choice-card-title">Open<\/span>\s*<span class="choice-card-text">Members and their agents write directly\. Every change is logged\.<\/span>/);
+  assert.match(h, /<span class="choice-card-title">Canon<\/span>\s*<span class="choice-card-text">Every change is a proposal a person approves before it applies\.<\/span>/);
+  assert.doesNotMatch(h, /<legend>Default policy<\/legend>/);
 });
 
 test("templates: Home's first-vault empty state mentions templates", async () => {

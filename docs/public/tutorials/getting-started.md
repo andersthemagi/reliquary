@@ -15,7 +15,7 @@ A vault holds files, variables and members. See [Vaults, files and folders](../c
 1. On Home, choose **New vault**.
 2. Name it `My project`.
 3. Under **Start from**, leave **Blank** chosen for this tutorial. For real work, a [template](../concepts/templates.md) like **Client engagement** or **Product team** starts the vault with folders, rules and a README that tells your agents how to work in it.
-4. Choose **Canon**, so every change to a file is a proposal a person approves. (Open would let editors and their agents write files directly. You can change this later, and set it per folder with [rules](../how-to/set-rules.md).)
+4. Under **Files without a rule are**, choose **Canon**, so every change to a file is a proposal a person approves. (Open would let editors and their agents write files directly. You can change this later, and set it per folder with [rules](../how-to/set-rules.md).)
 5. Choose **Create vault**. You are its owner.
 
 ## 3. Connect Claude Code
