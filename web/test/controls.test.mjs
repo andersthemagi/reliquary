@@ -87,7 +87,7 @@ test("proposal: no feedback block when nobody asked for changes", async () => {
 test("proposal: snooze is a secondary control at the top, before the diff", async () => {
   const h = await page(`${C}/proposals/${C_REVISED}`);
   const snooze = at(h, `action="${C}/proposals/${C_REVISED}/snooze"`);
-  assert.ok(at(h, "/decide") < snooze && snooze < at(h, 'class="diff'));
+  assert.ok(at(h, '<div class="page-actions">') < snooze && snooze < at(h, "/decide") && snooze < at(h, 'class="diff'));
 });
 
 test("proposal: closed or viewer pages show status at the top and no controls", async () => {
@@ -133,7 +133,7 @@ test("review: every waiting row carries one Snooze menu with three choices", asy
   const row = new RegExp(
     `<details class="menu-wrap row-snooze-menu">\\s*<summary class="button small quiet" aria-label="Snooze Create canon/row\\.md">Snooze</summary>\\s*` +
       `<form method="post" action="${C}/proposals/${C_ROW}/snooze" class="menu row-snooze" aria-label="Snooze Create canon/row\\.md">\\s*` +
-      `<input type="hidden" name="csrf" value="[0-9a-f]+"><span class="menu-label">Hide from your Review</span><button name="for" value="day">For a day</button>\\s*` +
+      `<input type="hidden" name="csrf" value="[0-9a-f]+"><span class="menu-label">Hide it from your inbox</span><button name="for" value="day">For a day</button>\\s*` +
       `<button name="for" value="week">For a week</button>\\s*<button name="for" value="change">Until it changes</button>`,
   );
   assert.match(h, row);
@@ -143,7 +143,7 @@ test("review: every waiting row carries one Snooze menu with three choices", asy
 test("review: a row's risk badge names the first reason, not a bare count", async () => {
   const h = await page("/inbox");
   assert.doesNotMatch(h, /\d+ to check/);
-  assert.match(h, /<span class="badge attention risk-count" title="[^"]+">(Deletes the file|Removes \d+ of \d+ lines|Revised [^<]+|First proposal [^<]+)( \+\d+ more)?<\/span>/);
+  assert.match(h, /<span class="badge attention risk-count" title="[^"]+">(Deletes the file|Removes \d+ of \d+ lines|Rewrites \d+ of \d+ lines|Revised [^<]+|First proposal [^<]+)( \+\d+ more)?<\/span>/);
   // Creating a file is not a risk: a neutral label, never the amber badge.
   assert.match(h, /<span class="badge">New file<\/span>/);
   assert.doesNotMatch(h, /risk-count"[^>]*>Creates a new file/);

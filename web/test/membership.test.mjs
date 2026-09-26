@@ -167,8 +167,8 @@ test("people: a proposal page, its thread and the review list name the proposer 
   const p = await page("bea", `/v/${V.team}/proposals/${proposal}`);
   assert.match(p, /<span>By cy@example\.test<\/span>/);
   assert.match(p, /Comment · cy@example\.test · revision 1/);
-  assert.match(await page("bea", "/inbox"), /by cy@example\.test · /);
-  assert.match(await page("bea", "/"), /by cy@example\.test · /);
+  assert.match(await page("bea", "/inbox"), / · cy@example\.test · <time /);
+  assert.match(await page("bea", "/"), / · cy@example\.test · <time /);
 });
 
 test("people: text a member wrote can't pass for a person, and no marker reaches a page", async () => {

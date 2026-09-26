@@ -1,5 +1,5 @@
 // A proposal's discussion (comments, review notes and approvals in one
-// timeline), and per-person snooze of proposals in the Review inbox.
+// timeline), and per-person snooze of proposals in the Inbox.
 // Everything is decided by the database (see
 // supabase/migrations/20260924170000_threads_snooze.sql); these handlers only
 // render and forward. Comment text is people's and agents' words: it goes
@@ -8,7 +8,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
-import { csrfField, html, time, when, type Raw } from "./html.js";
+import { csrfField, html, menu, time, when, type Raw } from "./html.js";
 import type { Ctx, Reply } from "./pages.js";
 import { personRef } from "./personref.js";
 
@@ -25,6 +25,15 @@ const message = refusalText;
 
 const who = (ctx: Ctx, id: string | null, agent: string | null) =>
   `${id === ctx.userId ? "you" : id ? personRef(id) : "system"}${agent ? ` via ${agent}` : ""}`;
+
+// A person, as the reader sees them: "you", or their email where the reader
+// may see it (people.ts).
+export const person = (ctx: Ctx, id: string | null) => (id === ctx.userId ? "you" : id ? personRef(id) : "system");
+
+// Who proposed something, the agent first when there is one, since that is
+// what did the work: "Claude Code for ben@example.test", or just the person.
+export const byWhom = (ctx: Ctx, id: string | null, agent: string | null) =>
+  agent ? `${agent} for ${person(ctx, id)}` : person(ctx, id);
 
 const LABEL: Record<string, string> = {
   comment: "Comment",
@@ -66,36 +75,56 @@ const snoozeButtons = html`<button name="for" value="day">For a day</button>
       <button name="for" value="week">For a week</button>
       <button name="for" value="change">Until it changes</button>`;
 
+// Snooze on a proposal page: a note saying it's snoozed (with Unsnooze),
+// shown above the decision; or, when it waits on this person, a Snooze
+// menu for the page header's actions, beside Revise and Edit, then approve.
 export async function snoozeControl(
   c: pg.PoolClient,
   ctx: Ctx,
   o: { vaultId: string; p: { id: string; status: string }; waitingOnMe: boolean },
-): Promise<Raw> {
+): Promise<{ note: Raw; menu: Raw }> {
   const { vaultId: id, p } = o;
   const snoozed = (await c.query(`select until from public.active_snoozes where proposal_id = $1 and user_id = $2`, [p.id, ctx.userId]))
     .rows[0];
   if (snoozed)
-    return html`<form method="post" action="${proposalPath(id, p.id, "/unsnooze")}" class="snoozed-note">
+    return {
+      note: html`<form method="post" action="${proposalPath(id, p.id, "/unsnooze")}" class="snoozed-note">
         ${csrfField(ctx.csrf)}<input type="hidden" name="back" value="proposal">
-        <span>Snoozed in your Review ${snoozed.until ? html`until ${when(snoozed.until)}, or ` : ""}until it changes.</span>
+        <span>Snoozed in your inbox ${snoozed.until ? html`until ${when(snoozed.until)}, or ` : ""}until it changes.</span>
         <button class="quiet">Unsnooze</button>
-      </form>`;
-  if (!o.waitingOnMe || !live(p.status)) return html``;
-  return html`<form method="post" action="${proposalPath(id, p.id, "/snooze")}" class="snooze">
-      ${csrfField(ctx.csrf)}
-      <span>Not now? Hide it from your Review</span>
-      ${snoozeButtons}
-      <p class="hint">Only you see this. A new revision or someone else’s comment brings it back.</p>
-    </form>`;
+      </form>`,
+      menu: html``,
+    };
+  if (!o.waitingOnMe || !live(p.status)) return { note: html``, menu: html`` };
+  const item = (value: string, label: string, description: string) => ({
+    action: proposalPath(id, p.id, "/snooze"),
+    csrf: ctx.csrf,
+    fields: { for: value },
+    label,
+    description,
+  });
+  return {
+    note: html``,
+    menu: menu({
+      label: "Snooze",
+      heading: "Hide it from your inbox",
+      className: "snooze-menu",
+      items: [
+        item("day", "For a day", "Or until it changes"),
+        item("week", "For a week", "Or until it changes"),
+        item("change", "Until it changes", "A new revision or someone else’s comment brings it back. Only you see this."),
+      ],
+    }),
+  };
 }
 
-// Snooze from a row of the Review list; the handler redirects to /review.
+// Snooze from a row of the Inbox; the handler redirects to /inbox.
 // One "Snooze" menu per row (a <details>, no script), so the list stays quiet.
 export const rowSnooze = (ctx: Ctx, vaultId: string, pid: string, label: string) =>
   html`<details class="menu-wrap row-snooze-menu">
     <summary class="button small quiet" aria-label="Snooze ${label}">Snooze</summary>
     <form method="post" action="${proposalPath(vaultId, pid, "/snooze")}" class="menu row-snooze" aria-label="Snooze ${label}">
-      ${csrfField(ctx.csrf)}<span class="menu-label">Hide from your Review</span>${snoozeButtons}
+      ${csrfField(ctx.csrf)}<span class="menu-label">Hide it from your inbox</span>${snoozeButtons}
     </form>
   </details>`;
 
@@ -120,6 +149,9 @@ export async function threadSection(
     )
   ).rows;
 
+  // A decided proposal nobody discussed has no discussion to show.
+  if (!live(p.status) && !entries.length) return html``;
+
   const timeline = entries.length
     ? html`<ol class="notes thread">${entries.map(
         (n) => html`<li${n.agent ? html` class="by-agent"` : ""}><p class="small muted">${LABEL[n.kind] ?? n.kind} · ${who(ctx, n.author, n.agent)} · revision ${n.revision} · ${time(n.at)}</p>
@@ -128,9 +160,7 @@ export async function threadSection(
     : html`<p class="muted">No comments yet.</p>`;
 
   const form = !live(p.status)
-    ? entries.length
-      ? html`<p class="muted small">This proposal is decided, so its discussion is closed.</p>`
-      : ""
+    ? html`<p class="muted small">This proposal is decided, so its discussion is closed.</p>`
     : o.canWrite
       ? html`<form method="post" action="${proposalPath(id, p.id, "/comment")}" class="panel comment">
           ${csrfField(ctx.csrf)}
@@ -236,7 +266,7 @@ export function snoozedSection(ctx: Ctx, rows: any[]): Raw {
     <ul class="rows">${rows.map(
       (p) => html`<li>
         <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${p.kind === "delete" ? "Delete" : p.creates ? "Create" : "Change"} ${p.path}</a>
-          <span class="muted small"> · ${p.vault} · by ${who(ctx, p.proposed_by, p.agent)} · ${p.until ? `until ${when(p.until)}` : "until it changes"}</span></span>
+          <span class="muted small"> · ${p.vault} · ${byWhom(ctx, p.proposed_by, p.agent)} · ${p.until ? `until ${when(p.until)}` : "until it changes"}</span></span>
         <form method="post" action="${proposalPath(p.vault_id, p.id, "/unsnooze")}">
           ${csrfField(ctx.csrf)}<input type="hidden" name="back" value="review">
           <button class="quiet">Unsnooze</button>
