@@ -1,4 +1,4 @@
--- Hostile tests for 20260926140000_sign_out_everywhere: ending every browser
+-- Hostile tests for 20260926140100_sign_out_everywhere: ending every browser
 -- session of an account (private.session_cutoffs, private.check_session)
 -- and, when asked, revoking its connections (public.end_my_sessions). Ana
 -- and Ben each have a personal token and a connected app; Cal has a token.

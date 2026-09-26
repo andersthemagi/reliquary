@@ -15,7 +15,7 @@
 // database (public.end_my_sessions sets a cutoff that private.check_session
 // holds every session issued before it to, so the access tokens already
 // handed out stop working at once instead of within the hour;
-// 20260926140000_sign_out_everywhere.sql). Connections (agent tokens,
+// 20260926140100_sign_out_everywhere.sql). Connections (agent tokens,
 // connected apps, CLI sign-ins) are not browser sessions and stay, unless
 // the person also ticks "Also revoke all my connections".
 //

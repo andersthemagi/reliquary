@@ -551,7 +551,7 @@ account at Supabase Auth, then records a cutoff in
 `private.session_cutoffs`; the web app runs `check_session` with the
 claims (now including the JWT's `iat`) at the start of every transaction,
 so access tokens already handed out stop working at once rather than
-within the hour (`20260926140000_sign_out_everywhere.sql`). Connections are
+within the hour (`20260926140100_sign_out_everywhere.sql`). Connections are
 not sessions and are revoked separately.
 
 **GDPR, from the start:**

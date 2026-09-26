@@ -53,7 +53,7 @@ alter table private.deleted_accounts enable row level security;
 revoke all on private.deleted_accounts
   from public, anon, authenticated, reliquary_web, reliquary_mcp, reliquary_ops;
 
--- As in 20260926140000_sign_out_everywhere, plus: a deleted account's
+-- As in 20260926140100_sign_out_everywhere, plus: a deleted account's
 -- sessions are refused, with or without an iat.
 create or replace function private.check_session() returns void
 language plpgsql stable security definer set search_path = '' as $$

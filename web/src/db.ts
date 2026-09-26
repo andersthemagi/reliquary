@@ -87,7 +87,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 // request's pages): when its access JWT was issued. begin() passes it to
 // the database with the claims, and private.check_session() refuses the
 // transaction (SQLSTATE RLA01) if the person has signed out everywhere
-// since (20260926140000_sign_out_everywhere.sql). Outside a request (the
+// since (20260926140100_sign_out_everywhere.sql). Outside a request (the
 // OAuth token endpoint, tests) there is none, and nothing is checked.
 const sessionStore = new AsyncLocalStorage<{ issuedAt?: number }>();
 export function inSession<T>(s: { issuedAt?: number }, fn: () => Promise<T>): Promise<T> {

@@ -72,7 +72,7 @@ Done so far:
   `/inbox`) and an account menu, drawn from one `shell_summary` call per
   page; Account settings with a display name, the person's own, in person.
 - account self-service on Account settings, each the person's own, in
-  person only: sign out everywhere (`20260926140000_sign_out_everywhere.sql`:
+  person only: sign out everywhere (`20260926140100_sign_out_everywhere.sql`:
   Supabase's global logout, then a cutoff that `private.check_session`, run
   with the claims at the start of every web transaction, holds sessions to;
   `RLA01`), change of email through Supabase Auth (nothing in the database:
