@@ -55,7 +55,17 @@ const post = async (base, path, fields, jar, headers = {}) =>
     }),
   );
 const csrfOf = (html) => /name="csrf" value="([0-9a-f]+)"/.exec(html)?.[1];
-const fake = async (path, init) => (await fetch(FAKE + path, init)).json();
+// One retry on a dropped connection: the fake Auth runs in its own container,
+// and a kept-alive socket it closed while the suite was busy elsewhere fails
+// the first request on it (undici doesn't replay a POST).
+const fake = async (path, init) => {
+  try {
+    return await (await fetch(FAKE + path, init)).json();
+  } catch (e) {
+    if (e?.message !== "fetch failed") throw e;
+    return (await fetch(FAKE + path, init)).json();
+  }
+};
 const stats = () => fake("/_stats");
 const lastEmail = async (email) => {
   const m = await fake(`/_last_email?email=${encodeURIComponent(email)}`);

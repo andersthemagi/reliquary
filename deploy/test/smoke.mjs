@@ -127,6 +127,14 @@ try {
   await step("sign in: the code opens a session", async () => {
     const r = await post("/signin/code", { csrf: codeFormCsrf, next: "/", email: EMAIL, code });
     check(r.status === 303 || r.status === 302, `POST /signin/code answered HTTP ${r.status}`);
+    // A brand-new account's first landing on Home is the welcome tour, once.
+    const first = await get("/");
+    check(first.status === 303 && (first.headers.get("location") ?? "").endsWith("/welcome"),
+      `a new account's first landing on Home answered HTTP ${first.status} to ${first.headers.get("location")}, not the welcome tour`);
+    const slide = await (await get("/welcome")).text();
+    check(/Welcome to Reliquary/i.test(slide), "the welcome tour's first slide doesn't say Welcome to Reliquary");
+    const skipped = await post("/welcome/done", { csrf: field(slide, "csrf") });
+    check(skipped.status === 303 || skipped.status === 302, `Skip answered HTTP ${skipped.status}`);
     const home = await (await get("/")).text();
     check(/New vault/.test(home), "Home doesn't show New vault: not signed in");
   });
