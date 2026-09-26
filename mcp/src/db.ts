@@ -115,7 +115,7 @@ export async function resolveOAuthToken(token: string, resource: string, db: pg.
 }
 
 // Records the name the MCP client reported at initialize (clientInfo.name),
-// for the Tokens page. Keyed by the token's hash, so only a caller holding
+// for the Connections page. Keyed by the token's hash, so only a caller holding
 // the token can set it. Best effort: never fails the request.
 export async function recordClient(token: string, clientName: string): Promise<void> {
   if (!TOKEN_SHAPE.test(token)) return;

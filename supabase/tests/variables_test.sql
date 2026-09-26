@@ -353,6 +353,8 @@ select t.expect('read: anonymous is unauthorized', t.err(t.run(null, t.read_sql(
 select t.expect_true('cli grant: consent makes a read-only cli row for the env API',
   (select kind = 'cli' and access = 'read' and all_vaults and resource = t.c('env') and client_id = t.c('cli')
      from public.access_tokens where id = t.g('ana-cli')));
+select t.expect('cli grant: it stores no client name, never "this computer"',
+  (select coalesce(client_name, 'none') from public.access_tokens where id = t.g('ana-cli')), 'none');
 select t.expect('cli grant: an agent cannot consent',
   t.run('ana', format($q$select public.create_cli_grant(%L, %L, %L, %L, null)$q$,
     t.c('cli'), t.c('loopback'), t.c('env'), t.s256('x' || t.c('verifier'))), 'Claude Code'), 'ERR 42501');

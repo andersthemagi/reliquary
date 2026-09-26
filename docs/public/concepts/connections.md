@@ -1,6 +1,6 @@
 # Connections
 
-A connection is anything that can act as you: an agent, an app or the CLI. Every one of yours is on the **Connections** page (the account menu at the top right, then **Tokens and connections**), where you can revoke it.
+A connection is anything that can act as you: an agent, an app or the CLI. Every one of yours is on the **Connections** page (the account menu at the top right, then **Connections**; its address is `/connections`), where you can revoke it. The page used to be at `/tokens`: old links and bookmarks still land on it.
 
 ## The three types
 
@@ -38,7 +38,7 @@ A connection's vaults and access are fixed when it is made. To change them, revo
 
 On the Connections page, choose **Revoke** next to it. A confirm page shows its type, vaults, access and last use; choose **Revoke** with its name to confirm. It is refused on its next request.
 
-Only you can revoke your own, in person: no agent, token, app or CLI can revoke one (an app can still end its own sign-in). A vault owner can also cut a member's connection off from their vault on **Members**, without touching the member's other vaults.
+Only you can revoke your own, in person: no agent, token, app or CLI can revoke one (an app can still end its own connection). A vault owner can also cut a member's connection off from their vault on **Members**, without touching the member's other vaults.
 
 When you leave a vault, or are removed, connections that reached only that vault are revoked, and the vault drops out of connections that reached several.
 

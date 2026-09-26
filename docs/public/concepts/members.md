@@ -9,7 +9,7 @@ A vault's members are on **Settings**, **Members**. Every member sees who else i
 - **Invite someone**, at the top right: a page with an email address and a role (owner, editor or viewer). When the vault has no places left, the button is off and the page says how to make room (see [Plans and limits](plans-and-limits.md)).
 - A role picker for each member, and **Remove** behind a confirm page.
 - Pending invites, with when each was sent and expires, and **Revoke** behind a confirm page.
-- Each member's agent connections that reach this vault, with when each was created and last used, and **Revoke** behind a confirm page, which cuts that connection off from this vault only. A member's command-line sign-in shows as **Reliquary CLI**, "Command-line sign-in".
+- **Connections**: each member's connections that reach this vault (tokens, apps and the Reliquary CLI), with each one's type, when it was created and last used, and **Revoke** behind a confirm page, which cuts that connection off from this vault only. See [Connections](connections.md).
 
 A vault always keeps an owner: the only owner can't step down, leave or remove themself. Make someone else an owner first.
 

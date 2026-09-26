@@ -1,5 +1,5 @@
 // Account settings (/settings): the person's display name, their email,
-// the theme, links to Plan and usage, Tokens and connections, and Connect,
+// the theme, links to Plan and usage, Connections, and Connect,
 // and (hosted) change of email, sign out and sign out everywhere. The name
 // is the database's to keep and check
 // (public.set_display_name, public.profiles with RLS: your own row, in
@@ -16,7 +16,7 @@
 // holds every session issued before it to, so the access tokens already
 // handed out stop working at once instead of within the hour;
 // 20260926140100_sign_out_everywhere.sql). Connections (agent tokens,
-// connected apps, CLI sign-ins) are not browser sessions and stay, unless
+// apps, the Reliquary CLI) are not browser sessions and stay, unless
 // the person also ticks "Also revoke all my connections".
 //
 // Change of email (POST /settings/email, hosted) asks Supabase Auth to move
@@ -100,26 +100,26 @@ export async function accountSettings(ctx: Ctx): Promise<Reply> {
       </form>
     </section>
     <section aria-labelledby="more">
-      <h2 id="more">Plan, tokens and connections</h2>
+      <h2 id="more">Plan and connections</h2>
       <ul class="rows">
         <li><span><a class="name" href="/account">Plan and usage</a><span class="muted small"> · your plan, and the people and storage of the vaults you own</span></span></li>
-        <li><span><a class="name" href="/tokens">Tokens and connections</a><span class="muted small"> · agent tokens, connected apps and CLI sign-ins, with Revoke</span></span></li>
+        <li><span><a class="name" href="/connections">Connections</a><span class="muted small"> · everything that can act as you: tokens, apps and the Reliquary CLI, each with Revoke</span></span></li>
         <li><span><a class="name" href="/connect">Connect an agent</a><span class="muted small"> · set up Claude, ChatGPT, Cursor, VS Code or the CLI</span></span></li>
       </ul>
     </section>
     ${hosted
       ? html`<section aria-labelledby="signout">
       <h2 id="signout">Sign out</h2>
-      <p class="small muted">Ends your session in this browser. Your agents’ connections stay until you revoke them on Tokens and connections.</p>
+      <p class="small muted">Ends your session in this browser. Your connections stay until you revoke them on Connections.</p>
       <form method="post" action="/signout">${csrfField(ctx.csrf)}<button>Sign out</button></form>
     </section>
     <section aria-labelledby="everywhere">
       <h2 id="everywhere">Sign out everywhere</h2>
       <p>Ends every session of your account at once, in every browser and on every device, this one included. Use it if you signed in on a computer you no longer use, or lost a phone.</p>
-      <p class="small muted">Connections are separate: agent tokens, connected apps (Claude, ChatGPT, Cursor and others) and Reliquary CLI sign-ins keep working after you sign out everywhere. Revoke them all here, or one at a time on <a href="/tokens">Tokens and connections</a>.</p>
+      <p class="small muted">Connections are separate: tokens, apps (Claude, ChatGPT, Cursor and others) and the Reliquary CLI keep working after you sign out everywhere. Revoke them all here, or one at a time on <a href="/connections">Connections</a>.</p>
       <form method="post" action="/settings/sign-out-everywhere" class="panel settings-form">
         ${csrfField(ctx.csrf)}
-        <label class="choice"><input type="checkbox" name="revoke_connections" value="1"> Also revoke all my connections: agent tokens, connected apps and CLI sign-ins</label>
+        <label class="choice"><input type="checkbox" name="revoke_connections" value="1"> Also revoke all my connections: tokens, apps and the Reliquary CLI</label>
         <div class="actions"><button class="danger">Sign out everywhere</button></div>
       </form>
     </section>`
@@ -166,8 +166,8 @@ export async function signOutEverywhere(ctx: Ctx): Promise<Reply> {
   const connections = revoke
     ? n === 0
       ? html`You had no live connections to revoke.`
-      : html`${n === 1 ? "Your one connection was" : `All ${n} of your connections were`} revoked too: agent tokens, connected apps and CLI sign-ins stop working now.`
-    : html`Your connections (agent tokens, connected apps and CLI sign-ins) still work. To end them, sign in and revoke them on Tokens and connections.`;
+      : html`${n === 1 ? "Your one connection was" : `All ${n} of your connections were`} revoked too: tokens, apps and the Reliquary CLI stop working now.`
+    : html`Your connections (tokens, apps and the Reliquary CLI) still work. To end them, sign in and revoke them on Connections.`;
   return {
     html: notice(
       "Signed out everywhere",
@@ -251,7 +251,7 @@ export async function deleteAccountPage(ctx: Ctx, error?: string): Promise<Reply
     confirmPage({
       title: "Delete your account",
       crumb,
-      lede: html`This deletes your account now. ${left} ${s.connections ? `${plural(s.connections, "connection")} (agent tokens, connected apps and CLI sign-ins) ${s.connections === 1 ? "is" : "are"} deleted and stop${s.connections === 1 ? "s" : ""} working.` : "You have no connections to delete."} This can’t be undone.`,
+      lede: html`This deletes your account now. ${left} ${s.connections ? `${plural(s.connections, "connection")} (tokens, apps and the Reliquary CLI) ${s.connections === 1 ? "is" : "are"} deleted and stop${s.connections === 1 ? "s" : ""} working.` : "You have no connections to delete."} This can’t be undone.`,
       consequences: [
         "Reliquary forgets your email address, your display name and your plan, and signs you out everywhere.",
         ...(s.invites ? [`${plural(s.invites, "invite")} you made that ${s.invites === 1 ? "is" : "are"} still waiting ${s.invites === 1 ? "is" : "are"} withdrawn.`] : []),

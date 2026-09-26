@@ -89,8 +89,11 @@ export const PRICING = {
   everyPlan: "Every plan: unlimited agents and AI tools, approvals and quorum, the agent ceiling enforced in the database, the activity log, and export. Storage counts every version of every file and your variables.",
 };
 
-export const requestAccessHref = () =>
-  `mailto:${OPERATOR.contactEmail}?subject=${encodeURIComponent("Reliquary early access")}`;
+// Mail to the operator (OPERATOR.contactEmail), one subject per reason.
+const mailOperator = (subject: string) => `mailto:${OPERATOR.contactEmail}?subject=${encodeURIComponent(subject)}`;
+export const requestAccessHref = () => mailOperator("Reliquary early access");
+export const biggerPlanHref = () => mailOperator("Reliquary: a bigger plan");
+export const suggestFeatureHref = () => mailOperator("Reliquary feature suggestion");
 
 // The site's own origin: SITE_URL when the public site has a host of its
 // own (hosts.ts), else PUBLIC_URL, else the default. server.ts refuses to

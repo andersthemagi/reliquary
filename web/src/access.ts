@@ -24,19 +24,29 @@ import {
 } from "./html.js";
 import { message, notFound, q, render, UUID, type Ctx, type Reply } from "./pages.js";
 
-// The routes of these pages; pages.ts sends /connect and /tokens/* here.
-// URLs are kept from before the rename (/tokens is the Connections page).
+// The routes of these pages; pages.ts sends /connect and /connections/* here.
 export function accessRoutes(ctx: Ctx): Promise<Reply> | Reply {
   const p = ctx.url.pathname;
   const get = ctx.method === "GET";
   if (get && p === "/connect") return connect(ctx);
-  if (get && p === "/tokens") return tokens(ctx);
-  if (get && p === "/tokens/new") return newToken(ctx);
-  if (!get && p === "/tokens/new") return createToken(ctx);
-  const m = /^\/tokens\/([^/]+)\/revoke$/.exec(p);
+  if (get && p === "/connections") return connections(ctx);
+  if (get && p === "/connections/new") return newToken(ctx);
+  if (!get && p === "/connections/new") return createToken(ctx);
+  const m = /^\/connections\/([^/]+)\/revoke$/.exec(p);
   if (get && m) return revokePage(ctx, m[1]);
   if (!get && m) return revokeToken(ctx, m[1]);
   return notFound(ctx);
+}
+
+// The Connections page lived at /tokens until 2026-09-26. Every old URL
+// answers with a permanent redirect to its new one, keeping the query, for
+// any method: a 308 makes a browser repeat a POST (a form left open in a
+// tab) at the new URL, unchanged. server.ts answers these before sign-in,
+// so an old link works signed out too. null for any other path.
+export function movedConnectionsPath(pathname: string): string | null {
+  if (pathname === "/tokens") return "/connections";
+  if (pathname.startsWith("/tokens/")) return `/connections${pathname.slice("/tokens".length)}`;
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +77,7 @@ export function connect(ctx: Ctx): Reply {
       title: "Connect",
       description: "Connect any MCP client to your vaults with this URL.",
       meta: html`<p class="endpoint"><span class="muted small">MCP URL</span><code>${url}</code></p>`,
-      secondary: html`<a class="button" href="/tokens">Your connections</a>`,
+      secondary: html`<a class="button" href="/connections">Your connections</a>`,
       tabs: CLIENTS.map((c) => ({ href: `/connect?client=${c.id}`, label: c.label, current: c.id === client })) as Tab[],
       tabsLabel: "Clients",
     })}
@@ -83,14 +93,14 @@ function clientSection(ctx: Ctx, client: Client): Raw {
       return html`<section id="claude-code"><h2>Claude Code (app or CLI)</h2>
       <p>Claude Code signs in with your Reliquary account: no token to copy. On each computer, add Reliquary once for your user:</p>
       <pre class="code" tabindex="0">claude mcp add --transport http --scope user reliquary ${url}</pre>
-      <p>Then in Claude Code run <code>/mcp</code>, choose <strong>reliquary</strong> and <strong>Authenticate</strong>. Your browser opens Reliquary: sign in, pick the vaults and access, and approve. Claude Code keeps the connection and refreshes it by itself. It shows on <a href="/tokens">Connections</a>, where you can revoke it.</p>
+      <p>Then in Claude Code run <code>/mcp</code>, choose <strong>reliquary</strong> and <strong>Authenticate</strong>. Your browser opens Reliquary: sign in, pick the vaults and access, and approve. Claude Code keeps the connection and refreshes it by itself. It shows on <a href="/connections">Connections</a>, where you can revoke it.</p>
       ${callout("info", CEILING)}</section>`;
     case "chat":
       return html`<section id="chat"><h2>Claude.ai and ChatGPT</h2>
       <p>Both sign in with your Reliquary account: no token to copy.</p>
       <p><strong>Claude.ai:</strong> Settings, Connectors, <strong>Add custom connector</strong>. Name it Reliquary and paste the MCP URL. Claude sends you here to sign in and approve.</p>
       <p><strong>ChatGPT:</strong> Settings, Apps and Connectors, turn on developer mode under Advanced, then create a connector with the MCP URL and OAuth authentication. ChatGPT sends you here to sign in and approve.</p>
-      <p>Each shows on <a href="/tokens">Connections</a> under the app’s name, where you can revoke it.</p>
+      <p>Each shows on <a href="/connections">Connections</a> under the app’s name, where you can revoke it.</p>
       ${callout("info", CEILING)}</section>`;
     case "cursor": {
       const cursorConfig = { url, headers: { Authorization: "Bearer ${env:RELIQUARY_TOKEN}" } };
@@ -99,7 +109,7 @@ function clientSection(ctx: Ctx, client: Client): Raw {
         Buffer.from(JSON.stringify(cursorConfig)).toString("base64"),
       )}`;
       return html`<section id="cursor"><h2>Cursor</h2>
-      <p>Cursor can’t sign in, so it uses a token. <a href="/tokens/new">Create a token</a>, set it as <code>RELIQUARY_TOKEN</code> in the environment Cursor starts from, then <a href="${cursorLink}">add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:</p>
+      <p>Cursor can’t sign in, so it uses a token. <a href="/connections/new">Create a token</a>, set it as <code>RELIQUARY_TOKEN</code> in the environment Cursor starts from, then <a href="${cursorLink}">add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:</p>
       <pre class="code" tabindex="0">${cursorJson}</pre>
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}</section>`;
@@ -114,7 +124,7 @@ function clientSection(ctx: Ctx, client: Client): Raw {
         2,
       );
       return html`<section id="vscode"><h2>VS Code</h2>
-      <p>VS Code uses a token. <a href="/tokens/new">Create a token</a>, then add this to <code>.vscode/mcp.json</code>. VS Code asks for the token once and stores it securely.</p>
+      <p>VS Code uses a token. <a href="/connections/new">Create a token</a>, then add this to <code>.vscode/mcp.json</code>. VS Code asks for the token once and stores it securely.</p>
       <pre class="code" tabindex="0">${vscodeJson}</pre>
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}</section>`;
@@ -122,7 +132,7 @@ function clientSection(ctx: Ctx, client: Client): Raw {
     case "other": {
       const helper = JSON.stringify({ reliquary: { type: "http", url, headersHelper: "/path/to/reliquary/mcp/headers-helper.sh" } }, null, 2);
       return html`<section id="other"><h2>Other clients</h2>
-      <p>A client that supports MCP sign-in (OAuth) only needs the MCP URL: it sends you here to sign in and approve. Any other client that speaks Streamable HTTP uses a token: <a href="/tokens/new">create one</a> and send it in this header, read from wherever the client keeps secrets:</p>
+      <p>A client that supports MCP sign-in (OAuth) only needs the MCP URL: it sends you here to sign in and approve. Any other client that speaks Streamable HTTP uses a token: <a href="/connections/new">create one</a> and send it in this header, read from wherever the client keeps secrets:</p>
       <pre class="code" tabindex="0">Authorization: Bearer &lt;your token&gt;</pre>
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}
@@ -140,7 +150,7 @@ function clientSection(ctx: Ctx, client: Client): Raw {
       <pre class="code" tabindex="0">npx @reliquary-ai/cli env pull --env development</pre>
       <p>To add a project’s <code>.env</code> to the vault, send it; you apply it on the Variables page, where only names are shown. An agent can run this for you without ever seeing a value:</p>
       <pre class="code" tabindex="0">npx @reliquary-ai/cli env push --env development --file .env</pre>
-      <p class="small muted">Add <code>--vault &lt;name&gt;</code> if you belong to more than one vault. The CLI shows on <a href="/tokens">Connections</a> as Reliquary CLI; revoke it there. Set values on a vault’s Variables page.</p></section>`;
+      <p class="small muted">Add <code>--vault &lt;name&gt;</code> if you belong to more than one vault. The CLI shows on <a href="/connections">Connections</a> as Reliquary CLI; revoke it there. Set values on a vault’s Variables page.</p></section>`;
   }
 }
 
@@ -202,7 +212,7 @@ const lastUse = (t: Row) =>
 // Revoke link leads to a confirm page; scope can't be edited: revoke and
 // create another. A token is shown once, in createToken's answer only, and
 // never logged.
-export async function tokens(ctx: Ctx): Promise<Reply> {
+export async function connections(ctx: Ctx): Promise<Reply> {
   const rows = await asPerson(
     ctx.userId,
     async (c) => (await c.query(`${SELECT} order by t.created_at desc`)).rows as Row[],
@@ -226,14 +236,14 @@ export async function tokens(ctx: Ctx): Promise<Reply> {
       title: "Connections",
       description: "Everything that can act as you: tokens, apps you signed in to, and the Reliquary CLI.",
       secondary: html`<a class="button" href="/connect">How to connect</a>`,
-      primary: html`<a class="button primary" href="/tokens/new">New token</a>`,
+      primary: html`<a class="button primary" href="/connections/new">New token</a>`,
     })}
     ${live.length
       ? html`<div class="table-wrap"><table class="token-list table-stack">${head}<th>Expires</th><th class="num"><span class="sr-only">Actions</span></th></tr></thead><tbody>
     ${live.map(
       (t) => html`<tr>${cells(t)}
         <td data-label="Expires" class="small">${time(t.expires_at, { absolute: true })}</td>
-        <td class="num"><a class="button danger" href="/tokens/${t.id}/revoke" aria-label="Revoke ${t.name}">Revoke</a></td></tr>`,
+        <td class="num"><a class="button danger" href="/connections/${t.id}/revoke" aria-label="Revoke ${t.name}">Revoke</a></td></tr>`,
     )}</tbody></table></div>`
       : emptyState({
           title: "Nothing can act as you right now",
@@ -249,14 +259,14 @@ export async function tokens(ctx: Ctx): Promise<Reply> {
         <td data-label="Ended" class="small">${t.revoked_at ? html`Revoked ${time(t.revoked_at)}` : html`Expired ${time(t.expires_at)}`}</td></tr>`,
     )}</tbody></table></div></details>`
       : ""}`,
-    "tokens",
+    "connections",
   );
 }
 
 // ---------------------------------------------------------------------------
 // New token
 
-const newCrumb = [{ label: "Connections", href: "/tokens" }, { label: "New token" }];
+const newCrumb = [{ label: "Connections", href: "/connections" }, { label: "New token" }];
 
 export async function newToken(ctx: Ctx): Promise<Reply> {
   const vaults = await asPerson(
@@ -278,11 +288,11 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
       crumb: newCrumb,
       title: "New token",
       description: "A token lets one MCP client that can’t sign in, like Cursor, VS Code or a script, act as you.",
-      secondary: html`<a class="button quiet" href="/tokens">Cancel</a>`,
+      secondary: html`<a class="button quiet" href="/connections">Cancel</a>`,
       primary: html`<button class="primary" form="new-token">Create token</button>`,
     })}
     <p class="hint new-token-hint">Claude Code, Claude.ai and ChatGPT don’t need one: they sign in. See <a href="/connect">Connect</a>.</p>
-    <form method="post" action="/tokens/new" class="panel token-form" id="new-token">
+    <form method="post" action="/connections/new" class="panel token-form" id="new-token">
       ${csrfField(ctx.csrf)}
       <label for="tn">Name it after the agent and machine</label>
       <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100" autocomplete="off">
@@ -307,9 +317,9 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
         ${[7, 30, 90, 180, 366].map((d) => html`<option value="${d}"${d === 90 ? raw(" selected") : ""}>${d === 366 ? "1 year" : `${d} days`}</option>`)}
       </select>
       <p class="hint">A token’s vaults and access can’t be changed later. To change them, revoke it and create another.</p>
-      <div class="actions"><button class="primary">Create token</button><a class="button quiet" href="/tokens">Cancel</a></div>
+      <div class="actions"><button class="primary">Create token</button><a class="button quiet" href="/connections">Cancel</a></div>
     </form>`,
-    "tokens",
+    "connections",
   );
 }
 
@@ -323,7 +333,7 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
   const days = Number.parseInt(ctx.form.get("days") ?? "90", 10);
   if (some && ticked.length === 0) {
     ctx.setFlash("Tick at least one vault, or choose all your vaults.", "danger");
-    return { redirect: "/tokens/new" };
+    return { redirect: "/connections/new" };
   }
   if (!ticked.every((v) => UUID.test(v))) return notFound(ctx);
   let token: string;
@@ -342,7 +352,7 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
     );
   } catch (err) {
     ctx.setFlash(message(err));
-    return { redirect: "/tokens/new" };
+    return { redirect: "/connections/new" };
   }
   // The one time the token is shown: this answer only, never a redirect
   // (it would have to be stored), and no form here inviting a second one.
@@ -352,13 +362,13 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
     html`${pageHeader({
       crumb: newCrumb,
       title: "Copy your token",
-      primary: html`<a class="button primary" href="/tokens">Done</a>`,
+      primary: html`<a class="button primary" href="/connections">Done</a>`,
     })}
     <div class="callout warning reveal" role="status"><strong>${name}</strong>
       <p class="muted small">Copy it now. It won’t be shown again. Put it where your client reads secrets (an environment variable or a password prompt), never in a chat or a file an agent can read.</p>
       <p class="secret">${token}</p></div>
     <p>Next, set up the client: <a href="/connect?client=cursor">Cursor</a>, <a href="/connect?client=vscode">VS Code</a> or <a href="/connect?client=other">another client</a>.</p>`,
-    "tokens",
+    "connections",
   );
 }
 
@@ -383,14 +393,14 @@ export async function revokePage(ctx: Ctx, tid: string): Promise<Reply> {
   if (!t) return notFound(ctx);
   if (t.revoked_at || t.expired) {
     ctx.setFlash(`${t.name} ${t.revoked_at ? "was already revoked" : "has already expired"}: it can’t act as you.`);
-    return { redirect: "/tokens" };
+    return { redirect: "/connections" };
   }
   const who = t.kind === "pat" ? "Anything using it" : t.kind === "cli" ? "The CLI on that computer" : "The app";
   return render(
     ctx,
     `Revoke ${t.name}`,
     confirmPage({
-      crumb: [{ label: "Connections", href: "/tokens" }, { label: t.name }],
+      crumb: [{ label: "Connections", href: "/connections" }, { label: t.name }],
       title: `Revoke ${t.name}?`,
       lede: `${t.name} stops working on its next request.`,
       consequences: [
@@ -399,12 +409,12 @@ export async function revokePage(ctx: Ctx, tid: string): Promise<Reply> {
         again[t.kind] ?? again.pat,
         "What it already did stays in Activity. This can’t be undone.",
       ],
-      action: `/tokens/${t.id}/revoke`,
+      action: `/connections/${t.id}/revoke`,
       csrf: ctx.csrf,
       button: `Revoke ${t.name}`,
-      cancel: "/tokens",
+      cancel: "/connections",
     }),
-    "tokens",
+    "connections",
   );
 }
 
@@ -417,5 +427,5 @@ export async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
   } catch (err) {
     ctx.setFlash(message(err));
   }
-  return { redirect: "/tokens" };
+  return { redirect: "/connections" };
 }

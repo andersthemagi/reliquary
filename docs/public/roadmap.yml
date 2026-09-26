@@ -39,7 +39,7 @@
   version: 0.1.0
 
 - title: Scoped, expiring access tokens
-  summary: Tokens and connections limited to chosen vaults, read-only or read-write, always expiring.
+  summary: Connections limited to chosen vaults, read-only or read-write, always expiring.
   status: shipped
   milestone: M1
   docs: concepts/connections
@@ -119,7 +119,7 @@
   docs: concepts/templates
 
 - title: OS keychain for the CLI
-  summary: CLI sign-ins in the macOS Keychain, the Secret Service on Linux or DPAPI on Windows, else a file.
+  summary: The Reliquary CLI's connection kept in the macOS Keychain, the Secret Service on Linux or DPAPI on Windows, else a file.
   status: shipped
   milestone: M2
   docs: reference/cli
@@ -131,7 +131,7 @@
   docs: reference/cli
 
 - title: Rate limits on sign-in and MCP
-  summary: Limits per address, email, session, client, token and CLI sign-in on sign-in, OAuth, invites, MCP, the env API and forms.
+  summary: Limits per address, email, session, client, token and Reliquary CLI connection on sign-in, OAuth, invites, MCP, the env API and forms.
   status: shipped
   docs: reference/limits
 

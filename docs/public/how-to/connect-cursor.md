@@ -4,7 +4,7 @@ Cursor connects with an access token that it reads from an environment variable,
 
 ## Steps
 
-1. In Reliquary, open the **Connections** page (the account menu, **Tokens and connections**) and choose **New token**:
+1. In Reliquary, open the **Connections** page (the account menu, then **Connections**) and choose **New token**:
    - name it after the agent and machine, like `Cursor on my laptop`;
    - choose its vaults and **Read only** or **Read and write**;
    - choose when it expires (90 days is the default).

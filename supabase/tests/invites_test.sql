@@ -334,6 +334,27 @@ select t.expect('connections: an editor, an outsider, the owner''s agent and tok
   || ' ' || t.run_tok('ana', 'ana-all', format($q$select count(*)::text from public.member_connections(%L)$q$, t.id('team'))),
   'ERR 42501 ERR 42501 ERR 42501 ERR 42501');
 
+-- The message p_sql raises as p_user, in the words of the Connections page.
+create function t.conn_msg(p_user text, p_sql text) returns text
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  execute p_sql;
+  perform set_config('role', 'none', true);
+  return null;
+exception when others then
+  perform set_config('role', 'none', true);
+  return sqlstate || ' ' || sqlerrm;
+end $$;
+select t.expect('connections: a non-owner is told only owners see the connections members have',
+  t.conn_msg('fay', format('select count(*) from public.member_connections(%L)', t.id('team'))),
+  '42501 only owners see the connections members have to this vault');
+select t.expect('connections: a non-owner is told only owners revoke the connections members have',
+  t.conn_msg('fay', format('select public.revoke_member_connection(%L, %L)', t.id('team'), t.tok('ben-team'))),
+  '42501 only owners revoke the connections members have to this vault');
+
 create function t.tok_state(p_name text) returns text language sql as $$
   select case when revoked_at is not null then 'revoked'
               when all_vaults then 'all'

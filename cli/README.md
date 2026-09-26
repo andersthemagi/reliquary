@@ -1,7 +1,7 @@
 # @reliquary-ai/cli
 
-`reliquary`: a vault's environment variables on this computer. It signs in
-with your browser, then either runs one command with the variables in its
+`reliquary`: a vault's environment variables on this computer. `reliquary login`
+connects it to your account through your browser, then it either runs one command with the variables in its
 environment, or writes them to a `.env` that git ignores. Those are the only
 two ways a value leaves Reliquary for a machine (AGENTS.md, "Secrets never
 reach a model"); nothing here prints a value. It can also send a project's
@@ -13,7 +13,7 @@ The contract it implements is [docs/variables.md](../docs/variables.md)
 20 or later and its built-ins.
 
 ```bash
-npx @reliquary-ai/cli login                    # sign this computer in (once)
+npx @reliquary-ai/cli login                    # connect the CLI to your account (once)
 npx @reliquary-ai/cli run --vault Team -- npm run dev
 npx @reliquary-ai/cli env pull --vault Team --env preview
 npx @reliquary-ai/cli env push --vault Team --file .env --wait
@@ -25,9 +25,9 @@ Or install it once: `npm install -g @reliquary-ai/cli`, then `reliquary ...`.
 
 | Command | Does |
 |---|---|
-| `reliquary login [--no-browser]` | Opens the server's consent page (and prints the link, for a browser elsewhere). You choose which vaults the CLI may read; it can't read files or write anything. Waits 5 minutes, then lists the vaults and environments it can read. Signing in again revokes the previous sign-in on this computer |
-| `reliquary logout` | Revokes the sign-in on the server, then forgets it |
-| `reliquary vaults` | Each vault this sign-in reaches: id, name, your role, the environments you may read |
+| `reliquary login [--no-browser]` | Opens the server's consent page (and prints the link, for a browser elsewhere). You choose which vaults the CLI may read; it can't read files or write anything. Waits 5 minutes, then lists the vaults and environments it can read. Running it again revokes the previous connection on this computer |
+| `reliquary logout` | Revokes the connection on the server, then forgets it |
+| `reliquary vaults` | Each vault this connection reaches: id, name, your role, the environments you may read |
 | `reliquary run [--vault V] [--env E] -- <command> [args...]` | Fetches the environment and starts the command directly (no shell) with your environment plus the variables. stdio is inherited, SIGINT, SIGTERM, SIGHUP, SIGQUIT and SIGUSR2 are forwarded, and it exits with the command's code (128 + signal if it was killed; 127 if it wasn't found). Writes nothing to disk. If a variable replaces one you already had, it says so by name |
 | `reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]` | Writes the environment to the file (default `.env`), mode 600, one `NAME="value"` per line in name order (`\`, `"`, newline and carriage return escaped) under a header saying where it came from. Prints the names, never the values |
 | `reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]` | Sends the file's variables to the vault **for approval**: nothing is set until an owner or editor applies it on the vault's Variables page (it expires in 24 hours). Lines it can't take (bad or reserved names, empty values, an unclosed quote) are listed with their reasons and not sent. Prints the names, which are new and which replace a value, and the approval link (stdout); never a value. `--wait` exits 0 once it's applied, 1 if it's rejected or expires, 3 if the timeout comes first |
@@ -81,12 +81,12 @@ pending import. The link it prints opens the preview: names, new or replacing
 a value, never a value; Apply sets them (as you, logged per variable), Reject
 drops them.
 
-A push needs a sign-in that was allowed to push: the consent page's box "Also
-let it send .env files here", ticked by default. A sign-in without it is told
+A push needs a connection that was allowed to push: the consent page's box "Also
+let it send .env files here", ticked by default. A connection without it is told
 to log in again. Editors can't push production values; the CLI says so before
 sending anything.
 
-## Sign-in and where it's kept
+## Connecting, and where the connection is kept
 
 OAuth 2.1 against Reliquary's own authorization server: the authorization
 code grant with PKCE S256, a redirect to `http://127.0.0.1:<free port>/callback`
@@ -118,9 +118,9 @@ in `credentials.json` in your config directory: `RELIQUARY_CONFIG_DIR`, else
 `~/.config/reliquary`. The directory is 0700 and the file 0600, written
 atomically. `RELIQUARY_CREDENTIALS=file` forces the file;
 `RELIQUARY_CREDENTIALS=keychain` forces the keychain and fails if none
-answers. `reliquary login` says where the sign-in went.
+answers. `reliquary login` says where the connection went.
 
-A sign-in in `credentials.json` from before the keychain keeps working: a
+A connection in `credentials.json` from before the keychain keeps working: a
 server the keychain doesn't have is read from the file, and the next write
 for it (a refresh, a login, a logout) puts it in the keychain and takes it
 out of the file.
@@ -131,7 +131,7 @@ token is ever printed, logged, put in a URL, an argument (a keychain tool's
 included) or a child's environment, and nothing a keychain tool prints is
 shown, only its exit code.
 
-The sign-in shows on the web app's Tokens page as "Reliquary CLI"
+The connection shows on the web app's Connections page as "Reliquary CLI"
 (Environment variables). Revoke it there or with `reliquary logout`; either
 way the next command says to run `reliquary login` and forgets the stored
 tokens. Every read is in the vault's access log.
@@ -154,9 +154,9 @@ closing the console ends the command's whole process tree (`taskkill /T`).
 ## Errors
 
 Plain sentences on stderr, prefixed `reliquary:`, never a value, a token or
-a response body. 401: your sign-in was revoked or expired, run `reliquary
+a response body. 401: the connection was revoked or expired, run `reliquary
 login`. 403: your role can't read that environment. 404: no such vault or
-environment for this sign-in. 503: the server has no key for variables.
+environment for this connection. 503: the server has no key for variables.
 Exit codes: 1 for errors, 2 for usage, and `run` passes the command's own.
 
 ## Publishing
@@ -214,12 +214,12 @@ Postgres with every migration, the web app (built from a read-only copy of
 `web/`, with a `VARIABLES_KEY` made for the run) and the MCP server, then
 `node --test` in a `node:22` container (it has git) drives `dist/cli.js`:
 login through the consent form over HTTP with a signed-in session, refresh
-and concurrent refresh, revocation on the Tokens page, logout, the token
+and concurrent refresh, revocation on the Connections page, logout, the token
 refused at `/mcp`, `run` (hashes of values in the child, exit codes, SIGTERM,
 nothing on disk), and `env pull` (ignored, not ignored, tracked, outside a
 repository, symlink, modes, atomic and in-place), and `env push` (the
 approval link, the web UI applying and rejecting, `--wait` and its timeout, a
-sign-in without the push permission, an editor's production). Every value and
+connection without the push permission, an editor's production). Every value and
 token the tests see is recorded; none may appear in the CLI's output or
 either server's log. Registry rows F60 to F62, F67, F70 and F190 to F195 in
 [tests/features.md](../tests/features.md).

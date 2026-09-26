@@ -316,8 +316,8 @@ test("errors: the env API answers a failure with its code, what, where, why and 
   }
   const none = await (await fetch(`${server.origin}/api/env/vaults`)).json();
   assert.equal(none.error, "invalid_token");
-  assert.equal(none.where, "env API (sign-in)");
-  assert.match(none.message, /^Listing your vaults and environments failed: No live sign-in/);
+  assert.equal(none.where, "env API (connection)");
+  assert.match(none.message, /^Listing your vaults and environments failed: No live connection/);
   assert.match(none.ref, /^[0-9a-f]{8}$/);
 });
 

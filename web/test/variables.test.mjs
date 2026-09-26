@@ -409,12 +409,21 @@ test("cli oauth: the consent page is the CLI's: environment variables only, a lo
   const r = await get(`/oauth/authorize?${new URLSearchParams(cliParams())}`);
   assert.equal(r.status, 200);
   const h = await r.text();
-  assert.match(h, /Sign in the Reliquary CLI\?/);
+  assert.match(h, /Connect the Reliquary CLI\?/);
   assert.match(h, /reliquary login/);
   assert.match(h, /class="callout attention loopback-warning"/);
   assert.match(h, /name="vault" value="[0-9a-f-]{36}"> Env Team/);
   assert.doesNotMatch(h, /name="access"/);
   assert.match(r.headers.get("content-security-policy"), /form-action 'self' http:\/\/127\.0\.0\.1:53682/);
+});
+
+test("cli oauth: the consent page connects the Reliquary CLI, which shows on Connections, where it is revoked", async () => {
+  const h = await (await get(`/oauth/authorize?${new URLSearchParams(cliParams())}`)).text();
+  assert.match(h, /<title>Connect the Reliquary CLI/);
+  assert.match(h, /wants to connect to your account and read environment variables as you/);
+  assert.match(h, /It shows on your <a href="\/connections">Connections<\/a> page as Reliquary CLI, where you can revoke it any time\./);
+  assert.match(h, /To change its vaults later, revoke it and run <code>reliquary login<\/code> again\./);
+  assert.doesNotMatch(h, /Sign in the Reliquary CLI|Tokens<\/a> page|href="\/tokens/);
 });
 
 test("cli oauth: allow gives a code, and the token endpoint an rle_ access token and a refresh token", async () => {
@@ -552,12 +561,12 @@ test("env api: a CLI token is useless at the MCP endpoint (it resolves only for 
 test("env api: the grant is on the Tokens page, and revoking it there cuts the CLI off on its next request", async () => {
   const { body } = await cliLogin();
   assert.equal((await api("/vaults", body.access_token)).status, 200);
-  const h = await (await get("/tokens")).text();
+  const h = await (await get("/connections")).text();
   const rows = [...h.matchAll(/<tr><td>Reliquary CLI<\/td>([\s\S]*?)<\/tr>/g)];
   assert.ok(rows.length > 0);
   assert.match(rows[0][1], /Environment variables/);
   const [grant] = await sql("select id from public.access_tokens where user_id = $1 and kind = 'cli' and revoked_at is null order by last_used_at desc nulls last limit 1", [OLIVE]);
-  const r = await fetch(`${base}/tokens/${grant.id}/revoke`, {
+  const r = await fetch(`${base}/connections/${grant.id}/revoke`, {
     method: "POST",
     redirect: "manual",
     headers: { cookie, "content-type": "application/x-www-form-urlencoded", origin: base },

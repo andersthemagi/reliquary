@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRE_ALPHA, html, preAlphaNote, raw, type Raw, type Theme } from "./html.js";
 import { renderDocMarkdown } from "./markdown.js";
-import { siteOrigin, sitePage } from "./site.js";
+import { siteOrigin, sitePage, suggestFeatureHref } from "./site.js";
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "docs-build");
 
@@ -178,7 +178,7 @@ const ROADMAP_COLUMNS: [string, string][] = [
   ["planned", "Planned"],
   ["considering", "Considering"],
 ];
-const SUGGEST = `mailto:andres@redmage.cc?subject=${encodeURIComponent("Reliquary feature suggestion")}`;
+const SUGGEST = suggestFeatureHref();
 
 function roadmapPage(d: Docs, theme: Theme): string {
   const item = (it: RoadmapItem) => {

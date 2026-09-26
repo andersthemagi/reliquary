@@ -22,7 +22,7 @@ import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inboxInviteRoutes, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
 import { NO_LIMIT_COUNT, accountPage, myAdmission, myPlan, notAdmittedNote, type Plan } from "./plans.js";
-import { OPERATOR } from "./site.js";
+import { biggerPlanHref } from "./site.js";
 import { NOT_SNOOZED_SQL, postComment, snooze, snoozedList, snoozedSection, unsnooze } from "./thread.js";
 import { editView, fileAction, fileView, folder, newFile, vaultShell } from "./files.js";
 import {
@@ -286,7 +286,6 @@ async function newVault(ctx: Ctx): Promise<Reply> {
   const blocked = !admission.admitted || full;
   const asked = ctx.url.searchParams.get("refused") ?? "";
   const ref = blocked && REF.test(asked) ? asked : "";
-  const bigger = `mailto:${OPERATOR.contactEmail}?subject=${encodeURIComponent("Reliquary: a bigger plan")}`;
   // Where the page can't create a vault, it doesn't offer the form: it
   // says why, and the way on.
   const why = !admission.admitted
@@ -296,7 +295,7 @@ async function newVault(ctx: Ctx): Promise<Reply> {
         html`<p>You own ${plan.vaultsOwned} of the ${plan.maxVaults} ${vaultWord(plan.maxVaults)} the ${plan.planName} plan allows, so a new one can’t be created.</p>
           <p>To make room, delete a vault you no longer need from its <strong>Settings</strong>. For more vaults, ask the operator for a bigger plan: nothing is billed during the beta.</p>
           ${ref ? refusedLine(ref) : ""}
-          <p class="callout-actions"><a class="button" href="/account">Plan and usage</a><a class="button ghost" href="${bigger}">Ask for a bigger plan</a></p>`,
+          <p class="callout-actions"><a class="button" href="/account">Plan and usage</a><a class="button ghost" href="${biggerPlanHref()}">Ask for a bigger plan</a></p>`,
         { title: "You’re at your plan’s vault limit" },
       );
   return render(
@@ -553,7 +552,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (!get && p === "/settings/email") return changeEmail(ctx);
   if (p === "/settings/delete") return get ? deleteAccountPage(ctx) : deleteAccount(ctx);
   if (get && p === "/activity") return allActivity(ctx);
-  if (p === "/connect" || p === "/tokens" || p.startsWith("/tokens/")) return accessRoutes(ctx);
+  if (p === "/connect" || p === "/connections" || p.startsWith("/connections/")) return accessRoutes(ctx);
   if (get && p === "/account") return accountPage(ctx);
   if (get && p === "/vaults/new") return newVault(ctx);
   if (!get && p === "/vaults/new") return createVault(ctx);

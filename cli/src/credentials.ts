@@ -186,7 +186,7 @@ function account(server: string): string {
 const keychainError = (where: string, what: string, r: ExecResult) =>
   new CliError(
     `Couldn't ${what} ${where} (${r.failed ? "it didn't run" : `exit ${r.status}`}). ` +
-      "Unlock it and try again, or set RELIQUARY_CREDENTIALS=file to keep sign-ins in a file instead.",
+      "Unlock it and try again, or set RELIQUARY_CREDENTIALS=file to keep the connection in a file instead.",
   );
 
 // macOS: /usr/bin/security. Reading takes the account in arguments and
@@ -199,7 +199,7 @@ export function macosKeychain(exec: Exec = realExec, bin = "/usr/bin/security", 
     const r = exec(bin, ["find-generic-password", "-s", service, "-a", account(server), "-w"]);
     if (r.status === 0) return decodeCredential(r.stdout);
     if (r.status === 44) return null; // errSecItemNotFound
-    throw keychainError(where, "read your sign-in from", r);
+    throw keychainError(where, "read your connection from", r);
   };
   return {
     kind: "keychain",
@@ -208,14 +208,14 @@ export function macosKeychain(exec: Exec = realExec, bin = "/usr/bin/security", 
     set(server, c) {
       if (!c) {
         const r = exec(bin, ["delete-generic-password", "-s", service, "-a", account(server)]);
-        if (r.status !== 0 && r.status !== 44) throw keychainError(where, "remove your sign-in from", r);
+        if (r.status !== 0 && r.status !== 44) throw keychainError(where, "remove your connection from", r);
         return;
       }
       const secret = encodeCredential(c);
       const r = exec(bin, ["-i"], { input: `add-generic-password -U -s ${service} -a ${account(server)} -w ${secret}\n` });
       // `security -i` may exit 0 even when its command failed: read it back.
       const back = r.status === 0 ? find(server) : null;
-      if (!back || encodeCredential(back) !== secret) throw keychainError(where, "save your sign-in in", r);
+      if (!back || encodeCredential(back) !== secret) throw keychainError(where, "save your connection in", r);
     },
   };
 }
@@ -237,16 +237,16 @@ export function secretTool(exec: Exec = realExec, bin = "secret-tool", service =
       const r = exec(bin, ["lookup", "service", service, "account", account(server)]);
       if (r.status === 0) return decodeCredential(r.stdout);
       if (r.status === 1 && r.stdout === "" && r.stderr.trim() === "") return null;
-      throw keychainError(where, "read your sign-in from", r);
+      throw keychainError(where, "read your connection from", r);
     },
     set(server, c) {
       if (!c) {
         const r = exec(bin, ["clear", "service", service, "account", account(server)]);
-        if (r.status !== 0 && !(r.status === 1 && r.stderr.trim() === "")) throw keychainError(where, "remove your sign-in from", r);
+        if (r.status !== 0 && !(r.status === 1 && r.stderr.trim() === "")) throw keychainError(where, "remove your connection from", r);
         return;
       }
-      const r = exec(bin, ["store", `--label=Reliquary CLI sign-in for ${account(server)}`, "service", service, "account", account(server)], { input: encodeCredential(c) });
-      if (r.status !== 0) throw keychainError(where, "save your sign-in in", r);
+      const r = exec(bin, ["store", `--label=Reliquary CLI connection for ${account(server)}`, "service", service, "account", account(server)], { input: encodeCredential(c) });
+      if (r.status !== 0) throw keychainError(where, "save your connection in", r);
     },
   };
 }
@@ -287,7 +287,7 @@ export function windowsDpapi(exec: Exec = realExec, bin = windowsPowershell(), f
     if (!B64.test(data)) throw new CliError(`${file()} is damaged. Delete it and run \`reliquary login\` again.`);
     const r = exec(bin, powershellArgs(PS_UNPROTECT), { input: data });
     const out = r.stdout.trim();
-    if (r.status !== 0 || !B64.test(out)) throw keychainError(where, "decrypt your sign-ins in", r);
+    if (r.status !== 0 || !B64.test(out)) throw keychainError(where, "decrypt your connections in", r);
     return parseStore(Buffer.from(out, "base64").toString("utf8"), file());
   };
   return {
@@ -300,7 +300,7 @@ export function windowsDpapi(exec: Exec = realExec, bin = windowsPowershell(), f
       else delete store.servers[server];
       const r = exec(bin, powershellArgs(PS_PROTECT), { input: Buffer.from(JSON.stringify(store), "utf8").toString("base64") });
       const out = r.stdout.trim();
-      if (r.status !== 0 || !B64.test(out)) throw keychainError(where, "encrypt your sign-ins for", r);
+      if (r.status !== 0 || !B64.test(out)) throw keychainError(where, "encrypt your connections for", r);
       writeAtomic(file(), out + "\n");
     },
   };

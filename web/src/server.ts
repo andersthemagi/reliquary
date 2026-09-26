@@ -45,6 +45,7 @@ import { landing } from "./landing.js";
 import { publicRoute } from "./legal.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
+import { movedConnectionsPath } from "./access.js";
 import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
 import { inSession, pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
@@ -367,6 +368,13 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     if (host === "app" && readOnly && url.pathname !== "/" && isSitePath(url.pathname)) {
       res.writeHead(308, { location: crossHost("site", url.pathname, url.search), "cache-control": "no-store" }).end();
       console.info(`${req.method} ${url.pathname} 308 app->site`);
+      return;
+    }
+    // The Connections page's old URLs (/tokens/*): permanent, any method.
+    const moved = movedConnectionsPath(url.pathname);
+    if (moved) {
+      res.writeHead(308, { location: moved + url.search, "cache-control": "no-store" }).end();
+      console.info(`${req.method} ${url.pathname} 308 -> ${moved}`);
       return;
     }
     if (url.pathname === "/healthz") {

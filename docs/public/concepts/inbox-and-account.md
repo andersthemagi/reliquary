@@ -41,7 +41,7 @@ The account menu, at the right of the bar, shows who you're signed in as and lin
 
 - **Account settings** (`/settings`): your display name, your email address, the theme, sign out, sign out everywhere and delete account.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
-- **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Connections](connections.md).
+- **Connections** (`/connections`): everything that can act as you (tokens, apps and the Reliquary CLI), each with **Revoke**. See [Connections](connections.md).
 
 It also switches the theme (Auto, Light or Dark) and signs you out.
 
@@ -77,7 +77,7 @@ If the new address already belongs to another Reliquary account, the change is r
 
 **Sign out** on **Account settings** ends your session in this browser. **Sign out everywhere** ends every session of your account at once: in every browser and on every device, this one included. Use it if you signed in on a computer you no longer use, or lost a phone. Pages open elsewhere go to the sign-in page on their next click. Signing in again works right away.
 
-Connections are not sessions. Agent tokens, connected apps (Claude, ChatGPT, Cursor and others) and Reliquary CLI sign-ins keep working after you sign out everywhere, unless you tick **Also revoke all my connections**. That revokes every one of them at once; to revoke them one at a time, use **Tokens and connections**. See [Connections](connections.md).
+Connections are not sessions. Tokens, apps (Claude, ChatGPT, Cursor and others) and the Reliquary CLI keep working after you sign out everywhere, unless you tick **Also revoke all my connections**. That revokes every one of them at once; to revoke them one at a time, use **Connections**. See [Connections](connections.md).
 
 Only you can sign out everywhere, signed in to the web app. An agent can't do it for you. If Reliquary can't reach its sign-in service, nothing is ended and the page says so, with a reference (see [Errors](../reference/errors.md)).
 

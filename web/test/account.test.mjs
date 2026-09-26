@@ -140,9 +140,9 @@ test("sign out everywhere: Account settings offers it, says connections are sepa
   const h = await (await get("/settings", jar)).text();
   assert.match(h, /<h2 id="everywhere">Sign out everywhere<\/h2>/);
   assert.match(h, /in every browser and on every device, this one included/);
-  assert.match(h, /Connections are separate: agent tokens, connected apps \(Claude, ChatGPT, Cursor and others\) and Reliquary CLI sign-ins keep working after you sign out everywhere\. Revoke them all here, or one at a time on <a href="\/tokens">Tokens and connections<\/a>\./);
+  assert.match(h, /Connections are separate: tokens, apps \(Claude, ChatGPT, Cursor and others\) and the Reliquary CLI keep working after you sign out everywhere\. Revoke them all here, or one at a time on <a href="\/connections">Connections<\/a>\./);
   assert.match(h, /<form method="post" action="\/settings\/sign-out-everywhere" class="panel settings-form">\s*<input type="hidden" name="csrf" value="[0-9a-f]+">/);
-  assert.match(h, /<label class="choice"><input type="checkbox" name="revoke_connections" value="1"> Also revoke all my connections: agent tokens, connected apps and CLI sign-ins<\/label>/);
+  assert.match(h, /<label class="choice"><input type="checkbox" name="revoke_connections" value="1"> Also revoke all my connections: tokens, apps and the Reliquary CLI<\/label>/);
   assert.match(h, /<button class="danger">Sign out everywhere<\/button>/);
 });
 
@@ -158,7 +158,7 @@ test("sign out everywhere: every browser's session ends at once, this one includ
   assert.equal(r.status, 200);
   const h = await r.text();
   assert.match(h, /<h1>Signed out everywhere<\/h1>/);
-  assert.match(h, /Every session of your account has ended, in every browser, this one included\. Your connections \(agent tokens, connected apps and CLI sign-ins\) still work\. To end them, sign in and revoke them on Tokens and connections\. <a href="\/signin">Sign in<\/a> again\./);
+  assert.match(h, /Every session of your account has ended, in every browser, this one included\. Your connections \(tokens, apps and the Reliquary CLI\) still work\. To end them, sign in and revoke them on Connections\. <a href="\/signin">Sign in<\/a> again\./);
   assert.equal((await stats()).logoutGlobal, n + 1, "Supabase ended every session of the account");
   assert.ok(!here.c.has(AT) && !here.c.has(RT), "this browser's cookies are cleared");
   // The other browser's access token is still within its hour, but the
@@ -185,7 +185,7 @@ test("sign out everywhere: with Also revoke all my connections, every live conne
   const jar = await signIn("acct-tomas@example.test");
   const r = await post("/settings/sign-out-everywhere", { csrf: await settingsCsrf(jar), revoke_connections: "1" }, jar);
   assert.equal(r.status, 200);
-  assert.match(await r.text(), /All 2 of your connections were revoked too: agent tokens, connected apps and CLI sign-ins stop working now\./);
+  assert.match(await r.text(), /All 2 of your connections were revoked too: tokens, apps and the Reliquary CLI stop working now\./);
   assert.equal(await live(U.tomas), 0);
   assert.equal(await live(U.uma), 2);
 });
@@ -375,7 +375,7 @@ test("delete account: the confirm page says which vaults I leave, what goes and 
   const jar = await signIn("acct-wes@example.test");
   const h = await (await get("/settings/delete", jar)).text();
   assert.match(h, /<h1>Delete your account<\/h1>/);
-  assert.match(h, /This deletes your account now\. You leave one vault: <strong>Acct Shared<\/strong> \(owner\)\. 1 connection \(agent tokens, connected apps and CLI sign-ins\) is deleted and stops working\. This can’t be undone\./);
+  assert.match(h, /This deletes your account now\. You leave one vault: <strong>Acct Shared<\/strong> \(owner\)\. 1 connection \(tokens, apps and the Reliquary CLI\) is deleted and stops working\. This can’t be undone\./);
   assert.match(h, /What you wrote in vaults stays there: files, proposals, comments and the activity log belong to each vault and its owners\. It shows as written by a deleted account\./);
   assert.match(h, /You can sign up again later with the same address\. That is a new account: it has none of your vaults\./);
   assert.match(h, /<label for="confirm-typed">Type your email address, <strong>acct-wes@example\.test<\/strong>, to confirm<\/label>\s*<input id="confirm-typed" type="text" name="confirm_email" required/);

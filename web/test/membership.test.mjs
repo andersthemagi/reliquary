@@ -92,7 +92,7 @@ async function startAs(user) {
 
 const get = (who, path) => fetch(S[who].origin + path, { headers: { cookie: S[who].cookie }, redirect: "manual" });
 const page = async (who, path) => (await get(who, path)).text();
-const csrfOf = async (who) => /name="csrf" value="([0-9a-f]+)"/.exec(await page(who, "/tokens"))[1];
+const csrfOf = async (who) => /name="csrf" value="([0-9a-f]+)"/.exec(await page(who, "/connections"))[1];
 const post = async (who, path, fields) =>
   fetch(S[who].origin + path, {
     method: "POST",

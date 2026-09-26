@@ -21,7 +21,7 @@ const post = (path, pairs) =>
     headers: { cookie, "content-type": "application/x-www-form-urlencoded", origin: BASE },
     body: new URLSearchParams(pairs).toString(),
   });
-const csrf = async () => /name="csrf" value="([0-9a-f]+)"/.exec(await page("/tokens"))[1];
+const csrf = async () => /name="csrf" value="([0-9a-f]+)"/.exec(await page("/connections"))[1];
 const follow = async (r) => page(r.headers.get("location"));
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -33,7 +33,7 @@ function row(h, name) {
 
 async function create(fields) {
   const token = await csrf();
-  return post("/tokens/new", [["csrf", token], ...fields]);
+  return post("/connections/new", [["csrf", token], ...fields]);
 }
 
 before(async () => {
@@ -42,7 +42,7 @@ before(async () => {
 });
 
 test("form: name, my vaults to tick, read or read-write, and a required expiry", async () => {
-  const h = await page("/tokens/new");
+  const h = await page("/connections/new");
   assert.match(h, /name="scope" value="all" checked/);
   assert.match(h, new RegExp(`type="checkbox" name="vault" value="${TEAM_VAULT}"> Team`));
   assert.doesNotMatch(h, /Dee private/);
@@ -57,7 +57,7 @@ test("create: a read-only token for one vault, shown once", async () => {
   const r = await create([["name", "Scoped reader"], ["scope", "some"], ["vault", TEAM_VAULT], ["access", "read"], ["days", "30"]]);
   const made = await r.text();
   assert.match(made, /<p class="secret">rlq_[0-9a-f]{64}<\/p>/);
-  const h = await page("/tokens");
+  const h = await page("/connections");
   assert.doesNotMatch(h, /rlq_[0-9a-f]{64}/);
   const tr = row(h, "Scoped reader");
   assert.match(tr, /<td data-label="Vaults" class="small">Team<\/td>/);
@@ -70,21 +70,21 @@ test("create: a read-only token for one vault, shown once", async () => {
 
 test("create: read and write, all vaults", async () => {
   await create([["name", "Everywhere writer"], ["scope", "all"], ["access", "write"], ["days", "7"]]);
-  const tr = row(await page("/tokens"), "Everywhere writer");
+  const tr = row(await page("/connections"), "Everywhere writer");
   assert.match(tr, /All your vaults/);
   assert.match(tr, /Read and write/);
 });
 
 test("create: a ticked vault narrows the token even if 'all' is still selected", async () => {
   await create([["name", "Mixed signals"], ["scope", "all"], ["vault", TEAM_VAULT], ["access", "read"], ["days", "30"]]);
-  const tr = row(await page("/tokens"), "Mixed signals");
+  const tr = row(await page("/connections"), "Mixed signals");
   assert.match(tr, /<td data-label="Vaults" class="small">Team<\/td>/);
   assert.doesNotMatch(tr, /All your vaults/);
 });
 
 test("create: an unknown access level becomes read-only, never read-write", async () => {
   await create([["name", "Odd access"], ["scope", "all"], ["access", "admin"], ["days", "30"]]);
-  assert.match(row(await page("/tokens"), "Odd access"), /Read only/);
+  assert.match(row(await page("/connections"), "Odd access"), /Read only/);
 });
 
 test("create: refused without a vault, for someone else's vault, or past a year", async () => {
@@ -100,20 +100,20 @@ test("create: refused without a vault, for someone else's vault, or past a year"
   assert.match(long, /Tokens last 1 to 366 days\./);
   const never = await follow(await create([["name", "Never ends"], ["scope", "all"], ["access", "read"], ["days", "never"]]));
   assert.match(never, /Tokens last 1 to 366 days\./);
-  assert.doesNotMatch(await page("/tokens"), /<td>(Too long|Never ends)<\/td>/);
+  assert.doesNotMatch(await page("/connections"), /<td>(Too long|Never ends)<\/td>/);
 
   assert.equal((await create([["name", "Bad id"], ["scope", "some"], ["vault", "not-a-uuid"], ["access", "read"]])).status, 404);
 });
 
 test("list: last use and the client name, escaped", async () => {
-  const tr = row(await page("/tokens"), "Seeded reader");
+  const tr = row(await page("/connections"), "Seeded reader");
   assert.match(tr, /2 h ago/);
   assert.match(tr, /from Cursor &lt;img src=x onerror=alert\(3\)&gt;/);
   assert.doesNotMatch(tr, /<img/);
 });
 
 test("list: an expired token says so and has nothing to revoke", async () => {
-  const h = await page("/tokens");
+  const h = await page("/connections");
   assert.match(h, /<tr class="inactive"><td>Seeded expired<\/td>/);
   const tr = row(h, "Seeded expired");
   assert.match(tr, /Expired/);
@@ -123,16 +123,16 @@ test("list: an expired token says so and has nothing to revoke", async () => {
 test("list: a vault the person has left drops out of the token's scope", async () => {
   // Leaving narrows the token for good (20260925180000_member_tokens.sql),
   // so the vault is neither named nor counted.
-  const tr = row(await page("/tokens"), "Seeded left");
+  const tr = row(await page("/connections"), "Seeded left");
   assert.match(tr, /Team/);
   assert.doesNotMatch(tr, /no longer belong/);
   assert.doesNotMatch(tr, /Dee private/);
 });
 
 test("revoke: a scoped token is revoked like any other", async () => {
-  const h = await page("/tokens");
-  const id = new RegExp(`<td>Scoped reader</td>[\\s\\S]*?href="/tokens/([0-9a-f-]{36})/revoke"`).exec(h)[1];
-  const r = await post(`/tokens/${id}/revoke`, [["csrf", await csrf()]]);
+  const h = await page("/connections");
+  const id = new RegExp(`<td>Scoped reader</td>[\\s\\S]*?href="/connections/([0-9a-f-]{36})/revoke"`).exec(h)[1];
+  const r = await post(`/connections/${id}/revoke`, [["csrf", await csrf()]]);
   assert.match(await follow(r), /Revoked Scoped reader\./);
-  assert.match(row(await page("/tokens"), "Scoped reader"), /Revoked/);
+  assert.match(row(await page("/connections"), "Scoped reader"), /Revoked/);
 });

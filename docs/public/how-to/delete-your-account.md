@@ -22,7 +22,7 @@ You're signed out everywhere at once, and the page confirms what was deleted.
 Deleted at once:
 
 - your memberships: you leave every vault, and each vault's activity log records that you left;
-- your connections: agent tokens, connected apps (Claude, ChatGPT, Cursor and others) and Reliquary CLI sign-ins;
+- your connections: tokens, apps (Claude, ChatGPT, Cursor and others) and the Reliquary CLI;
 - invites you made that are still waiting, which are withdrawn;
 - your email address, display name, plan, and your sign-in account itself;
 - `.env` files you pasted on a Variables page and didn't apply.

@@ -66,7 +66,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
     "/account": "Opening Plan and usage",
     "/activity": "Opening Activity",
     "/connect": "Opening Connect",
-    "/tokens": "Opening Tokens",
+    "/connections": "Opening Connections",
     "/vaults/new": "Opening New vault",
     "/signin": "Signing in",
     "/signin/code": "Signing in with a code",
@@ -82,8 +82,8 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (p === "/settings/email") return say("Changing your email address");
   if (p === "/settings/delete") return say(get ? "Opening Delete account" : "Deleting your account");
   if (p === "/vaults/new") return say(`Creating vault ${typed(form.get("name")) || "(no name)"}`.trim());
-  if (p === "/tokens/new") return say("Creating an agent token");
-  if (/^\/tokens\/[^/]+\/revoke$/.test(p)) return say("Revoking an agent token");
+  if (p === "/connections/new") return say("Creating a token");
+  if (/^\/connections\/[^/]+\/revoke$/.test(p)) return say("Revoking a connection");
   if (p === "/oauth/authorize") return say(get ? "Connecting an app (the consent page)" : "Connecting an app");
   if (p === "/invite") return say(get ? "Opening an invite" : "Accepting an invite");
   const m = /^\/v\/([^/]+)(\/.*)?$/.exec(p);

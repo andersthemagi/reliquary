@@ -38,11 +38,11 @@ What your plan and a vault's tier allow. How they count, and what happens at a l
 
 Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
 
-## Tokens, connections and sign-in
+## Connections and sign-in
 
 | What | Limit |
 |---|---|
-| Access token lifetime | 7, 30, 90 or 180 days, or 1 year |
+| Token lifetime | 7, 30, 90 or 180 days, or 1 year |
 | OAuth and CLI access tokens | 1 hour, refreshed by the client |
 | OAuth and CLI refresh tokens | 30 days, renewed on each use, never beyond a year from consent |
 | An OAuth authorization code | one use, within 60 seconds |
@@ -99,7 +99,7 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 | Fetching an app's client metadata | 20 every 10 minutes per app host |
 | MCP tool calls | 120 a minute and 10000 a day per token or connection; a batch counts each call; listing tools and starting a session don't count |
 | MCP requests without a valid token | 30 a minute per IP address |
-| The env API (the CLI) | 60 a minute and 5000 a day per CLI sign-in |
+| The env API (the CLI) | 60 a minute and 5000 a day per Reliquary CLI connection |
 
 "Per app" counts every person's use of one app together (one client id). "Per token or connection" counts a personal token, or an OAuth connection across its hourly access tokens.
 

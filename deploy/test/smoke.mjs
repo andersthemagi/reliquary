@@ -145,8 +145,8 @@ try {
   });
 
   await step("the owner makes a read-write token for that vault", async () => {
-    const csrf = field(await (await get("/tokens")).text(), "csrf");
-    const r = await post("/tokens/new", { csrf, name: "Smoke agent", scope: "some", vault: vaultId, access: "write", days: "1" });
+    const csrf = field(await (await get("/connections")).text(), "csrf");
+    const r = await post("/connections/new", { csrf, name: "Smoke agent", scope: "some", vault: vaultId, access: "write", days: "1" });
     const h = await r.text();
     token = /<p class="secret">(rlq_[0-9a-f]{64})<\/p>/.exec(h)?.[1] ?? "";
     check(token, `no token on the page (HTTP ${r.status})`);
