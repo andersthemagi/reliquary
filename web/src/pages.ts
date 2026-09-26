@@ -7,7 +7,7 @@ import type pg from "pg";
 import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
-import { csrfField, emptyState, html, page, pageHeader, type Nav, type Raw, type Shell, type Theme } from "./html.js";
+import { callout, csrfField, emptyState, html, page, pageHeader, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
 import { accountSettings, saveDisplayName } from "./settings.js";
@@ -20,7 +20,8 @@ import { pendingPushes } from "./variables.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
-import { accountPage, myAdmission, myPlan, notAdmittedNote, planLine } from "./plans.js";
+import { NO_LIMIT_COUNT, accountPage, myAdmission, myPlan, notAdmittedNote, type Plan } from "./plans.js";
+import { OPERATOR } from "./site.js";
 import { NOT_SNOOZED_SQL, postComment, snooze, snoozedList, snoozedSection, unsnooze } from "./thread.js";
 import { editView, fileAction, fileView, folder, newFile, vaultShell } from "./files.js";
 import {
@@ -178,39 +179,59 @@ const waitingSql = (order: string, limit?: number) =>
 // ---------------------------------------------------------------------------
 // Home and Review
 
+// "You own 2 of 5 vaults on the Free plan": the vaults counted against the
+// plan are the ones the person created (plans.ts, myPlan).
+const vaultWord = (n: number) => (n === 1 ? "vault" : "vaults");
+const planFull = (p: Plan) => p.vaultsOwned >= p.maxVaults;
+function ownedLine(p: Plan): string {
+  if (p.maxVaults >= NO_LIMIT_COUNT) return `You own ${p.vaultsOwned} ${vaultWord(p.vaultsOwned)} on the ${p.planName} plan, which has no limit`;
+  return `You own ${p.vaultsOwned} of ${p.maxVaults} ${vaultWord(p.maxVaults)} on the ${p.planName} plan`;
+}
+const ROLE_LABEL: Record<string, string> = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
+
 async function home(ctx: Ctx): Promise<Reply> {
   const waitingCount = ctx.reviewCount ?? 0;
   const counts = ctx.shell?.counts;
   const { vaults, waiting, plan, gone } = await asPerson(ctx.userId, async (c) => ({
     plan: await myPlan(c),
+    // Each vault with what a person compares across them: their role, its
+    // files, the proposals open in it, and when anything last happened
+    // there (its newest log row, from the log's (vault_id, seq) key), most
+    // recently active first.
     vaults: (
       await c.query(
         `select v.id, v.name, m.role,
-                (select count(*) from public.files f where f.vault_id = v.id and f.deleted_at is null)::int as files
+                (select count(*) from public.files f where f.vault_id = v.id and f.deleted_at is null)::int as files,
+                (select count(*) from public.proposals p where p.vault_id = v.id and p.status = 'open')::int as open,
+                coalesce((select l.at from public.log l where l.vault_id = v.id order by l.seq desc limit 1), v.created_at) as updated
            from public.vaults v
            join public.vault_members m on m.vault_id = v.id and m.user_id = $1
-          order by v.name`,
+          order by updated desc, v.name`,
         [ctx.userId],
       )
-    ).rows,
+    ).rows as { id: string; name: string; role: string; files: number; open: number; updated: Date }[],
     // Asked only when the top bar's count says something waits, or there
     // are notices to show (and so take).
     waiting: waitingCount > 0 ? (await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows : [],
     gone: (counts?.notices ?? 1) > 0 ? await deletionNotices(c) : html``,
   }));
   const invites = counts?.invites ?? 0;
+  const full = planFull(plan);
   // One primary per page: New vault. Review, when something waits, sits
-  // before it as a secondary button. A section with nothing in it isn't
-  // shown: what needs the person is in the inbox.
+  // before it as a secondary button. At the plan's limit New vault is a
+  // secondary button: it leads to the page that says why and what to do.
+  // A section with nothing in it isn't shown: what needs the person is in
+  // the inbox. The title is the nav item's name, Home.
   return render(
     ctx,
     "Home",
     html`${pageHeader({
-      title: "Reliquary",
-      actions: html`${waitingCount > 0 ? html`<a class="button" href="/inbox">Review ${waitingCount} waiting</a>` : ""}
-        <a class="button primary" href="/vaults/new">New vault</a>`,
+      title: "Home",
+      description: "Shared context your agents read and propose to. Changes to canon files wait for your approval.",
+      meta: html`<p class="meta plan-line"><span>${ownedLine(plan)}${full ? html` <span class="badge warning">At the limit</span>` : ""}</span><span><a href="/account">Plan and usage</a></span></p>`,
+      secondary: waitingCount > 0 ? html`<a class="button" href="/inbox">Review ${waitingCount} waiting</a>` : "",
+      primary: full ? html`<a class="button" href="/vaults/new">New vault</a>` : html`<a class="button primary" href="/vaults/new">New vault</a>`,
     })}
-    <p class="lede">Shared context your agents read and propose to. Changes to canon files wait for your approval.</p>
     ${gone}
     ${waiting.length
       ? html`<h2>Needs your review</h2>
@@ -218,7 +239,6 @@ async function home(ctx: Ctx): Promise<Reply> {
         ${waitingCount > waiting.length ? html`<p class="small"><a href="/inbox">All ${waitingCount} waiting</a></p>` : ""}`
       : ""}
     <h2>Your vaults</h2>
-    <p class="small muted plan-line"><a href="/account">${planLine(plan)}</a></p>
     ${vaults.length === 0
       ? html`<div class="empty first-vault"><strong>Create your first vault.</strong>
           <p>A vault holds the files you and your agents share: notes, briefs, decisions. You choose which of them are canon, so an agent can only propose changes and you approve them.</p>
@@ -226,12 +246,19 @@ async function home(ctx: Ctx): Promise<Reply> {
           <p><a class="button" href="/vaults/new">Create your first vault</a></p>
           <p class="small">Joining someone else’s vault? Open the invite link they sent you. It works once you’re signed in with the address it was sent to.${
             invites ? html` You have ${invites === 1 ? "an invite" : `${invites} invites`} waiting: <a href="/inbox#invites">see your inbox</a>.` : ""}</p></div>`
-      : html`<ul class="rows">${vaults.map(
-          (v) => html`<li>
-            <span><a class="name" href="${vaultPath(v.id)}">${v.name}</a>
-              <span class="muted small"> · ${v.role} · ${v.files} ${v.files === 1 ? "file" : "files"}</span></span>
-          </li>`,
-        )}</ul>`}`,
+      : html`<div class="table-wrap"><table class="vault-list table-stack">
+        <thead><tr><th>Name</th><th>Your role</th><th class="num">Files</th><th class="num">Open proposals</th><th>Updated</th></tr></thead>
+        <tbody>${vaults.map(
+          (v) => html`<tr>
+            <td data-label="Name" class="vault-name"><a href="${vaultPath(v.id)}">${v.name}</a></td>
+            <td data-label="Your role">${ROLE_LABEL[v.role] ?? v.role}</td>
+            <td data-label="Files" class="num">${v.files}</td>
+            <td data-label="Open proposals" class="num">${v.open
+              ? html`<a href="${vaultPath(v.id, "/proposals")}" aria-label="${v.open} open ${v.open === 1 ? "proposal" : "proposals"} in ${v.name}">${v.open}</a>`
+              : html`<span class="muted">0</span>`}</td>
+            <td data-label="Updated">${time(v.updated)}</td>
+          </tr>`,
+        )}</tbody></table></div>`}`,
     "home",
   );
 }
@@ -241,42 +268,82 @@ async function home(ctx: Ctx): Promise<Reply> {
 // agent through an all-vaults read-write token); here it is always the
 // person. They become its owner.
 
+// A refused create that the page explains on its own (the plan's vault
+// limit, RLP01; not admitted, RLP02) comes back as ?refused=<ref>, not as a
+// flash, so the reason is said once, with the reference beside it.
+const REF = /^[0-9a-f]{8}$/;
+const refusedLine = (ref: string) =>
+  html`<p class="small refused-ref">Your vault wasn’t created, for this reason (ref <code>${ref}</code>).</p>`;
+
 async function newVault(ctx: Ctx): Promise<Reply> {
   const { plan, admission } = await asPerson(ctx.userId, async (c) => ({ plan: await myPlan(c), admission: await myAdmission(c) }));
-  const full = plan.vaultsOwned >= plan.maxVaults;
+  const full = planFull(plan);
+  const blocked = !admission.admitted || full;
+  const asked = ctx.url.searchParams.get("refused") ?? "";
+  const ref = blocked && REF.test(asked) ? asked : "";
+  const bigger = `mailto:${OPERATOR.contactEmail}?subject=${encodeURIComponent("Reliquary: a bigger plan")}`;
+  // Where the page can't create a vault, it doesn't offer the form: it
+  // says why, and the way on.
+  const why = !admission.admitted
+    ? html`${notAdmittedNote()}${ref ? refusedLine(ref) : ""}`
+    : callout(
+        "warning",
+        html`<p>You own ${plan.vaultsOwned} of the ${plan.maxVaults} ${vaultWord(plan.maxVaults)} the ${plan.planName} plan allows, so a new one can’t be created.</p>
+          <p>To make room, delete a vault you no longer need from its <strong>Settings</strong>. For more vaults, ask the operator for a bigger plan: nothing is billed during the beta.</p>
+          ${ref ? refusedLine(ref) : ""}
+          <p class="callout-actions"><a class="button" href="/account">Plan and usage</a><a class="button ghost" href="${bigger}">Ask for a bigger plan</a></p>`,
+        { title: "You’re at your plan’s vault limit" },
+      );
   return render(
     ctx,
     "New vault",
     html`${pageHeader({
-      crumb: html`<p class="crumb"><a href="/">Vaults</a></p>`,
+      crumb: [{ label: "Home", href: "/" }, { label: "New vault" }],
       title: "New vault",
-      actions: html`<a class="button quiet" href="/">Cancel</a>
-        <button class="primary" form="new-vault">Create vault</button>`,
+      description: "A vault holds the files you and your agents share. You’ll be its owner: you add members and set its rules.",
+      secondary: blocked ? html`<a class="button ghost" href="/">Back to Home</a>` : html`<a class="button ghost" href="/">Cancel</a>`,
+      primary: blocked ? "" : html`<button class="primary" form="new-vault">Create vault</button>`,
     })}
-    <p class="lede">A vault holds the files you and your agents share. You’ll be its owner: you add members and set its rules.</p>
-    ${!admission.admitted
-      ? notAdmittedNote()
-      : full
-      ? html`<p class="callout attention" role="status">You own ${plan.vaultsOwned} of the ${plan.maxVaults} vaults the ${plan.planName} plan allows, so a new one can’t be created. Delete a vault you no longer need first. <a href="/account">Plan and usage</a></p>`
-      : html`<p class="small muted plan-line">${planLine(plan)}. <a href="/account">Plan and usage</a></p>`}
-    <form method="post" action="/vaults/new" class="panel choice-form" id="new-vault">
+    ${blocked
+      ? why
+      : html`<p class="small muted plan-line">${ownedLine(plan)}. <a href="/account">Plan and usage</a></p>
+    <form method="post" action="/vaults/new" class="panel choice-form new-vault-form" id="new-vault">
       ${csrfField(ctx.csrf)}
       <label for="vn">Name</label>
       <input id="vn" type="text" name="name" placeholder="Client work" required maxlength="100">
       ${templateChoices()}
-      <fieldset>
-        <legend>Default policy</legend>
-        <label class="choice"><input type="radio" name="default_policy" value="open" checked>
-          <span><strong>Open:</strong> members and their agents write files directly. Every change is logged.</span></label>
-        <label class="choice"><input type="radio" name="default_policy" value="canon">
-          <span><strong>Canon:</strong> every change is a proposal that people approve before it applies.</span></label>
-        <p class="hint">This is what a file is unless a rule says otherwise. You can make folders or files canon or open later, on the vault’s Rules page.</p>
+      <fieldset class="choice-cards policy-cards" aria-describedby="policy-hint">
+        <legend>Files without a rule are</legend>
+        <p class="hint" id="policy-hint">Templates set rules for their folders; this applies to everything else, like the README at the top. You can change it later on the vault’s Settings, or per folder on Rules.</p>
+        <div class="choice-card-grid">
+          <label class="choice-card"><input type="radio" name="default_policy" value="open" checked>
+            <span class="choice-card-body"><span class="choice-card-title">Open</span>
+            <span class="choice-card-text">Members and their agents write directly. Every change is logged.</span></span></label>
+          <label class="choice-card"><input type="radio" name="default_policy" value="canon">
+            <span class="choice-card-body"><span class="choice-card-title">Canon</span>
+            <span class="choice-card-text">Every change is a proposal a person approves before it applies.</span></span></label>
+        </div>
       </fieldset>
       <div class="actions"><button class="primary">Create vault</button>
-        <a class="button quiet" href="/">Cancel</a></div>
-    </form>`,
+        <a class="button ghost" href="/">Cancel</a></div>
+    </form>`}`,
     "vaults",
   );
+}
+
+// The refusals New vault explains by itself, when it next shows: the plan's
+// vault limit (RLP01 with limit "vaults"; a template's files can meet a
+// storage limit, also RLP01, which the page wouldn't explain) and not
+// admitted (RLP02).
+function explainedByPage(err: unknown): boolean {
+  const e = err as { code?: string; detail?: string };
+  if (e?.code === "RLP02") return true;
+  if (e?.code !== "RLP01") return false;
+  try {
+    return (JSON.parse(e.detail ?? "{}") as { limit?: string }).limit === "vaults";
+  } catch {
+    return false;
+  }
 }
 
 async function createVault(ctx: Ctx): Promise<Reply> {
@@ -296,10 +363,15 @@ async function createVault(ctx: Ctx): Promise<Reply> {
       template.files.length
         ? `Created ${name} from the ${template.name} template. You’re its owner. Start with README.md.`
         : `Created ${name}. You’re its owner. Add files, or connect an agent to it.`,
+      "success",
     );
     return { redirect: vaultPath(id) };
   } catch (err) {
-    ctx.setFlash(message(err));
+    // message() logs the refusal with its ref either way.
+    const text = message(err);
+    const ref = /\(ref ([0-9a-f]{8})\)/.exec(text)?.[1];
+    if (ref && explainedByPage(err)) return { redirect: `/vaults/new?refused=${ref}` };
+    ctx.setFlash(text);
     return { redirect: "/vaults/new" };
   }
 }

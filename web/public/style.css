@@ -1548,4 +1548,46 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
   .rules-table td:nth-child(2), .rules-table .rule-actions { width: auto; }
   .rules-table .rule-actions { text-align: left; }
   .rules-table .rule-actions .action-list { min-width: 0; width: min(16rem, calc(100vw - 2 * var(--space-5))); left: 0; right: auto; }
+
+/* Package H: home and new vault */
+/* Home (pages.ts home()): the plan line under the title, the badge beside
+   the count when the plan is full. */
+.plan-line .badge { margin-left: var(--space-2); }
+/* The vault table: the name leads (and heads each block on a phone); the
+   counts line up on the right; role and time never wrap. */
+.vault-list td.vault-name { font-weight: 500; min-width: 10rem; overflow-wrap: anywhere; }
+.vault-list td.num, .vault-list th.num { width: 1%; white-space: nowrap; }
+.vault-list td[data-label="Your role"], .vault-list td[data-label="Updated"] { white-space: nowrap; }
+/* New vault (pages.ts newVault(), templates.ts templateChoices()): the
+   template and the default policy as cards. The radio sits inside the
+   label, so the whole card picks it; the checked card is outlined in the
+   brand colour, so the choice never rests on the small radio alone. */
+.new-vault-form .choice-cards > .hint { margin: 0 0 var(--space-3); max-width: var(--measure); }
+.choice-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-3); }
+label.choice-card {
+  display: flex; align-items: flex-start; gap: var(--space-3); margin: 0; min-width: 0;
+  padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg);
+  font-weight: 400; font-size: var(--text-sm); line-height: var(--lh-sm); cursor: pointer;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out, box-shadow 120ms ease-out;
+}
+label.choice-card:hover { border-color: var(--border-strong); background: var(--bg-subtle); }
+label.choice-card:has(input:checked) { border-color: var(--brand-strong); box-shadow: inset 0 0 0 1px var(--brand-strong); background: var(--bg-subtle); }
+label.choice-card:has(input:focus-visible) { outline: 2px solid var(--link); outline-offset: 2px; }
+label.choice-card input { flex: none; margin-top: 2px; }
+label.choice-card input:focus-visible { outline: none; }
+.choice-card-body { display: grid; gap: var(--space-1); min-width: 0; }
+.choice-card-title { font-weight: 600; font-size: var(--text-md); line-height: var(--lh-md); color: var(--fg); }
+.choice-card-text { color: var(--fg-muted); }
+.choice-card-rules, .choice-card-vars { color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); }
+.choice-card-rules { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); margin-top: var(--space-1); }
+.choice-card code { font-size: inherit; padding: 0 3px; }
+/* At the vault limit: the callout is the page, its way on as buttons. */
+.callout-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0 0; }
+.refused-ref { color: var(--fg-muted); }
+@media (max-width: 640px) {
+  .choice-card-grid { grid-template-columns: minmax(0, 1fr); }
+  .vault-list td.num, .vault-list th.num { width: auto; }
+  /* On a phone the name heads its block, without a label. */
+  .table-stack td.vault-name { grid-template-columns: minmax(0, 1fr); font-size: var(--text-md); line-height: var(--lh-md); }
+  .table-stack td.vault-name::before { content: none; }
 }

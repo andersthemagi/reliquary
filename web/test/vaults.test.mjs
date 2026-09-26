@@ -30,6 +30,10 @@ const post = (path, fields, headers = {}, base = BASE, c = cookie, origin = BASE
   });
 const csrfOf = (h) => /name="csrf" value="([0-9a-f]+)"/.exec(h)[1];
 const header = (h) => /<div class="page-head">[\s\S]*?<\/div>\s*<\/div>/.exec(h)[0];
+// Home's vault table, and the row of the vault named `name` in it.
+const vaultRows = (h) => [...h.matchAll(/<tr>\s*<td data-label="Name" class="vault-name">[\s\S]*?<\/tr>/g)].map((m) => m[0]);
+const rowNamed = (h, name) => vaultRows(h).find((r) => r.includes(`>${name}</a>`)) ?? "";
+const ownerRows = (h) => vaultRows(h).filter((r) => r.includes('data-label="Your role">Owner<')).length;
 // Eve, on the supabase-mode instance A. Her cookies follow Set-Cookie (a
 // notice after a form is a cookie there), starting from a minted session.
 const eveJar = new Map();
@@ -69,11 +73,12 @@ test("new vault: a name, and open or canon, each explained in a line", async () 
   const h = await page("/vaults/new");
   assert.match(h, /<h1>New vault<\/h1>/);
   assert.match(h, /<button class="primary" form="new-vault">Create vault<\/button>/);
-  assert.match(h, /<form method="post" action="\/vaults\/new" class="panel choice-form" id="new-vault">/);
+  assert.match(h, /<form method="post" action="\/vaults\/new" class="panel choice-form new-vault-form" id="new-vault">/);
   assert.match(h, /name="csrf" value="[0-9a-f]+"/);
   assert.match(h, /<input id="vn" type="text" name="name"[^>]* required maxlength="100">/);
-  assert.match(h, /name="default_policy" value="open" checked>\s*<span><strong>Open:<\/strong> [^<]+\.<\/span>/);
-  assert.match(h, /name="default_policy" value="canon">\s*<span><strong>Canon:<\/strong> [^<]+\.<\/span>/);
+  assert.match(h, /<legend>Files without a rule are<\/legend>/);
+  assert.match(h, /name="default_policy" value="open" checked>\s*<span class="choice-card-body"><span class="choice-card-title">Open<\/span>\s*<span class="choice-card-text">[^<]+\.<\/span>/);
+  assert.match(h, /name="default_policy" value="canon">\s*<span class="choice-card-body"><span class="choice-card-title">Canon<\/span>\s*<span class="choice-card-text">[^<]+\.<\/span>/);
   assert.doesNotMatch(h, /<script/i);
 });
 
@@ -87,7 +92,9 @@ test("new vault: creating one lands in it, owned by me, with the default I chose
   assert.match(h, /Created Zephyr ledger\. You’re its owner\./);
   assert.match(h, /<a class="side-title" href="\/v\/[0-9a-f-]{36}">Zephyr ledger<\/a>/);
   assert.match(await page(`${loc}/rules`), /Everything is <span class="badge policy canon"[^>]*>Canon<\/span> unless a rule says otherwise/);
-  assert.match(await page("/"), new RegExp(`href="${loc}">Zephyr ledger</a>\\s*<span class="muted small"> · owner · 0 files`));
+  const row = rowNamed(await page("/"), "Zephyr ledger");
+  assert.match(row, new RegExp(`<a href="${loc}">Zephyr ledger</a>`));
+  assert.match(row, /data-label="Your role">Owner<\/td>\s*<td data-label="Files" class="num">0<\/td>/);
   assert.match(await page(`${loc}/activity`), /Created the vault/);
 });
 
@@ -99,13 +106,52 @@ test("new vault: needs the form token and a same-origin Origin", async () => {
 });
 
 test("new vault: a blank name is refused with a reason, and nothing is created", async () => {
-  const before = (await page("/")).match(/· owner ·/g).length;
+  const before = ownerRows(await page("/"));
   const token = csrfOf(await page("/vaults/new"));
   const r = await post("/vaults/new", { csrf: token, name: "   ", default_policy: "open" });
   assert.equal(r.status, 303);
   assert.equal(r.headers.get("location"), "/vaults/new");
   assert.match(await page("/vaults/new"), /A vault name is 1 to 100 characters\./);
-  assert.equal((await page("/")).match(/· owner ·/g).length, before);
+  assert.equal(ownerRows(await page("/")), before);
+});
+
+test("new vault: the notice after creating one is a success, not a plain note", async () => {
+  const token = csrfOf(await page("/vaults/new"));
+  const r = await post("/vaults/new", { csrf: token, name: "Zephyr notice", default_policy: "open" });
+  assert.equal(r.status, 303);
+  const h = await page(r.headers.get("location"));
+  assert.match(h, /<p class="callout success flash" role="status">Created Zephyr notice\. You’re its owner\. Add files, or connect an agent to it\.<\/p>/);
+});
+
+// Home's vault table (Ana) -----------------------------------------------------------
+
+test("vault table: Home is titled Home, as in the nav, and lists my vaults with my role, files, open proposals and when each last changed", async () => {
+  const h = await page("/");
+  assert.match(h, /<title>Home · Reliquary<\/title>/);
+  assert.match(h, /<h1>Home<\/h1>/);
+  assert.match(h, /<a href="\/" aria-current="page">Home<\/a>/);
+  assert.match(h, /<table class="vault-list table-stack">\s*<thead><tr><th>Name<\/th><th>Your role<\/th><th class="num">Files<\/th><th class="num">Open proposals<\/th><th>Updated<\/th><\/tr><\/thead>/);
+  const row = rowNamed(h, "Zephyr ledger");
+  assert.match(row, /<td data-label="Your role">Owner<\/td>/);
+  assert.match(row, /<td data-label="Open proposals" class="num"><span class="muted">0<\/span><\/td>/);
+  assert.match(row, /<td data-label="Updated"><time datetime="\d{4}-\d\d-\d\dT[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">[^<]+<\/time><\/td>/);
+  assert.doesNotMatch(h, /<span class="muted small"> · (owner|editor|viewer) · \d+ files?/, "no longer a row list");
+});
+
+test("vault table: a vault with open proposals links the count to its proposals", async () => {
+  const row = vaultRows(await page("/")).find((r) => r.includes(`href="/v/${TEAM_VAULT}"`));
+  assert.ok(row, "Team is listed");
+  assert.match(row, new RegExp(`<td data-label="Open proposals" class="num"><a href="/v/${TEAM_VAULT}/proposals" aria-label="([1-9]\\d*) open proposals? in [^"]+">\\1</a></td>`));
+  assert.match(row, /<td data-label="Your role">(Owner|Editor|Viewer)<\/td>/);
+});
+
+test("vault table: every cell says its column, so the table stacks on a phone", async () => {
+  const rows = vaultRows(await page("/"));
+  assert.ok(rows.length >= 2);
+  for (const r of rows) {
+    const cells = [...r.matchAll(/<td( data-label="([^"]+)")?/g)];
+    assert.deepEqual(cells.map((c) => c[2]), ["Name", "Your role", "Files", "Open proposals", "Updated"]);
+  }
 });
 
 // First vault (Eve, who has none) -------------------------------------------------
@@ -126,7 +172,7 @@ test("first vault: created from the form on the hosted sign-in, and Home lists i
   assert.equal(r.status, 303);
   assert.match(r.headers.get("location"), /^\/v\/[0-9a-f-]{36}$/);
   const h = await evePage("/");
-  assert.match(h, /Eve studio<\/a>\s*<span class="muted small"> · owner · 0 files/);
+  assert.match(rowNamed(h, "Eve studio"), /data-label="Your role">Owner<\/td>\s*<td data-label="Files" class="num">0<\/td>/);
   assert.doesNotMatch(h, /Create your first vault\./);
 });
 
@@ -180,4 +226,22 @@ test("revise: a revision by someone else is refused by the database, and says so
   const h = await page(r.headers.get("location"));
   assert.match(h, /No such proposal of yours\./);
   assert.doesNotMatch(h, /Hijack\./);
+});
+
+// Home's order (Eve: only she acts in her vaults) ---------------------------------
+
+test("vault table: the vault where something happened last comes first, whatever its name", async () => {
+  const token = csrfOf(await evePage("/vaults/new"));
+  const r = await evePost("/vaults/new", { csrf: token, name: "Eve zinc", default_policy: "open" });
+  assert.equal(r.status, 303);
+  let names = vaultRows(await evePage("/")).map((row) => />([^<]+)<\/a><\/td>/.exec(row)[1]);
+  assert.deepEqual(names.slice(0, 2), ["Eve zinc", "Eve studio"]);
+  // Something happens in Eve studio: it moves to the top.
+  const vault = /href="(\/v\/[0-9a-f-]{36})">Eve studio</.exec(await evePage("/"))[1];
+  const made = await evePost(`${vault}/file`, { csrf: csrfOf(await evePage(`${vault}/new`)), action: "create", path: "order.md", content: "Order.", reason: "order" });
+  assert.equal(made.status, 303);
+  const h = await evePage("/");
+  names = vaultRows(h).map((row) => />([^<]+)<\/a><\/td>/.exec(row)[1]);
+  assert.deepEqual(names.slice(0, 2), ["Eve studio", "Eve zinc"]);
+  assert.match(rowNamed(h, "Eve studio"), new RegExp(`<a href="${vault}/proposals" aria-label="2 open proposals in Eve studio">2</a>`));
 });
