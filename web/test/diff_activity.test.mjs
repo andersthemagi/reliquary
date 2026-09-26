@@ -21,8 +21,8 @@ const page = async (path) => {
   assert.equal(r.status, 200, path);
   return r.text();
 };
-const events = (h) => [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
-const seqOf = (row) => Number(/<td class="num small muted hide-sm">(\d+)<\/td>/.exec(row)[1]);
+const events = (h) => [...h.matchAll(/<tr class="ev"[^>]*>[\s\S]*?<\/tr>/g)].map((m) => m[0]);
+const seqOf = (row) => Number(/<tr class="ev" id="ev-(\d+)">/.exec(row)[1]);
 const older = (h) => /<a class="older" href="([^"]+)">Older<\/a>/.exec(h)?.[1].replaceAll("&amp;", "&");
 const cells = (row) => [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").trim());
 
@@ -207,16 +207,16 @@ test("activity: filter by person, action, path and date", async () => {
   const ben = events(await page(`${T}/activity?who=${BEN}`));
   assert.ok(ben.length > 0 && ben.every((r) => !r.includes(">you<")));
   const opened = events(await page(`${T}/activity?action=proposal.open`));
-  assert.ok(opened.length >= 4 && opened.every((r) => cells(r)[2] === "Proposed"));
+  assert.ok(opened.length >= 4 && opened.every((r) => cells(r)[1] === "Proposed"));
   const files = events(await page(`${T}/activity?action=file.`));
-  assert.ok(files.length > 0 && files.every((r) => ["Wrote", "Deleted", "Erased"].includes(cells(r)[2])));
+  assert.ok(files.length > 0 && files.every((r) => ["Wrote", "Deleted", "Erased"].includes(cells(r)[1])));
   const clients = events(await page(`${T}/activity?path=clients%2F`));
-  assert.ok(clients.length > 0 && clients.every((r) => cells(r)[3].startsWith("clients/")));
+  assert.ok(clients.length > 0 && clients.every((r) => cells(r)[2].startsWith("clients/")));
   const today = new Date().toISOString().slice(0, 10);
   assert.ok(events(await page(`${T}/activity?from=${today}&to=${today}`)).length > 0);
   const old = await page(`${T}/activity?from=2000-01-01&to=2000-01-02`);
   assert.equal(events(old).length, 0);
-  assert.match(old, /Nothing matches these filters\./);
+  assert.match(old, /Nothing matches these filters/);
   assert.match(old, /Clear filters/);
 });
 
@@ -266,4 +266,96 @@ test("copy: no em dashes or straight apostrophes on the new views", async () => 
     assert.doesNotMatch(visible, /—/, `em dash on ${path}`);
     assert.doesNotMatch(visible, /[a-z]'[a-z]/i, `straight apostrophe on ${path}`);
   }
+});
+
+// Activity layout (ui-audit package E) ----------------------------------------------
+
+const chipsOf = (h) =>
+  [...h.matchAll(/<a class="filter-chip" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({
+    href: m[1].replaceAll("&amp;", "&"),
+    text: m[2].replace(/<span class="filter-chip-x"[^>]*>×<\/span>/, "").replace(/<[^>]+>/g, "").trim(),
+  }));
+
+test("activity bar: the filters sit closed behind a Filters button, and the events follow it", async () => {
+  for (const path of ["/activity", `${T}/activity`, `${T}/file?path=canon%2Fpricing.md&tab=history`]) {
+    const h = await page(path);
+    assert.match(h, /<details class="activity-filter-panel">\s*<summary class="button">Filters<\/summary>/, path);
+    assert.ok(h.indexOf('<table class="activity">') > h.indexOf('<details class="activity-filter-panel">'), path);
+    assert.doesNotMatch(h, /class="filter-chip"|Clear filters/, path);
+  }
+});
+
+test("activity bar: each filter in use is a chip that removes only itself, with the count on the button", async () => {
+  const h = await page(`${T}/activity?agent=people&action=proposal.open&path=canon%2F`);
+  assert.match(h, /<summary class="button">Filters<span class="count" aria-label="3 in use">3<\/span><\/summary>/);
+  const chips = chipsOf(h);
+  assert.deepEqual(chips.map((c) => c.text), ["Agent: People only", "Action: Proposed", "Path: canon/"]);
+  assert.equal(chips[0].href, `${T}/activity?action=proposal.open&path=canon%2F`);
+  assert.equal(chips[1].href, `${T}/activity?agent=people&path=canon%2F`);
+  assert.equal(chips[2].href, `${T}/activity?agent=people&action=proposal.open`);
+  assert.match(h, /aria-label="Remove filter Agent: People only"/);
+  assert.ok(h.includes(`<a class="button quiet" href="${T}/activity">Clear filters</a>`));
+  assert.ok(h.indexOf('class="filter-chip"') < h.indexOf('<table class="activity">'));
+  const fewer = await page(chips[0].href);
+  assert.deepEqual(chipsOf(fewer).map((c) => c.text), ["Action: Proposed", "Path: canon/"]);
+});
+
+test("activity bar: chips name the vault and the person, and paging keeps the chips, which drop the page", async () => {
+  const chips = chipsOf(await page(`/activity?vault=${SIDE_VAULT}&who=${BEN}`));
+  assert.equal(chips[0].text, "Vault: Side");
+  assert.match(chips[1].text, /^Person: \S+$/);
+  assert.doesNotMatch(chips[1].text, /\[\[person/);
+  const paged = await page(older(await page(`${S}/activity?agent=agents`)));
+  assert.deepEqual(chipsOf(paged), [{ href: `${S}/activity`, text: "Agent: Agents only" }]);
+});
+
+test("activity empty: filters that match nothing say so, open the form and offer Clear filters", async () => {
+  const h = await page(`${T}/activity?from=2000-01-01&to=2000-01-02`);
+  assert.match(h, /<details class="activity-filter-panel" open>/);
+  assert.match(h, /<div class="empty"><strong>Nothing matches these filters<\/strong><p>No event matches all of them\. Remove a filter above, widen the dates, or clear them all\.<\/p>/);
+  assert.ok(h.includes(`<p class="empty-action"><a class="button" href="${T}/activity">Clear filters</a></p>`));
+  const file = await page(`${T}/file?path=canon%2Fpricing.md&tab=history&from=2000-01-01&to=2000-01-02`);
+  assert.match(file, /No event on this file matches all of them\./);
+  assert.match(file, /<a class="button" href="[^"]*\/file\?path=canon%2Fpricing\.md&amp;tab=history">Clear filters<\/a>/);
+});
+
+test("activity empty: past the last page says so and links back to the newest, keeping the filters", async () => {
+  const h = await page(`${S}/activity?agent=agents&before=1`);
+  assert.equal(events(h).length, 0);
+  assert.match(h, /<strong>No older events<\/strong>/);
+  assert.ok(h.includes(`<a class="button" href="${S}/activity?agent=agents">Back to the newest</a>`));
+  assert.doesNotMatch(h, /<nav class="pager"/);
+});
+
+test("activity rows: no sequence column; each row is linkable by its place in the log", async () => {
+  const h = await page(`${T}/activity`);
+  assert.match(h, /<thead><tr><th>When<\/th><th>What<\/th><th>Path<\/th><th>By<\/th><\/tr><\/thead>/);
+  assert.doesNotMatch(h, /<th[^>]*>#<\/th>|hide-sm/);
+  assert.match(await page("/activity"), /<thead><tr><th>When<\/th><th>What<\/th><th>Vault<\/th><th>Path<\/th><th>By<\/th><\/tr><\/thead>/);
+  const rows = events(h);
+  assert.ok(rows.length > 0 && rows.every((r) => /^<tr class="ev" id="ev-\d+">/.test(r)));
+});
+
+test("activity rows: times are relative, with the exact UTC time on hover", async () => {
+  const [row] = events(await page(`${T}/activity`));
+  assert.match(row, /<td class="small nowrap ev-when"><time datetime="\d{4}-\d\d-\d\dT[\d:.]+Z" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">(just now|\d+ min ago|\d+ h ago)<\/time><\/td>/);
+});
+
+test("activity rows: member changes say whom and which role, in plain words", async () => {
+  const rows = events(await page(`${T}/activity?action=member.set`)).map((r) => cells(r)[1]);
+  assert.ok(rows.some((w) => /^Made \S+ an editor$/.test(w)), rows.join(" | "));
+  assert.ok(rows.every((w) => /^(Made \S+ an? (owner|editor|viewer)|Removed \S+ from the vault)$/.test(w)), rows.join(" | "));
+});
+
+test("activity rows: on phones the table is a two-line list, not a sideways scroll", () => {
+  const css = readFileSync(new URL("../public/style.css", import.meta.url), "utf8");
+  const at = css.indexOf("/* Package E: activity");
+  assert.ok(at > 0, "the Package E section exists");
+  const phone = /@media \(max-width: 640px\) \{([\s\S]*?)\n\}/.exec(css.slice(at))?.[1] ?? "";
+  assert.match(phone, /\.table-wrap\.activity-wrap \{[^}]*overflow: visible/);
+  assert.match(phone, /table\.activity thead \{[^}]*position: absolute/);
+  assert.match(phone, /table\.activity tr\.ev \{[^}]*display: flex; flex-wrap: wrap/);
+  assert.match(phone, /table\.activity \.ev-what \{ order: 1;/);
+  assert.match(phone, /table\.activity \.ev-when \{ order: 2;/);
+  assert.match(phone, /table\.activity tr\.ev > td:last-child \{ order: 3; \}/);
 });

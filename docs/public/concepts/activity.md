@@ -14,9 +14,19 @@ The log is append-only: no row can be updated or deleted, by anyone, including t
 - A vault's **Activity** covers that vault.
 - A file's **History** tab is the same log, for one file.
 
-Each event is named in plain words, like "Approved", "Set a variable" or "Added an environment". The **Action** filter lists every one of them, plus groups: **Any file change**, **Any proposal event** and **Any variable change**.
+Each event is named in plain words, like "Approved", "Set a variable" or "Added an environment". Member changes say whom and which role, like "Made ben@example.test an editor", "Removed ben@example.test from the vault" or "Invited someone as a viewer". An invite never shows the address it was sent to.
 
-Filter by person, by agent (or people or agents only), by action, by path prefix and by date. Pages show 50 events at a time.
+Times read like "6 min ago". Hover over one for the exact time in UTC.
+
+On a phone, each event is two lines: what happened and when, then who, the vault and the path.
+
+## Filtering
+
+Select **Filters** to filter by person, by agent (or people or agents only), by action, by path prefix and by date, then **Apply filters**. The **Action** filter lists every event, plus groups: **Any file change**, **Any proposal event** and **Any variable change**.
+
+The filters in use show as chips beside the **Filters** button, like "Agent: Agents only". Select a chip to remove just that filter, or **Clear filters** to remove them all. When nothing matches, the page says so and offers **Clear filters**.
+
+Pages show 50 events at a time. **Older** goes back, and **Newest** returns to the latest events, keeping your filters.
 
 ## For agents
 

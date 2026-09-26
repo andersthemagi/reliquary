@@ -1412,3 +1412,58 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   .readme-head { padding: var(--space-3) var(--space-4); }
   .file-more .action-list { min-width: 0; width: min(18rem, calc(100vw - 2 * var(--space-5))); }
 }
+
+/* Package E: activity ------------------------------------------------------ */
+/* The filter bar: a Filters button that opens the form, the filters in use
+   as chips (each removes itself), Clear filters. Then the events: a table,
+   and below 640px a two-line list (what and when; who, vault and path). */
+.activity-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-5); }
+.activity-filter-panel[open] { flex-basis: 100%; }
+.activity-filter-panel > summary { list-style: none; }
+.activity-filter-panel > summary::-webkit-details-marker { display: none; }
+.activity-filter-panel > summary::after {
+  content: ""; width: 6px; height: 6px; margin: -3px 2px 0 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg);
+}
+.activity-filter-panel[open] > summary { background: var(--bg-muted); }
+.activity-filter-panel[open] > summary::after { margin-top: 3px; transform: rotate(-135deg); }
+.activity-filter-panel > summary .count { margin-left: 2px; }
+.activity-filter-panel > form.filters { margin: var(--space-3) 0 0; }
+.filter-chips { display: flex; flex-wrap: wrap; gap: var(--space-3); list-style: none; margin: 0; padding: 0; min-width: 0; }
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-sm); max-width: 100%;
+  padding: 0 4px 0 12px; border: 1px solid var(--border); border-radius: var(--radius-full);
+  background: var(--bg-subtle); color: var(--fg); font-size: 0.8125rem; line-height: 1.3; text-decoration: none; overflow-wrap: anywhere;
+}
+.filter-chip-key { color: var(--fg-muted); font-weight: 500; }
+.filter-chip-x {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 20px; height: 20px; border-radius: var(--radius-full); color: var(--fg-muted); font-size: 15px; line-height: 1;
+}
+.filter-chip:hover { border-color: var(--border-strong); color: var(--fg); }
+.filter-chip:hover .filter-chip-x { background: var(--bg-muted); color: var(--fg); }
+table.activity .ev-when { width: 1%; color: var(--fg-muted); }
+table.activity tr.ev:target > td { background: var(--attention-bg); }
+@media (max-width: 640px) {
+  .table-wrap.activity-wrap { margin: 0; padding: 0; overflow: visible; }
+  table.activity, table.activity tbody { display: block; min-width: 0; }
+  table.activity thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  table.activity tr.ev {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2);
+    padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border);
+  }
+  table.activity tbody tr.ev:first-child { border-top: 0; }
+  table.activity tr.ev:hover { background: var(--bg-subtle); }
+  table.activity tr.ev > td { display: block; height: auto; padding: 0; border: 0; background: transparent; min-width: 0; }
+  table.activity tr.ev > td:empty { display: none; }
+  /* Line one: what (it wraps) and when, filling the line. */
+  table.activity .ev-what { order: 1; flex: 1 1 calc(100% - 6.5rem - var(--space-2)); font-size: var(--text-sm); font-weight: 600; color: var(--fg); }
+  table.activity .ev-when { order: 2; flex: 0 0 6.5rem; width: auto; text-align: right; font-size: 0.8125rem; }
+  /* Line two: who, then the vault and the path. */
+  table.activity tr.ev > td:last-child { order: 3; }
+  table.activity .ev-vault { order: 4; }
+  table.activity .path-cell { order: 5; }
+  table.activity tr.ev > td:last-child, table.activity .ev-vault, table.activity .path-cell { font-size: 0.8125rem; color: var(--fg-muted); }
+  table.activity .ev-vault::before, table.activity .path-cell::before { content: "·"; margin-right: var(--space-2); color: var(--fg-muted); }
+  table.activity .ev-vault a, table.activity .path-cell a { font-weight: 500; }
+}

@@ -332,7 +332,7 @@ test("activity: invites show in the vault's activity, without addresses", async 
   assert.match(h, /Invited someone/);
   assert.match(h, /Joined by invite/);
   assert.match(h, /Withdrew an invite/);
-  assert.match(h, /Cut off a member’s connection/);
+  assert.match(h, /Cut off (\S+’s|your) connection/);
   const rows = await sql("select count(*)::int as n from public.log where vault_id = $1 and detail::text like '%@%'", [V.team]);
   assert.equal(rows[0].n, 0);
 });
