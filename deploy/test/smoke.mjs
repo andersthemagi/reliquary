@@ -133,7 +133,7 @@ try {
 
   await step("the owner is on the self-hosted plan, with no limits", async () => {
     const home = await (await get("/")).text();
-    check(/Self-hosted plan · 0 vaults \(no limit\)/.test(home), "Home doesn't say 'Self-hosted plan · 0 vaults (no limit)'");
+    check(/You own 0 vaults on the Self-hosted plan, which has no limit/.test(home), "Home doesn't say 'You own 0 vaults on the Self-hosted plan, which has no limit'");
   });
 
   await step("the owner creates a vault", async () => {
