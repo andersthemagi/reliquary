@@ -23,7 +23,9 @@ The operator can take admission back. The account keeps its vaults and membershi
 | People per vault | 10 | 25 |
 | Storage per vault | 100 MB | 1 GB |
 
-A vault's tier is **Standard** unless it has been upgraded. A Standard vault takes its people and storage limits from the plan of the account that created it, whoever else becomes an owner later. A vault can be upgraded on its own: the **Pro** tier holds 50 people and 5 GB, whatever its account's plan. Upgrades are given by hand during the beta: ask the operator with **Ask for a bigger plan** on **Plan and usage**, which writes to andres@redmage.cc. On a self-hosted server there is no billing: its operator sets plans and tiers, and the Self-hosted plan has no limits.
+A vault's tier is **Standard** unless it has been upgraded. A Standard vault takes its people and storage limits from the plan of the account that created it, whoever else becomes an owner later. A vault can be upgraded on its own: the **Pro** tier holds 50 people and 5 GB, whatever its account's plan; the operator can also add storage to one vault without a whole new tier, on top of whatever it already has. Upgrades are given by hand during the beta: ask the operator with **Ask for a bigger plan** on **Plan and usage**, which writes to andres@redmage.cc. On a self-hosted server there is no billing: its operator sets plans and tiers, and the Self-hosted plan has no limits.
+
+Reliquary's own staff and contributors are on a **Reliquary staff** plan: no limit on the vaults they own, with each one still taking Alpha tester's own people and storage numbers unless the operator upgrades it or adds storage.
 
 Sizes are decimal: 1 MB is 1,000,000 bytes, 1 GB is 1,000 MB.
 

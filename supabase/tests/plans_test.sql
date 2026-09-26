@@ -99,10 +99,10 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Defaults
 
-select t.expect('defaults: the seeded plans are Free (5 vaults, 10 people, 100 MB) and Alpha tester (25, 25, 1 GB)',
+select t.expect('defaults: the seeded plans are Free (5 vaults, 10 people, 100 MB), Alpha tester (25, 25, 1 GB) and Reliquary staff (no vault limit, 25, 1 GB)',
   (select string_agg(concat_ws(' ', id, name, max_vaults, max_members, max_storage_bytes), ' | ' order by max_vaults)
      from private.plans),
-  'free Free 5 10 100000000 | alpha_tester Alpha tester 25 25 1000000000');
+  'free Free 5 10 100000000 | alpha_tester Alpha tester 25 25 1000000000 | staff Reliquary staff 1000000000 25 1000000000');
 select t.expect('defaults: the seeded vault tiers are Standard (the plan''s limits) and Pro (50 people, 5 GB)',
   (select string_agg(concat_ws(' ', id, name, coalesce(max_members::text, '-'), coalesce(max_storage_bytes::text, '-')), ' | ' order by id)
      from private.vault_tiers where id <> 'tiny'),

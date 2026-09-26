@@ -202,9 +202,11 @@ names and counts only). The model and the numbers are in
 | See the plans and tiers | `scripts/plan.sh plans` |
 | See someone's plan and their vaults | `scripts/plan.sh show <email>` |
 | Make someone an alpha tester (25 vaults, 25 people and 1 GB each) | `scripts/plan.sh user <email> alpha_tester` |
+| Put Reliquary's own staff or contributors on staff (no vault limit; each vault still gets alpha tester's 25 people, 1 GB, unless given a tier or a grant) | `scripts/plan.sh user <email> staff` |
 | Put them back on Free | `scripts/plan.sh user <email> free` |
 | Upgrade one vault (50 people, 5 GB) | `scripts/plan.sh vault <vault-id> pro` |
 | Take it back to its account's plan | `scripts/plan.sh vault <vault-id> standard` |
+| Give one vault extra storage on top of its tier or plan (`500mb`, `2gb`; `0` to take it back) | `scripts/plan.sh grant-storage <vault-id> <amount>` |
 | Usage, largest first (everyone, one person's vaults, or one vault) | `scripts/plan.sh usage [<email>\|<vault-id>]` |
 | Let an account create vaults while invite-only | `scripts/plan.sh admit <email>` |
 | Take that back (they keep their vaults and memberships) | `scripts/plan.sh revoke-admission <email>` |

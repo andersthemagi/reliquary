@@ -5,8 +5,11 @@
 #
 #   scripts/plan.sh plans                         the plans and vault tiers, with their limits
 #   scripts/plan.sh show <email>                  a person's plan, and the vaults they own
-#   scripts/plan.sh user <email> <plan>           put a person on a plan (free, alpha_tester)
+#   scripts/plan.sh user <email> <plan>           put a person on a plan (free, alpha_tester, staff)
 #   scripts/plan.sh vault <vault-id> <tier>       give a vault a tier (pro), or standard to undo
+#   scripts/plan.sh grant-storage <vault-id> <amount>
+#                                                  give a vault <amount> (e.g. 500mb, 2gb) more storage
+#                                                  than its tier or plan allows; 0 takes the grant back
 #   scripts/plan.sh usage [<email>|<vault-id>]    people and storage per vault, largest first
 #   scripts/plan.sh admit <email>                 let an account create vaults while invite-only
 #   scripts/plan.sh revoke-admission <email>      take that back (they keep their vaults)
@@ -31,12 +34,26 @@ ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
 host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 
-usage() { sed -n '6,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '6,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
 UUID='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 NAME='^[a-z][a-z0-9_]{0,31}$'
 EMAIL='^[^[:space:][:cntrl:]@]+@[^[:space:][:cntrl:]@]+\.[^[:space:][:cntrl:]@]+$'
 need() { [[ $2 =~ $3 ]] || { echo "That isn't $1: $2" >&2; exit 2; }; }
+
+# "500mb", "2gb", "0" or a plain byte count, decimal (1 MB = 1,000,000 bytes,
+# matching private.size_text) -> a byte count, or exits naming the problem.
+bytes_of() {
+  local n unit
+  [[ $1 =~ ^([0-9]+)(b|kb|mb|gb)?$ ]] || { echo "That isn't an amount of storage (500mb, 2gb, 0): $1" >&2; exit 2; }
+  n=${BASH_REMATCH[1]}; unit=${BASH_REMATCH[2]:-b}
+  case "$unit" in
+    b) echo "$n" ;;
+    kb) echo $((n * 1000)) ;;
+    mb) echo $((n * 1000000)) ;;
+    gb) echo $((n * 1000000000)) ;;
+  esac
+}
 
 # psql with the SQL on stdin and the arguments as psql variables.
 run() {
@@ -121,6 +138,13 @@ SQL
     need "a tier id" "$3" "$NAME"
     run -v arg="$2" -v tier="$3" <<'SQL'
 select private.set_vault_tier(:'arg'::uuid, :'tier') as done;
+SQL
+    ;;
+  grant-storage)
+    [ $# -eq 3 ] || usage
+    need "a vault id" "$2" "$UUID"
+    run -v arg="$2" -v extra="$(bytes_of "$3")" <<'SQL'
+select private.grant_vault_storage(:'arg'::uuid, :'extra'::bigint) as done;
 SQL
     ;;
   usage)
