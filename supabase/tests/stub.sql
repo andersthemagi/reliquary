@@ -32,5 +32,9 @@ create table if not exists auth.users (
   id    uuid primary key,
   email varchar(255)
 );
+-- When Auth confirmed the address (joining from the Inbox needs it,
+-- 20260926140000_inbox_join.sql). Tests' accounts are confirmed unless a
+-- test clears it; Supabase's own column has no default.
+alter table auth.users add column if not exists email_confirmed_at timestamptz default now();
 revoke all on schema auth from public;
 revoke all on auth.users from public, anon, authenticated;

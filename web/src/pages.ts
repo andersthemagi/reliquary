@@ -18,7 +18,7 @@ import { fillPeople, personRef } from "./people.js";
 import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
 import { adminRoutes } from "./vaultadmin.js";
-import { deletionNotices, inviteRoutes } from "./members.js";
+import { deletionNotices, inboxInviteRoutes, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
 import { NO_LIMIT_COUNT, accountPage, myAdmission, myPlan, notAdmittedNote, type Plan } from "./plans.js";
 import { OPERATOR } from "./site.js";
@@ -245,7 +245,7 @@ async function home(ctx: Ctx): Promise<Reply> {
           <p>Start blank, or from a template: a client engagement, personal projects or a product team, with folders, rules and a README that tells agents how to work there.</p>
           <p><a class="button" href="/vaults/new">Create your first vault</a></p>
           <p class="small">Joining someone else’s vault? Open the invite link they sent you. It works once you’re signed in with the address it was sent to.${
-            invites ? html` You have ${invites === 1 ? "an invite" : `${invites} invites`} waiting: <a href="/inbox#invites">see your inbox</a>.` : ""}</p></div>`
+            invites ? html` You have ${invites === 1 ? "an invite" : `${invites} invites`} waiting: <a href="/inbox#invites">see your inbox</a>. Join or decline ${invites === 1 ? "it" : "them"} there, no link needed.` : ""}</p></div>`
       : html`<div class="table-wrap"><table class="vault-list table-stack">
         <thead><tr><th>Name</th><th>Your role</th><th class="num">Files</th><th class="num">Open proposals</th><th>Updated</th></tr></thead>
         <tbody>${vaults.map(
@@ -386,7 +386,8 @@ async function inbox(ctx: Ctx): Promise<Reply> {
   const { waiting, revising, snoozed, mine, invites, gone } = await asPerson(ctx.userId, async (c) => ({
     gone: has(counts?.notices) ? await deletionNotices(c) : html``,
     invites: has(counts?.invites)
-      ? ((await c.query(`select vault_name, role, invited_by_email, expires_at from public.my_invites()`)).rows as {
+      ? ((await c.query(`select id, vault_name, role, invited_by_email, expires_at from public.my_invites()`)).rows as {
+          id: string;
           vault_name: string;
           role: string;
           invited_by_email: string | null;
@@ -444,10 +445,12 @@ async function inbox(ctx: Ctx): Promise<Reply> {
     ${gone.html.trim() ? html`<div id="notices">${gone}</div>` : ""}
     ${invites.length
       ? html`<h2 id="invites">Invites</h2>
-        <p class="muted small">Someone invited your address to a vault. To join, open the invite link they sent you while you’re signed in as this address. Can’t find it? Ask them to send a new one.</p>
+        <p class="muted small">Someone invited your address to a vault. Join makes you a member with the role they chose; Decline ends the invite, and its owners see that you declined. You can also open the invite link they sent you.</p>
         <ul class="rows">${invites.map(
           (i) => html`<li><span><span class="name">${i.vault_name}</span>
-            <span class="muted small"> · as ${i.role} · from ${i.invited_by_email ?? "an owner"} · expires in ${days(new Date(i.expires_at))} ${days(new Date(i.expires_at)) === 1 ? "day" : "days"}</span></span></li>`,
+            <span class="muted small"> · as ${i.role} · from ${i.invited_by_email ?? "an owner"} · expires in ${days(new Date(i.expires_at))} ${days(new Date(i.expires_at)) === 1 ? "day" : "days"}</span></span>
+            <span class="row-end"><form method="post" action="/inbox/invites/join">${csrfField(ctx.csrf)}<input type="hidden" name="invite" value="${i.id}"><button aria-label="Join ${i.vault_name} as ${i.role}">Join</button></form>
+            <form method="post" action="/inbox/invites/decline">${csrfField(ctx.csrf)}<input type="hidden" name="invite" value="${i.id}"><button class="quiet" aria-label="Decline the invite to ${i.vault_name}">Decline</button></form></span></li>`,
         )}</ul>`
       : ""}
     ${pushes.length ? pendingList(ctx, pushes, true) : ""}
@@ -534,6 +537,8 @@ async function route(ctx: Ctx): Promise<Reply> {
   }
   if (get && p === "/") return home(ctx);
   if (get && p === "/inbox") return inbox(ctx);
+  if (!get && p === "/inbox/invites/join") return inboxInviteRoutes(ctx, "join");
+  if (!get && p === "/inbox/invites/decline") return inboxInviteRoutes(ctx, "decline");
   // The Review page became the Inbox; old links and bookmarks land there.
   if (get && p === "/review") return { redirect: `/inbox${ctx.url.search}` };
   if (get && p === "/search") return searchAll(ctx);

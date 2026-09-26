@@ -454,3 +454,69 @@ test("races, the operator waits: a tier change during a write waits for it, and 
   assert.equal(tierState, "blocked", "the tier change didn't wait for the write in flight");
   assert.equal(tier.rows[0].s, "Races tiny: 1 of 4 people, 300 bytes of 1 KB");
 });
+
+// ---------------------------------------------------------------------------
+// Answering an invite from the Inbox while its link is used
+// (20260926140000_inbox_join.sql): the same invite, the same person, two
+// tabs. Whichever goes first stops holding the vault's and the invite's
+// rows; the other waits on them and is then refused, so the invite is used
+// (or declined) once and the person joins at most once.
+
+// An owner of their own: OWNER's invites an hour are spent above.
+const INBOX_OWNER = uid(310);
+const inboxPeople = [300, 301, 302, 303].map(uid);
+const inviteId = async (token) =>
+  (await sql("select id from private.vault_invites where token_hash = encode(extensions.digest($1, 'sha256'), 'hex')", [token]))[0].id;
+
+test("races, one wins: joining from the inbox and by the link at once, either first, uses the invite once", async () => {
+  await sql(`insert into auth.users (id, email) select u, 'races-' || right(u::text, 4) || '@example.test' from unnest($1::uuid[]) u
+             on conflict (id) do nothing`, [[INBOX_OWNER, ...inboxPeople]]);
+  const v = await newVault(INBOX_OWNER, "Races inbox join");
+  const outcomes = [];
+  for (const [round, inboxFirst] of [[0, true], [1, false]]) {
+    const who = inboxPeople[round];
+    const token = await invite(INBOX_OWNER, v, who);
+    const id = await inviteId(token);
+    const byInbox = (c, stop) => as(c, who, "select public.accept_my_invite($1)::text", [id], stop);
+    const byLink = (c, stop) => as(c, who, "select public.accept_invite($1)::text", [token], stop);
+    // The first adds the member and stops before committing.
+    const [a, b, bState] = inboxFirst
+      ? await interleave((c) => byInbox(c, "members"), (c) => byLink(c))
+      : await interleave((c) => byLink(c, "members"), (c) => byInbox(c));
+    outcomes.push(`${outcome(a)}/${outcome(b)} (${bState})`);
+    if (!b.ok) assert.match(b.message, /this invite has already been used/);
+    const [{ members, used, logged }] = await sql(
+      `select (select count(*)::int from public.vault_members where vault_id = $1 and user_id = $2) as members,
+              (select count(*)::int from private.vault_invites where id = $3 and accepted_by = $2) as used,
+              (select count(*)::int from public.log where vault_id = $1 and event = 'invite.accept' and actor = $2) as logged`,
+      [v, who, id],
+    );
+    assert.deepEqual({ members, used, logged }, { members: 1, used: 1, logged: 1 });
+  }
+  log("inbox join vs link", outcomes);
+  assert.deepEqual(outcomes, ["ok/55000 (blocked)", "ok/55000 (blocked)"]);
+});
+
+test("races, one wins: declining from the inbox while the link is accepted, either first, answers the invite once", async () => {
+  await sql(`insert into auth.users (id, email) select u, 'races-' || right(u::text, 4) || '@example.test' from unnest($1::uuid[]) u
+             on conflict (id) do nothing`, [[INBOX_OWNER, ...inboxPeople]]);
+  const v = await newVault(INBOX_OWNER, "Races inbox decline");
+  const outcomes = [];
+  for (const [round, declineFirst] of [[2, true], [3, false]]) {
+    const who = inboxPeople[round];
+    const token = await invite(INBOX_OWNER, v, who);
+    const id = await inviteId(token);
+    // The decline stops at its log row; the link's acceptance at its member.
+    const decline = (c, stop) => as(c, who, "select public.decline_my_invite($1)", [id], stop);
+    const byLink = (c, stop) => as(c, who, "select public.accept_invite($1)::text", [token], stop);
+    const [a, b, bState] = declineFirst
+      ? await interleave((c) => decline(c, "log"), (c) => byLink(c))
+      : await interleave((c) => byLink(c, "members"), (c) => decline(c));
+    outcomes.push(`${outcome(a)}/${outcome(b)} (${bState})`);
+    if (!b.ok) assert.match(b.message, declineFirst ? /you declined this invite/ : /this invite has already been used/);
+    const [{ members }] = await sql("select count(*)::int as members from public.vault_members where vault_id = $1 and user_id = $2", [v, who]);
+    assert.equal(members, declineFirst ? 0 : 1);
+  }
+  log("inbox decline vs link", outcomes);
+  assert.deepEqual(outcomes, ["ok/55000 (blocked)", "ok/55000 (blocked)"]);
+});

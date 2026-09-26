@@ -40,6 +40,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["invite.create", "Invited someone"],
   ["invite.accept", "Joined by invite"],
   ["invite.revoke", "Withdrew an invite"],
+  ["invite.decline", "Declined an invite"],
   ["member.connection_revoke", "Cut off a member’s connection"],
   ["vault.create", "Created the vault"],
   ["vault.rename", "Renamed the vault"],
@@ -113,7 +114,7 @@ type Row = {
 
 // The events whose `detail` names a member or a role; nothing else is read
 // from `detail`.
-const MEMBER_EVENTS = ["member.set", "member.leave", "member.connection_revoke", "invite.create", "invite.accept"];
+const MEMBER_EVENTS = ["member.set", "member.leave", "member.connection_revoke", "invite.create", "invite.accept", "invite.decline"];
 
 // One page of events, newest first. Keyset on seq, which increases with
 // every insert, so pages never skip or repeat rows as new events arrive.
@@ -220,6 +221,9 @@ export function describe(me: string, r: Pick<Row, "event" | "subject" | "role" |
       break;
     case "invite.accept":
       if (role) return `Joined by invite as ${role}`;
+      break;
+    case "invite.decline":
+      if (role) return `Declined an invite as ${role}`;
       break;
   }
   return label;

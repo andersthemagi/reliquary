@@ -16,6 +16,15 @@ Only an owner can invite, in the web app.
 
 The link works once, for 7 days, and only for someone signed in with that email address. If they have no account yet, the sign-in page tells them what to do. Joining by invite also lets a new account create vaults of its own while Reliquary is [invite-only](../concepts/plans-and-limits.md#invite-only).
 
+## If they already have an account
+
+Someone who already signs in with that address doesn't need the link. The invite waits in their **Inbox**, with **Join** and **Decline**:
+
+- **Join** makes them a member with the role you chose, the same as opening the link.
+- **Decline** ends the invite. The link stops working, the invite leaves your list on **Members**, and the vault's **Activity** shows "Declined an invite". To join later, they ask you for a new invite.
+
+Only the person signed in with the invited address, in the web app, can answer from the Inbox, and only once their address is confirmed. Nobody else can join or decline with it, and neither can their agents. The invite is used once, whichever way they answer. See [The top bar, inbox and account](../concepts/inbox-and-account.md#inbox).
+
 ## After they join
 
 They appear on **Members** with their role. They can connect their own AI tools, which act as them, not as you. See [Agents and the ceiling](../concepts/agents.md).
@@ -26,7 +35,7 @@ They appear on **Members** with their role. They can connect their own AI tools,
 
 ## Undo an invite
 
-Pending invites are listed on **Members**. **Revoke**, then confirm, makes the link stop working. Inviting the same address again replaces the old link.
+Pending invites are listed on **Members**. **Revoke**, then confirm, makes the link stop working and takes the invite out of their Inbox. Inviting the same address again replaces the old link.
 
 ## Limits
 
