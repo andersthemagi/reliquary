@@ -116,7 +116,7 @@ function listen(): Promise<{ port: number; code: Promise<string>; close: () => v
       if (error) return fail(400, DENIED[error] ?? "The server refused the sign-in.");
       const c = q.get("code");
       if (!c) return fail(400, "The sign-in answer had no code.");
-      res.writeHead(200, PAGE_HEADERS).end(page("Signed in", "The Reliquary CLI is signed in. You can close this tab and go back to the terminal."));
+      res.writeHead(200, PAGE_HEADERS).end(page("Connected", "The Reliquary CLI is connected to your account. You can close this tab and go back to the terminal."));
       finish(null, c);
     });
     const timer = setTimeout(() => finish(new CliError("Timed out after 5 minutes waiting for the browser. Run `reliquary login` again.")), LOGIN_TIMEOUT_MS);
@@ -238,9 +238,9 @@ export async function accessToken(server: Server, stale?: string): Promise<strin
     }
     if (r.error === "invalid_grant") {
       setCredential(server.issuer, null);
-      throw new NotSignedIn(server.issuer, "Your sign-in was revoked or has expired");
+      throw new NotSignedIn(server.issuer, "The Reliquary CLI's connection was revoked or has expired");
     }
-    throw new CliError(`Refreshing your sign-in failed: the server refused it (${r.error}).${r.says || " It sent no reason."} If it keeps failing, run \`reliquary login\`.`);
+    throw new CliError(`Refreshing the Reliquary CLI's connection failed: the server refused it (${r.error}).${r.says || " It sent no reason."} If it keeps failing, run \`reliquary login\`.`);
   });
 }
 

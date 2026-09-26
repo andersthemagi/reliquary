@@ -255,7 +255,7 @@ test("push: a sign-in that wasn't allowed to send values is refused, with how to
   const { file } = envFile([`NOPE=${value("nope")}`]);
   const r = await cli(["env", "push", "--vault", team, "--file", file], { config: reader });
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /This sign-in wasn't allowed to send values\. Run `reliquary login` again/);
+  assert.match(r.stderr, /This connection wasn't allowed to send values\. Run `reliquary login` again/);
   assert.equal(r.stdout, "");
 });
 

@@ -211,7 +211,7 @@ test("login: signs in through the browser's consent (PKCE S256, loopback redirec
   assert.equal(u.searchParams.get("code_challenge_method"), "S256");
   assert.match(u.searchParams.get("code_challenge"), /^[A-Za-z0-9_-]{43}$/);
   assert.match(u.searchParams.get("redirect_uri"), /^http:\/\/127\.0\.0\.1:\d+\/callback$/);
-  assert.match(r.stderr, /Signed in to http:\/\/127\.0\.0\.1:\d+/);
+  assert.match(r.stderr, /Connected the Reliquary CLI to http:\/\/127\.0\.0\.1:\d+\. It can read:/);
   assert.match(r.stderr, /CLI Team \(owner\): development, preview, production/);
   assert.match(r.stderr, /Dan Shared \(editor\): development, preview\n/);
   assert.match(r.stderr, /Twin \(viewer\): no environments your role may read/);
@@ -275,7 +275,7 @@ test("login: a sign-in scoped to one vault reaches only that vault", async () =>
   assert.equal(vaults.stdout, `${team}  CLI Team (owner): development, preview, production\n`);
   const run = await cli(["run", "--vault", shared, "--", "true"], { config });
   assert.equal(run.code, 1);
-  assert.match(run.stderr, /No vault .* for this sign-in/);
+  assert.match(run.stderr, /No vault .* for this connection/);
 });
 
 test("login: signing in again revokes the previous sign-in on this computer", async () => {
@@ -327,12 +327,12 @@ test("tokens: two commands refreshing at once take turns, so the grant survives 
   assert.equal((await cli(["vaults"], { config })).code, 0);
 });
 
-test("tokens: a sign-in revoked on the Tokens page fails with 'run reliquary login', and is forgotten", async () => {
+test("tokens: a connection revoked on the Connections page fails with 'run reliquary login', and is forgotten", async () => {
   const config = tmp("revoked");
   assert.equal((await login(config)).code, 0);
-  const h = await (await page("/tokens")).text();
+  const h = await (await page("/connections")).text();
   const [grant] = await as(null, "select id from public.access_tokens where user_id = $1 and kind = 'cli' and revoked_at is null order by created_at desc limit 1", [CARA]);
-  const rv = await fetch(`${WEB}/tokens/${grant.id}/revoke`, {
+  const rv = await fetch(`${WEB}/connections/${grant.id}/revoke`, {
     method: "POST",
     redirect: "manual",
     headers: { cookie, "content-type": "application/x-www-form-urlencoded", origin: WEB },
@@ -363,7 +363,7 @@ test("tokens: logout revokes the grant on the server and forgets it", async () =
   assert.equal((await refresh.json()).error, "invalid_grant");
   const again = await cli(["vaults"], { config });
   assert.equal(again.code, 1);
-  assert.match(again.stderr, /not signed in.*reliquary login/);
+  assert.match(again.stderr, /isn't connected to .*reliquary login/);
 });
 
 test("tokens: the CLI's token is refused at the MCP endpoint", async () => {
@@ -686,7 +686,7 @@ test("keychain choice: without a keychain, login keeps the sign-in in the file a
   const config = tmp("kc-file");
   const r = await login(config);
   assert.equal(r.code, 0, r.stderr);
-  assert.ok(r.stderr.includes(`The sign-in is kept in ${path.join(config, "credentials.json")}.`), r.stderr);
+  assert.ok(r.stderr.includes(`The connection is kept in ${path.join(config, "credentials.json")}.`), r.stderr);
 });
 
 test("keychain choice: RELIQUARY_CREDENTIALS=keychain where none answers fails plainly; a value that isn't file or keychain is a usage error", async () => {
@@ -723,9 +723,9 @@ test("keychain migration: a sign-in in the file keeps working with a keychain, m
   // It works from the keychain, and logout revokes and clears it.
   assert.equal((await cli(["vaults"], { config, env: st.env })).code, 0);
   const out = await cli(["logout"], { config, env: st.env });
-  assert.match(out.stderr, /the sign-in is revoked and forgotten/);
+  assert.match(out.stderr, /the connection is revoked and forgotten/);
   assert.deepEqual(st.items(), []);
   const argv = st.argv();
   for (const t of [before.refreshToken, before.accessToken, m[1], m[2]]) assert.ok(!argv.includes(t), "a token in secret-tool's arguments");
-  assert.match(argv, /^store --label=Reliquary CLI sign-in for http:\/\/127\.0\.0\.1:\d+ service reliquary-cli account http:\/\/127\.0\.0\.1:\d+$/m);
+  assert.match(argv, /^store --label=Reliquary CLI connection for http:\/\/127\.0\.0\.1:\d+ service reliquary-cli account http:\/\/127\.0\.0\.1:\d+$/m);
 });

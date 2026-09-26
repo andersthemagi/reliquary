@@ -23,10 +23,14 @@ export class UsageError extends CliError {
   }
 }
 
-// No sign-in for this server, or it was revoked or expired.
+// No connection to this server, or it was revoked or expired.
 export class NotSignedIn extends CliError {
-  constructor(server: string, why = "You're not signed in") {
-    super(`${why} to ${server}. Run \`reliquary login${loginFlag(server)}\`.`);
+  constructor(server: string, why?: string) {
+    super(
+      why
+        ? `${why} (server ${server}). Run \`reliquary login${loginFlag(server)}\` to connect it again.`
+        : `The Reliquary CLI isn't connected to ${server}. Run \`reliquary login${loginFlag(server)}\` to connect it.`,
+    );
     this.name = "NotSignedIn";
   }
 }
