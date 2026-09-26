@@ -71,6 +71,12 @@ Sign-in email goes through your SMTP server. Vault invites are sent by the web a
 
 Then `docker compose up -d` again. Leave both empty to keep invites by link only. With only one set, or a malformed one, nothing is emailed and `docker compose logs web` says which setting is wrong. If an email can't be sent, the invite is still made and the owner sees the link to copy, with the reason and a reference.
 
+## Feedback from your people
+
+People on your instance can [send feedback](send-feedback.md) from the top bar, and their agents with `send_feedback`. It goes to you, the operator of this instance, never to Red Mage. Read it and answer with `scripts/feedback.sh` (it lists, shows, sets a status and replies), run where you run `scripts/plan.sh`.
+
+To be emailed about each new item, set `FEEDBACK_EMAIL` in `deploy/compose/.env` to your address, beside `RESEND_API_KEY` and `EMAIL_FROM`. Without it nothing is emailed, and the feedback waits for `scripts/feedback.sh list`.
+
 ## Connect your agents
 
 Your MCP URL is your `MCP_RESOURCE`, for example `https://mcp.example.com/mcp`. Use it wherever the guides say `https://mcp.reliquary.redmage.cc/mcp`: [Connect Claude Code](connect-claude-code.md), [Connect another client](connect-other-clients.md).

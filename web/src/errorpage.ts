@@ -68,6 +68,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
     "/connect": "Opening Connect",
     "/tokens": "Opening Tokens",
     "/vaults/new": "Opening New vault",
+    "/feedback": "Opening Feedback",
     "/signin": "Signing in",
     "/signin/code": "Signing in with a code",
     "/auth/confirm": "Signing in with a link",
@@ -78,6 +79,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (p === "/signout") return say("Signing out");
   if (p === "/theme") return say("Changing the theme");
   if (p === "/settings/name") return say("Saving your display name");
+  if (p === "/feedback") return say("Sending feedback");
   if (p === "/vaults/new") return say(`Creating vault ${typed(form.get("name")) || "(no name)"}`.trim());
   if (p === "/tokens/new") return say("Creating an agent token");
   if (/^\/tokens\/[^/]+\/revoke$/.test(p)) return say("Revoking an agent token");

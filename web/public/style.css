@@ -321,6 +321,37 @@ strong { font-weight: 600; }
 .search-menu { width: min(24rem, calc(100vw - 32px)); }
 .search-menu .top-search { margin: 0; }
 .search-menu .top-search input[type="search"] { width: 100%; }
+/* The Feedback button and its short form (html.ts, feedbackPop). */
+.feedback-button { gap: 6px; }
+.feedback-label { font-size: var(--text-sm); font-weight: 500; }
+.feedback-menu { width: min(24rem, calc(100vw - 32px)); }
+.feedback-form { display: grid; gap: var(--space-3); margin: 0; }
+.feedback-form .actions { margin: 0; }
+.feedback-form .hint { margin: 0; }
+.feedback-form textarea { min-height: 6rem; }
+.feedback-kinds { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); border: 0; margin: 0; padding: 0; min-width: 0; }
+.feedback-kinds label, .feedback-include {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; font-size: var(--text-sm); cursor: pointer;
+}
+.feedback-include { flex-wrap: wrap; }
+.feedback-include code { overflow-wrap: anywhere; font-size: var(--text-xs); }
+/* The Feedback page (feedback.ts) */
+.feedback-page-form textarea { min-height: 8rem; }
+.feedback-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 60ch; }
+.feedback-list td { vertical-align: top; }
+/* Below wide screens the button is its icon, like the inbox: the label
+   would push the search box over the main links. On phones there is no
+   room for it beside the logo; the account menu's Send feedback opens the
+   Feedback page with the page you were on. */
+@media (max-width: 1240px) {
+  .feedback-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+@media (max-width: 640px) {
+  .top-tools > .feedback-pop { display: none; }
+}
 
 /* Search across vaults (search.ts) and Account settings (settings.ts) */
 .search-page { display: grid; gap: var(--space-3); margin: 0 0 var(--space-6); max-width: 40rem; }
@@ -340,6 +371,11 @@ strong { font-weight: 600; }
     padding: 0 var(--space-4); border-top: 1px solid var(--border); min-height: 44px;
   }
   .top-search input[type="search"] { width: 14rem; }
+}
+/* Where the main links share the bar with the tools, the search box gives
+   up the width of the Feedback button. */
+@media (min-width: 901px) and (max-width: 1080px) {
+  .top-search input[type="search"] { width: 8rem; }
 }
 /* Phones: search behind a button; every menu opens full width under the bar. */
 @media (max-width: 640px) {

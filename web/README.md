@@ -237,6 +237,7 @@ never a JWT, refresh token, code, token hash or email (`test.sh` checks).
 | `SITE_URL` | no | optional: the public site's https origin, when it has its own host |
 | `RESEND_API_KEY` | **yes** | optional: a Resend API key with sending access only, to email vault invites (`src/mailer.ts`) |
 | `EMAIL_FROM` | no | optional, with `RESEND_API_KEY`: the sender, e.g. `Reliquary <no-reply@mail.reliquary.redmage.cc>`, on a domain verified in Resend |
+| `FEEDBACK_EMAIL` | no | optional: where feedback notices go (`src/feedback.ts`); unset, only the hosted service (`VERCEL`) falls back to the operator's contact address, and a self-hosted instance emails nobody |
 
 The server refuses to start without these, naming the variable, never its
 value. It never uses a Supabase key that bypasses RLS.

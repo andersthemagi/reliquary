@@ -40,6 +40,14 @@ What people and their agents can each do, where, and who may: every rule here is
 | Export a vault | **Settings**, **Export** | none | person, owners |
 | Delete a vault | **Settings**, **Danger zone** | none | person, owners |
 
+## Feedback
+
+| Action | Web app | MCP tool | Who may |
+|---|---|---|---|
+| Send feedback or a bug report to the operator | the top bar's **Feedback**, the **Feedback** page | `send_feedback` | both, any connection (read-only ones too); a vault named must be one you, and the connection, can see |
+| See your feedback, its status and replies | the **Feedback** page | `list_my_feedback` | both, your own only; over MCP, without the text you typed in the web app |
+| Set a status or reply | none | none | the operator of the site only |
+
 ## Environment variables
 
 | Action | Web app | MCP tool | Who may |

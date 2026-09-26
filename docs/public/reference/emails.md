@@ -52,6 +52,12 @@ Sent after a change to your account, to tell you it happened. If it was you, the
 
 Invites are emailed when the site has an email sender (the hosted service does). Otherwise, or if the email couldn't be sent, the owner copies the link from the **Members** page and sends it to you another way: it's the same link. See [Members and invites](../concepts/members.md).
 
+## Feedback notices
+
+| Subject | When | What's in it |
+|---|---|---|
+| Reliquary feedback (*kind*): *first line* | Someone sent [feedback](../how-to/send-feedback.md) | Sent to the operator of the site only, never to you: the kind, who sent it and how (the web app or which agent), the vault and page if given, and the start of the message. |
+
 ## On a self-hosted instance
 
-The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites).
+The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites). Feedback notices go to the address in `FEEDBACK_EMAIL`, the instance's own operator; with none set, none are sent.

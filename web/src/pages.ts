@@ -11,6 +11,7 @@ import { callout, csrfField, emptyState, html, page, pageHeader, time, type Nav,
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
 import { accountSettings, saveDisplayName } from "./settings.js";
+import { feedbackRoutes } from "./feedback.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure } from "./failure.js";
 import type { Flash, Tone } from "./flash.js";
@@ -544,6 +545,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && p === "/search") return searchAll(ctx);
   if (get && p === "/settings") return accountSettings(ctx);
   if (!get && p === "/settings/name") return saveDisplayName(ctx);
+  if (p === "/feedback") return feedbackRoutes(ctx);
   if (get && p === "/activity") return allActivity(ctx);
   if (p === "/connect" || p === "/tokens" || p.startsWith("/tokens/")) return accessRoutes(ctx);
   if (get && p === "/account") return accountPage(ctx);

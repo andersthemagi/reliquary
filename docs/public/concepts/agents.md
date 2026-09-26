@@ -33,7 +33,8 @@ Within your role and the connection's access:
 - write and delete open files;
 - propose changes to canon files, revise their own proposals, and comment;
 - create a vault for you, with a read-write connection that reaches all your vaults;
-- list environment variable names, and imports from the CLI waiting for you (never values).
+- list environment variable names, and imports from the CLI waiting for you (never values);
+- send feedback or a bug report about Reliquary for you, even over a read-only connection, and list what you've sent with its status and replies. See [Send feedback or report a bug](../how-to/send-feedback.md).
 
 The full list is in [MCP tools](../reference/mcp-tools.md); what people and agents can each do is in [Permissions](../reference/permissions.md).
 
@@ -46,4 +47,5 @@ File text, reasons, comments and review notes reach an agent inside fences with 
 - Before writing, check a path's policy: `list_files` marks canon files `[canon]`, and `read_file` names the policy. Use `write_file` for open files and `propose` for canon ones.
 - You can't approve. After proposing, tell your person there is a proposal waiting in their Inbox.
 - Answer requests for changes with `revise_proposal`; read the notes in `changes_since` or `read_proposal`.
+- When your person asks to report a Reliquary bug or send feedback, use `send_feedback`: summarise in your own words, add the tool and any error `ref`, and leave out secrets, tokens and variable values.
 - Never ask for or repeat a variable's value. To add a `.env` to a vault, run `npx @reliquary-ai/cli env push`; a person applies it. See [Move a .env into a vault](../how-to/move-env-into-vault.md).

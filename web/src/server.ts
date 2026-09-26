@@ -49,6 +49,7 @@ import { configureVariables, missingKeyIds, variablesConfigured } from "./secret
 import { pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { configureMailer } from "./mailer.js";
+import { feedbackTick, flushFeedbackNotices, noticeTarget } from "./feedback.js";
 import { versionJson } from "./version.js";
 import { emailTemplate, selfHosted } from "./selfhost.js";
 import { safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
@@ -105,6 +106,9 @@ try {
   configureVariables(process.env);
   configureRateLimits(process.env);
   configureMailer(process.env);
+  // Names the setting, never the address.
+  const notices = noticeTarget(process.env);
+  if ("off" in notices && process.env.FEEDBACK_EMAIL) console.warn(`Feedback notices are off: ${notices.off}`);
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);
@@ -210,6 +214,7 @@ const FIELD_LIMITS: Record<string, { max: number; bytes?: boolean; message?: str
   name: { max: 200 },
   confirm_name: { max: 200 },
   display_name: { max: 80, message: "A display name is at most 80 characters. Nothing was saved." },
+  message: { max: 5000, message: "Feedback is at most 5000 characters: shorten it, or summarise a long log. Nothing was sent." },
 };
 function codePoints(s: string): number {
   let n = 0;
@@ -550,6 +555,9 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     }
     send(res, reply, {}, auth.cookies);
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
+    // Feedback notices waiting (an agent's, or one whose email failed):
+    // at most once a minute per instance, after the page has gone out.
+    if (req.method === "GET") feedbackTick();
   } catch (err) {
     // What was being done, where it broke, why, and the reference, which
     // is also in the log with the detail (failure.ts).
@@ -569,4 +577,8 @@ export const handle: http.RequestListener = (req, res) => {
 };
 if (!process.env.VERCEL) {
   server.listen(PORT, HOST, () => console.info(`reliquary web on http://${HOST}:${PORT}`));
+  // A long-running server also sends feedback notices on a timer, so an
+  // agent's feedback is emailed within a minute or two even when nobody
+  // opens a page (feedback.ts).
+  setInterval(() => void flushFeedbackNotices(), 60_000).unref();
 }

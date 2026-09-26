@@ -1,6 +1,6 @@
 # The top bar, inbox and account
 
-Every page of the web app has the same bar at the top. From the left: the Reliquary logo (Home), the main links, a search box, your **Inbox** and your account menu.
+Every page of the web app has the same bar at the top. From the left: the Reliquary logo (Home), the main links, a search box, **Feedback**, your **Inbox** and your account menu.
 
 ## The main links
 
@@ -15,6 +15,10 @@ On a phone the links take a row of their own under the bar, and the search box f
 ## Search
 
 The search box looks through file names and text in every vault you're in, and nothing else. Results show each file's vault and whether it is canon or open. Use quotes for a phrase, or `or` between words. To search one vault, use the search in its sidebar: its page says which vault it covers and has **Search all vaults** to look everywhere with the same words. Agents search one vault at a time with the `search` tool; see [MCP tools](../reference/mcp-tools.md#search).
+
+## Feedback
+
+The **Feedback** button, on every page (on a phone, **Send feedback** in the account menu), opens a short form to send the people who run Reliquary a bug, an idea or a question, with the page you're on if you like. **Your feedback** opens the Feedback page, with what you and your agents sent, its status and any reply. See [Send feedback or report a bug](../how-to/send-feedback.md).
 
 ## Inbox
 

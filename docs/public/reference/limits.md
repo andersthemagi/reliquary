@@ -58,6 +58,14 @@ Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
 | Invites a person creates | 20 an hour, across all their vaults |
 | A vault deletion notice | shown once to each other member, within 30 days |
 
+## Feedback
+
+| What | Limit |
+|---|---|
+| A message | 1 to 5000 characters, no control characters but line breaks and tabs |
+| The page or context sent with it | 500 characters |
+| Feedback a person sends | 20 an hour, from the web app and their agents together |
+
 ## Export
 
 | What | Limit |

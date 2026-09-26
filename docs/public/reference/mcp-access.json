@@ -4,6 +4,7 @@
   "create_vault": "An agent whose connection reaches all its person's vaults with read-write access; the person owns the new vault",
   "delete_file": "An owner's or editor's agent with read-write access, for open files only",
   "list_files": "Any member's agent, within its connection's vaults (read-only is enough)",
+  "list_my_feedback": "Any connection; shows only its person's feedback, with the operator's replies, and never the text of what was typed in the web UI",
   "list_proposals": "Any member's agent, within its connection's vaults (read-only is enough)",
   "list_variables": "Any member's agent, within its connection's vaults; pushes waiting for a person are shown to owners' and editors' read-write agents. Never values",
   "list_vaults": "Any connection or token; a read-only one shows you as viewer",
@@ -12,5 +13,6 @@
   "read_proposal": "Any member's agent, within its connection's vaults (read-only is enough)",
   "revise_proposal": "The proposer's agent (the person whose agent proposed counts as the proposer), with read-write access",
   "search": "Any member's agent, within its connection's vaults (read-only is enough)",
+  "send_feedback": "Any connection, read-only ones included: it sends feedback to the people who run this Reliquary and writes nothing to a vault. A vault it names must be within the connection",
   "write_file": "An owner's or editor's agent with read-write access, for open files only"
 }

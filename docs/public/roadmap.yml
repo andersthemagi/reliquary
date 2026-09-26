@@ -151,6 +151,11 @@
   milestone: M1
   docs: concepts/inbox-and-account
 
+- title: Feedback and bug reports
+  summary: Send a bug, an idea or a question from the top bar's Feedback button or through your agent, and see its status and the reply.
+  status: shipped
+  docs: how-to/send-feedback
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core

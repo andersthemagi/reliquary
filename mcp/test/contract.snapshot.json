@@ -141,6 +141,29 @@
     }
   },
   {
+    "name": "list_my_feedback",
+    "title": "List your person's feedback",
+    "description": "Feedback your person and their agents sent, newest first, with its status and the operator's reply.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "new",
+            "seen",
+            "planned",
+            "fixed",
+            "wont_fix"
+          ]
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": true
+    }
+  },
+  {
     "name": "list_proposals",
     "title": "List proposals",
     "description": "A vault's proposals (open by default), newest first, with reviewers' notes. changes_requested: those waiting for you to revise.",
@@ -364,6 +387,45 @@
     "annotations": {
       "readOnlyHint": true
     }
+  },
+  {
+    "name": "send_feedback",
+    "title": "Send feedback about Reliquary",
+    "description": "Send a bug report, idea or question about Reliquary itself to the people who run it, when your person asks. Summarise in your own words, with any error ref; no large logs. Never include secrets, tokens or variable values. Your person sees its status and any reply on the web UI's Feedback page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bug",
+            "idea",
+            "question",
+            "other"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "vault": {
+          "description": "The vault it's about, if any",
+          "type": "string",
+          "maxLength": 200
+        },
+        "context": {
+          "description": "What you were doing, e.g. the tool and error ref",
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "kind",
+        "message"
+      ]
+    },
+    "annotations": null
   },
   {
     "name": "write_file",

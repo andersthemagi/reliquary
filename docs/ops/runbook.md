@@ -245,6 +245,49 @@ names and counts only). The model and the numbers are in
   `PLAN_DB_CONTAINER=<a local postgres container with the migrations>`
   (and `PLAN_DB_NAME`).
 
+## Feedback
+
+People send bugs, ideas and questions from the web app's **Feedback**
+button (`/feedback`) and their agents with `send_feedback` over MCP
+(`supabase/migrations/20260926163000_feedback.sql`, `web/src/feedback.ts`;
+what people see: `docs/public/how-to/send-feedback.md`). The operator reads
+and answers with `scripts/feedback.sh` (psql as postgres, like
+`scripts/plan.sh`; `PLAN_DB_CONTAINER` for a local or self-hosted database):
+
+| Do | Command |
+|---|---|
+| What's new, newest first | `scripts/feedback.sh list` |
+| Everything, or one status | `scripts/feedback.sh list all`, `scripts/feedback.sh list planned` |
+| One in full (sender's email, agent and client, vault, page, message, reply, notice) | `scripts/feedback.sh show <id>` |
+| Set its status (the sender sees it) | `scripts/feedback.sh status <id> seen` (`new`, `seen`, `planned`, `fixed`, `wont_fix`) |
+| Reply (the sender and their agents see it; `""` clears it) | `scripts/feedback.sh reply <id> "Fixed in 0.5.0, thanks."` |
+
+- **Notices.** Each new item is emailed to the operator through Resend,
+  from the web app (the MCP server has no mailer): to `FEEDBACK_EMAIL` if
+  set, else, on the hosted service only (`VERCEL` and not `SELF_HOSTED`),
+  to `OPERATOR.contactEmail` in `web/src/site.ts`. The web app claims
+  unsent items (`private.claim_feedback_notices`) after every feedback
+  form, on a signed-in page load at most once a minute per instance, and
+  every minute where the server runs continuously (self-hosted, local); so
+  an agent's feedback is emailed when someone next uses the web app. A
+  claim lapses after 10 minutes, an item is tried at most 5 times and only
+  within 7 days; a failed send is logged with a ref (`kind=feedback`).
+  Nothing about the feedback itself depends on the email: `list` shows
+  every item, with `notice` saying whether it was emailed.
+- **What you see is private.** The list and `show` print senders' emails
+  and their words; don't paste them anywhere public. Never quote a
+  secret, token or variable value in a reply, even one the sender pasted:
+  replies reach the sender's agents.
+- **Limits.** 20 an hour per person, web and agents together (`54000`,
+  with when they can send again). Messages up to 5000 characters.
+- **Access.** A person reads only their own feedback and their agents'
+  (RLS); only postgres and `reliquary_ops` list, show, set a status or
+  reply; only the web app's role claims notices (hostile tests in
+  `supabase/tests/feedback_test.sql`).
+- **Self-hosted instances** send nothing to Red Mage: their feedback stays
+  in their database, and notices go to their own `FEEDBACK_EMAIL` or
+  nowhere.
+
 ## Email sender
 
 All email goes out through Resend (resend.com) from one subdomain,

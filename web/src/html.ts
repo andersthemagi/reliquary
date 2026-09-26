@@ -87,7 +87,8 @@ export type Nav =
   | "tokens"
   | "search"
   | "settings"
-  | "account";
+  | "account"
+  | "feedback";
 
 // What the top bar shows, from one call per page (inbox.ts, loadShell;
 // public.shell_summary in 20260926100000_shell_inbox.sql).
@@ -234,6 +235,7 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
           <li><a href="/settings"${current("settings")}>Account settings</a></li>
           <li><a href="/account"${current("account")}>Plan and usage</a></li>
           <li><a href="/tokens"${current("tokens")}>Tokens and connections</a></li>
+          <li><a href="/feedback?from=${encodeURIComponent(path)}"${current("feedback")}>Send feedback</a></li>
         </ul>
         <p class="menu-links"><a href="${siteHref("/docs")}">Docs</a><a href="${siteHref("/roadmap")}">Roadmap</a></p>
         <p class="menu-meta">${PRE_ALPHA}</p>
@@ -266,11 +268,52 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
       <summary class="button quiet icon-button" aria-label="Search">${ICON_SEARCH}</summary>
       <div class="menu search-menu">${searchForm(q, "top-q-sm")}</div>
     </details>
+    ${opts.csrf ? feedbackPop(opts.csrf, path, opts.nav === "feedback") : ""}
     ${inbox}
     ${account}
   </div>
   </div>
 </header>`;
+}
+
+// Feedback ------------------------------------------------------------------
+
+// The kinds of feedback (public.send_feedback), for the top bar's button and
+// the Feedback page (feedback.ts).
+export const FEEDBACK_KINDS = [
+  { id: "bug", label: "Bug", hint: "Something broke or didn’t do what it said" },
+  { id: "idea", label: "Idea", hint: "Something that would help" },
+  { id: "question", label: "Question", hint: "Something you couldn’t work out" },
+  { id: "other", label: "Other", hint: "Anything else" },
+] as const;
+export const FEEDBACK_MAX = 5000;
+
+const ICON_FEEDBACK = raw(
+  '<svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2.5 2h11c.8 0 1.5.7 1.5 1.5v7c0 .8-.7 1.5-1.5 1.5H8.3l-3.1 2.6c-.5.4-1.2 0-1.2-.6V12H2.5C1.7 12 1 11.3 1 10.5v-7C1 2.7 1.7 2 2.5 2Zm0 1.5v7h3v1.9l2.3-1.9h5.7v-7h-11ZM4 5.5h8V7H4V5.5Zm0 2.5h5v1.5H4V8Z"/></svg>',
+);
+
+// The Feedback button in the top bar: a short form in a <details> popover
+// (no script), posting to /feedback (feedback.ts) with the page it sits on.
+function feedbackPop(csrf: string, path: string, current: boolean): Raw {
+  const here = path.startsWith("/") && !path.startsWith("//") ? path.slice(0, 500) : "/";
+  const shown = here.length > 48 ? `${here.slice(0, 45)}...` : here;
+  return html`<details class="menu-wrap feedback-pop">
+      <summary class="button quiet icon-button feedback-button"${current ? raw(' aria-current="page"') : ""}>${ICON_FEEDBACK}<span class="feedback-label">Feedback</span></summary>
+      <div class="menu feedback-menu">
+        <p class="menu-head"><span class="menu-label">Send feedback</span><a href="/feedback">Your feedback</a></p>
+        <form method="post" action="/feedback" class="feedback-form">
+          ${csrfField(csrf)}<input type="hidden" name="page" value="${here}">
+          <fieldset class="feedback-kinds"><legend class="sr-only">What is it?</legend>${FEEDBACK_KINDS.map(
+            (k, i) => html`<label title="${k.hint}"><input type="radio" name="kind" value="${k.id}"${i === 0 ? raw(" required") : ""}> ${k.label}</label>`,
+          )}</fieldset>
+          <label class="sr-only" for="feedback-pop-message">Message</label>
+          <textarea id="feedback-pop-message" name="message" rows="4" required maxlength="${FEEDBACK_MAX}" placeholder="What happened, or what would help?"></textarea>
+          <label class="feedback-include"><input type="checkbox" name="include_page" value="1" checked> Include this page <code>${shown}</code></label>
+          <p class="hint">Goes to the people who run this Reliquary. Never paste secrets, tokens or variable values.</p>
+          <div class="actions"><button class="primary">Send</button></div>
+        </form>
+      </div>
+    </details>`;
 }
 
 // Auto, Light and Dark, the current one pressed (the Account menu and

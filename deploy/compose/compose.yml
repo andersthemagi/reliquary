@@ -182,6 +182,8 @@ services:
       # Optional: vault invites by email through Resend (both, or neither).
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      # Optional: where feedback notices go (you, this instance's operator).
+      FEEDBACK_EMAIL: ${FEEDBACK_EMAIL:-}
       # Only true behind a proxy that overwrites X-Real-IP (caddy below does).
       TRUST_PROXY_IP: ${TRUST_PROXY_IP:-0}
     ports:
