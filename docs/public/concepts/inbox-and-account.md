@@ -32,7 +32,7 @@ A proposal you snoozed leaves the count and the list until the snooze ends. **Sh
 
 The account menu, at the right of the bar, shows who you're signed in as and links to:
 
-- **Account settings** (`/settings`): your display name, your email, the theme, sign out and sign out everywhere.
+- **Account settings** (`/settings`): your display name, your email address, the theme, sign out and sign out everywhere.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
 - **Tokens and connections** (`/tokens`): agent tokens, connected apps and CLI sign-ins, each with **Revoke**. See [Connections](connections.md).
 
@@ -48,7 +48,23 @@ On **Account settings**, you can give yourself a display name. People who share 
 
 Only you can set your name, signed in to the web app. An agent can't set or read it, over any tool: it's your profile, like your memberships. See [Agents and the ceiling](agents.md).
 
-Your email is how you sign in and how invites find you. It can't be changed in the web app; ask the operator of your Reliquary.
+## Your email address
+
+Your email is how you sign in and how invites find you. To change it, enter the new address under **Email** on **Account settings** and choose **Send confirmation link**.
+
+1. Reliquary's sign-in service emails a link to the new address, and one to your current address too if this site asks both (it does by default). Nothing changes yet: you keep signing in with your current address, and **Account settings** shows the change waiting for confirmation.
+2. Open the link (or both links). With two, the first one you open says to open the other. Then the change is made, and you land on **Account settings**, signed in.
+3. From then on you sign in with the new address.
+
+What changes and what stays:
+
+- Your vaults, roles, connections, plan and display name stay as they are. They belong to your account, not your address.
+- People who share a vault with you see the new address, in Members, Activity and proposals.
+- Invites are matched to the address your account has when you open one. An invite made out to your old address stops working: ask the owner for a new one. An invite made out to your new address works with its link.
+- Until you confirm, a change grants nothing: invites made out to the new address don't show in your Inbox and can't be accepted.
+- Your old address is free again. Someone who later signs up with it gets the invites made out to it, but nothing of yours.
+
+If the new address already belongs to another Reliquary account, the change is refused. Only you can change your address, signed in to the web app; an agent can't. A confirmation link expires after a while: if yours did, send a new one.
 
 ## Sign out everywhere
 

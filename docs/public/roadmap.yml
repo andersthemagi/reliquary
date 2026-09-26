@@ -156,6 +156,11 @@
   status: shipped
   docs: concepts/inbox-and-account
 
+- title: Change your email address
+  summary: Move your account to another address from Account settings, confirmed by a link; your vaults, roles and connections stay.
+  status: shipped
+  docs: concepts/inbox-and-account
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core

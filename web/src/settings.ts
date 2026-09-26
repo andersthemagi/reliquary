@@ -1,6 +1,7 @@
 // Account settings (/settings): the person's display name, their email,
 // the theme, links to Plan and usage, Tokens and connections, and Connect,
-// and (hosted) sign out and sign out everywhere. The name is the database's to keep and check
+// and (hosted) change of email, sign out and sign out everywhere. The name
+// is the database's to keep and check
 // (public.set_display_name, public.profiles with RLS: your own row, in
 // person only; 20260926100000_shell_inbox.sql). An agent can't set it: it's
 // profile management, like managing members (docs/parity.md).
@@ -17,19 +18,35 @@
 // 20260926140000_sign_out_everywhere.sql). Connections (agent tokens,
 // connected apps, CLI sign-ins) are not browser sessions and stay, unless
 // the person also ticks "Also revoke all my connections".
+//
+// Change of email (POST /settings/email, hosted) asks Supabase Auth to move
+// the account to another address (PUT /user). Auth emails a link to the new
+// address and, with its secure email change (on by default), one to the
+// current address too; the address changes only once the link is opened
+// (/auth/confirm?type=email_change, signin.ts), and until then the page
+// shows the change waiting (GET /user). Reliquary keeps no copy of the
+// address: memberships, roles, connections, admission and plans hang off
+// the account id, so they stay; co-members see the new address; invites are
+// matched to the address the account has when one is accepted, so invites
+// made out to the old address stop matching and those made out to the new
+// one (whose inbox the person has just proved they hold) can be accepted
+// with their links (supabase/tests/email_change_test.sql).
 
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
 import { Refusal } from "./failure.js";
-import { csrfField, html, notice, pageHeader, signsOut, themeButtons } from "./html.js";
+import { callout, csrfField, html, notice, pageHeader, signsOut, themeButtons, time } from "./html.js";
+import { EMAIL } from "./signin.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 import { shortId } from "./personref.js";
 
 export const DISPLAY_NAME_MAX = 80;
 
-export function accountSettings(ctx: Ctx): Reply {
+export async function accountSettings(ctx: Ctx): Promise<Reply> {
   const me = ctx.shell?.me ?? { email: null, name: null };
   const hosted = signsOut();
+  // A change of address waiting for its link, as Supabase Auth has it.
+  const pending = hosted && ctx.session ? await ctx.session.pendingEmail() : null;
   return render(
     ctx,
     "Account settings",
@@ -47,7 +64,24 @@ export function accountSettings(ctx: Ctx): Reply {
     <section aria-labelledby="email">
       <h2 id="email">Email</h2>
       <p>${me.email ? html`<strong>${me.email}</strong>` : html`<span class="muted">No email on this account (local sign-in).</span>`}</p>
-      <p class="small muted">You sign in with this address, and invites to vaults are made out to it. It can’t be changed here: to use another address, ask the operator of this Reliquary.</p>
+      ${hosted
+        ? html`${pending === "unavailable"
+            ? callout("warning", "Reliquary couldn’t reach its sign-in service to check for a change of address waiting to be confirmed.")
+            : pending
+              ? callout(
+                  "info",
+                  html`<p>Waiting for confirmation: <strong>${pending.email}</strong>. We sent a link to that address${pending.sentAt ? html` ${time(pending.sentAt)}` : ""}, and one to your current address too if this site asks both. Open it (or both) to finish the change. Until then you sign in with your current address.</p>`,
+                  { title: "Change of email address", id: "email-pending" },
+                )
+              : ""}
+          <form method="post" action="/settings/email" class="panel settings-form">
+            ${csrfField(ctx.csrf)}
+            <label for="new-email">New email address</label>
+            <input id="new-email" type="text" name="new_email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required aria-describedby="new-email-hint">
+            <p class="hint" id="new-email-hint">We email a link to the new address to confirm it is yours; nothing changes until you open it. Afterwards you sign in with the new address. Your vaults, roles, connections and plan stay as they are, and people who share a vault with you see the new address. Invites made out to your old address stop working: ask for a new one.</p>
+            <div class="actions"><button class="primary">Send confirmation link</button></div>
+          </form>`
+        : html`<p class="small muted">You sign in with this address, and invites to vaults are made out to it. It can’t be changed here: to use another address, ask the operator of this Reliquary.</p>`}
     </section>
     <section aria-labelledby="appearance">
       <h2 id="appearance">Appearance</h2>
@@ -124,4 +158,32 @@ export async function signOutEverywhere(ctx: Ctx): Promise<Reply> {
       ctx.theme,
     ),
   };
+}
+
+export async function changeEmail(ctx: Ctx): Promise<Reply> {
+  const where = "web app (Account settings)";
+  if (!signsOut() || !ctx.session) {
+    throw new Refusal({ status: 404, where, why: "Changing your email is for Supabase sign-in; the local stand-in has no email to change" });
+  }
+  const email = (ctx.form.get("new_email") ?? "").trim();
+  const refuse = (why: string, at = where) => {
+    ctx.setFlash(refusalText(new Refusal({ status: 400, where: at, why })));
+    return { redirect: "/settings" };
+  };
+  if (!EMAIL.test(email) || email.length > 254) return refuse("Enter the new address like name@example.com. Nothing was changed");
+  const current = (await asPerson(ctx.userId, async (c) => (await c.query(`select public.my_email() as e`)).rows[0].e as string | null)) ?? "";
+  if (email.normalize("NFC").toLowerCase() === current.normalize("NFC").toLowerCase()) {
+    return refuse("That is already your address. Nothing was changed");
+  }
+  const r = await ctx.session.changeEmail(email);
+  const auth = "change of email (Supabase Auth)";
+  if (r === "unavailable") {
+    throw new Refusal({ status: 503, where: auth, why: "Reliquary couldn’t reach its sign-in service, so no confirmation link was sent and your address is unchanged. Try again in a minute" });
+  }
+  if (r === "taken") return refuse("That address already belongs to another Reliquary account, so it can’t be yours too. Nothing was changed", auth);
+  if (r === "invalid") return refuse("The sign-in service doesn’t accept that as an email address. Nothing was changed", auth);
+  if (r === "limited") return refuse("The sign-in service has sent as many emails as it allows for now, so no link was sent. Wait an hour, then ask again. Nothing was changed", auth);
+  if (r === "refused") return refuse("The sign-in service refused the change, so no link was sent. Sign out, sign in again and retry. Nothing was changed", auth);
+  ctx.setFlash("We sent a confirmation link to the new address. Open it to finish the change; until then you sign in with your current address.", "success");
+  return { redirect: "/settings" };
 }

@@ -1,7 +1,8 @@
 // Account settings with Supabase Auth (src/settings.ts, src/auth.ts):
-// signing out everywhere. Against web/test.sh's AUTH_MODE=supabase instance
-// A and the fake Auth (test/fake-auth.mjs). The database rules are in
-// supabase/tests/sign_out_everywhere_test.sql.
+// signing out everywhere and changing the email address. Against
+// web/test.sh's AUTH_MODE=supabase instance A and the fake Auth
+// (test/fake-auth.mjs). The database rules are in
+// supabase/tests/sign_out_everywhere_test.sql and email_change_test.sql.
 //
 // Everyone here is made by this file (acct-*@example.test, in the fake Auth
 // and in auth.users) and used by no other. Every sign-in code, token hash
@@ -225,4 +226,110 @@ test("sign out everywhere: needs the form token and this site's origin", async (
   assert.equal((await stats()).logoutGlobal, n);
   assert.equal((await get("/", jar)).status, 200);
   assert.equal(await live(U.uma), 2);
+});
+
+// ---------------------------------------------------------------------------
+// Change of email
+
+const flashOf = (h) => (/<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "");
+const flashAfter = async (r, jar) => {
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), "/settings");
+  return flashOf(await (await get("/settings", jar)).text());
+};
+const confirmLink = async (tokenHash, jar) => {
+  remember(tokenHash);
+  const page = await (await get(`/auth/confirm?token_hash=${tokenHash}&type=email_change`, jar)).text();
+  return post("/auth/confirm", { csrf: csrfOf(page), token_hash: tokenHash, type: "email_change" }, jar);
+};
+
+test("change email: Account settings shows my address and a form for a new one, saying what changes and what stays", async () => {
+  await account("acct-vera@example.test");
+  const jar = await signIn("acct-vera@example.test");
+  const h = await (await get("/settings", jar)).text();
+  assert.match(h, /<h2 id="email">Email<\/h2>\s*<p><strong>acct-vera@example\.test<\/strong><\/p>/);
+  assert.match(h, /<form method="post" action="\/settings\/email" class="panel settings-form">\s*<input type="hidden" name="csrf" value="[0-9a-f]+">\s*<label for="new-email">New email address<\/label>/);
+  assert.match(h, /<input id="new-email" type="text" name="new_email" inputmode="email" autocomplete="email"[^>]* maxlength="254" required aria-describedby="new-email-hint">/);
+  assert.match(h, /We email a link to the new address to confirm it is yours; nothing changes until you open it\. Afterwards you sign in with the new address\. Your vaults, roles, connections and plan stay as they are, and people who share a vault with you see the new address\. Invites made out to your old address stop working: ask for a new one\./);
+  assert.match(h, /<button class="primary">Send confirmation link<\/button>/);
+  assert.doesNotMatch(h, /It can’t be changed here/);
+  assert.doesNotMatch(h, /Waiting for confirmation/);
+});
+
+test("change email: asking emails a link to the new address and one to the current, and the page shows the change waiting", async () => {
+  const jar = await signIn("acct-vera@example.test");
+  const n = (await stats()).userUpdate;
+  const r = await post("/settings/email", { csrf: await settingsCsrf(jar), new_email: "  acct-vera.new@example.test " }, jar);
+  assert.equal(await flashAfter(r, jar), "We sent a confirmation link to the new address. Open it to finish the change; until then you sign in with your current address.");
+  assert.equal((await stats()).userUpdate, n + 1);
+  assert.equal((await lastEmail("acct-vera.new@example.test")).type, "email_change");
+  assert.equal((await lastEmail("acct-vera@example.test")).type, "email_change");
+  const h = await (await get("/settings", jar)).text();
+  assert.match(h, /<div class="callout info" id="email-pending"><p class="callout-title"><strong>Change of email address<\/strong><\/p><p>Waiting for confirmation: <strong>acct-vera\.new@example\.test<\/strong>\. We sent a link to that address <time datetime="[^"]+"[^>]*>[^<]+<\/time>, and one to your current address too if this site asks both\. Open it \(or both\) to finish the change\. Until then you sign in with your current address\.<\/p><\/div>/);
+  assert.match(h, /<p><strong>acct-vera@example\.test<\/strong><\/p>/, "the address in use is still the current one");
+});
+
+test("change email: the links confirm the change, which lands on Account settings with a notice, and the new address signs in", async () => {
+  const { token_hash: current } = await lastEmail("acct-vera@example.test");
+  const { token_hash: next } = await lastEmail("acct-vera.new@example.test");
+  const jar = new Jar();
+  const first = await confirmLink(current, jar);
+  assert.equal(first.status, 200);
+  assert.match(await first.text(), /One address confirmed/);
+  const second = await confirmLink(next, jar);
+  assert.equal(second.status, 303);
+  assert.equal(second.headers.get("location"), "/settings");
+  // Supabase Auth writes the new address to auth.users; the fake can't.
+  await sql("update auth.users set email = 'acct-vera.new@example.test' where email = 'acct-vera@example.test'");
+  const h = await (await get("/settings", jar)).text();
+  assert.equal(flashOf(h), "Your email address is changed: you sign in with the new one from now on, and people who share a vault with you see it.");
+  assert.match(h, /<p><strong>acct-vera\.new@example\.test<\/strong><\/p>/);
+  assert.doesNotMatch(h, /Waiting for confirmation/);
+  const again = await signIn("acct-vera.new@example.test");
+  assert.match(await (await get("/settings", again)).text(), /<p><strong>acct-vera\.new@example\.test<\/strong><\/p>/);
+});
+
+test("change email: a malformed address, my own or another account's is refused with the reason and a reference, and nothing changes", async () => {
+  const jar = await signIn("acct-vera.new@example.test");
+  const n = (await stats()).userUpdate;
+  const csrf = await settingsCsrf(jar);
+  assert.match(await flashAfter(await post("/settings/email", { csrf, new_email: "not an address" }, jar), jar), /^Enter the new address like name@example\.com\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(await flashAfter(await post("/settings/email", { csrf, new_email: "ACCT-VERA.NEW@example.test" }, jar), jar), /^That is already your address\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+  assert.equal((await stats()).userUpdate, n, "neither reached Supabase Auth");
+  assert.match(await flashAfter(await post("/settings/email", { csrf, new_email: "acct-uma@example.test" }, jar), jar), /^That address already belongs to another Reliquary account, so it can’t be yours too\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+  const h = await (await get("/settings", jar)).text();
+  assert.doesNotMatch(h, /Waiting for confirmation/);
+  assert.match(h, /<p><strong>acct-vera\.new@example\.test<\/strong><\/p>/);
+});
+
+test("change email: if Supabase Auth can't be reached or limits emails, the page says where, why and a reference", async () => {
+  const jar = await signIn("acct-vera.new@example.test");
+  try {
+    await fake("/_fail_user_update", { method: "POST", body: JSON.stringify({ status: 500 }) });
+    const r = await post("/settings/email", { csrf: await settingsCsrf(jar), new_email: "acct-vera.third@example.test" }, jar);
+    assert.equal(r.status, 503);
+    const h = await r.text();
+    assert.match(h, /Changing your email address/);
+    assert.match(h, /change of email \(Supabase Auth\)/);
+    assert.match(h, /Reliquary couldn’t reach its sign-in service, so no confirmation link was sent and your address is unchanged/);
+    await fake("/_fail_user_update", { method: "POST", body: JSON.stringify({ status: 429, body: { code: 429, error_code: "over_email_send_rate_limit", msg: "email rate limit exceeded" } }) });
+    const limited = await post("/settings/email", { csrf: await settingsCsrf(jar), new_email: "acct-vera.third@example.test" }, jar);
+    assert.match(await flashAfter(limited, jar), /^The sign-in service has sent as many emails as it allows for now, so no link was sent\. Wait an hour, then ask again\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+  } finally {
+    await fake("/_fail_user_update", { method: "POST", body: JSON.stringify({ status: 0 }) });
+  }
+});
+
+test("change email: needs the form token and this site's origin", async () => {
+  const jar = await signIn("acct-vera.new@example.test");
+  const n = (await stats()).userUpdate;
+  assert.equal((await post("/settings/email", { new_email: "acct-forged@example.test" }, jar)).status, 403);
+  const r = await fetch(A + "/settings/email", {
+    method: "POST",
+    redirect: "manual",
+    headers: { cookie: jar.header, "content-type": "application/x-www-form-urlencoded", origin: "https://evil.example" },
+    body: new URLSearchParams({ csrf: await settingsCsrf(jar), new_email: "acct-forged@example.test" }).toString(),
+  });
+  assert.equal(r.status, 403);
+  assert.equal((await stats()).userUpdate, n);
 });

@@ -32,6 +32,7 @@ import {
   clearCookie,
   clearPreToken,
   cookieName,
+  flashCookie,
   preToken,
   preTokenOk,
   readCookie,
@@ -86,7 +87,7 @@ export function safeNext(value: string | null | undefined): string {
 export const signinUrl = (next: string) => (safeNext(next) === "/" ? "/signin" : `/signin?next=${encodeURIComponent(safeNext(next))}`);
 
 const NEXT = "rlq_next";
-const EMAIL = /^[^\s@<>()",;:\\]{1,64}@[^\s@<>()",;:\\]{1,190}\.[^\s@<>()",;:\\]{1,63}$/;
+export const EMAIL = /^[^\s@<>()",;:\\]{1,64}@[^\s@<>()",;:\\]{1,190}\.[^\s@<>()",;:\\]{1,63}$/;
 const CODE = /^[0-9]{6,10}$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{16,256}$/;
 
@@ -338,6 +339,12 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
         back: "/signin",
       }),
     });
+  }
+  // A change of address, done: back to Account settings, which shows the
+  // address now in use, with a notice saying so.
+  if (type === "email_change") {
+    cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT), flashCookie({ text: "Your email address is changed: you sign in with the new one from now on, and people who share a vault with you see it.", tone: "success" }));
+    return out({ redirect: "/settings" });
   }
   let back = "/";
   try {
