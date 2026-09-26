@@ -13,6 +13,8 @@ const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
 
 // A static picture of the product's core loop, drawn in HTML: an agent's
 // proposal waiting for a person. Decorative; the steps below say the same.
+// Its buttons are spans, hidden from assistive tech and inert, so nothing
+// on it can be focused or mistaken for a control.
 const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-cap">
   <div class="hero-card-head">
     <span class="badge info">Open</span>
@@ -24,7 +26,7 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
     <div class="del"><span>−</span>Deploy to: staging</div>
     <div class="add"><span>+</span>Deploy to: eu-production</div>
   </div>
-  <div class="hero-card-actions" aria-hidden="true">
+  <div class="hero-card-actions" aria-hidden="true" inert>
     <span class="button primary">Approve</span>
     <span class="button">Request changes</span>
   </div>
@@ -141,8 +143,8 @@ export function landing(theme: Theme): string {
 
 <section class="site-section trust" aria-labelledby="trust-title">
   <h2 id="trust-title">What your agent can't do</h2>
-  <ul class="ceiling">
-    ${ceiling.map((c) => html`<li>${c}</li>`)}
+  <ul class="cant-list">
+    ${ceiling.map((c) => html`<li><span class="cant-mark" aria-hidden="true">✕</span>${c}</li>`)}
   </ul>
   <p>Enforced in the database, not the prompt, and tested on every push. Data is hosted in the EU; variable values are encrypted with a key the database never holds. We say plainly what we can't promise: an agent can read what reaches its process, and we, as the operator, could technically decrypt values.</p>
   <p><a href="/security">Read how security works</a></p>

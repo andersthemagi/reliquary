@@ -1146,3 +1146,15 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure dt { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-md); }
 .failure dd { margin: 0; overflow-wrap: anywhere; }
 .failure-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Package I: signed-out and error pages */
+/* Landing: what an agent can't do, as a plain list with a mark (landing.ts). */
+.cant-list { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: var(--space-3) var(--space-7); }
+.cant-list li { display: flex; align-items: baseline; gap: var(--space-3); font-weight: 500; }
+.cant-mark { flex: none; color: var(--danger); font-size: var(--text-sm); }
+@media (min-width: 700px) { .cant-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Error pages (errorpage.ts): the lines to copy into a report, folded away. */
+.failure-details { margin: 0 0 var(--space-6); max-width: 80ch; }
+.failure-details > summary { cursor: pointer; width: fit-content; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.failure-details > summary:hover { color: var(--fg); }
+.failure-details[open] > summary { margin-bottom: var(--space-3); }

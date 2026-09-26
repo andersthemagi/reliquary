@@ -34,12 +34,14 @@ import {
   verifySignin,
   type Session,
 } from "./auth.js";
-import { html, notice, page, type Theme } from "./html.js";
+import { html, page, type Theme } from "./html.js";
+import { siteHref } from "./hosts.js";
 import { inviteTokenOf, maskEmail, peekInvite, type Peek } from "./invites.js";
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage } from "./errorpage.js";
 import { failure, noteUpstream, upstreamNote } from "./failure.js";
+import { requestAccessHref } from "./site.js";
 
 // The live invite a sign-in is for, if `next` is an invite page. Looking
 // one up counts against the address's invite limit (ratelimit.ts), like
@@ -95,6 +97,11 @@ type Out = { reply: Reply; cookies: string[] };
 
 const hidden = (name: string, value: string) => html`<input type="hidden" name="${name}" value="${value}">`;
 
+// A refused form: the reason in the danger tone, announced, and tied to the
+// field it is about (aria-describedby on the field, aria-invalid).
+const formError = (id: string, error?: string) => (error ? html`<p class="callout danger" role="alert" id="${id}">${error}</p>` : "");
+const invalid = (id: string, error?: string) => (error ? html` aria-invalid="true" aria-describedby="${id}"` : "");
+
 function emailForm(csrf: string, next: string, theme: Theme, error?: string, invite?: Peek): string {
   return page(
     "Sign in",
@@ -104,14 +111,17 @@ function emailForm(csrf: string, next: string, theme: Theme, error?: string, inv
           <p class="lede">You’ve been invited to <strong>${invite.vaultName}</strong> on Reliquary. Sign in with the address the invite was sent to, <strong>${maskEmail(invite.email)}</strong>: we’ll email it a sign-in link and a 6-digit code. New to Reliquary? The same step makes your account.</p>`
         : html`<h1>Sign in to Reliquary</h1>
           <p class="lede">We’ll email you a sign-in link and a 6-digit code.</p>`}
-      ${error ? html`<p class="callout attention" role="alert">${error}</p>` : ""}
+      ${formError("email-error", error)}
       <form method="post" action="/signin" class="panel">
         ${hidden("csrf", csrf)}${hidden("next", next)}
         <label for="email">Email</label>
-        <input type="text" id="email" name="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required>
+        <input type="text" id="email" name="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${invalid("email-error", error)}>
         <div class="actions"><button class="primary">Email me a code</button></div>
       </form>
-      ${invite ? "" : html`<p class="hint">Reliquary is invite-only: ask the person who runs your vault to add you.</p>`}
+      ${invite
+        ? ""
+        : html`<p class="hint">Reliquary is invite-only. Anyone can sign in, but an account creates vaults only after it joins one by invite. Have an invite? Open its link. Otherwise, <a href="${requestAccessHref()}">request access</a>.</p>`}
+      <p class="hint"><a href="${siteHref("/docs")}">About Reliquary</a></p>
     </div>`,
     { theme },
   );
@@ -123,11 +133,11 @@ function codeForm(csrf: string, email: string, next: string, theme: Theme, error
     html`<div class="signin">
       <h1>Check your email</h1>
       <p class="lede">If <strong>${email}</strong> has a Reliquary account, we’ve sent it a sign-in link and a code. Open the link on this device, or enter the code here.</p>
-      ${error ? html`<p class="callout attention" role="alert">${error}</p>` : ""}
+      ${formError("code-error", error)}
       <form method="post" action="/signin/code" class="panel">
         ${hidden("csrf", csrf)}${hidden("next", next)}${hidden("email", email)}
         <label for="code">Code</label>
-        <input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required>
+        <input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required${invalid("code-error", error)}>
         <div class="actions"><button class="primary">Sign in</button></div>
       </form>
       <form method="post" action="/signin" class="actions">
@@ -202,7 +212,16 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (i.method === "GET" && p === "/auth/confirm") {
     const tokenHash = i.url.searchParams.get("token_hash") ?? "";
     if (!TOKEN_HASH.test(tokenHash) || i.url.searchParams.get("type") !== "email") {
-      return out({ status: 400, html: notice("Link incomplete", html`This sign-in link is missing a part. Copy the whole link from the email, or <a href="/signin">send a new one</a>.`, i.theme) });
+      const f = failure({ status: 400, where: "sign-in link", why: "The link is missing its token or its type: it was cut short when it was copied" });
+      return out({
+        status: 400,
+        html: errorPage(f, {
+          theme: i.theme,
+          title: "Link incomplete",
+          lede: html`This sign-in link is missing a part. Copy the whole link from the email, or <a href="/signin">send a new one</a>.`,
+          back: "/signin",
+        }),
+      });
     }
     return out({ html: confirmForm(pre(), tokenHash, i.theme) });
   }
@@ -229,13 +248,16 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     const r = await sendSigninEmail(email, invite !== undefined && email.toLowerCase() === invite.email);
     if (r.unavailable) return out(unavailable(i.theme));
     if (r.signupsOff) {
+      // The reason is logged, so it names no address; the page does.
+      const f = failure({ status: 403, where: "sign-in (Supabase Auth)", why: "This site isn’t making new accounts on its own right now, and the address has no account yet" });
       return out({
         status: 403,
-        html: notice(
-          "No account yet",
-          html`There’s no Reliquary account for <strong>${email}</strong> yet, and this site isn’t making new accounts on its own right now. Ask the person who invited you to have an account made for that address, then open the invite link again.`,
-          i.theme,
-        ),
+        html: errorPage(f, {
+          theme: i.theme,
+          title: "No account yet",
+          lede: html`There’s no Reliquary account for <strong>${email}</strong> yet, and this site isn’t making new accounts on its own right now. Ask the person who invited you to have an account made for that address, then open the invite link again.`,
+          back: signinUrl(next),
+        }),
       });
     }
     // The emailed link can't carry `next`, so it waits in a cookie for the
@@ -272,9 +294,15 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   const r = TOKEN_HASH.test(tokenHash) ? await verifySignin({ tokenHash }) : ({ ok: false, unavailable: false } as const);
   if (!r.ok) {
     if (r.unavailable) return out(unavailable(i.theme));
+    const f = failure({ status: 400, where: "sign-in (Supabase Auth)", why: "The sign-in link has expired or was already used" });
     return out({
       status: 400,
-      html: notice("Link expired", html`That sign-in link has expired or was already used. <a href="/signin">Send a new one</a>.`, i.theme),
+      html: errorPage(f, {
+        theme: i.theme,
+        title: "Link expired",
+        lede: html`That sign-in link has expired or was already used. <a href="/signin">Send a new one</a>.`,
+        back: "/signin",
+      }),
     });
   }
   let back = "/";

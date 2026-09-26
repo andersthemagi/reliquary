@@ -53,7 +53,7 @@ Reliquary never shows a variable's value, a token, a key, a password, a file's t
 
 ## What each surface shows
 
-The web app shows an error page with the right HTTP status (400, 403, 404, 409, 413, 429, 500, 502, 503 or 504), the four fields, and **Copy details**: the same fields as plain text to paste into a report. A refusal on a form you just sent (you aren't allowed, a name is taken) shows at the top of the page you were on, ending with its reference.
+The web app shows an error page with the right HTTP status (400, 403, 404, 409, 413, 429, 500, 502, 503 or 504), the four fields, and **Details to send if you report this**: open it for the same fields as plain text to paste into a report. A refusal on a form you just sent (you aren't allowed, a name is taken) shows at the top of the page you were on, ending with its reference.
 
 An MCP tool error has two lines: the first says what failed and why, the second gives what, where and the reference:
 
@@ -83,6 +83,6 @@ reliquary: Couldn't reach app.example.com (GET /api/env/vaults): the DNS lookup 
 
 ## Reporting an error
 
-Send the reference with what you were doing. On the web, **Copy details** has everything in one block. The reference finds the full record in Reliquary's server log: the time, the SQLSTATE and constraint, the function and line in the database, and where in the code it happened. The reference itself holds nothing about you or your data.
+Send the reference with what you were doing. On the web, open **Details to send if you report this** on the error page: it has everything in one block. The reference finds the full record in Reliquary's server log: the time, the SQLSTATE and constraint, the function and line in the database, and where in the code it happened. The reference itself holds nothing about you or your data.
 
 References are random and only mean something together with the server's log, so there's no harm in pasting one in an issue or a chat.

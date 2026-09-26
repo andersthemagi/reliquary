@@ -138,6 +138,16 @@ test("invite sign-in: any other address signs in as usual and never makes an acc
   assert.equal((await stats()).lastCreateUser, false);
 });
 
+test("invite sign-in: no account yet is an error page with where, why and a reference, and the reason names no address", async () => {
+  const r = await askForCode(new Jar(), T.newbie, "newbie@example.test");
+  assert.equal(r.status, 403);
+  const h = await r.text();
+  assert.match(h, /<h1>No account yet<\/h1>/);
+  assert.match(h, /<dt>Where<\/dt><dd>sign-in \(Supabase Auth\)<\/dd>/);
+  assert.match(h, /<dt>Why<\/dt><dd>This site isn’t making new accounts on its own right now, and the address has no account yet\.<\/dd>/);
+  assert.match(h, /<dt>Reference<\/dt><dd><code>ref [0-9a-f]{8}<\/code><\/dd>/);
+});
+
 test("invite sign-in: with sign-ups off, the invited address is told plainly it has no account yet", async () => {
   const r = await askForCode(new Jar(), T.newbie, "Newbie@Example.test");
   assert.equal(r.status, 403);

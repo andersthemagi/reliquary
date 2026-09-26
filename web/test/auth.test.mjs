@@ -191,6 +191,61 @@ test("sign-in: copy has no em dashes or straight apostrophes", async () => {
   }
 });
 
+test("sign-in: the page says Reliquary is invite-only, what an invite does, and how to request access", async () => {
+  const h = await (await get(A, "/signin", new Jar())).text();
+  assert.match(h, /<p class="hint">Reliquary is invite-only\. Anyone can sign in, but an account creates vaults only after it joins one by invite\. Have an invite\? Open its link\. Otherwise, <a href="mailto:[^"?]+\?subject=Reliquary%20early%20access">request access<\/a>\.<\/p>/);
+  assert.match(h, /<a href="[^"]*\/docs">About Reliquary<\/a>/);
+});
+
+test("sign-in: a malformed email is refused in the danger tone, announced, and tied to the email field", async () => {
+  const jar = new Jar();
+  const page = await (await get(A, "/signin", jar)).text();
+  assert.doesNotMatch(page, /aria-invalid/);
+  const r = await post(A, "/signin", { csrf: csrfOf(page), email: "not-an-address", next: "/" }, jar);
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<p class="callout danger" role="alert" id="email-error">Enter your email address, like name@example\.com\.<\/p>/);
+  assert.match(h, /<input type="text" id="email" name="email"[^>]* required aria-invalid="true" aria-describedby="email-error">/);
+});
+
+test("sign-in: a bad or expired code is refused in the danger tone, announced, and tied to the code field", async () => {
+  const jar = new Jar();
+  const page = await (await askForCode(A, jar, "danger-tone@example.test")).text();
+  assert.doesNotMatch(page, /aria-invalid/);
+  const r = await post(A, "/signin/code", { csrf: csrfOf(page), email: "danger-tone@example.test", code: "12" }, jar);
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<p class="callout danger" role="alert" id="code-error">That code didn’t work\. It may have expired or been used already/);
+  assert.match(h, /<input type="text" id="code" name="code"[^>]* required aria-invalid="true" aria-describedby="code-error">/);
+  assert.doesNotMatch(h, /callout attention/);
+});
+
+test("sign-in: an incomplete link is an error page with what, where, why and a reference", async () => {
+  const r = await get(A, "/auth/confirm?token_hash=short", new Jar());
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<h1>Link incomplete<\/h1>/);
+  assert.match(h, /<p class="lede">This sign-in link is missing a part\. Copy the whole link from the email, or <a href="\/signin">send a new one<\/a>\.<\/p>/);
+  assert.match(h, /<dt>What<\/dt><dd>Signing in with a link<\/dd>/);
+  assert.match(h, /<dt>Where<\/dt><dd>sign-in link<\/dd>/);
+  assert.match(h, /<dt>Why<\/dt><dd>The link is missing its token or its type: it was cut short when it was copied\.<\/dd>/);
+  assert.match(h, /<dt>Reference<\/dt><dd><code>ref [0-9a-f]{8}<\/code><\/dd>/);
+});
+
+test("sign-in: an expired or used link is an error page with a reference", async () => {
+  const jar = new Jar();
+  const hash = "expiredlinkexpiredlink";
+  const page = await (await get(A, `/auth/confirm?token_hash=${hash}&type=email`, jar)).text();
+  const r = await post(A, "/auth/confirm", { csrf: csrfOf(page), token_hash: hash }, jar);
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<h1>Link expired<\/h1>/);
+  assert.match(h, /That sign-in link has expired or was already used\. <a href="\/signin">Send a new one<\/a>\./);
+  assert.match(h, /<dt>Where<\/dt><dd>sign-in \(Supabase Auth\)<\/dd>/);
+  assert.match(h, /<dt>Reference<\/dt><dd><code>ref [0-9a-f]{8}<\/code><\/dd>/);
+  assert.ok(!jar.c.has(AT));
+});
+
 // Session cookies ------------------------------------------------------------
 
 test("session: cookies are __Host-, HttpOnly, Secure, SameSite=Lax, Path=/, no Domain, and private", async () => {

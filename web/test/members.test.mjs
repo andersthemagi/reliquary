@@ -243,6 +243,16 @@ test("invite page: a malformed or unknown link is not found", async () => {
   }
 });
 
+test("invite page: an unknown link is an error page with where, why and a reference, like every failure", async () => {
+  const h = await page("zoe", `/invite?token=rli_${"0".repeat(64)}`);
+  assert.match(h, /<h1>Invite not found<\/h1>/);
+  assert.match(h, /<p class="lede">This invite link isn’t valid\. Check you copied all of it, or ask the person who invited you for a new one\.<\/p>/);
+  assert.match(h, /<dt>What<\/dt><dd>Opening an invite<\/dd>/);
+  assert.match(h, /<dt>Where<\/dt><dd>invites<\/dd>/);
+  assert.match(h, /<dt>Why<\/dt><dd>This link isn’t a valid invite: it may be cut short, or already replaced\.<\/dd>/);
+  assert.match(h, /<dt>Reference<\/dt><dd><code>ref [0-9a-f]{8}<\/code><\/dd>/);
+});
+
 test("invite: revoking a pending invite kills its link", async () => {
   const h = await (await post("olga", `${members(V.team)}/invite`, { email: "zoe@example.test", role: "editor" })).text();
   tokens.zoe = tokenOf(h);
