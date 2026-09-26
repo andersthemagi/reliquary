@@ -338,6 +338,18 @@ Self-hosted instances serve them to their Auth server on their own
 once, and again whenever `web/emails/` changes (a release note or the diff
 says so).
 
+**The quick way:** put all 13 in at once through Supabase's Management API.
+Make a personal access token (supabase.com, Account > Access Tokens), paste
+it into `supabase/.access-token` (gitignored; `chmod 600`), then run
+`scripts/email-templates.sh apply`. It sets every template and subject and
+turns the security notifications on. `scripts/email-templates.sh check`
+says, per template, whether the project matches the files. Delete the token
+afterwards if you won't need it again. The token is read from the file and
+never printed. (`SUPABASE_API_URL` points the script elsewhere, for testing
+only.)
+
+**By hand, in the dashboard:**
+
 1. `scripts/email-templates.sh` lists all 13: dashboard place, subject, file.
 2. Supabase dashboard, project `bigonndpibguxuwtysnx`: **Authentication >
    Emails**.

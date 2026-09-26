@@ -17,6 +17,7 @@ web/.login
 web/docs-build/
 mcp/.login-oauth-*
 supabase/.db-password
+supabase/.access-token
 supabase/.*-db-password
 supabase/.*-secret
 supabase/.vercel-*.env
