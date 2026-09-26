@@ -69,6 +69,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   };
   if (get && pages[p]) return say(pages[p]);
   if (p === "/signin" || p === "/signin/code") return say("Signing in");
+  if (p === "/auth/confirm") return say("Signing in with a link");
   if (p === "/signout") return say("Signing out");
   if (p === "/theme") return say("Changing the theme");
   if (p === "/vaults/new") return say(`Creating vault ${typed(form.get("name")) || "(no name)"}`.trim());
@@ -137,13 +138,15 @@ export type ErrorPageOpts = {
   path?: string;
 };
 
-// The error page: the reason first, then what, where, why and the
-// reference, the same as plain text to copy (no script needed), and links
-// back.
-export function errorPage(f: Failure, o: ErrorPageOpts = {}): string {
+// The error page's body: the reason first, then what, where, why and the
+// reference, and, folded away (a <details>, no script needed), the same as
+// plain text to copy into a report, then links back. For a page that has
+// its own frame (the invite page, members.ts); everything else uses
+// errorPage().
+export function errorBody(f: Failure, o: Pick<ErrorPageOpts, "title" | "lede" | "back"> = {}): Raw {
   const title = o.title ?? `${f.what} failed`;
   const back = o.back && o.back.startsWith("/") && !o.back.startsWith("//") ? o.back : "/";
-  const body = html`<h1>${title}</h1>
+  return html`<h1>${title}</h1>
     <p class="lede">${o.lede ?? f.why}</p>
     <dl class="failure">
       <dt>What</dt><dd>${f.what}</dd>
@@ -151,11 +154,17 @@ export function errorPage(f: Failure, o: ErrorPageOpts = {}): string {
       <dt>Why</dt><dd>${f.why}</dd>
       <dt>Reference</dt><dd><code>ref ${f.ref}</code></dd>
     </dl>
-    <h2>Copy details</h2>
-    <p class="small muted">If you report this, send these lines. The reference finds the full record in Reliquary’s server log.</p>
-    <pre class="code failure-copy">${plainText(f, { time: new Date().toISOString().slice(0, 19) + "Z" })}</pre>
+    <details class="failure-details">
+      <summary>Details to send if you report this</summary>
+      <p class="small muted">Copy these lines into your report. The reference finds the full record in Reliquary’s server log.</p>
+      <pre class="code failure-copy">${plainText(f, { time: new Date().toISOString().slice(0, 19) + "Z" })}</pre>
+    </details>
     <p class="actions">${back !== "/" ? html`<a class="button" href="${back}">Back</a>` : ""}<a class="button" href="/">Home</a><a href="${siteHref("/docs/reference/errors")}">What these fields mean</a></p>`;
-  return page(title, body, {
+}
+
+// The error page: errorBody() in the site's frame, signed in or not.
+export function errorPage(f: Failure, o: ErrorPageOpts = {}): string {
+  return page(o.title ?? `${f.what} failed`, errorBody(f, o), {
     theme: o.theme,
     user: o.user,
     csrf: o.csrf,

@@ -81,6 +81,23 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   assert.doesNotMatch(h, /<script/i);
 });
 
+test("site landing: what an agent can't do is a plain list with a mark, not button-like pills", async () => {
+  const h = await text(A, "/");
+  const list = /<ul class="cant-list">([\s\S]*?)<\/ul>/.exec(h)?.[1] ?? "";
+  const items = [...list.matchAll(/<li><span class="cant-mark" aria-hidden="true">✕<\/span>([^<]+)<\/li>/g)].map((m) => m[1]);
+  assert.deepEqual(items, ["Approve its own change", "Change the rules", "Add or remove people", "Reveal a secret&#39;s value", "Export or delete a vault"]);
+  assert.doesNotMatch(h, /<ul class="ceiling">/);
+});
+
+test("site landing: the demo card's buttons can't be focused or reached by assistive tech", async () => {
+  const h = await text(A, "/");
+  const actions = /<div class="hero-card-actions"([^>]*)>([\s\S]*?)<\/div>/.exec(h);
+  assert.ok(actions, "the demo card has its buttons");
+  assert.match(actions[1], /aria-hidden="true"/);
+  assert.match(actions[1], /\binert\b/);
+  assert.doesNotMatch(actions[2], /<button|<a /);
+});
+
 test("site landing: calls to action are Sign in and Request access by email with a subject", async () => {
   const h = await text(A, "/");
   assert.match(h, /<a class="button primary" href="mailto:andres@redmage\.cc\?subject=Reliquary%20early%20access">Request access<\/a>/);

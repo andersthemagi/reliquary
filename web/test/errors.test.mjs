@@ -216,6 +216,16 @@ test("errors: a database error shows what was being done, where, why and a refer
   assert.equal(l.what, `POST /v/:id/file ${V.own} action=write`);
 });
 
+test("errors: the lines to copy are folded away under Details to send if you report this, closed until opened", async () => {
+  const r = await get("/no/such/page");
+  assert.equal(r.status, 404);
+  const h = await r.text();
+  assert.ok(fields(h).ref, "a reference");
+  assert.match(h, /<details class="failure-details">\s*<summary>Details to send if you report this<\/summary>[\s\S]*?<pre class="code failure-copy">Reliquary error\n[\s\S]*?<\/pre>\s*<\/details>/);
+  assert.doesNotMatch(h, /<details class="failure-details" open/);
+  assert.doesNotMatch(h, /<h2>Copy details<\/h2>/);
+});
+
 test("errors: a unique violation's row values never reach the page or the log", async () => {
   const r = await write("errors-test/unique.md");
   assert.equal(r.status, 303);

@@ -20,6 +20,8 @@
 import type pg from "pg";
 import { authMode } from "./auth.js";
 import { asPerson } from "./db.js";
+import { errorBody } from "./errorpage.js";
+import { failure } from "./failure.js";
 import { csrfField, html, pageHeader, raw, when, type Raw } from "./html.js";
 import { deliverInvite, INVITE_TOKEN, inviteLink, maskEmail, peekInvite, ROLE_TEXT, type Peek } from "./invites.js";
 import { limit, tooManyPage } from "./ratelimit.js";
@@ -365,8 +367,10 @@ export async function membersRoutes(ctx: Ctx, id: string, rest: string): Promise
 function invitePageBody(ctx: Ctx, token: string, p: Peek | undefined, me: string | null, error?: string): Raw {
   const head = (title: string) => pageHeader({ title });
   if (!p) {
-    return html`${head("Invite not found")}<p class="lede">This invite link isn’t valid. Check you copied all of it, or ask for a new one.</p>
-      <p><a href="/">Your vaults</a></p>`;
+    // A failure like any other: what, where, why and a reference. Unknown,
+    // cut short and made-up links look the same.
+    const f = failure({ status: 404, where: "invites", why: "This link isn’t a valid invite: it may be cut short, or already replaced" });
+    return errorBody(f, { title: "Invite not found", lede: "This invite link isn’t valid. Check you copied all of it, or ask the person who invited you for a new one." });
   }
   if (p.state !== "pending") {
     const why = {
