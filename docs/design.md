@@ -20,20 +20,22 @@ The research behind this draft is in `docs/research/`
 5. [Identity and permissions](#identity-and-permissions)
 6. [Access surfaces](#access-surfaces)
 7. [Context](#context)
-8. [Links](#links)
-9. [Routines](#routines)
-10. [Environment variables](#environment-variables)
-11. [Continuity](#continuity)
-12. [Client engagements](#client-engagements)
-13. [Git mirror and export](#git-mirror-and-export)
-14. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
-15. [Architecture](#architecture)
-16. [Data model](#data-model)
-17. [Hostile tests](#hostile-tests)
-18. [Build order](#build-order)
-19. [Open decisions](#open-decisions)
-20. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
-21. [Out of scope](#out-of-scope)
+8. [Path ownership](#path-ownership)
+9. [Notifications](#notifications)
+10. [Links](#links)
+11. [Routines](#routines)
+12. [Environment variables](#environment-variables)
+13. [Continuity](#continuity)
+14. [Client engagements](#client-engagements)
+15. [Git mirror and export](#git-mirror-and-export)
+16. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
+17. [Architecture](#architecture)
+18. [Data model](#data-model)
+19. [Hostile tests](#hostile-tests)
+20. [Build order](#build-order)
+21. [Open decisions](#open-decisions)
+22. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
+23. [Out of scope](#out-of-scope)
 
 ## What changed from v2
 
@@ -265,6 +267,189 @@ scope.
 - **File text is data.** Every surface wraps it as quoted content with its
   policy, author and date. Proposals that address an AI system are flagged in
   review.
+
+## Path ownership
+
+Written 2026-09-28, an addendum settled the way [Links](#links)'s was,
+before any of it is built. A folder or file can name specific people as
+its owners, narrowing `policy_for` from a fixed per-path setting to one
+that depends on who's asking:
+
+- **For a path's named owners**, the path is **open**: they, and their
+  agents, write it directly, no proposal.
+- **For everyone else** with write access to the vault, the same path is
+  **canon**: they propose, and it lands once enough of the *named owners*
+  approve.
+
+This is "approver groups per folder", already named in [Where it falls
+flat](#where-it-falls-flat-and-what-scales-later) as a later-scale item,
+brought forward on the owner's call (2026-09-28), alongside Links rather
+than after it. It replaces neither canon nor open as policies: a path
+with no named owners behaves exactly as today.
+
+### Who can be an owner
+
+A path's owner list may include anyone who is a member of the vault,
+**including a viewer** (owner's decision, 2026-09-28): naming a viewer a
+path's owner promotes them to write access for that path alone; they stay
+a viewer everywhere else in the vault. Path ownership is about who's
+responsible for this content, not a side door into a broader role.
+
+### Quorum draws from the owner list
+
+Today `decide()` counts an approval from any member with write access to
+the vault. A path with named owners counts only approvals **from that
+list** toward its quorum, same mechanics otherwise: the folder's quorum
+is still a headcount, just within the narrowed group; the proposer's own
+approval still counts only as a UI click; agents never count.
+
+### Guardrails (owner's call, 2026-09-28)
+
+- **Confirm before granting.** Naming someone a path owner is a bigger
+  trust delta than ordinary editor access: it hands their agent
+  unsupervised, no-review write power over a shared region of the vault.
+  The web app requires an explicit confirm step (typed name or a second
+  click, matching the delete and rotate pattern elsewhere), never a quiet
+  toggle in a form.
+- **No vault-wide override.** The `owner` role's existing powers (rename,
+  delete, export, members) are a fixed, enumerated list, per [Identity and
+  permissions](#identity-and-permissions); they don't swallow path
+  ownership. A vault owner who isn't a named path owner still proposes on
+  that path like anyone else.
+- **Break-glass reuses Emergency Access**, not a new mechanism, if one is
+  ever wanted: a named trusted member requests it, it grants after a
+  waiting period unless declined, and it is logged, per
+  [Continuity](#continuity). No dedicated override path exists yet.
+
+### Data model sketch
+
+Not yet built; nothing below is schema or code:
+
+- `public.path_owners(path_policy_id, user_id, added_by, added_at)`, one
+  row per (path rule, owner), referencing `public.path_policies`.
+- `policy_for` grows an `actor` parameter (today it takes only vault and
+  path) and an `is_owner` output, alongside the existing policy and
+  quorum: called from `write_file`, `propose`, and everywhere else a
+  caller needs to know whether *this* actor may write directly.
+- `decide()`'s quorum count is filtered to the owner list only when a
+  path has one: `and (no owners set for this path or approver is one of
+  them)`.
+- Granting and revoking ownership: an owner-only function
+  (`set_path_owner` / `remove_path_owner`), in person
+  (`require_human`), confirmed in the UI as above, logged.
+
+### Open questions this doesn't resolve
+
+- Whether an owner list attaches to a `path_policies` row (ownership
+  always implies a rule exists) or can exist with an implied default
+  policy.
+- Whether removing someone from a path's owner list is itself
+  owner-list-gated (only existing owners remove each other) or
+  vault-owner-only, matching who sets the rule today.
+- How the web UI surfaces "you're an owner of this path" distinctly from
+  "you're a vault editor", so nobody mistakes narrower-than-they-think
+  access for broader, or the reverse.
+
+## Notifications
+
+Written 2026-09-28, alongside [Path ownership](#path-ownership) above,
+same status: settled shape, nothing built. Agents connect over MCP, which
+is request/response with no push, so "notified" means **flagged on the
+agent's next tool call**, whatever call that happens to be. The web app
+already computes most of this for people, in `shell_summary` (the
+Inbox's data source): proposals waiting on your review, your own
+proposals sent back, pending imports, invites and deletion notices. This
+section is mostly about giving an **agent** the same thing over MCP, with
+two genuinely new categories alongside it.
+
+### Four categories
+
+| Category | What it flags | Opt-in? |
+|---|---|---|
+| Direct address | A note or file addressed `to:` you | No, always surfaced |
+| Working-set staleness | A file you recently read, or a proposal you have pending, changed under you | No, tied to your own recent activity |
+| Standing responsibility | A proposal is waiting on you specifically (a vault owner, or a path's named owner) | No, always surfaced: it's blocking on you |
+| Subscriptions | Tags or paths you chose to watch | Yes, off by default |
+
+Only the fourth is a standing preference. The other three follow from
+what you already are (an owner, a required approver) or already did
+(read this file, opened this proposal); nothing to configure.
+
+### A separate watermark
+
+Notification state needs its own **last-notified** marker per identity
+(a person, or a specific agent connection), distinct from
+`changes_since`'s feed cursor: the feed is "what changed", notifications
+are "what changed that you haven't been told about yet". It advances the
+moment a flag is actually shown in a response, not on request, so a call
+that errors before returning, or a client that discards the response,
+doesn't lose the flag.
+
+### Addressed notes
+
+Not a new object type. An open file (or a log entry, for something
+transient) with a `to:` field naming one or more members. Content is not
+private: anyone who can read the vault reads it, same as any open file.
+Addressing controls only whose *notification* queue it lands in, never
+who can see it. Two people wanting an actual private side-channel are
+asking for something this vault doesn't offer, and the model says so
+rather than pretending to.
+
+### Proactive approval nudges
+
+Folds entirely into "standing responsibility" above; no separate
+mechanism. An agent that sees a pending-approval flag may say so and link
+straight to the proposal, saving its person a search. This changes
+nothing about the ceiling: **the agent still can't approve**, whatever the
+flag says or whatever a proposal's own content tries to suggest. Worth
+stating plainly because "agent nudges its person about a proposal" sits
+one prompt-injection away from someone assuming the nudge means the agent
+can act on it. It can't, structurally: `decide()` refuses without
+`require_human()` regardless of any flag, note or nudge that preceded the
+call.
+
+### Not "notify"
+
+Routines already have a `notify:` output (a webhook, e.g. `{ channel:
+discord, webhook: env:... }`): an outbound send to something outside
+Reliquary. This is a different, inbound-to-the-agent mechanism, and needs
+its own word rather than reusing "notify" the way "connection" briefly
+meant two things. Working name: **flag** ("a proposal is flagged for
+you"). Not settled if a better word turns up before this is built.
+
+### Data model sketch
+
+Not yet built:
+
+- `public.notification_watermarks(identity_kind, identity_id, vault_id,
+  last_seq, updated_at)`. `identity_kind` distinguishes a person from a
+  specific agent connection, since a person and several agents of theirs
+  may each want their own watermark: one agent reading a flag on its
+  person's behalf plausibly shouldn't silence it for that person's other
+  agents.
+- A `list_flags`-shaped MCP tool (or folded into an existing read call,
+  see open questions) returning what's newly true since the watermark, in
+  the four categories, then advancing it.
+- Working-set staleness needs to know what you've recently read: reuses
+  or extends whatever `read_file` and `changes_since` already log per
+  caller, rather than a new tracking table, if that signal is enough.
+- Subscriptions: `public.subscriptions(user_id, vault_id, kind, target)`
+  (`kind` a tag or a path prefix).
+
+### Open questions this doesn't resolve
+
+- Whether subscriptions are person-only to create (matching variables and
+  rules) or an agent may create one for its person: a read-scoped,
+  reversible action, unlike everything actually on the ceiling, so it
+  doesn't obviously need a human in the loop the way approving or
+  revealing a secret does.
+- Whether flags ride inside every MCP tool's response (a `flags` field
+  alongside the actual answer) or need their own dedicated tool a client
+  must think to call: the former reaches an agent that never calls it
+  directly, the latter is cleaner to reason about and test.
+- Working-set staleness's exact trigger: does re-reading a file that
+  changed clear its own staleness flag, or does it need an explicit
+  acknowledgement?
 
 ## Links
 
@@ -762,6 +947,14 @@ previous check has held for a week of real use.
 | 5 | **Team and clients.** Second person, quorum above 1, per-member variable grants, credential requests, emergency access | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; a real client fills a credential request instead of emailing it; the access logs show all of it |
 | 6 | **Git mirror, version history view** | A one-way mirror stays in sync for a week; a file is restored from its history |
 | 7 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
+
+[Path ownership](#path-ownership) and [Notifications](#notifications)
+aren't a numbered milestone of their own: they're being built alongside
+milestone 3 (owner's decision, 2026-09-28, same call as starting Links
+early), not after it. Path ownership touches the same core `write_file`
+/ `propose` / `decide` functions every other milestone depends on, so
+treat it with at least as much care as core schema work, not less because
+it rode in beside a smaller feature.
 
 ## Open decisions
 
