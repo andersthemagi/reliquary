@@ -6,6 +6,15 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.8.0](https://github.com/andersthemagi/reliquary/compare/v0.7.0...v0.8.0) (2026-09-28)
+
+
+### Features
+
+* **db:** flags and watched paths, schema and SQL functions only ([f8f087e](https://github.com/andersthemagi/reliquary/commit/f8f087ef1dda96dac55ed8ae2b996e0174417bf5))
+* **db:** links to upstream MCP servers, schema and owner-only management ([b100dd1](https://github.com/andersthemagi/reliquary/commit/b100dd1fdad1d81cd817a2dc6e89f2ce24c42b24))
+* **db:** path ownership, alongside links ([2b621ce](https://github.com/andersthemagi/reliquary/commit/2b621ceb1cac934b9db1894a5d1a2635040a8b66))
+
 ## [0.7.0](https://github.com/andersthemagi/reliquary/compare/v0.6.0...v0.7.0) (2026-09-26)
 
 
