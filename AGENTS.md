@@ -174,6 +174,17 @@ pages still go by vault role and `rule_for`, not the caller-aware
 and a viewer owner gets no Edit or decide buttons (their agents write
 directly over MCP).
 
+Fixed 2026-09-28, in review before the web UI shipped, before any real
+traffic used it (`20260928170000_path_owner_connection_scope.sql`,
+F425): `can_write_path`/`policy_for`'s owner branch checked only a
+`path_owners` row, never `role_in()`'s token-scope check the way
+`can_write()` does — so a named owner's read-only token, or a token
+scoped only to a different vault, could still write their path.
+`private.connection_write_capable()` now gates both; `decide()` was
+never exposed (`require_human()` refuses every token outright). Mutation-
+checked: reverting the gate reproduces exactly the four new hostile
+tests failing, restored.
+
 **Flags** (design.md's "Notifications"; the working name is flag, not
 notify) ride alongside milestone 3 the same way, on the same owner's call
 (2026-09-28), and aren't part of its exit either. Done so far:
