@@ -12,7 +12,13 @@ for a week of real use, not when the code merges.
 
 Current milestones (owner's decision, 2026-09-24): **1** is built and hosted,
 and in its week of real use; **2, environment variables**, is being built
-alongside it. Nothing from milestone 3 on.
+alongside it.
+
+**3, links, started early (owner's decision, 2026-09-28):** milestone 2's
+week of real use isn't done, so this is a deliberate exception to "work on
+the current milestone only," not a new default. Schema and owner-only
+management are built (see below); discovery and the MCP proxy are not,
+and are what "milestone 3" still means for exit purposes.
 
 Milestone 1: **core, MCP and UI** (vaults, files with canon/open
 policies, proposals with quorum, log, gate, remote MCP with OAuth, web UI).
@@ -109,6 +115,24 @@ interface and phase 2's work in [docs/variables.md](docs/variables.md)):
   custom environments (owners, typed-name delete), with limits (1000
   variables per vault, no NUL in values).
 Milestone 2 is built; next is its week of real use.
+
+Milestone 3: **links** (design.md's "Links"; renamed 2026-09-28 from
+"connection", which the Connections page already meant, `docs(design)
+35d5078`). Done so far:
+- core schema and owner-only management in
+  `20260928120000_links.sql` (`links`, `link_secrets`, `link_tools`,
+  `link_grants`, `link_calls`), with hostile tests
+  (`supabase/tests/links_test.sql`): adding, editing, deleting a link and
+  setting its tool grants are an owner's, in person, matching the
+  delegation ceiling; the credential is never selectable by any
+  authenticated role, sealed the same way as an environment variable;
+  `link_calls` is append-only and outlives a deleted link (no foreign
+  key, so a link's call history is never blocked or wiped by deleting
+  it).
+Not built: discovery (populating `link_tools` from an upstream server's
+`tools/list`) and the MCP proxy (`<link>.<tool>`, credential egress,
+`link_calls` writes) — both server-side, per design.md's open questions
+there. Nothing calls a link's tools yet.
 
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits

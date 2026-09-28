@@ -426,9 +426,17 @@ git). All four: `./test.sh`.
 | F402 | Skip and Get started mark it seen | Skip, and Get started on the last slide, are POSTs (this session's form token and this origin; a missing or wrong token or a foreign origin is refused with 403 and marks nothing, and GET marks nothing); each marks the tour seen, then Skip goes Home and Get started goes to New vault when the person has no vault and Home otherwise; opening the tour again and marking it again is harmless | `web/test/welcome.test.mjs#welcome seen:`, `web/test/welcome.test.mjs#welcome form:` | `docs/public/how-to/take-the-welcome-tour.md` |
 | F403 | Seen is the person's own, in person only | `public.welcome_seen` holds one row per person, deleted with the account; only that person, in person, reads it or marks it seen (`mark_welcome_seen`): an agent, token or connected app, and anyone acting for another person, are refused (42501), nobody updates or deletes a row, and a person can't un-see it | `supabase/tests/welcome_test.sql#welcome:` | `docs/public/how-to/take-the-welcome-tour.md` |
 
+## Links (milestone 3, schema and management only; docs/design.md "Links")
+
+| ID | Feature | Acceptance criteria | Tests | Docs |
+|---|---|---|---|---|
+| F404 | Add, edit and delete a link: owners, in person | `create_link`, `update_link` and `delete_link` refuse an editor, a viewer, an outsider, anonymous, the owner's agent and the owner's token (42501), and change and log nothing when refused; the owner adds a link with a name (letters, digits, underscores), an https url and an already-sealed credential (key id, 12-byte nonce, ciphertext, exactly as `set_variable` takes them; a bad shape is refused, 22023), logged with its name and url; a duplicate name in the same vault is refused (23505), the same name in another vault is fine; editing changes name and url and logs the previous values, a no-op logs nothing; deleting removes the link and its grants (cascade) and logs its name, but never its call history, which has no foreign key to the link and outlives it | `supabase/tests/links_test.sql#create:`, `supabase/tests/links_test.sql#update:`, `supabase/tests/links_test.sql#delete:` | `docs/public/concepts/links.md` |
+| F405 | The credential is never selectable, and members read the rest | `private.link_secrets` is refused (42501) to every authenticated role, owner included, matching `private.variable_secrets`; every member (owner, editor, viewer), within their role, reads a vault's links; an outsider sees none | `supabase/tests/links_test.sql#secret:`, `supabase/tests/links_test.sql#read:` | `docs/public/concepts/links.md` |
+| F406 | Tool grants and the call log | `set_link_grant` (owner, in person only) sets or upserts one (role, tool) grant, refusing an invalid role or an empty tool name (22023); `link_calls` is append-only (update, delete and truncate all refused, even for the table owner) and readable by owners and editors only, viewers and outsiders seeing none; nothing outside the migration's own functions may insert a row | `supabase/tests/links_test.sql#grant:`, `supabase/tests/links_test.sql#calls:` | `docs/public/concepts/links.md` |
+
 ## Not built yet (no rows until they ship)
 
-Connections, routines, the git mirror. Each lands with its row and tests.
+Discovery and the MCP proxy for links (F404-F406 are the schema and owner-only management underneath them), routines, the git mirror. Each lands with its row and tests.
 
 ## Known gaps
 

@@ -12,7 +12,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Canon.** A file policy: the file changes only through a proposal approved by enough people. See [Canon, open and rules](../concepts/canon-and-rules.md).
 
-**Ceiling.** The actions no agent can do, however its person connected it: approving, rules, members, grants, secret values, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
+**Ceiling.** The actions no agent can do, however its person connected it: approving, rules, members, grants, secret values, links, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
 
 **Connection.** Anything that can act as you. It has a type: **Token**, **App** or **Reliquary CLI**. All are listed on the **Connections** page (the account menu), where you revoke them. See [Connections](../concepts/connections.md).
 
@@ -33,6 +33,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 **Inbox.** The top bar's list of what needs you: changes to review, your proposals sent back, .env imports to apply, invites and deleted-vault notices. See [The top bar, inbox and account](../concepts/inbox-and-account.md#inbox).
 
 **Invite.** A single-use link for one email address and a role, the only way to join a vault. See [Members and invites](../concepts/members.md).
+
+**Link.** A vault's credential to a remote MCP server, like Stripe or Linear, so a team shares a platform account with their agents without sharing the key. Not to be confused with a connection: a link is Reliquary reaching out, a connection is a client reaching in. See [Links](../concepts/links.md).
 
 **MCP.** The Model Context Protocol, how AI tools call Reliquary's tools over one URL. See [MCP tools](mcp-tools.md).
 

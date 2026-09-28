@@ -201,19 +201,20 @@
   status: in-progress
   docs: how-to/self-host
 
+- title: Links
+  summary: A vault's credential to a remote MCP server. Owners add, edit, delete and grant one; using its tools waits on discovery and the proxy.
+  status: in-progress
+  milestone: M3
+  docs: concepts/links
+
 # Planned ------------------------------------------------------------------
 
 - title: Publish the CLI to npm
   summary: "@reliquary-ai/cli on npm, so npx works everywhere without a checkout."
   status: planned
 
-- title: Shared connections
-  summary: A vault holds connections to remote MCP servers; agents use their tools and never see the key.
-  status: planned
-  milestone: M3
-
-- title: Tool grants per connection
-  summary: Each connection's tools allowed per role, with writes off until an owner turns them on.
+- title: Discovery and the MCP proxy for links
+  summary: Adding a link discovers its tools from the upstream server; agents call granted tools as <link>.<tool>, and never see the credential.
   status: planned
   milestone: M3
 
