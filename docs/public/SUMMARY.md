@@ -16,6 +16,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Canon, open and rules](concepts/canon-and-rules.md)
 - [Proposals and review](concepts/proposals-and-review.md)
 - [The top bar, inbox and account](concepts/inbox-and-account.md)
+- [Flags](concepts/flags.md)
 - [Agents and the ceiling](concepts/agents.md)
 - [Connections](concepts/connections.md)
 - [Links](concepts/links.md)

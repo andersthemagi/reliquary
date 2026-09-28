@@ -134,6 +134,26 @@ Not built: discovery (populating `link_tools` from an upstream server's
 `link_calls` writes) — both server-side, per design.md's open questions
 there. Nothing calls a link's tools yet.
 
+**Flags** (design.md's "Notifications"; the working name is flag, not
+notify) ride alongside milestone 3, like path ownership, on the owner's call
+(2026-09-28). They aren't part of its exit. Done so far:
+- schema and SQL-callable functions in `20260928150000_flags.sql`, with
+  hostile tests (`supabase/tests/flags_test.sql`): `notification_watermarks`,
+  one per identity (the person in the web app, or one connection by its
+  token) and vault, closed to direct access, moved only by `advance_flags`
+  and only forward, never by reading; `subscriptions` to paths, the person's
+  own, created and removed in person, listed by their agents too;
+  `list_flags`, which returns proposals waiting on you (`shell_summary`'s
+  review set), changes to your own proposals and to the files under them,
+  and changes on watched paths. Both tables cascade from `vault_members`, so
+  leaving, removal, account deletion and vault deletion take them with it.
+Not built: category 1, notes addressed `to:` someone (design.md doesn't say
+how `to:` is stored); staleness for files you've read (nothing logs a read);
+tag subscriptions (files have no tags; `create_subscription` refuses the
+kind); path owners in "waiting on you" (follows path ownership when it
+lands). Nothing in `mcp/` or `web/` calls these yet, pending design.md's open
+question: do flags ride in every response, or get a tool of their own?
+
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits
 (`20260925230000_plans.sql`, hostile tests in

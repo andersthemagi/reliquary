@@ -207,6 +207,11 @@
   milestone: M3
   docs: concepts/links
 
+- title: Flags
+  summary: Telling you and each of your agents what changed since you were last told, and watching paths. The database keeps them; nothing shows them over MCP yet, and notes addressed to someone aren't built.
+  status: in-progress
+  docs: concepts/flags
+
 # Planned ------------------------------------------------------------------
 
 - title: Publish the CLI to npm

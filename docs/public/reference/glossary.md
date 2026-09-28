@@ -28,6 +28,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Erase.** Blanking every version of a file's text, while the log keeps its entries. Owners only, in person. See [Export, delete and erase](../concepts/export-delete-erase.md#erase-a-file).
 
+**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. Not shown anywhere yet. See [Flags](../concepts/flags.md).
+
 **Import.** A whole `.env` brought in at once, pasted in the web app or sent from the CLI, waiting for a person to apply it. See [Imports](../concepts/imports.md).
 
 **Inbox.** The top bar's list of what needs you: changes to review, your proposals sent back, .env imports to apply, invites and deleted-vault notices. See [The top bar, inbox and account](../concepts/inbox-and-account.md#inbox).
@@ -63,3 +65,5 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 **Token.** A type of connection: a secret you paste into an MCP client that can't sign in, which sends it in a header (`Authorization: Bearer ...`). Made with **New token**, scoped to vaults and access, always expiring. See [Connections](../concepts/connections.md).
 
 **Vault.** The container for one team, client or project: files, variables, members and activity. See [Vaults, files and folders](../concepts/vaults-and-files.md).
+
+**Watch.** Asking to be flagged about changes on a folder or file in a vault. Yours only, set in person, and private to you. See [Flags](../concepts/flags.md#watching-a-path).
