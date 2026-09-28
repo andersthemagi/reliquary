@@ -140,3 +140,66 @@ select t.expect('cascade: the owner clears the policy on canon/shared.md',
   t.run('ana', format($q$select 'ok' from public.set_policy(%L, 'canon/shared.md', null)$q$, t.id('gone'))), 'ok');
 select t.expect('cascade: Cal''s ownership of it went with the rule',
   (select count(*)::text from public.path_owners where vault_id = t.id('gone') and path = 'canon/shared.md'), '0');
+
+-- ---------------------------------------------------------------------------
+-- Membership: a path's owner list goes with it (20260928160000). A named
+-- owner who leaves, is removed, or deletes their account loses that row and
+-- the write / decide access it granted; a role change alone leaves it
+-- untouched. canon/removed.md (Ben alone, quorum 1) covers set_member(...,
+-- null); canon/quorum2.md (Ben and Cal, quorum 2) covers leave_vault and
+-- proves a removed owner's earlier approval stops counting toward quorum;
+-- a fresh user, Eve, covers delete_account.
+
+select t.run('ana', format($q$select public.set_policy(%L, 'canon/removed.md', 'canon', 1)$q$, t.id('gone')));
+select t.run('ana', format($q$select public.set_policy(%L, 'canon/quorum2.md', 'canon', 2)$q$, t.id('gone')));
+select t.run('ana', t.own_sql('canon/removed.md', 'ben'));
+select t.run('ana', t.own_sql('canon/quorum2.md', 'ben'));
+select t.run('ana', t.own_sql('canon/quorum2.md', 'cal'));
+
+select t.expect('membership: before, Cal owns canon/quorum2.md alongside Ben',
+  (select count(*)::text from public.path_owners where vault_id = t.id('gone') and path = 'canon/quorum2.md'), '2');
+select t.run('ana', format($q$select 'ok' from public.set_member(%L, %L, 'editor')$q$, t.id('gone'), t.id('cal')));
+select t.expect('membership: a role change keeps the row',
+  (select count(*)::text from public.path_owners where vault_id = t.id('gone') and path = 'canon/quorum2.md' and user_id = t.id('cal')), '1');
+select t.run('ana', format($q$select 'ok' from public.set_member(%L, %L, 'viewer')$q$, t.id('gone'), t.id('cal')));
+
+insert into t.ids select 'quorum2_p', t.run('ana',
+  format($q$select public.propose(%L, 'canon/quorum2.md', 'first draft', 'why')$q$, t.id('gone')))::uuid;
+select t.expect('membership: Cal, still a named owner, approves; one of two isn''t quorum yet',
+  t.run('cal', format($q$select public.decide(%L, 'approve')$q$, t.id('quorum2_p'))), 'open');
+
+select t.run('cal', format($q$select 'ok' from public.leave_vault(%L)$q$, t.id('gone')));
+select t.expect('membership: leaving the vault takes her ownership of both paths she owned',
+  (select count(*)::text from public.path_owners where vault_id = t.id('gone') and user_id = t.id('cal')), '0');
+select t.expect('membership: Cal can no longer write the path she used to own, having left',
+  t.run('cal', format($q$select public.write_file(%L, 'canon/quorum2.md', 'cal after leaving')::text$q$, t.id('gone'))), 'ERR 42501');
+select t.expect('membership: nor call decide() on it, even to re-approve the same proposal',
+  t.run('cal', format($q$select public.decide(%L, 'approve')$q$, t.id('quorum2_p'))), 'ERR P0002');
+
+select t.expect('membership: Ben approves too; only his approval counts now, not Cal''s stale one, so quorum 2 still isn''t met',
+  t.run('ben', format($q$select public.decide(%L, 'approve')$q$, t.id('quorum2_p'))), 'open');
+select t.expect('membership: the proposal record agrees: still open',
+  (select status from public.proposals where id = t.id('quorum2_p')), 'open');
+
+select t.expect('membership: before, Ben owns canon/removed.md',
+  (select count(*)::text from public.path_owners where vault_id = t.id('gone') and path = 'canon/removed.md'), '1');
+select t.run('ana', format($q$select 'ok' from public.set_member(%L, %L, null)$q$, t.id('gone'), t.id('ben')));
+select t.expect('membership: removed by the owner, Ben loses the row too',
+  (select count(*)::text from public.path_owners where vault_id = t.id('gone') and path = 'canon/removed.md'), '0');
+select t.expect('membership: Ben can no longer write it',
+  t.run('ben', format($q$select public.write_file(%L, 'canon/removed.md', 'ben after removal')::text$q$, t.id('gone'))), 'ERR 42501');
+select t.expect('membership: nor delete it',
+  t.run('ben', format($q$select public.delete_file(%L, 'canon/removed.md')::text$q$, t.id('gone'))), 'ERR 42501');
+
+insert into t.ids values ('eve', '00000000-0000-0000-0000-00000000000e');
+insert into auth.users (id, email) values (t.id('eve'), 'eve@example.test');
+select test_support.add_member(t.id('gone'), t.id('eve'), 'viewer', t.id('ana'));
+select t.run('ana', format($q$select public.set_policy(%L, 'canon/eve.md', 'canon', 1)$q$, t.id('gone')));
+select t.run('ana', t.own_sql('canon/eve.md', 'eve'));
+select t.expect('membership: before, Eve owns canon/eve.md',
+  (select count(*)::text from public.path_owners where vault_id = t.id('gone') and path = 'canon/eve.md'), '1');
+select t.run('eve', $q$select public.delete_account('eve@example.test')::text$q$);
+select t.expect('membership: deleting her account takes the row',
+  (select count(*)::text from public.path_owners where vault_id = t.id('gone') and path = 'canon/eve.md'), '0');
+select t.expect('membership: her write access to it is gone with the rest of her account',
+  t.run('eve', format($q$select public.write_file(%L, 'canon/eve.md', 'eve after deletion')::text$q$, t.id('gone'))), 'ERR 42501');
