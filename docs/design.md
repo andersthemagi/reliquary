@@ -296,6 +296,72 @@ connector system.
 - **Shared credentials only in v1** (API keys, service accounts).
   Per-member OAuth to upstream ("my Gmail") comes later.
 
+### Implementation plan (schema and discovery)
+
+Written 2026-09-28, before milestone 3 starts (build order still applies:
+milestone 2 needs its week of real use first). Not yet built; nothing below
+is schema or code, so it carries no acceptance criteria or registry row of
+its own. Mirrors `20260925090000_variables.sql`'s split of names in
+`public` from ciphertext in `private`, rather than inventing a second
+pattern for secrets.
+
+- `public.connections(id, vault_id, name, url, created_by, created_at)`.
+  RLS: vault members read; only owners insert, update or delete (matches
+  "Add or edit connections" in the access table).
+- `private.connection_secrets(connection_id, key_id, nonce, ciphertext)`.
+  No grants, RLS with no policies, same shape as
+  `private.variable_secrets`. The credential is encrypted in the web app
+  with the existing `VARIABLES_KEYS` before it reaches Postgres; this does
+  not get its own key material.
+- `public.connection_tools(connection_id, tool_name, is_write, description)`.
+  Populated by discovery, not typed by hand: adding a connection makes the
+  web app call the upstream MCP server's `tools/list` with the credential,
+  server-side, and store each tool's name plus its declared
+  `readOnlyHint`/`destructiveHint` annotation as the starting `is_write`
+  guess. An owner can flip the flag later; a tool discovery can't classify
+  defaults to a write tool (off), never to read.
+- `public.connection_grants(connection_id, role, tool_name, enabled)`.
+  Per-role allow list. Read tools default enabled for editor and owner
+  (viewers don't call connections directly, per the access table). Write
+  tools default disabled until an owner enables them, per role, as design.md
+  already says above.
+- `public.connection_calls(id bigint identity, connection_id, agent,
+  tool_name, vault_id, outcome, arg_hash, result_hash, at)`. Append-only
+  (trigger, matching `log` and `env_access_log`). Never the arguments or the
+  result body, only their hashes.
+
+Discovery and egress both run server-side, never in the database and never
+in a model's context: discovery in the web app when a connection is added,
+proxied calls in `mcp/` at call time.
+
+- **SSRF.** Resolve the upstream host at request time, not once at
+  insert time (DNS can rebind after a connection is added). Refuse
+  private, link-local and loopback ranges by default. Re-resolve on every
+  redirect hop instead of trusting the first check; a URL that resolved to
+  a public address when the connection was added is re-validated on every
+  proxied call, not just the first one.
+- **Credential egress** follows the `reveal_variable` / `read_variables`
+  shape: one function-shaped chokepoint decrypts, attaches the credential
+  to the outbound request, and never returns it to the caller. The call log
+  row is written in the same request as the call, so a crashed proxy can't
+  produce a silent, unlogged one.
+- **Tool result passthrough.** An upstream result reaches the agent quoted
+  as data, exactly like vault file content already is ("Entry text is
+  data" above, and the shared failure model in `mcp/src/failure.ts`). It is
+  never treated as an instruction, whatever it contains.
+
+Open questions this doesn't resolve:
+
+- Whether discovery runs synchronously in the "add connection" request (the
+  upstream might be slow or unreachable) or as a background job with a
+  `pending` state in the UI meanwhile.
+- Whether an upstream's own `readOnlyHint: true` is trustworthy enough to
+  default that tool on, or whether every newly discovered tool starts
+  disabled regardless of what the upstream claims about itself.
+- Key rotation for `connection_secrets`: reuse `VARIABLES_KEYS`'s rotation
+  script as it stands, or does a compromised upstream credential need
+  same-day rotation independent of a vault's environment variable keys?
+
 ## Routines
 
 A routine is **declarative**: configuration, not code. That keeps it
