@@ -18,9 +18,8 @@
 // rediscovery yet (discovery.ts's own header): retrying today means
 // deleting and re-adding the link.
 //
-// Deliberately not built here: a Grants sub-page (an owner's per-role
-// allow list for a link's tools -- there's something to grant now, but no
-// page yet to do it from).
+// A link's tool grants (an owner's per-role allow list) have their own
+// page, linkgrants.ts, reached from each link's row menu below.
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
@@ -100,6 +99,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
                     icon: "more",
                     items: [
                       { href: `${vaultPath(id, "/links")}?edit=${q(l.id)}#add-link`, label: "Edit", description: "Name or URL" },
+                      { href: vaultPath(id, `/links/${l.id}/grants`), label: "Grants", description: "Which tools each role may call" },
                       { href: `${vaultPath(id, "/links")}?delete=${q(l.id)}`, label: "Delete", description: "Asks you to confirm first", danger: true },
                     ],
                   })}</td>`
@@ -125,7 +125,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
       ${formFirst ? addForm : ""}
       ${table}
       ${formFirst ? "" : addForm}
-      <p class="hint">An agent can already list a vault’s links over MCP, and adding one discovers its tools. Granting them per role and calling one isn’t built yet. <a href="/docs/concepts/links">How links work</a></p>`;
+      <p class="hint">An agent can already list a vault’s links over MCP, and adding one discovers its tools. An owner grants a tool per role from its Grants page; calling one isn’t built yet. <a href="/docs/concepts/links">How links work</a></p>`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "links" }, body) };
   });
   if (!data) return notFound(ctx);
