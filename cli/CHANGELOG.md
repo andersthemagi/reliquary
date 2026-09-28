@@ -4,6 +4,23 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.3.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.2.0...cli-v0.3.0) (2026-09-28)
+
+
+### Features
+
+* **cli:** keep sign-ins in the OS keychain (macOS Keychain, Secret Service, Windows DPAPI) ([dc9c1d4](https://github.com/andersthemagi/reliquary/commit/dc9c1d49da7c152a5491d52d73b2d06846cf2c74))
+* **cli:** the CLI speaks of its connection, and points to the Connections page ([1bfc8de](https://github.com/andersthemagi/reliquary/commit/1bfc8de59548754f7bbf06b301423447505b8e18))
+
+
+### Bug fixes
+
+* **cli:** print the server's reason and reference, and why a request got no answer ([1b62920](https://github.com/andersthemagi/reliquary/commit/1b62920578840a593862924e13d87004f44d2068))
+* **cli:** publish under the MIT licence ([236c7db](https://github.com/andersthemagi/reliquary/commit/236c7dba05127d861dd97d0eeed2524e4e17a7e9))
+* **cli:** run npm, npx and pnpm on Windows, and merge variables without case duplicates ([972a7d8](https://github.com/andersthemagi/reliquary/commit/972a7d8b00955d6531220a8cd304bf6034b09f1e))
+* **cli:** say when to retry after the env API's rate limit ([78e1174](https://github.com/andersthemagi/reliquary/commit/78e1174652f268a7da0b523768108a73e1be01d5))
+* **variables:** refuse Windows start-up, trust-store and npm config names ([f05b7d2](https://github.com/andersthemagi/reliquary/commit/f05b7d2852ca671c07efe6247d6e552ee6928427))
+
 ## [0.2.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.1.0...cli-v0.2.0) (2026-09-25)
 
 
