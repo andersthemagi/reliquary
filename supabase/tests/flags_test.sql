@@ -78,7 +78,7 @@ end $$;
 create function t.head(p_vault text) returns bigint language sql as
 $$ select coalesce(max(seq), 0) from public.log where vault_id = t.id(p_vault) $$;
 create function t.mark(p_user text, p_vault text, p_tok text default null) returns text language sql as $$
-  select coalesce((select last_seq::text from public.notification_watermarks
+  select coalesce((select last_seq::text from public.flag_watermarks
                     where user_id = t.id(p_user) and vault_id = t.id(p_vault)
                       and token_id is not distinct from t.tok(p_tok)), 'none')
 $$;
@@ -86,7 +86,7 @@ create function t.subs(p_user text, p_vault text) returns text language sql as $
   select count(*)::text from public.subscriptions where user_id = t.id(p_user) and vault_id = t.id(p_vault)
 $$;
 create function t.marks(p_user text, p_vault text) returns text language sql as $$
-  select count(*)::text from public.notification_watermarks where user_id = t.id(p_user) and vault_id = t.id(p_vault)
+  select count(*)::text from public.flag_watermarks where user_id = t.id(p_user) and vault_id = t.id(p_vault)
 $$;
 -- Counted in a function of their own, so a count in the same statement as
 -- the change it checks sees that change (a fresh snapshot per call).
@@ -94,7 +94,7 @@ create function t.sub_count(p_sub text) returns text language sql as
 $$ select count(*)::text from public.subscriptions where id = t.id(p_sub) $$;
 create table t.marks_before (id uuid, last_seq bigint);
 create function t.marks_changed() returns text language sql as $$
-  select count(*)::text from public.notification_watermarks w join t.marks_before b on b.id = w.id
+  select count(*)::text from public.flag_watermarks w join t.marks_before b on b.id = w.id
    where w.last_seq is distinct from b.last_seq
 $$;
 
@@ -224,7 +224,7 @@ select t.expect('flags: your agent is told what waits on you, even what you star
 select t.expect('flags: reading again without advancing shows the same flags',
   t.flags('ben', 'team'), 'responsibility review proposal.open canon/a.md');
 select t.expect('watermark: none is stored until an identity advances; reading never stores one',
-  (select count(*)::text from public.notification_watermarks), '0');
+  (select count(*)::text from public.flag_watermarks), '0');
 select t.expect('flags: each flag carries its seq, category, reason, event, path, proposal, who and when, and the answer its watermark, through and more',
   (select string_agg(k, ',' order by k) from jsonb_object_keys((t.flag_json('ben', 'team')::jsonb -> 'flags') -> 0) k)
   || ' / ' || (select string_agg(k, ',' order by k) from jsonb_object_keys(t.flag_json('ben', 'team')::jsonb) k)
@@ -383,9 +383,9 @@ select t.expect('watermark: list_flags reports the caller''s own watermark, the 
   || ' ' || (t.mark('ana', 'team') <> t.mark('ana', 'team', 'ana-agent'))::text,
   'true true true');
 select t.expect('watermark: one row per identity and vault, however often it moves',
-  (select count(*)::text from public.notification_watermarks
+  (select count(*)::text from public.flag_watermarks
     where user_id = t.id('ana') and vault_id = t.id('team') and token_id is null), '1');
-insert into t.marks_before select id, last_seq from public.notification_watermarks;
+insert into t.marks_before select id, last_seq from public.flag_watermarks;
 select t.expect('watermark: advancing never moves it back',
   t.run('ana', t.advance_sql('team', '1')), t.mark('ana', 'team'));
 select t.expect('watermark: past the vault''s latest entry is refused',
@@ -397,7 +397,7 @@ select t.expect('watermark: an outsider, a connection scoped elsewhere, a CLI si
     t.run_tok('ana', 'ana-cli', t.advance_sql('team', '1')), t.run(null, t.advance_sql('team', '1'))),
   'ERR P0002,ERR P0002,ERR 42501,ERR 42501');
 select t.expect('watermark: refused and backward calls change no watermark, and add none',
-  t.marks_changed() || ' ' || (select count(*)::text from public.notification_watermarks w
+  t.marks_changed() || ' ' || (select count(*)::text from public.flag_watermarks w
                                 where not exists (select 1 from t.marks_before b where b.id = w.id)),
   '0 0');
 select t.expect('watermark: a read-only connection moves its own',
@@ -409,13 +409,13 @@ select t.expect('watermark: moving one identity''s leaves every other''s',
   t.head('team') || ' 1 ' || t.head('team'));
 select t.expect('watermark: nobody reads or writes the table directly, the person, an agent or a connection',
   concat_ws(',',
-    t.run('ana', $q$select count(*)::text from public.notification_watermarks$q$),
-    t.run('ana', $q$select count(*)::text from public.notification_watermarks$q$, 'Claude Code'),
-    t.run_tok('ana', 'ana-agent', $q$select count(*)::text from public.notification_watermarks$q$),
-    t.run('ana', format($q$insert into public.notification_watermarks (user_id, vault_id, last_seq) values (%L, %L, 1) returning 1$q$,
+    t.run('ana', $q$select count(*)::text from public.flag_watermarks$q$),
+    t.run('ana', $q$select count(*)::text from public.flag_watermarks$q$, 'Claude Code'),
+    t.run_tok('ana', 'ana-agent', $q$select count(*)::text from public.flag_watermarks$q$),
+    t.run('ana', format($q$insert into public.flag_watermarks (user_id, vault_id, last_seq) values (%L, %L, 1) returning 1$q$,
       t.id('ana'), t.id('side'))),
-    t.run('ana', $q$update public.notification_watermarks set last_seq = 0 returning 1$q$),
-    t.run('ana', $q$delete from public.notification_watermarks returning 1$q$)),
+    t.run('ana', $q$update public.flag_watermarks set last_seq = 0 returning 1$q$),
+    t.run('ana', $q$delete from public.flag_watermarks returning 1$q$)),
   'ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501');
 
 -- ---------------------------------------------------------------------------
@@ -447,5 +447,5 @@ select t.expect('membership: before, Ana has a subscription and watermarks in Si
 select t.run('ana', format($q$select public.delete_vault(%L, 'Side')::text$q$, t.id('side')));
 select t.expect('membership: deleting a vault takes every subscription and watermark in it',
   (select count(*)::text from public.subscriptions where vault_id = t.id('side'))
-  || ' ' || (select count(*)::text from public.notification_watermarks where vault_id = t.id('side')),
+  || ' ' || (select count(*)::text from public.flag_watermarks where vault_id = t.id('side')),
   '0 0');

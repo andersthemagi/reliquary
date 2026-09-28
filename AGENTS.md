@@ -138,7 +138,7 @@ there. Nothing calls a link's tools yet.
 notify) ride alongside milestone 3, like path ownership, on the owner's call
 (2026-09-28). They aren't part of its exit. Done so far:
 - schema and SQL-callable functions in `20260928150000_flags.sql`, with
-  hostile tests (`supabase/tests/flags_test.sql`): `notification_watermarks`,
+  hostile tests (`supabase/tests/flags_test.sql`): `flag_watermarks`,
   one per identity (the person in the web app, or one connection by its
   token) and vault, closed to direct access, moved only by `advance_flags`
   and only forward, never by reading; `subscriptions` to paths, the person's

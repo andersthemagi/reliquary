@@ -9,7 +9,7 @@
 -- This migration is the schema and SQL-callable functions only, the way
 -- create_link existed before any surface called it: nothing in mcp/ or web/
 -- calls these yet.
--- - public.notification_watermarks: per identity and vault, the last log
+-- - public.flag_watermarks: per identity and vault, the last log
 --   seq that identity has been shown flags through.
 -- - public.subscriptions: the paths a person chose to watch.
 -- - public.list_flags(vault, limit): categories 2, 3 and 4 of the design's
@@ -119,19 +119,19 @@
 -- proposal back to the Inbox but doesn't flag it again until something new
 -- happens on it, since nothing is logged when a snooze ends.
 
-create table public.notification_watermarks (
+create table public.flag_watermarks (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null,
   vault_id    uuid not null,
   token_id    uuid references public.access_tokens on delete cascade,
   last_seq    bigint not null default 0 check (last_seq >= 0),
   updated_at  timestamptz not null default now(),
-  constraint notification_watermarks_identity unique nulls not distinct (user_id, vault_id, token_id),
+  constraint flag_watermarks_identity unique nulls not distinct (user_id, vault_id, token_id),
   foreign key (vault_id, user_id) references public.vault_members (vault_id, user_id) on delete cascade
 );
 -- The identity constraint's index leads with (user_id, vault_id), covering
 -- the membership foreign key; the token's needs its own.
-create index on public.notification_watermarks (token_id);
+create index on public.flag_watermarks (token_id);
 
 create table public.subscriptions (
   id          uuid primary key default gen_random_uuid(),
@@ -144,7 +144,7 @@ create table public.subscriptions (
   foreign key (vault_id, user_id) references public.vault_members (vault_id, user_id) on delete cascade
 );
 
-alter table public.notification_watermarks enable row level security;
+alter table public.flag_watermarks enable row level security;
 alter table public.subscriptions enable row level security;
 
 -- Watermarks: no policy, so no direct read or write for any API role. Each
@@ -152,7 +152,7 @@ alter table public.subscriptions enable row level security;
 -- advance_flags. (private.token_id() isn't the signed-in role's to call,
 -- 20260924160000_token_scope.sql, so a policy couldn't tell one connection
 -- from another without widening that; a closed table needs neither.)
-revoke all on public.notification_watermarks from public, anon, authenticated;
+revoke all on public.flag_watermarks from public, anon, authenticated;
 
 -- Subscriptions: the person's own, in the vaults the caller reaches: a
 -- connection scoped to other vaults lists none of these. One readable-set
@@ -243,7 +243,7 @@ declare
   v_last bigint;
 begin
   select * into c from private.flag_caller(p_vault);
-  select w.last_seq into v_mark from public.notification_watermarks w
+  select w.last_seq into v_mark from public.flag_watermarks w
    where w.user_id = c.person and w.vault_id = p_vault and w.token_id is not distinct from c.token;
   v_mark := coalesce(v_mark, 0);
   select coalesce(max(l.seq), 0) into v_head from public.log l where l.vault_id = p_vault;
@@ -338,7 +338,7 @@ begin
     raise exception 'flags can''t be marked shown past this vault''s latest entry, %: pass the through value list_flags returned', v_head
       using errcode = '22023';
   end if;
-  insert into public.notification_watermarks as w (user_id, vault_id, token_id, last_seq)
+  insert into public.flag_watermarks as w (user_id, vault_id, token_id, last_seq)
   values (c.person, p_vault, c.token, p_through)
   on conflict (user_id, vault_id, token_id) do update
     set last_seq = greatest(w.last_seq, excluded.last_seq),
