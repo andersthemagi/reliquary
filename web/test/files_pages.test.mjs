@@ -142,7 +142,7 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   const tabs = /<div class="vault-tabs"><nav class="tabs" aria-label="Vault \(phone\)">([\s\S]*?)<\/nav><\/div>/.exec(h)?.[1];
   assert.ok(tabs, "a tabs row in the vault shell");
   assert.deepEqual([...tabs.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]), [
-    `/v/${V.main}`, `/v/${V.main}/proposals`, `/v/${V.main}/activity`, `/v/${V.main}/variables`, `/v/${V.main}/config`,
+    `/v/${V.main}`, `/v/${V.main}/proposals`, `/v/${V.main}/activity`, `/v/${V.main}/variables`, `/v/${V.main}/links`, `/v/${V.main}/config`,
   ]);
   assert.match(tabs, new RegExp(`<a href="/v/${V.main}" aria-current="page">Files</a>`));
   assert.match(tabs, /Proposals<span class="count">1<\/span>/);

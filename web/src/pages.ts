@@ -20,6 +20,7 @@ import type { Flash, Tone } from "./flash.js";
 import { fillPeople, personRef } from "./people.js";
 import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
+import { linksRoutes } from "./linkspage.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inboxInviteRoutes, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
@@ -584,6 +585,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (!get && rest === "/rules") return setRule(ctx, id);
   if (get && rest === "/search") return search(ctx, id);
   if (rest === "/variables" || rest.startsWith("/variables/")) return variablesRoutes(ctx, id, rest);
+  if (rest === "/links") return linksRoutes(ctx, id);
   if (rest === "/config" || rest.startsWith("/config/") || rest === "/erase") return adminRoutes(ctx, id, rest);
   const pm = /^\/proposals\/([^/]+)(\/[a-z]+)?$/.exec(rest);
   if (pm) {

@@ -2,7 +2,7 @@
 
 A link is a vault's credential to another remote MCP server, like Stripe, Linear or Supabase, so a team can share a platform account with their agents without sharing the key.
 
-**Partly usable.** An agent can list a vault's links (name and url, never the credential) with `list_links`. Adding one still can't be done anywhere: no web app, no CLI, no MCP tool. Discovering a link's tools and letting an agent actually call one, through the MCP proxy, aren't built either.
+**Partly usable.** A vault's owner adds, edits and deletes links from its **Links** page in the web app, and an agent can list them (name and url, never the credential) with `list_links`. Discovering a link's tools, granting them per role, and letting an agent actually call one through the MCP proxy, aren't built yet: a link's tools show as none until then.
 
 ## What a link holds
 

@@ -202,7 +202,7 @@
   docs: how-to/self-host
 
 - title: Links
-  summary: A vault's credential to a remote MCP server. An agent can list them over MCP; adding one and using its tools wait on the web app, discovery and the proxy.
+  summary: A vault's credential to a remote MCP server. An owner adds, edits and deletes one from the web app; an agent can list them over MCP. Using a link's own tools waits on discovery and the proxy.
   status: in-progress
   milestone: M3
   docs: concepts/links

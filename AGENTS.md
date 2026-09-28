@@ -134,11 +134,18 @@ Milestone 3: **links** (design.md's "Links"; renamed 2026-09-28 from
 - `list_links` over MCP (2026-09-28, `mcp/src/tools.ts`, hostile tests
   in `mcp/test/links.test.mjs`): name and url, never the credential, any
   member's agent, read-only connections included.
+- The Links web page (2026-09-28, `web/src/linkspage.ts`, its own nav
+  section alongside Variables; tests in `web/test/links_page.test.mjs`):
+  an owner adds, edits and deletes a link; the credential is sealed with
+  `sealLink`/`openLink` (`web/src/secrets.ts`, the same `VARIABLES_KEYS`,
+  AAD scoped to the vault only since renaming a link never touches its
+  credential) and never rendered back once saved; delete goes through a
+  confirm page. No Grants page yet: `link_tools` stays empty until
+  discovery exists, so there is nothing to grant.
 Not built: discovery (populating `link_tools` from an upstream server's
 `tools/list`) and the MCP proxy (`<link>.<tool>`, credential egress,
 `link_calls` writes) — both server-side, per design.md's open questions
-there. Nothing calls a link's tools yet; adding one still needs the web
-app, which doesn't exist either.
+there. Nothing calls a link's tools yet.
 
 Also alongside milestone 3, not a numbered milestone of its own (design.md's
 "Path ownership" and "Notifications", owner's decision 2026-09-28): **path
