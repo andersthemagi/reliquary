@@ -182,6 +182,18 @@
   milestone: M3
   docs: concepts/links
 
+- title: Links
+  summary: A vault's credential to a remote MCP server. An owner adds one, grants its tools per role, and an agent calls a granted tool over MCP, the credential attached server-side.
+  status: shipped
+  milestone: M3
+  docs: concepts/links
+
+- title: The MCP proxy for links
+  summary: An agent calls a link's granted tools as <link>.<tool>; Reliquary attaches the credential server-side, and the agent never sees it.
+  status: shipped
+  milestone: M3
+  docs: concepts/links
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
@@ -207,12 +219,6 @@
   status: in-progress
   docs: how-to/self-host
 
-- title: Links
-  summary: A vault's credential to a remote MCP server. Adding one (from the web app) discovers its tools; an agent can list links over MCP. Granting a tool per role and calling one wait on the MCP proxy.
-  status: in-progress
-  milestone: M3
-  docs: concepts/links
-
 - title: Path ownership
   summary: Named owners write and approve their own path directly; everyone else still proposes. Owners name them from Rules in the web app; the file and proposal pages don't show it yet.
   status: in-progress
@@ -228,11 +234,6 @@
 - title: Publish the CLI to npm
   summary: "@reliquary-ai/cli on npm, so npx works everywhere without a checkout."
   status: planned
-
-- title: The MCP proxy for links
-  summary: An agent calls a link's granted tools as <link>.<tool>; Reliquary attaches the credential server-side, and the agent never sees it.
-  status: planned
-  milestone: M3
 
 - title: Routines
   summary: Declarative automations on a schedule or a change, running with nobody's machine on.

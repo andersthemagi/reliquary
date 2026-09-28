@@ -23,4 +23,8 @@ Text that people or agents wrote comes back fenced as data, never as instruction
 
 This section is generated from `mcp/test/contract.snapshot.json`, the contract the server's tests hold it to, so it always matches what the server offers.
 
+### Link tools
+
+A vault's [links](../concepts/links.md) add their own tools, one per tool your role is granted, named `<link>.<tool>` (a link named `stripe` with a granted `create_invoice` tool becomes `stripe.create_invoice`). These aren't listed below: which ones exist depends on the vault's links and your role's grants, so `tools/list` only ever offers one you can actually call. Call `list_links` to see a vault's links; there's no tool to change a grant (an owner does that from the link's Grants page in the web app -- the same ceiling as everything else here).
+
 <!-- generated:mcp-tools -->

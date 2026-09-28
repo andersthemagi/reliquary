@@ -43,6 +43,14 @@ echo "alter role reliquary_mcp login password 'test';" | psql
 echo "alter role reliquary_web login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=' )
 
+# Link credential encryption (secrets.ts: only the web container holds this)
+# and the shared secret authenticating mcp/'s own calls to its internal
+# link-call endpoint (linkproxy.ts). Test files seal a link's credential
+# with the same key directly (LINK_TEST_KEY), matching web/test.sh's own
+# session-secret pattern.
+link_test_key=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
+link_proxy_secret=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
+
 # The web app as the OAuth authorization server, signed in as Ben. It is
 # built inside its own container from a read-only view of web/, so it never
 # races web/test.sh over web/dist or web/node_modules. CIMD_ALLOW_LOOPBACK
@@ -51,7 +59,8 @@ seed=$(psql -A -t < test/seed.sql | grep '=' )
 "$engine" run -d --name "$web" --network host -v "$PWD/../web":/src:ro,z -v "$PWD":/mcp:z -v "$PWD/../version.txt":/version.txt:ro,z \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000b -e LOGIN_FILE="/mcp/.login-oauth-$slot" \
-  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e RATE_LIMIT_SCALE=1000 -e PORT=$webport "$node" sh -c \
+  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e LINK_DISCOVERY_ALLOW_LOOPBACK=1 -e RATE_LIMIT_SCALE=1000 -e PORT=$webport \
+  -e VARIABLES_KEY="$link_test_key" -e LINK_PROXY_SECRET="$link_proxy_secret" "$node" sh -c \
   'mkdir -p /app && cd /src && cp -r src public package.json package-lock.json tsconfig.json stamp-version.mjs /app/ && cd /app &&
    if [ -x /src/node_modules/.bin/tsc ]; then ln -s /src/node_modules node_modules; else npm ci --no-audit --no-fund --silent; fi &&
    npm run -s compile && exec node dist/server.js' >/dev/null
@@ -64,6 +73,7 @@ seed=$(psql -A -t < test/seed.sql | grep '=' )
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
+  -e LINK_PROXY_SECRET="$link_proxy_secret" \
   -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
 until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
 # Tool calls: 3 per 2-second window (so a test can wait one out) and 5 a
@@ -90,6 +100,7 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   -e MCP_ERROR_REFS_FILE="/app/.error-refs-$slot" -e MCP_RL_URL="http://127.0.0.1:$rlport/mcp" -e TEST_SUPER_URL="postgres://postgres:test@127.0.0.1:$pgport/postgres" \
   -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
+  -e LINK_TEST_KEY="$link_test_key" \
   -e TOKEN_LOAD_MEASURE_ONLY="${TOKEN_LOAD_MEASURE_ONLY:-}" \
   -e EXPECT_VERSION="$(tr -d '[:space:]' < ../version.txt)" \
   "$node" node --test --test-concurrency=1 ${MCP_TESTS:-test/*.test.mjs}
@@ -98,12 +109,15 @@ echo "== server log (must contain no tokens or file text)"
 # Not `tee /dev/stderr`: when stderr is a file (./test.sh logs) that reopens
 # and truncates it, losing the test output.
 server_log=$("$engine" logs "$srv" 2>&1; "$engine" logs "$rl" 2>&1)
+web_log=$("$engine" logs "$web" 2>&1)
 printf '%s\n' "$server_log" >&2
 grep -E 'rlq_|800 EUR|Hermes|Falcon|CIPHERTEXT-MARKER|SEKRIT' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
+# LINKVAL- is link_proxy.test.mjs's real (working) credential marker; the
+# web app is the one that ever holds it in plaintext (linkcall.ts).
+grep -E 'LINKVAL-' <<< "$web_log" && { echo "LEAK: a link credential in the web app's log"; exit 1; } || echo "clean (link credential)"
 # The addresses test/rate_limits.test.mjs sends from.
 grep -E '198\.51\.100\.|2001:db8' <<< "$server_log" && { echo "LEAK: a client address in the server log"; exit 1; } || echo "clean (addresses)"
 # OAuth: no personal token, access (MCP or CLI) or refresh token, or code in either app's log.
-web_log=$("$engine" logs "$web" 2>&1)
 grep -E 'rl[qorce]_[0-9a-f]' <<< "$server_log
 $web_log" && { echo "LEAK: a token or code in a server log"; exit 1; } || echo "clean (oauth)"
 # Every reference test/errors.test.mjs saw is in the server log, with its detail.

@@ -216,7 +216,9 @@ function parseJsonRpc(res: RawResponse, id: number): { result?: unknown; error?:
   return match;
 }
 
-async function call(
+export type CallOptions = Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve">;
+
+export async function call(
   u: URL,
   credential: string,
   method: string,
@@ -224,7 +226,7 @@ async function call(
   id: number | undefined,
   sessionId: string | undefined,
   protocolVersion: string | undefined,
-  opts: Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve">,
+  opts: CallOptions,
 ): Promise<{ result: unknown; sessionId?: string; protocolVersion?: string }> {
   const body = JSON.stringify(id === undefined ? { jsonrpc: "2.0", method, params } : { jsonrpc: "2.0", id, method, params });
   const headers: Record<string, string> = { authorization: `Bearer ${credential}`, "user-agent": "Reliquary (link discovery)" };
@@ -260,11 +262,16 @@ function toolOf(raw: unknown): DiscoveredTool | null {
   return { name: t.name, isWrite, description };
 }
 
-// Calls the upstream MCP server named by a link's own url with its
-// credential, and returns every tool it declares (paged, capped at 500).
-// Throws DiscoveryError, never the credential, with a reason written for
-// people.
-export async function discoverTools(url: string, credential: string, options: DiscoveryOptions = {}): Promise<DiscoveredTool[]> {
+export type Handshake = { u: URL; sessionId: string | undefined; protocolVersion: string; opts: CallOptions };
+
+// Validates a link's url and runs the initialize / initialized handshake
+// every call to an upstream MCP server starts with -- shared by
+// discoverTools (below) and linkcall.ts's callUpstreamTool, which proxies
+// a single tools/call the same way. No session is kept between calls
+// (design.md: a link's address is re-validated on every proxied call, not
+// just discovery's), so this runs fresh each time, whichever caller needs
+// it.
+export async function handshake(url: string, credential: string, options: DiscoveryOptions = {}): Promise<Handshake> {
   const opts = { allowLoopback: options.allowLoopback ?? false, timeoutMs: options.timeoutMs ?? TIMEOUT_MS, resolve: options.resolve };
   let u: URL;
   try {
@@ -291,7 +298,15 @@ export async function discoverTools(url: string, credential: string, options: Di
       ? ((init.result as Record<string, unknown>).protocolVersion as string)
       : PROTOCOL_VERSION;
   await call(u, credential, "notifications/initialized", {}, undefined, sessionId, protocolVersion, opts);
+  return { u, sessionId, protocolVersion, opts };
+}
 
+// Calls the upstream MCP server named by a link's own url with its
+// credential, and returns every tool it declares (paged, capped at 500).
+// Throws DiscoveryError, never the credential, with a reason written for
+// people.
+export async function discoverTools(url: string, credential: string, options: DiscoveryOptions = {}): Promise<DiscoveredTool[]> {
+  const { u, sessionId, protocolVersion, opts } = await handshake(url, credential, options);
   const tools: DiscoveredTool[] = [];
   const seen = new Set<string>();
   let cursor: string | undefined;

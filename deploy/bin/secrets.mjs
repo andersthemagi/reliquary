@@ -15,6 +15,10 @@
 //   SESSION_SECRET                         the web app's CSRF key
 //   VARIABLES_KEYS                         k1:<32 bytes, base64url>, the key
 //                                          that encrypts variable values
+//   LINK_PROXY_SECRET                      shared by the web and mcp
+//                                          services, authenticating mcp/'s
+//                                          own calls to the web app's
+//                                          internal link-call endpoint
 
 import { generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
 
@@ -34,5 +38,6 @@ const out = {
   GOTRUE_JWT_KEYS: JSON.stringify(keys),
   SESSION_SECRET: b64url(32),
   VARIABLES_KEYS: `k1:${b64url(32)}`,
+  LINK_PROXY_SECRET: b64url(24),
 };
 for (const [k, v] of Object.entries(out)) process.stdout.write(`${k}=${v}\n`);

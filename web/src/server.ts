@@ -40,6 +40,7 @@ import { doing, fail, failure, withRequest } from "./failure.js";
 import { toFlash } from "./flash.js";
 import { signinUnavailablePage } from "./signin.js";
 import { envApi } from "./envapi.js";
+import { configureLinkProxy, linkProxyApi } from "./linkproxy.js";
 import { crossHost, hostKind, hostsConfigError, isSitePath } from "./hosts.js";
 import { landing } from "./landing.js";
 import { publicRoute } from "./legal.js";
@@ -108,6 +109,7 @@ try {
   configureOAuth();
   configureVariables(process.env);
   configureDiscovery(process.env);
+  configureLinkProxy(process.env);
   configureRateLimits(process.env);
   configureMailer(process.env);
   // Names the setting, never the address.
@@ -409,6 +411,8 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     if (await oauthPublic(req, res, url)) return;
     // The env API, for the Reliquary CLI's bearer tokens (envapi.ts).
     if (await envApi(req, res, url)) return;
+    // mcp/ calling one already-authorized link tool (linkproxy.ts).
+    if (await linkProxyApi(req, res, url)) return;
     if (MODE === "local" && url.pathname === "/login" && req.method === "GET") {
       const setCookie = localLogin(url.searchParams.get("code") ?? "");
       if (!setCookie) {

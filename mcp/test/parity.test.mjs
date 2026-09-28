@@ -23,9 +23,20 @@ async function liveTools() {
   return names.sort();
 }
 
-// The backticked names in the "MCP" column of every table in the file.
+// A <link>.<tool> name (tools.ts's registerLinkTools) is identity-
+// dependent -- who's granted one legitimately varies -- so docs/parity.md
+// doesn't enumerate instances of it, it has one row for the pattern
+// itself, literally `<link>.<tool>` (design.md's own placeholder). That
+// text can't match the plain-name regex below (it has < > . in it), so it
+// never pollutes the listed set; it's checked for separately.
+const DYNAMIC_PLACEHOLDER = "<link>.<tool>";
+const isDynamic = (name) => name.includes(".");
+
+// The backticked names in the "MCP" column of every table in the file,
+// and whether the dynamic placeholder itself is listed anywhere.
 function listedTools() {
   const names = new Set();
+  let dynamicListed = false;
   let col = -1;
   for (const line of readFileSync(PARITY, "utf8").split("\n")) {
     if (!line.startsWith("|")) {
@@ -39,20 +50,26 @@ function listedTools() {
       continue;
     }
     if (col < 0 || /^:?-+:?$/.test(cells[0])) continue;
-    for (const [, name] of (cells[col] ?? "").matchAll(/`([a-z_]+)`/g)) names.add(name);
+    const cell = cells[col] ?? "";
+    for (const [, name] of cell.matchAll(/`([a-z_]+)`/g)) names.add(name);
+    if (cell.includes(`\`${DYNAMIC_PLACEHOLDER}\``)) dynamicListed = true;
   }
-  return [...names].sort();
+  return { names: [...names].sort(), dynamicListed };
 }
 
 test("parity: every MCP tool is in docs/parity.md", async () => {
-  const listed = listedTools();
+  const { names: listed, dynamicListed } = listedTools();
   assert.ok(listed.length > 0, "no MCP column found in docs/parity.md");
-  const missing = (await liveTools()).filter((n) => !listed.includes(n));
+  const live = await liveTools();
+  const missing = live.filter((n) => !isDynamic(n) && !listed.includes(n));
   assert.deepEqual(missing, [], "add these tools to docs/parity.md (MCP column)");
+  if (live.some(isDynamic)) {
+    assert.ok(dynamicListed, `a <link>.<tool> tool is live, but docs/parity.md has no \`${DYNAMIC_PLACEHOLDER}\` row`);
+  }
 });
 
 test("parity: docs/parity.md names no MCP tool that doesn't exist", async () => {
   const live = await liveTools();
-  const stale = listedTools().filter((n) => !live.includes(n));
+  const stale = listedTools().names.filter((n) => !live.includes(n));
   assert.deepEqual(stale, [], "docs/parity.md names tools the server doesn't offer");
 });

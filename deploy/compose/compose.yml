@@ -175,6 +175,7 @@ services:
       JWT_ALG: ES256
       SESSION_SECRET: ${SESSION_SECRET:?run deploy/setup.sh first}
       VARIABLES_KEYS: ${VARIABLES_KEYS:?run deploy/setup.sh first}
+      LINK_PROXY_SECRET: ${LINK_PROXY_SECRET:?run deploy/setup.sh first}
       PUBLIC_URL: ${PUBLIC_URL}
       SITE_URL: ${SITE_URL:-}
       MCP_RESOURCE: ${MCP_RESOURCE:?set MCP_RESOURCE in .env}
@@ -213,6 +214,7 @@ services:
       DATABASE_TLS: "off"
       MCP_RESOURCE: ${MCP_RESOURCE}
       AUTH_ISSUER: ${PUBLIC_URL}
+      LINK_PROXY_SECRET: ${LINK_PROXY_SECRET:?run deploy/setup.sh first}
       TRUST_PROXY_IP: ${TRUST_PROXY_IP:-0}
     ports:
       - ${MCP_BIND:-127.0.0.1:8787}:8787

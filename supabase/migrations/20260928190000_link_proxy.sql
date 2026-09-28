@@ -14,12 +14,17 @@
 --   the same check 20260928170000_path_owner_connection_scope.sql built
 --   for path ownership's F425 fix, so a read-only or wrong-vault-scoped
 --   token can't reach a write tool's credential even when its role's
---   grant is on) and, on success, hands back the sealed credential for
---   mcp/ to decrypt and attach server-side. Nothing is logged on success
---   yet -- the call hasn't happened. A refusal is logged right here,
---   though, and returned as {ok: false, ...} without raising, the same
---   reveal_variable/read_variables reasoning: so the refusal's own row
---   still commits regardless of what the caller does with the answer.
+--   grant is on) and, on success, hands back the sealed credential
+--   (still encrypted) and its vault id. mcp/ never decrypts this itself
+--   -- server.ts refuses to start with VARIABLES_KEY(S) set, so the key
+--   stays web-app-only, same as every environment variable -- it sends
+--   the sealed value on to the web app's own internal endpoint
+--   (web/src/linkproxy.ts), which opens it and makes the call. Nothing
+--   is logged on success yet -- the call hasn't happened. A refusal is
+--   logged right here, though, and returned as {ok: false, ...} without
+--   raising, the same reveal_variable/read_variables reasoning: so the
+--   refusal's own row still commits regardless of what the caller does
+--   with the answer.
 -- - record_link_call is the one, final row: mcp/ calls it once the
 --   upstream call has resolved, one way or another, from a try/finally
 --   around the outbound request so every path -- success, an upstream
@@ -143,8 +148,9 @@ language sql volatile security definer set search_path = '' as $$
 $$;
 
 -- Authorizes a <link>.<tool> call and, on success, hands back the sealed
--- credential (never plaintext -- mcp/ decrypts it with the same
--- VARIABLES_KEYS the web app uses). Not require_human: this runs on an
+-- credential and its vault id (never plaintext -- mcp/ forwards this,
+-- still sealed, to the web app's internal endpoint to open and use; mcp/
+-- never holds VARIABLES_KEYS). Not require_human: this runs on an
 -- agent's behalf, same as any other proxied tool call.
 create function public.begin_link_call(p_link uuid, p_tool_name text)
 returns jsonb
@@ -198,7 +204,7 @@ begin
     return jsonb_build_object('ok', false, 'error', 'not_found');
   end if;
 
-  return jsonb_build_object('ok', true, 'url', v_url, 'key_id', v_key_id,
+  return jsonb_build_object('ok', true, 'vault_id', v_vault, 'url', v_url, 'key_id', v_key_id,
     'nonce', encode(v_nonce, 'base64'), 'ciphertext', encode(v_ciphertext, 'base64'));
 end $$;
 
