@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.9.0](https://github.com/andersthemagi/reliquary/compare/v0.8.0...v0.9.0) (2026-09-28)
+
+
+### Features
+
+* **mcp:** list_links, list_flags, advance_flags, list_subscriptions ([af6ca6f](https://github.com/andersthemagi/reliquary/commit/af6ca6f68cf7adb92526b9a65867a9e88efe5c19))
+
 ## [0.8.0](https://github.com/andersthemagi/reliquary/compare/v0.7.0...v0.8.0) (2026-09-28)
 
 
