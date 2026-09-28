@@ -163,6 +163,16 @@ care. Deliberately not touched: `propose`, `revise_proposal`,
 nothing since they write directly, and can still approve or reject with
 plain `decide()`, but can't yet use edit-and-approve or comment unless
 they also have ordinary editor or owner access).
+Naming and removing owners is in the web app (2026-09-28,
+`web/src/pathowners.ts`, `web/test/path_owners_page.test.mjs`): a rule's
+**Owners** on Rules (`/v/:id/rules/owners?path=`), every member reading the
+list, each grant and removal behind its own confirm page, and a POST
+without that page's confirm field sent to it rather than acting. No MCP
+tool, on purpose (the ceiling). Not built: the file, editor and proposal
+pages still go by vault role and `rule_for`, not the caller-aware
+`policy_for`, so in the web app a named owner still sees the canon flow
+and a viewer owner gets no Edit or decide buttons (their agents write
+directly over MCP).
 
 **Flags** (design.md's "Notifications"; the working name is flag, not
 notify) ride alongside milestone 3 the same way, on the same owner's call

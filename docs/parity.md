@@ -83,7 +83,7 @@ and, for the agent, its token's vaults and access.
 | Mark flags shown | none yet | `advance_flags` | both, any connection (read-only is enough) | Not in the ceiling: a watermark is the connection's own bookkeeping, never a write to the vault |
 | List watched paths | none yet | `list_subscriptions` | both, any connection (read-only is enough) | Web UI not built yet |
 | Watch or unwatch a path | none yet | none | person | **Ceiling**: `create_subscription` and `delete_subscription` are `require_human`, the same conservative default as variables and rules (design.md leaves whether an agent should be allowed to as an open question) |
-| Name or remove a path's owner | none yet | none | owner | **Ceiling**: `set_path_owner` and `remove_path_owner` are `require_human`, owners only (`20260928130000_path_ownership.sql`). Web UI not built yet |
+| Name or remove a path's owner | `/v/:v/rules/owners?path=` (a rule's **⋯**, **Owners**; `&add=` and `&remove=` confirm, then POST) | none | owner | **Ceiling**: `set_path_owner` and `remove_path_owner` are `require_human`, owners only (`20260928130000_path_ownership.sql`) |
 | Write, delete or decide on a path you're named owner of | none yet | `write_file`, `delete_file`; approving still needs the person | the path's named owners, whatever their vault role | Not a new tool: `write_file`/`delete_file` already pass a path's named owners even when `can_write()` alone would refuse them (a viewer may be named); approving is still the ceiling, same as everywhere else |
 
 ## Fixed in this change

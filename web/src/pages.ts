@@ -40,6 +40,7 @@ import {
   reviseProposal,
 } from "./proposals.js";
 import { rules, search, setRule } from "./rules.js";
+import { pathOwnerAction, pathOwners } from "./pathowners.js";
 import { accessRoutes } from "./access.js";
 
 export type Ctx = {
@@ -583,6 +584,8 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && (rest === "/activity" || rest === "/log")) return activity(ctx, id);
   if (get && rest === "/rules") return rules(ctx, id);
   if (!get && rest === "/rules") return setRule(ctx, id);
+  if (get && rest === "/rules/owners") return pathOwners(ctx, id);
+  if (!get && rest === "/rules/owners") return pathOwnerAction(ctx, id);
   if (get && rest === "/search") return search(ctx, id);
   if (rest === "/variables" || rest.startsWith("/variables/")) return variablesRoutes(ctx, id, rest);
   if (rest === "/links") return linksRoutes(ctx, id);

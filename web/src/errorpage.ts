@@ -106,6 +106,11 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (rest === "/proposals") return say(`Opening the proposals of ${vault}`);
   if (rest === "/activity" || rest === "/log") return say(`Opening the activity of ${vault}`);
   if (rest === "/rules") return say(get ? `Opening the rules of ${vault}` : `Saving a rule for ${path || "a path"} in ${vault}`);
+  if (rest === "/rules/owners") {
+    if (get) return say(`Opening the owners of ${path || "a path"} in ${vault}`);
+    const naming = form.get("action") === "add";
+    return say(`${naming ? "Naming an owner of" : "Removing an owner of"} ${path || "a path"} in ${vault}`, `action=${naming ? "add" : "remove"}`);
+  }
   if (rest === "/search") return say(`Searching ${vault}`);
   if (rest === "/erase") return say(`Erasing ${path || "a file"} in ${vault}`);
   if (rest === "/variables" || rest.startsWith("/variables/")) {

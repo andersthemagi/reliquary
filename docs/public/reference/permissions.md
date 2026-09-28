@@ -27,6 +27,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | Action | Web app | MCP tool | Who may |
 |---|---|---|---|
 | Set or remove a rule | **Settings**, **Rules** | none | person, owners |
+| Name or remove a path's [owners](../concepts/path-ownership.md) | **Rules**, a rule's **⋯**, **Owners** | none | person, owners |
 | Rename a vault or change its default policy | **Settings**, **General** | none | person, owners |
 | See members (by email) | **Settings**, **Members** | none | person, any member |
 | Invite, change roles, remove members | **Members** | none | person, owners |

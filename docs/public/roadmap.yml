@@ -208,7 +208,7 @@
   docs: concepts/links
 
 - title: Path ownership
-  summary: Named owners write and approve their own path directly; everyone else still proposes. No web app or MCP tool for naming one yet.
+  summary: Named owners write and approve their own path directly; everyone else still proposes. Owners name them from Rules in the web app; the file and proposal pages don't show it yet.
   status: in-progress
   docs: concepts/path-ownership
 
