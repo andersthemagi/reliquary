@@ -20,6 +20,17 @@
 //
 // The tar writer is the minimum POSIX ustar needs: regular files, 0644,
 // owner 0, and a pax header for any path over 100 bytes. No dependency.
+//
+// Every entry name is safe to extract anywhere. A vault path is written as
+// given under files/ only when no system would read it as something else
+// (entryProblem). Otherwise (a backslash, which Windows extractors take as a
+// folder separator, so "a\..\..\x" would climb out; a colon, a drive or a
+// stream; a name ending in a dot or space; a device name; a character that
+// Windows maps to / \ : or . when it converts names), the file goes under
+// renamed/ as "<n>-<the path with every unsafe character as _>", and the
+// manifest's "renamed" list gives its path in the vault. New paths like
+// these are refused by the database (20260926130000_portable_paths.sql);
+// this keeps files saved before that safe too.
 
 import { createHash } from "node:crypto";
 import type { Writable } from "node:stream";
@@ -101,11 +112,15 @@ function paxRecord(key: string, value: string): Buffer {
 }
 
 export function tarEntry(path: string, body: Buffer, mtime: number): Buffer {
-  const name = Buffer.from(path, "utf8");
+  let name = Buffer.from(path, "utf8");
   const parts: Buffer[] = [];
   if (name.length > 100) {
     const pax = paxRecord("path", path);
     parts.push(header(Buffer.from("PaxHeader", "ascii"), pax.length, mtime, "x"), pax, padding(pax.length));
+    // The name an extractor that ignores pax sees: the first 100 bytes, if
+    // that cut is itself a safe name (it could end in ".." or a dot).
+    const cut = name.subarray(0, 100);
+    name = entryProblem(cut.toString("utf8")) ? Buffer.from("long-path", "ascii") : cut;
   }
   parts.push(header(name, body.length, mtime, "0"), body, padding(body.length));
   return Buffer.concat(parts);
@@ -113,6 +128,46 @@ export function tarEntry(path: string, body: Buffer, mtime: number): Buffer {
 
 // Two empty blocks end an archive.
 export const tarEnd = () => Buffer.alloc(1024);
+
+// ---------------------------------------------------------------------------
+// Entry names
+
+// Characters some Windows code pages convert ("best fit") to / \ : or .
+// when a program uses the ANSI file APIs: fullwidth and look-alike slashes,
+// yen and won signs (\ in Japanese and Korean code pages), fullwidth colon
+// and full stop, and friends.
+const BEST_FIT = /[\u00a5\u20a9\u2044\u2215\u2236\u2024\u2025\u2026\uff0e\uff0f\uff1a\uff3c\ufe55\ufe52\ufe68]/u;
+const DEVICE = /^(CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[0-9\u00b9\u00b2\u00b3]|LPT[0-9\u00b9\u00b2\u00b3])$/;
+
+// Why a vault path can't be an entry name as it is, or null when it can.
+export function entryProblem(path: string): string | null {
+  if (path === "" || path.length > 1024) return "empty or over 1024 characters";
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(path)) return "a control character";
+  if (path.includes("\\")) return "a backslash, a folder separator on Windows";
+  if (/[:*?"<>|]/.test(path)) return "a character Windows can't hold in a name (: * ? \" < > |)";
+  if (BEST_FIT.test(path)) return "a character Windows can convert to / \\ : or .";
+  if (path.startsWith("/")) return "an absolute path";
+  for (const seg of path.split("/")) {
+    if (seg === "" || seg === "." || seg === "..") return "an empty, . or .. segment";
+    if (/[. ]$/.test(seg)) return "a name ending in a dot or a space";
+    if (DEVICE.test(seg.split(".")[0].replace(/ +$/, "").toUpperCase())) return "a name Windows reserves for a device";
+  }
+  return null;
+}
+
+// The name under renamed/ for the n-th renamed file: one segment, every
+// character entryProblem objects to as "_", no trailing dot or space, and a
+// number first, so it is never a device name and never collides.
+export function renamedEntry(path: string, n: number): string {
+  const flat = [...path]
+    // eslint-disable-next-line no-control-regex
+    .map((c) => (/[\u0000-\u001f\u007f/\\:*?"<>|]/.test(c) || BEST_FIT.test(c) ? "_" : c))
+    .join("")
+    .slice(0, 150)
+    .replace(/[. ]+$/, "");
+  return `${String(n).padStart(4, "0")}-${flat || "file"}`;
+}
 
 // ---------------------------------------------------------------------------
 // The archive
@@ -157,7 +212,8 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
     if (gz.destroyed) throw new Error("export aborted");
     if (!gz.write(b)) await drained();
   };
-  const files: { path: string; sha256: string; bytes: number; updated_at: string; version_id: string }[] = [];
+  const files: { path: string; archived_as?: string; sha256: string; bytes: number; updated_at: string; version_id: string }[] = [];
+  const renamed: { path: string; archived_as: string; why: string }[] = [];
   let total = 0;
   try {
     let after = "";
@@ -167,9 +223,13 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
         const body = Buffer.from(r.body, "utf8");
         total += body.length;
         if (total > STREAM_CAP) throw new Error("export grew past its cap while streaming");
-        await put(tarEntry(`${root}/files/${r.path}`, body, r.updated_at.getTime() / 1000));
+        const why = entryProblem(r.path);
+        const entry = why ? `renamed/${renamedEntry(r.path, renamed.length + 1)}` : `files/${r.path}`;
+        if (why) renamed.push({ path: r.path, archived_as: entry, why });
+        await put(tarEntry(`${root}/${entry}`, body, r.updated_at.getTime() / 1000));
         files.push({
           path: r.path,
+          ...(why ? { archived_as: entry } : {}),
           sha256: createHash("sha256").update(body).digest("hex"),
           bytes: body.length,
           updated_at: r.updated_at.toISOString(),
@@ -186,13 +246,17 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
           vault: h.vault,
           exported_at: h.exported_at,
           exported_by: h.exported_by,
-          layout: "Each file's current text is under files/, at its path in the vault.",
+          layout:
+            "Each file's current text is under files/, at its path in the vault. " +
+            "A path that another system could read as something else (a backslash, a colon, a name ending in a dot " +
+            "or a space, a device name like CON) is under renamed/ instead: renamed lists each one's path in the vault.",
           not_included:
             "Deleted and erased files, earlier versions, proposals, comments and the activity log. " +
             "Environment variable values are never exported: only their names and the environments that have a value.",
           default_policy: h.vault.default_policy,
           rules: h.rules,
           files,
+          renamed,
           variables: { values_included: false, names: h.variables },
         },
         null,

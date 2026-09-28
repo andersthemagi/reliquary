@@ -19,7 +19,7 @@ What your plan and a vault's tier allow. How they count, and what happens at a l
 | What | Limit |
 |---|---|
 | Vault name | 1 to 100 characters, no control characters |
-| File path | up to 1024 characters, no control characters |
+| File path | up to 1024 characters, no control characters; a new path has no `\` or `: * ? " < > \|`, no name ending in a dot or space, and no Windows device name like `CON` ([rules](../concepts/vaults-and-files.md)) |
 | File or proposal text | 1 MiB |
 | A proposal's reason, a review note | 4000 characters |
 | A comment | 1 to 4000 characters, at most 200 per proposal |
