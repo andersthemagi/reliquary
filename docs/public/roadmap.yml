@@ -207,6 +207,11 @@
   milestone: M3
   docs: concepts/links
 
+- title: Path ownership
+  summary: Named owners write and approve their own path directly; everyone else still proposes. No web app or MCP tool for naming one yet.
+  status: in-progress
+  docs: concepts/path-ownership
+
 # Planned ------------------------------------------------------------------
 
 - title: Publish the CLI to npm
@@ -282,7 +287,7 @@
   status: considering
 
 - title: Approver groups
-  summary: Quorums like one approval from legal and one from engineering.
+  summary: Beyond path ownership's one owner list per path, multiple named groups each needing their own approval, like one from legal and one from engineering.
   status: considering
 
 - title: Member names over MCP

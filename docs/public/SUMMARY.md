@@ -14,6 +14,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Vaults, files and folders](concepts/vaults-and-files.md)
 - [Vault templates](concepts/templates.md)
 - [Canon, open and rules](concepts/canon-and-rules.md)
+- [Path ownership](concepts/path-ownership.md)
 - [Proposals and review](concepts/proposals-and-review.md)
 - [The top bar, inbox and account](concepts/inbox-and-account.md)
 - [Agents and the ceiling](concepts/agents.md)

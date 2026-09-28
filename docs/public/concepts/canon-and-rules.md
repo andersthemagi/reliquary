@@ -6,7 +6,7 @@ Every file is either canon, which changes only when enough people approve, or op
 
 | | Canon | Open |
 |---|---|---|
-| A direct write | refused, even from the owner | allowed for owners, editors and their agents |
+| A direct write | refused, even from the owner, unless they're a [named owner of that path](path-ownership.md) | allowed for owners, editors and their agents |
 | A change | a [proposal](proposals-and-review.md), applied once enough people approve | written at once, as a new version |
 | Meant for | what the team treats as settled: briefs, decisions, prices, instructions for agents | notes, drafts, agent output, scratch work |
 
@@ -28,3 +28,5 @@ Only an owner sets rules, in person, on the vault's **Rules** page (under **Sett
 ## Quorum
 
 A canon change lands when it has approvals from the quorum of distinct people. Agents never count. Your own click counts, including on a change your agent proposed, but your agent proposing is not your approval. In a one-person vault this means: your agent proposes, you approve.
+
+If a path has [named owners](path-ownership.md), its quorum counts only their approvals, whatever anyone else's vault role is.

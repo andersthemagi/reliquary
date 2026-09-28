@@ -12,7 +12,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Canon.** A file policy: the file changes only through a proposal approved by enough people. See [Canon, open and rules](../concepts/canon-and-rules.md).
 
-**Ceiling.** The actions no agent can do, however its person connected it: approving, rules, members, grants, secret values, links, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
+**Ceiling.** The actions no agent can do, however its person connected it: approving, rules, path owners, members, grants, secret values, links, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
 
 **Connection.** Anything that can act as you. It has a type: **Token**, **App** or **Reliquary CLI**. All are listed on the **Connections** page (the account menu), where you revoke them. See [Connections](../concepts/connections.md).
 
@@ -41,6 +41,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 **Open.** A file policy: owners, editors and their agents write the file directly, each write a new version. See [Canon, open and rules](../concepts/canon-and-rules.md).
 
 **Owners-only environment.** An environment, like `production`, whose values only owners set or read.
+
+**Path owner.** Someone named on a specific path's owner list: open for them there, whatever the path's own rule says for everyone else, and their approval is what its quorum counts. Anyone who is a member may be named, including a viewer, promoted for that one path only. See [Path ownership](../concepts/path-ownership.md).
 
 **Proposal.** A suggested change to a file that waits for people to approve, request changes or reject it. See [Proposals and review](../concepts/proposals-and-review.md).
 

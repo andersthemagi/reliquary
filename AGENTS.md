@@ -16,9 +16,11 @@ alongside it.
 
 **3, links, started early (owner's decision, 2026-09-28):** milestone 2's
 week of real use isn't done, so this is a deliberate exception to "work on
-the current milestone only," not a new default. Schema and owner-only
-management are built (see below); discovery and the MCP proxy are not,
-and are what "milestone 3" still means for exit purposes.
+the current milestone only," not a new default. Alongside it, same
+decision: path ownership (built) and notifications (not yet). Links'
+schema and owner-only management are built (see below); discovery and the
+MCP proxy are not, and are what "milestone 3" still means for exit
+purposes.
 
 Milestone 1: **core, MCP and UI** (vaults, files with canon/open
 policies, proposals with quorum, log, gate, remote MCP with OAuth, web UI).
@@ -133,6 +135,24 @@ Not built: discovery (populating `link_tools` from an upstream server's
 `tools/list`) and the MCP proxy (`<link>.<tool>`, credential egress,
 `link_calls` writes) — both server-side, per design.md's open questions
 there. Nothing calls a link's tools yet.
+
+Also alongside milestone 3, not a numbered milestone of its own (design.md's
+"Path ownership" and "Notifications", owner's decision 2026-09-28): **path
+ownership** is built in `20260928130000_path_ownership.sql`, with hostile
+tests (`supabase/tests/path_ownership_test.sql`) — a path's named owners
+write, delete and decide on it directly, whatever their vault role (a
+viewer may be named), and only their approvals count toward its quorum; a
+path with no named owner is provably unchanged (the same suite re-runs
+every existing canon/open hostile test, all still passing). This touched
+`policy_for`, `write_file`, `delete_file` and `decide()`, functions every
+other feature depends on, more than the schema-only shape of most
+milestone work — treat any further change to those four with the same
+care. Deliberately not touched: `propose`, `revise_proposal`,
+`edit_and_approve`, `comment_on_proposal` (a path-owning viewer proposes
+nothing since they write directly, and can still approve or reject with
+plain `decide()`, but can't yet use edit-and-approve or comment unless
+they also have ordinary editor or owner access). **Notifications** is not
+yet built; its schema and MCP surface are the next slice.
 
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits

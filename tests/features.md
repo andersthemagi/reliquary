@@ -434,9 +434,19 @@ git). All four: `./test.sh`.
 | F405 | The credential is never selectable, and members read the rest | `private.link_secrets` is refused (42501) to every authenticated role, owner included, matching `private.variable_secrets`; every member (owner, editor, viewer), within their role, reads a vault's links; an outsider sees none | `supabase/tests/links_test.sql#secret:`, `supabase/tests/links_test.sql#read:` | `docs/public/concepts/links.md` |
 | F406 | Tool grants and the call log | `set_link_grant` (owner, in person only) sets or upserts one (role, tool) grant, refusing an invalid role or an empty tool name (22023); `link_calls` is append-only (update, delete and truncate all refused, even for the table owner) and readable by owners and editors only, viewers and outsiders seeing none; nothing outside the migration's own functions may insert a row | `supabase/tests/links_test.sql#grant:`, `supabase/tests/links_test.sql#calls:` | `docs/public/concepts/links.md` |
 
+## Path ownership (milestone 3, alongside links; docs/design.md "Path ownership")
+
+| ID | Feature | Acceptance criteria | Tests | Docs |
+|---|---|---|---|---|
+| F407 | Naming and removing a path's owners: owners, in person | `set_path_owner` and `remove_path_owner` refuse an editor, a viewer, an outsider, anonymous, the owner's agent and the owner's token (42501), changing and logging nothing when refused; naming requires the path to already have a policy rule (P0002 if not) and the target to already be a vault member, any role (P0002 if not, so an outsider can never be named); naming the same person twice is harmless (one row, logged each time); removing someone who isn't an owner is refused (P0002); members read a path's owners, an outsider sees none | `supabase/tests/path_ownership_test.sql#set:`, `supabase/tests/path_ownership_test.sql#read:`, `supabase/tests/path_ownership_test.sql#remove:` | `docs/public/concepts/path-ownership.md` |
+| F408 | A path's named owners write and delete it directly, whatever their vault role | A viewer named owner of a canon path writes and deletes it with `write_file`/`delete_file` directly, no proposal; an editor or the vault owner who isn't named on that path still can't (42501, no vault-wide override); a path with no named owner behaves exactly as before this migration, canon or open, for every role including the vault owner | `supabase/tests/path_ownership_test.sql#write:` | `docs/public/concepts/path-ownership.md` |
+| F409 | A path's named owners are the only approvals its quorum counts | On a path with named owners, only their approvals count toward its quorum, whatever their own vault role; a non-owner's proposal is still accepted and they may still call `decide()` if they otherwise have vault write access, but their own approval of it doesn't count; a named-owner viewer may call `decide()` at all (approve or reject) though `can_write()` alone would refuse them; a path with no named owner counts any owner or editor's approval, exactly as before this migration; removing a path's policy rule (`set_policy(path, null)`) cascades away its owner list too | `supabase/tests/path_ownership_test.sql#decide:`, `supabase/tests/path_ownership_test.sql#cascade:` | `docs/public/concepts/path-ownership.md` |
+
+Deliberately not built in this pass: `propose`, `revise_proposal`, `edit_and_approve` and `comment_on_proposal` are unchanged. A path-owning viewer proposes nothing (they write directly instead) and can still approve or reject with plain `decide()`, but can't use the one-step edit-and-approve or comment on a proposal unless they also have ordinary editor or owner access to the vault.
+
 ## Not built yet (no rows until they ship)
 
-Discovery and the MCP proxy for links (F404-F406 are the schema and owner-only management underneath them), routines, the git mirror. Each lands with its row and tests.
+Discovery and the MCP proxy for links (F404-F406 are the schema and owner-only management underneath them), the notifications addendum's schema, edit-and-approve and commenting for path owners (F407-F409's own follow-up), routines, the git mirror. Each lands with its row and tests.
 
 ## Known gaps
 
