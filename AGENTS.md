@@ -130,11 +130,15 @@ Milestone 3: **links** (design.md's "Links"; renamed 2026-09-28 from
   authenticated role, sealed the same way as an environment variable;
   `link_calls` is append-only and outlives a deleted link (no foreign
   key, so a link's call history is never blocked or wiped by deleting
-  it).
+  it);
+- `list_links` over MCP (2026-09-28, `mcp/src/tools.ts`, hostile tests
+  in `mcp/test/links.test.mjs`): name and url, never the credential, any
+  member's agent, read-only connections included.
 Not built: discovery (populating `link_tools` from an upstream server's
 `tools/list`) and the MCP proxy (`<link>.<tool>`, credential egress,
 `link_calls` writes) — both server-side, per design.md's open questions
-there. Nothing calls a link's tools yet.
+there. Nothing calls a link's tools yet; adding one still needs the web
+app, which doesn't exist either.
 
 Also alongside milestone 3, not a numbered milestone of its own (design.md's
 "Path ownership" and "Notifications", owner's decision 2026-09-28): **path
@@ -167,14 +171,20 @@ notify) ride alongside milestone 3 the same way, on the same owner's call
   and changes on watched paths. Both tables cascade from `vault_members`, so
   leaving, removal, account deletion and vault deletion take them with it.
   Built in a separate worktree from path ownership, so it touches neither
-  `path_policies` nor `policy_for`, `write_file`, `propose` or `decide()`.
+  `path_policies` nor `policy_for`, `write_file`, `propose` or `decide()`;
+- `list_flags`, `advance_flags` and `list_subscriptions` over MCP
+  (2026-09-28, `mcp/src/tools.ts`, hostile tests in
+  `mcp/test/flags.test.mjs`): design.md's open question (ride in every
+  response, or a tool of their own) answered in favour of a tool of their
+  own, `list_flags`, called on request rather than automatically. No tool
+  creates or removes a watch: that's still the person, in the web app,
+  same as variables and rules.
 Not built: category 1, notes addressed `to:` someone (design.md doesn't say
 how `to:` is stored); staleness for files you've read (nothing logs a read);
 tag subscriptions (files have no tags; `create_subscription` refuses the
 kind); path owners in "waiting on you" (follows path ownership above when
-someone does that follow-up). Nothing in `mcp/` or `web/` calls these yet,
-pending design.md's open question: do flags ride in every response, or get
-a tool of their own?
+someone does that follow-up); watching or unwatching a path anywhere at
+all, web app included.
 
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits

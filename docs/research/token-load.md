@@ -133,3 +133,24 @@ Still to do, from the token side:
   pass: the next tool or longer description will need the budget raised on
   purpose, or a trim first (`list_variables`'s description, 447
   characters, is the longest).
+
+## Fourth pass (flags and links)
+
+2026-09-28. Four new tools (`list_flags`, `advance_flags`,
+`list_subscriptions`, `list_links`, `20260928120000_links.sql` and
+`20260928150000_flags.sql`): `tools/list` is 10,417 bytes, over its
+8,500-byte budget (itself raised past this doc's 7,300 at some point
+between the third pass and `send_feedback`/`list_my_feedback` landing,
+without an entry here -- a gap in this doc, not new today). Raised the
+budget to 10,600, just above the actual, per this doc's own rule. Every
+other tool's budget is unchanged: none of the four touches an existing
+response.
+
+Still to do, from the token side:
+
+- **This doc's own numbers drifted from `tools/list`'s real budget once**,
+  silently, between the third pass and today. Worth a habit: whoever raises
+  a budget in `token_load.test.mjs` adds a line here in the same change,
+  not just the trailer.
+- **`tools/list` has no headroom again.** The next tool needs the budget
+  raised on purpose, same as every pass so far.

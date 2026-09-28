@@ -202,7 +202,7 @@
   docs: how-to/self-host
 
 - title: Links
-  summary: A vault's credential to a remote MCP server. Owners add, edit, delete and grant one; using its tools waits on discovery and the proxy.
+  summary: A vault's credential to a remote MCP server. An agent can list them over MCP; adding one and using its tools wait on the web app, discovery and the proxy.
   status: in-progress
   milestone: M3
   docs: concepts/links
@@ -213,7 +213,7 @@
   docs: concepts/path-ownership
 
 - title: Flags
-  summary: Telling you and each of your agents what changed since you were last told, and watching paths. The database keeps them; nothing shows them over MCP yet, and notes addressed to someone aren't built.
+  summary: Telling you and each of your agents what changed since you were last told. Live over MCP now; watching or unwatching a path, and notes addressed to someone, still need the web app.
   status: in-progress
   docs: concepts/flags
 

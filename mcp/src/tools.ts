@@ -966,6 +966,154 @@ export function registerTools(
       }),
   );
 
+  // Flags (20260928150000_flags.sql, design.md "Notifications"): what's
+  // changed that your person, or this connection, hasn't been shown yet.
+  // Read-only ones may read and advance a watermark (it's the connection's
+  // own bookkeeping, never a write to the vault); nothing here sets or
+  // removes a watch, which needs the person in the web app, same as
+  // variables and rules. No tool proposes on your person's behalf and no
+  // flag, however worded, lets an agent approve anything.
+
+  server.registerTool(
+    "list_flags",
+    {
+      title: "List flags",
+      description:
+        "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, or a change on a path they watch. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
+      inputSchema: {
+        vault: VAULT,
+        limit: z.number().int().min(1).max(200).optional().describe("Flags, default 50"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ vault, limit }) =>
+      run(async (c) => {
+        const { rows } = await c.query("select public.list_flags(private.vault_ref($1), $2) as r", [vault, limit ?? null]);
+        const r = rows[0].r as {
+          watermark: number;
+          through: number;
+          more: boolean;
+          flags: {
+            seq: number;
+            category: string;
+            reason: string;
+            event: string;
+            path: string | null;
+            proposal_id: string | null;
+            actor: string | null;
+            agent: string | null;
+            at: string;
+            watching: string | null;
+          }[];
+        };
+        if (r.flags.length === 0) {
+          return ok(`No new flags since watermark ${r.watermark}. Nothing waiting on your person right now.`);
+        }
+        // People by a short label, as changes_since does: a person's id on
+        // every line would be a third of the response.
+        const people = new Map<string, string>();
+        const who = (u: string | null) => {
+          if (!u) return "system";
+          let label = people.get(u);
+          if (!label) people.set(u, (label = `p${people.size + 1}`));
+          return label;
+        };
+        const lines = r.flags.map((f) => {
+          const bits = [
+            `${f.seq}  ${f.category}/${f.reason}  ${f.event}${f.path ? ` ${f.path}` : ""}`,
+            `by ${who(f.actor)}${f.agent ? ` via ${f.agent}` : ""}`,
+            at(new Date(f.at)),
+          ];
+          if (f.proposal_id) bits.push(`proposal ${f.proposal_id}`);
+          if (f.watching) bits.push(`watching ${f.watching}`);
+          return `  ${bits.join("  ")}`;
+        });
+        const out = [
+          `watermark was ${r.watermark}; ${r.flags.length} flag${r.flags.length === 1 ? "" : "s"}` +
+            `${r.more ? " (more waiting; call again after advancing)" : ""}:`,
+          "people: " + [...people].map(([u, l]) => `${l}=${u}${u === id.userId ? " (your person)" : ""}`).join(", "),
+          ...lines,
+          `through: ${r.through}`,
+          "Call advance_flags(vault, through) once these are shown to your person.",
+        ];
+        return ok(out.join("\n"));
+      }),
+  );
+
+  server.registerTool(
+    "advance_flags",
+    {
+      title: "Mark flags shown",
+      description:
+        "Marks your connection's flags shown, through the value list_flags returned. Only ever moves forward, and never past the vault's latest entry. A read-only connection may call this too.",
+      inputSchema: {
+        vault: VAULT,
+        through: z.number().int().min(0).max(1e15).describe("The through value list_flags returned"),
+      },
+    },
+    async ({ vault, through }) =>
+      run(async (c) => {
+        const { rows } = await c.query("select public.advance_flags(private.vault_ref($1), $2) as w", [vault, through]);
+        return ok(`Flags marked shown through ${rows[0].w}.`);
+      }),
+  );
+
+  server.registerTool(
+    "list_subscriptions",
+    {
+      title: "List watched paths",
+      description:
+        "Paths your person watches in a vault, for flags. Only their own. Watching or unwatching a path needs your person in the web app; no tool here sets one.",
+      inputSchema: { vault: VAULT },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ vault }) =>
+      run(async (c) => {
+        const { rows } = await c.query(
+          `select s.target, s.created_at
+             from ${VAULT_REF} join public.subscriptions s on s.vault_id = v.id
+            order by s.target`,
+          [vault],
+        );
+        if (rows.length === 0) return ok("Your person watches nothing in this vault.");
+        const out = (rows as { target: string; created_at: string }[]).map(
+          (s) => `${s.target}  since ${at(new Date(s.created_at))}`,
+        );
+        return ok(out.join("\n"));
+      }),
+  );
+
+  // Links (20260928120000_links.sql, design.md "Links"): read only. Adding,
+  // editing, deleting a link and granting its tools all need the owner in
+  // the web app (the ceiling); no tool here does any of that. Discovery and
+  // the proxy aren't built, so a link's tools aren't callable yet, whatever
+  // it's granted.
+
+  server.registerTool(
+    "list_links",
+    {
+      title: "List links",
+      description:
+        "A vault's links to upstream MCP servers: name and url only, never the credential. Discovery and the proxy aren't built yet, so no link has usable tools through Reliquary yet; this only shows what exists.",
+      inputSchema: { vault: VAULT },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ vault }) =>
+      run(async (c) => {
+        const { rows } = await c.query(
+          `select l.name, l.url, l.created_by, l.created_at
+             from ${VAULT_REF} join public.links l on l.vault_id = v.id
+            order by l.name`,
+          [vault],
+        );
+        if (rows.length === 0) return ok("No links.");
+        const out = (rows as { name: string; url: string; created_by: string; created_at: string }[]).map(
+          (l) => `${l.name}  ${l.url}  added by ${l.created_by}${l.created_by === id.userId ? " (your person)" : ""}  ${at(new Date(l.created_at))}`,
+        );
+        return ok(out.join("\n"));
+      }),
+  );
+
   cacheToolList(server);
 }
 

@@ -2,7 +2,7 @@
 
 A flag tells you, or your agent, about something in a vault that changed since you were last told: a proposal waiting on your review, a change to one of your own proposals, or a change on a path you watch.
 
-**Not yet usable.** The database keeps flags, the paths you watch and where each of you was last told, but nothing uses them yet: no MCP tool shows flags, and there is no way to watch a path in the web app or the CLI. Notes addressed to someone aren't built either. This page describes the shape once that lands.
+**Partly usable.** An agent can list your flags (`list_flags`) and what you watch (`list_subscriptions`) over MCP, and mark flags shown (`advance_flags`). There is still no way to watch or unwatch a path anywhere: not the web app, not the CLI, not MCP (that needs you, in the web app, same as variables and rules). Notes addressed to someone aren't built either.
 
 ## What gets flagged
 

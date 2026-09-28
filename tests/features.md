@@ -454,9 +454,16 @@ Deliberately not built in this pass: `propose`, `revise_proposal`, `edit_and_app
 | F413 | A watermark per identity | No watermark is stored until an identity advances, and reading never moves one; `advance_flags` moves only the caller's own (the person in the web app, or one connection by its token), only forward, never past the vault's latest entry, and not with a missing or negative position (22023); one row per identity and vault; a read-only connection moves its own; moving one leaves every other; `list_flags` reports the caller's own; an outsider, a connection scoped elsewhere or revoked, a CLI sign-in, anonymous and an agent without a connection can't move one, and refused or backward calls change none; nobody reads or writes the table directly | `supabase/tests/flags_test.sql#watermark:` | `docs/public/concepts/flags.md` |
 | F414 | Subscriptions and watermarks go with the membership | A role change keeps them; deleting a connection takes its own watermark and no other; leaving a vault, being removed from it and the vault's deletion take the person's subscriptions and watermarks there and nowhere else, and flags and watching are then refused as no such vault | `supabase/tests/flags_test.sql#membership:` | `docs/public/concepts/flags.md` |
 
+## Links and flags over MCP (2026-09-28)
+
+| ID | Feature | Acceptance criteria | Tests | Docs |
+|---|---|---|---|---|
+| F415 | `list_links` over MCP | Any member's agent, within its connection's vaults (read-only is enough), reads a vault's links: name and url, never the credential; an empty vault says so plainly; no MCP tool adds, edits or deletes a link, or grants its tools (the ceiling stays owners in person) | `mcp/test/links.test.mjs#list_links:` | `docs/public/concepts/links.md` |
+| F416 | `list_flags`, `advance_flags` and `list_subscriptions` over MCP | `list_flags` shows a proposal waiting on the caller's person (`responsibility/review`) and a change on a watched path (`subscription/path`), each with its proposal id or watched path, ending in a `through` value and a prompt to call `advance_flags`; the caller's own agent's own actions never raise its own flag; `advance_flags` moves the watermark forward and a later `list_flags` reports nothing new; it refuses to move past the vault's latest entry; `list_subscriptions` shows only the caller's own watched paths; no MCP tool creates or removes a watch, or decides a proposal (the ceiling stays the person, in person) | `mcp/test/flags.test.mjs#list_flags:`, `mcp/test/flags.test.mjs#advance_flags:`, `mcp/test/flags.test.mjs#list_subscriptions:` | `docs/public/concepts/flags.md` |
+
 ## Not built yet (no rows until they ship)
 
-Discovery and the MCP proxy for links (F404-F406 are the schema and owner-only management underneath them), edit-and-approve and commenting for path owners (F407-F409's own follow-up), flags over MCP and notes addressed to someone (F410-F414 are the schema and SQL functions underneath them), routines, the git mirror. Each lands with its row and tests.
+Discovery and the MCP proxy for links (F404-F406, F415 are the schema, management and read access underneath it), edit-and-approve and commenting for path owners (F407-F409's own follow-up), notes addressed to someone (design.md's category 1, still unresolved), watching or unwatching a path over MCP (F410, F411, F416: the ceiling keeps this with the person, same as variables and rules), routines, the git mirror. Each lands with its row and tests.
 
 ## Known gaps
 

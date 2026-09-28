@@ -42,7 +42,7 @@ async function measure(c, name, args, label = name) {
 // Budgets in bytes, set just above what the compact formats produce, so a
 // regression shows and small wording changes don't.
 const BUDGET = {
-  "tools/list": 8500,
+  "tools/list": 10600,
   list_vaults: 200,
   list_files: 1800,
   "list_files prefix=canon/": 400,
