@@ -29,6 +29,8 @@ node=docker.io/library/node:22-slim
 envfile=.env.dev
 
 rand() { python3 -c 'import secrets; print(secrets.token_urlsafe(24))'; }
+# 32 random bytes, base64url, no padding: secrets.ts's key shape.
+randkey() { python3 -c 'import secrets; print(secrets.token_urlsafe(32))'; }
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 
 if [[ ! -f $envfile ]]; then
@@ -40,6 +42,12 @@ if [[ ! -f $envfile ]]; then
   } > $envfile
 fi
 grep -q '^WEB_DB_PASSWORD=' $envfile || echo "WEB_DB_PASSWORD=$(rand)" >> $envfile
+# Environment variable and link credential encryption (secrets.ts): only the
+# web container ever holds this. LINK_PROXY_SECRET authenticates mcp/'s own
+# calls to the web app's internal link-call endpoint (linkproxy.ts); both
+# containers hold it.
+grep -q '^VARIABLES_KEY=' $envfile || echo "VARIABLES_KEY=$(randkey)" >> $envfile
+grep -q '^LINK_PROXY_SECRET=' $envfile || echo "LINK_PROXY_SECRET=$(rand)" >> $envfile
 # shellcheck disable=SC1090
 source $envfile
 
@@ -82,6 +90,7 @@ case "${1:-}" in
     "$engine" rm -f $srv >/dev/null 2>&1 || true
     "$engine" run -d --name $srv --network host --restart unless-stopped -v "$PWD":/app:Z -w /app \
       -e DATABASE_URL="postgres://reliquary_mcp:$MCP_DB_PASSWORD@127.0.0.1:$pgport/postgres" \
+      -e LINK_PROXY_SECRET="$LINK_PROXY_SECRET" \
       -e PORT=$port $node node dist/server.js >/dev/null
     until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
     echo "alter role reliquary_web login password :'pw';" | psql -v pw="$WEB_DB_PASSWORD"
@@ -89,6 +98,7 @@ case "${1:-}" in
     "$engine" rm -f $web >/dev/null 2>&1 || true
     "$engine" run -d --name $web --network host --restart unless-stopped -v "$PWD/../web":/app:Z -w /app \
       -e DATABASE_URL="postgres://reliquary_web:$WEB_DB_PASSWORD@127.0.0.1:$pgport/postgres" \
+      -e VARIABLES_KEY="$VARIABLES_KEY" -e LINK_PROXY_SECRET="$LINK_PROXY_SECRET" \
       -e LOCAL_USER_ID="$ME" -e LOGIN_FILE=/app/.login -e PORT=$webport $node node dist/server.js >/dev/null
     until curl -sf "http://127.0.0.1:$webport/healthz" >/dev/null; do sleep 0.3; done
     echo "MCP endpoint: http://127.0.0.1:$port/mcp"

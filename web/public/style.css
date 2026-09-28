@@ -1447,6 +1447,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 @media (max-width: 640px) {
   .readme-head { padding: var(--space-3) var(--space-4); }
   .file-more .action-list { min-width: 0; width: min(18rem, calc(100vw - 2 * var(--space-5))); }
+}
 
 /* Package D: access */
 /* Connections (/tokens, access.ts): the name leads each row, and on a phone
@@ -1482,6 +1483,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .connect-panel .callout { margin-top: var(--space-4); max-width: 80ch; }
 @media (max-width: 639px) {
   .token-list td.num { width: auto; }
+}
 
 /* Package C: proposals and review */
 /* Worth a closer look (proposals.ts): each flag's short label, then the sentence. */
@@ -1587,6 +1589,7 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
   .rules-table td:nth-child(2), .rules-table .rule-actions { width: auto; }
   .rules-table .rule-actions { text-align: left; }
   .rules-table .rule-actions .action-list { min-width: 0; width: min(16rem, calc(100vw - 2 * var(--space-5))); left: 0; right: auto; }
+}
 
 /* Package H: home and new vault */
 /* Home (pages.ts home()): the plan line under the title, the badge beside

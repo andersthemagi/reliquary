@@ -24,6 +24,13 @@
 # (docs/ops/runbook.md, "Email sender"). Leave both out to keep invites by
 # link only; with the placeholder left in, nothing is emailed.
 #
+# LINK_PROXY_SECRET (mcp/'s own calls to the web app's internal
+# link-call endpoint, web/src/linkproxy.ts) comes from
+# supabase/.link-proxy-secret, made once and put in both projects; run
+# `web` and `mcp` and redeploy both together when rotating it
+# (docs/ops/runbook.md, "Rotating secrets") -- a mismatch refuses every
+# proxied link call until both are live.
+#
 # The variables encryption keys (VARIABLES_KEYS, docs/variables.md "Key
 # rotation") come from supabase/.variables-keys-secret, one id:key per line,
 # the current key first (scripts/variables-keys.sh). To rotate
@@ -69,6 +76,14 @@ web=${web%/}; mcp=${mcp%/}
 pw() { tr -d '[:space:]' < "supabase/.$1-db-password"; }
 enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(),safe=""))'; }
 
+# Shared by both projects (mcp/'s own calls to the web app's internal
+# link-call endpoint, linkproxy.ts): made once, the same value goes in
+# both, from the same file, whichever runs first.
+link_secret=supabase/.link-proxy-secret
+if [[ ! -s $link_secret ]]; then
+  (umask 077; head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$link_secret")
+fi
+
 out=supabase/.vercel-$app.env
 case $app in
   web)
@@ -95,6 +110,7 @@ SUPABASE_URL=https://$ref.supabase.co
 SUPABASE_PUBLISHABLE_KEY=<from Supabase: Project Settings -> API Keys>
 JWT_ALG=ES256
 SESSION_SECRET=$(cat "$secret")
+LINK_PROXY_SECRET=$(cat "$link_secret")
 RESEND_API_KEY=<from Resend: API Keys, sending access only>
 EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>
 EOF
@@ -105,6 +121,7 @@ DATABASE_URL=postgres://reliquary_mcp.$ref:$(pw mcp | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 MCP_RESOURCE=$mcp/mcp
 AUTH_ISSUER=$web
+LINK_PROXY_SECRET=$(cat "$link_secret")
 EOF
     ;;
   *) echo "web or mcp"; exit 1 ;;

@@ -21,6 +21,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
 import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnauthorized, rateLimitedBody } from "./ratelimit.js";
 import { registerTools } from "./tools.js";
+import { configureLinkProxy } from "./linkproxy.js";
 import { BUILD, versionJson } from "./version.js";
 import { compact, fail, failure, withRequest, type Failure } from "./failure.js";
 
@@ -62,6 +63,16 @@ const OAUTH = oauthConfig();
 // Rate limits (ratelimit.ts): tool calls per token, 401s per address.
 try {
   configureRateLimits(process.env);
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
+
+// The link proxy (linkproxy.ts): calling the web app's own internal
+// endpoint to make an already-authorized <link>.<tool> call. OAUTH.issuer
+// is the web app's own URL, already resolved above.
+try {
+  configureLinkProxy(process.env, OAUTH.issuer);
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);
@@ -301,7 +312,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
 
   const mcp = new McpServer({ name: "reliquary", version: BUILD.version });
   const runner = session;
-  registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
+  await registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

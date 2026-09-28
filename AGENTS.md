@@ -17,10 +17,12 @@ alongside it.
 **3, links, started early (owner's decision, 2026-09-28):** milestone 2's
 week of real use isn't done, so this is a deliberate exception to "work on
 the current milestone only," not a new default. Alongside it, same
-decision: path ownership (built) and notifications (not yet). Links'
-schema and owner-only management are built (see below); discovery and the
-MCP proxy are not, and are what "milestone 3" still means for exit
-purposes.
+decision: path ownership (built) and notifications (not yet). Milestone
+3's exit criterion, the MCP proxy, is now built (see below); what's left
+before calling the milestone done is its own week of real use, plus
+rediscovering a link's tools by hand (not built, `web/src/discovery.ts`'s
+own header: today, retrying a failed discovery means deleting and
+re-adding the link).
 
 Milestone 1: **core, MCP and UI** (vaults, files with canon/open
 policies, proposals with quorum, log, gate, remote MCP with OAuth, web UI).
@@ -140,12 +142,62 @@ Milestone 3: **links** (design.md's "Links"; renamed 2026-09-28 from
   `sealLink`/`openLink` (`web/src/secrets.ts`, the same `VARIABLES_KEYS`,
   AAD scoped to the vault only since renaming a link never touches its
   credential) and never rendered back once saved; delete goes through a
-  confirm page. No Grants page yet: `link_tools` stays empty until
-  discovery exists, so there is nothing to grant.
-Not built: discovery (populating `link_tools` from an upstream server's
-`tools/list`) and the MCP proxy (`<link>.<tool>`, credential egress,
-`link_calls` writes) — both server-side, per design.md's open questions
-there. Nothing calls a link's tools yet.
+  confirm page.
+- Discovery (2026-09-28, `20260928180000_link_discovery.sql`,
+  `web/src/discovery.ts`, hostile tests in `supabase/tests/links_test.sql`
+  and `web/test/discovery.test.mjs`, wiring in
+  `web/test/links_page.test.mjs`): design.md's first open question
+  (synchronous or a background job) answered synchronous, in the same
+  request as `create_link` — a slow or unreachable upstream flashes a
+  warning naming why, with a reference in the server log, and keeps the
+  link; there is no rediscovery yet, so retrying today means deleting and
+  re-adding the link. The MCP handshake (`initialize`, `initialized`,
+  paged `tools/list`) is hand-rolled in the web app rather than pulling in
+  the official SDK's client there (mcp/'s server already needs it for a
+  different reason). Address safety is shared with the Client ID
+  Metadata Document fetch (`web/src/netsafety.ts`, extracted from
+  `cimd.ts` the same day). `is_write` comes from a tool's own
+  `readOnlyHint` alone (anything but an explicit `true` stays a write
+  tool, matching design.md); `set_link_tools` seeds a grant only for a
+  newly discovered tool, never overwrites an owner's own flip on
+  rediscovery, and never deletes a stale tool's grant, only the tool row
+  itself.
+- The Grants page (2026-09-28, `web/src/linkgrants.ts`, reached from a
+  link's row menu; tests in `web/test/links_page.test.mjs`): an owner
+  checks or unchecks a tool per role in one table, saved as a diff
+  (`set_link_grant` once per changed cell); read-only for everyone else.
+  No confirm step, unlike naming a path owner: a grant is adjustable and
+  reversible either way, so it follows `rules.ts`'s "set a rule" pattern
+  instead.
+- The MCP proxy (2026-09-28, `20260928190000_link_proxy.sql`,
+  `mcp/src/tools.ts`, `web/src/linkcall.ts`, `web/src/linkproxy.ts`;
+  hostile tests in `supabase/tests/link_proxy_test.sql`, end-to-end in
+  `mcp/test/link_proxy.test.mjs`), milestone 3's exit criterion:
+  `begin_link_call`/`record_link_call` are the credential-egress
+  chokepoint (`reveal_variable`/`read_variables`'s shape, split in two
+  since a call's outcome crosses a network boundary SQL can't); a write
+  tool also needs `private.connection_write_capable()`, mirroring F425's
+  path-ownership fix, so a read-only-scoped token can't reach one even
+  once its role (collapsed to viewer) is granted it. mcp/ never holds
+  `VARIABLES_KEYS` (`server.ts` already refused to start with it set,
+  before this existed): it forwards the still-sealed credential to the
+  web app's own internal endpoint (`linkproxy.ts`, a shared secret,
+  `LINK_PROXY_SECRET`), which opens it and makes the call
+  (`linkcall.ts`, `discovery.ts`'s own safe-HTTP machinery, re-checking
+  the address on every call, not just when the link was added).
+  `private.list_callable_link_tools()` is what builds each identity's
+  `<link>.<tool>` entries in `tools/list` — the exact criteria
+  `begin_link_call` checks, so a tool is only ever listed if calling it
+  would succeed; `tools/list` is no longer cached process-wide (it was,
+  identity-independent) now that this makes it identity-dependent. An
+  upstream tool's result is quoted as data, the same marker convention
+  file text already uses. `link_tools` grows `input_schema`, so a
+  registered tool carries the upstream's own argument names (untyped:
+  the SDK's `registerTool` has no hook for a raw JSON Schema, only Zod);
+  a tool discovered with none takes one `args` field instead.
+Not built: rediscovering a link's tools by hand (`web/src/discovery.ts`'s
+own header: today, retrying a failed discovery means deleting and
+re-adding the link).
 
 Also alongside milestone 3, not a numbered milestone of its own (design.md's
 "Path ownership" and "Notifications", owner's decision 2026-09-28): **path

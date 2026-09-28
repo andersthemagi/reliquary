@@ -287,3 +287,18 @@ test("stylesheet: stacked tables on phones label each cell from data-label", () 
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {
   for (const sel of [/\n\.secondary \{/, /\n\.ghost \{/, /\n\.ghost:hover \{/, /\n\.danger \{/, /\n\.danger\.solid \{/, /\n\.primary, a\.button\.primary \{/]) assert.match(CSS, sel);
 });
+
+test("stylesheet: every rule and @media block closes, so a missing brace can't swallow the rest of the file", () => {
+  const stripped = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+  let depth = 0;
+  let line = 1;
+  for (const ch of stripped) {
+    if (ch === "\n") line++;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      assert.ok(depth >= 0, `unmatched closing brace at line ${line}`);
+    }
+  }
+  assert.equal(depth, 0, "unclosed rule or @media block (brace count doesn't return to 0)");
+});

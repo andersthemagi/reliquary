@@ -1,9 +1,12 @@
--- Hostile tests for links to upstream MCP servers (20260928120000_links):
--- schema and owner-only management only. Discovery and the MCP proxy
--- aren't built, so there is nothing here about tool calls, grants taking
--- effect at call time, or a credential leaving private.link_secrets
--- through a function -- that's a later migration's tests. Ana owns Gone
--- (Ben edits, Cal views) and Keep; Dee is an outsider.
+-- Hostile tests for links to upstream MCP servers (20260928120000_links) and
+-- discovery's own storage function (20260928180000_link_discovery,
+-- "set_link_tools" below). The MCP proxy isn't built, so there is nothing
+-- here about tool calls, grants taking effect at call time, or a credential
+-- leaving private.link_secrets through a function -- that's a later
+-- migration's tests; nor about the discovery HTTP call itself, which is
+-- web/test/discovery.test.mjs's (web/src/discovery.ts runs entirely in the
+-- web app, never in the database). Ana owns Gone (Ben edits, Cal views) and
+-- Keep; Dee is an outsider.
 
 -- ---------------------------------------------------------------------------
 -- Setup
@@ -196,3 +199,90 @@ select t.expect('delete: the owner deletes it, and its grant goes with it',
 select t.expect('delete: logged with its name',
   (select detail from public.log where vault_id = t.id('gone') and event = 'link.delete')::text,
   format('{"link": "%s", "name": "linear2"}', t.id('lk1')));
+
+-- ---------------------------------------------------------------------------
+-- set_link_tools (20260928180000_link_discovery)
+
+create function t.tool_count(p_link text) returns text language sql as
+$$ select count(*)::text from public.link_tools where link_id = t.id(p_link) $$;
+create function t.grant_enabled(p_link text, p_role text, p_tool text) returns text language sql as $$
+  select enabled::text from public.link_grants where link_id = t.id(p_link) and role = p_role and tool_name = p_tool
+$$;
+create function t.set_tools_sql(p_link text, p_tools text) returns text language sql as $$
+  select format($q$select 'ok' from public.set_link_tools(%L, %L::jsonb)$q$, t.id(p_link), p_tools)
+$$;
+
+insert into t.ids select 'lk2', t.run('ana', t.create_link_sql('gone', 'zendesk', 'https://api.zendesk.example'))::uuid;
+
+select t.expect('tools: an editor cannot record discovered tools',
+  t.run('ben', t.set_tools_sql('lk2', '[]')), 'ERR 42501');
+select t.expect('tools: a viewer cannot record discovered tools',
+  t.run('cal', t.set_tools_sql('lk2', '[]')), 'ERR 42501');
+select t.expect('tools: an outsider cannot record discovered tools',
+  t.run('dee', t.set_tools_sql('lk2', '[]')), 'ERR 42501');
+select t.expect('tools: the owner''s agent cannot record discovered tools',
+  t.run('ana', t.set_tools_sql('lk2', '[]'), 'Claude Code'), 'ERR 42501');
+select t.expect('tools: the owner''s token cannot record discovered tools',
+  t.run_tok('ana', 'all-rw', t.set_tools_sql('lk2', '[]')), 'ERR 42501');
+select t.expect('tools: refused calls store nothing',
+  t.tool_count('lk2'), '0');
+
+select t.expect('tools: not an array is refused',
+  t.run('ana', t.set_tools_sql('lk2', '{"name": "x"}')), 'ERR 22023');
+select t.expect('tools: a tool missing a name is refused',
+  t.run('ana', t.set_tools_sql('lk2', '[{"is_write": true}]')), 'ERR 22023');
+select t.expect('tools: an empty name is refused',
+  t.run('ana', t.set_tools_sql('lk2', '[{"name": ""}]')), 'ERR 22023');
+select t.expect('tools: a non-boolean is_write is refused',
+  t.run('ana', t.set_tools_sql('lk2', '[{"name": "x", "is_write": "yes"}]')), 'ERR 22023');
+select t.expect('tools: more than 500 tools is refused',
+  t.run('ana', format($q$select 'ok' from public.set_link_tools(%L,
+    (select jsonb_agg(jsonb_build_object('name', 't' || g)) from generate_series(1, 501) g))$q$, t.id('lk2'))),
+  'ERR 22023');
+select t.expect('tools: a bad call stores nothing either',
+  t.tool_count('lk2'), '0');
+
+select t.expect('tools: the owner records two discovered tools',
+  t.run('ana', t.set_tools_sql('lk2',
+    '[{"name": "list_tickets", "is_write": false, "description": "List tickets"}, {"name": "create_ticket", "is_write": true}]')),
+  'ok');
+select t.expect('tools: both are stored', t.tool_count('lk2'), '2');
+select t.expect('tools: a read tool defaults enabled for owner and editor',
+  t.grant_enabled('lk2', 'owner', 'list_tickets') || ' ' || t.grant_enabled('lk2', 'editor', 'list_tickets'), 'true true');
+select t.expect('tools: a write tool defaults disabled for owner and editor',
+  t.grant_enabled('lk2', 'owner', 'create_ticket') || ' ' || t.grant_enabled('lk2', 'editor', 'create_ticket'), 'false false');
+select t.expect('tools: viewers get no seeded grant row (they don''t call links directly)',
+  coalesce((select count(*)::text from public.link_grants where link_id = t.id('lk2') and role = 'viewer'), '0'), '0');
+select t.expect('tools: logged with what was added',
+  (select detail from public.log where vault_id = t.id('gone') and event = 'link.discover')::text,
+  format('{"link": "%s", "added": ["create_ticket", "list_tickets"], "removed": [], "tool_count": 2}', t.id('lk2')));
+
+-- The owner overrides a default by hand (set_link_grant, already built),
+-- then discovery runs again: the same tool's description can change, but
+-- neither its is_write guess nor an owner's own grant is reset, while a
+-- genuinely new tool still gets its default, and a tool that's gone is
+-- removed while its grant sits inert.
+select t.run('ana', format($q$select 'ok' from public.set_link_grant(%L, 'editor', 'create_ticket', true)$q$, t.id('lk2')));
+select t.expect('tools: a second discovery run: same tools, new description, plus one added and one removed',
+  t.run('ana', t.set_tools_sql('lk2',
+    '[{"name": "create_ticket", "is_write": false, "description": "Create a ticket"}, {"name": "delete_ticket", "is_write": true}]')),
+  'ok');
+select t.expect('tools: the removed tool is gone from link_tools', t.tool_count('lk2'), '2');
+select t.expect('tools: create_ticket''s is_write guess survives (never re-guessed after the first time)',
+  (select is_write::text from public.link_tools where link_id = t.id('lk2') and tool_name = 'create_ticket'), 'true');
+select t.expect('tools: create_ticket''s description is refreshed',
+  (select description from public.link_tools where link_id = t.id('lk2') and tool_name = 'create_ticket'), 'Create a ticket');
+select t.expect('tools: the owner''s earlier grant for create_ticket survives the second run',
+  t.grant_enabled('lk2', 'editor', 'create_ticket'), 'true');
+select t.expect('tools: the newly discovered tool gets its own default',
+  t.grant_enabled('lk2', 'owner', 'delete_ticket') || ' ' || t.grant_enabled('lk2', 'editor', 'delete_ticket'), 'false false');
+select t.expect('tools: list_tickets'' now-stale grant sits inert, not deleted',
+  t.grant_enabled('lk2', 'owner', 'list_tickets'), 'true');
+select t.expect('tools: the second run logged only the real change',
+  (select count(*)::text from public.log where vault_id = t.id('gone') and event = 'link.discover'), '2');
+
+select t.expect('tools: calling again with the exact same set logs nothing',
+  t.run('ana', t.set_tools_sql('lk2',
+    '[{"name": "create_ticket", "is_write": false, "description": "Create a ticket"}, {"name": "delete_ticket", "is_write": true}]'))
+  || ' ' || (select count(*)::text from public.log where vault_id = t.id('gone') and event = 'link.discover'),
+  'ok 2');

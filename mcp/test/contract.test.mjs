@@ -18,6 +18,15 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const SNAPSHOT = new URL("./contract.snapshot.json", import.meta.url);
 
+// A dotted name is a <link>.<tool> entry (tools.ts's registerLinkTools):
+// identity-dependent (different vaults, different grants -- its own name
+// check constraints forbid a dot in either a link's or a discovered
+// tool's own name, so this can't collide with a fixed tool). The fixed
+// set below is the same, enumerable, identity-independent list for
+// everyone; a granted-vs-ungranted <link>.<tool> is proven by
+// mcp/test/link_proxy.test.mjs instead of snapshotted here.
+const isFixed = (name) => !name.includes(".");
+
 async function toolSurface(token) {
   const client = new Client({ name: "contract", version: "0.0.0" });
   await client.connect(
@@ -26,6 +35,7 @@ async function toolSurface(token) {
   const { tools } = await client.listTools();
   await client.close();
   return tools
+    .filter((t) => isFixed(t.name))
     .map(({ name, title, description, inputSchema, annotations }) => ({
       name,
       title: title ?? null,
@@ -54,7 +64,7 @@ test("contract: the MCP tool list matches the approved snapshot", async () => {
   }
 });
 
-test("contract: a read-only token sees the same tools; the database refuses, not the list", async () => {
+test("contract: a read-only token sees the same fixed tools; the database refuses, not the list", async () => {
   const full = (await toolSurface(process.env.ANA_TOKEN)).map((t) => t.name);
   const readOnly = (await toolSurface(process.env.ANA_TEAM_RO)).map((t) => t.name);
   assert.deepEqual(readOnly, full);
