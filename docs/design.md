@@ -20,7 +20,7 @@ The research behind this draft is in `docs/research/`
 5. [Identity and permissions](#identity-and-permissions)
 6. [Access surfaces](#access-surfaces)
 7. [Context](#context)
-8. [Shared connections](#shared-connections)
+8. [Links](#links)
 9. [Routines](#routines)
 10. [Environment variables](#environment-variables)
 11. [Continuity](#continuity)
@@ -63,7 +63,7 @@ into one repo. v3 separates the two.
  Hermes (Nous) ───────┤       ├──────▶ │ context   files, canon/open, log │
  scripts, CI ─────────┘       │  gate  │ routines  automations on context │
  browser ──────── web UI ─────┤        │ env       shared variables        │
- terminal ─────── CLI ────────┘        │ connections  shared upstream MCP  │──▶ Stripe, Linear,
+ terminal ─────── CLI ────────┘        │ links      shared upstream MCP    │──▶ Stripe, Linear,
                                        │ members   people and agents      │    any remote MCP
                                        └──────────────┬───────────────────┘
                                                       └──▶ optional git mirror
@@ -80,7 +80,7 @@ Five jobs:
 3. **Build with the same accounts, and survive losing a person.** Shared
    variables, access logs, and emergency access mean the team and their
    agents can carry on.
-4. **Share tools, not keys.** A vault holds connections to other MCP
+4. **Share tools, not keys.** A vault holds links to other MCP
    servers with the team's credentials. Members' agents and routines use
    those tools through Reliquary and never see the credential.
 5. **Run client engagements without email.** A client hands over context and
@@ -139,9 +139,10 @@ Five jobs:
     and scratch work live here, and open folders can set an expiry.
 - **Proposal.** A suggested new file, edit, move, or retraction of a canon
   file, waiting for approvals.
-- **Connection.** A remote MCP server plus the credential to reach it,
+- **Link.** A remote MCP server plus the credential to reach it,
   stored in the vault. Members and routines use its tools through
-  Reliquary.
+  Reliquary. Not to be confused with an agent connection (above): a link is
+  Reliquary reaching *out*, a connection is a client reaching *in*.
 - **Routine.** A declarative automation inside a vault: a trigger, a
   prompt, an audience, and outputs.
 - **Environment.** A named set of variables in a vault (`development`,
@@ -160,8 +161,8 @@ Five jobs:
 | Propose changes to canon files | yes | yes | no | if granted |
 | Approve or reject (counts toward quorum) | yes | yes | no | never |
 | Set a file or folder's policy and quorum | yes | no | no | never |
-| Use a connection's tools | if granted | if granted | if granted, read-only tools | if granted |
-| Add or edit connections | yes | no | no | never |
+| Use a link's tools | if granted | if granted | if granted, read-only tools | if granted |
+| Add or edit links | yes | no | no | never |
 | Create and edit routines | yes | yes | no | never |
 | Use environment variables (pull, run) | if granted | if granted | no | if granted, per environment |
 | Reveal a variable's value in the UI | if granted | if granted | no | never |
@@ -187,7 +188,7 @@ injection turns any permission the agent holds into a permission the
 injected text holds. The ceiling keeps the few irreversible or
 trust-granting actions behind a human click. Everything else is open to
 their agent: reading, writing open files, proposing canon changes, and using
-granted connections.
+granted links.
 
 **Quorum.** A canon change lands when it has approvals from the folder's
 quorum of distinct people. The proposer's own approval counts, but only as
@@ -241,9 +242,9 @@ under 6 ms at 200k rows.
 | `list_proposals` | Pending and recent |
 | `list_routines`, `routine_runs` | Status and artifacts |
 | `list_variables` | Variable names and which environments they are in. **Never values** |
-| `<connection>.<tool>` | Each granted connection's tools, proxied (see [Shared connections](#shared-connections)) |
+| `<link>.<tool>` | Each granted link's tools, proxied (see [Links](#links)) |
 
-No MCP tool returns a variable's value or a connection's credential, on any
+No MCP tool returns a variable's value or a link's credential, on any
 scope.
 
 ## Context
@@ -265,19 +266,21 @@ scope.
   policy, author and date. Proposals that address an AI system are flagged in
   review.
 
-## Shared connections
+## Links
 
-A vault can hold connections to other remote MCP servers (Stripe, Linear,
+A vault can hold links to other remote MCP servers (Stripe, Linear,
 Supabase, a client's own server), each with the credential to reach it. A
-member's agent connects to Reliquary once, and sees each connection's tools
-as `<connection>.<tool>`. Reliquary calls the upstream server with the
+member's agent connects to Reliquary once, and sees each link's tools
+as `<link>.<tool>`. Reliquary calls the upstream server with the
 vault's credential. The agent never has the credential.
 
 This is how a team shares a platform account without sharing its key. It
 is also how routines reach third-party data, so there is no separate
-connector system.
+connector system. (Not to be confused with an [agent connection](#concepts):
+a link is Reliquary reaching an upstream server, a connection is a client
+reaching Reliquary.)
 
-- **Grants per connection and role.** Each connection has a tool
+- **Grants per link and role.** Each link has a tool
   allowlist. Tools that write or send are off until an owner enables them,
   per role.
 - **Credentials** are stored like environment variables (secret store,
@@ -291,54 +294,56 @@ connector system.
   on someone's laptop (stdio MCP). Upstream URLs must be public HTTPS: no
   private or link-local addresses, and redirects are re-checked (SSRF).
 - **What the gate doesn't cover:** upstream data isn't vault context. A
-  member granted a connection sees whatever that upstream account returns.
-  The connection grant is the control, so grant accordingly.
+  member granted a link sees whatever that upstream account returns.
+  The link's grant is the control, so grant accordingly.
 - **Shared credentials only in v1** (API keys, service accounts).
   Per-member OAuth to upstream ("my Gmail") comes later.
 
 ### Implementation plan (schema and discovery)
 
 Written 2026-09-28, before milestone 3 starts (build order still applies:
-milestone 2 needs its week of real use first). Not yet built; nothing below
-is schema or code, so it carries no acceptance criteria or registry row of
-its own. Mirrors `20260925090000_variables.sql`'s split of names in
-`public` from ciphertext in `private`, rather than inventing a second
-pattern for secrets.
+milestone 2 needs its week of real use first). Renamed the entity to
+**link** on 2026-09-28, before any of this was built: "connection" was
+already taken (the Connections page, [agent connection](#concepts) above),
+and the two meant opposite directions (a client reaching Reliquary, versus
+Reliquary reaching an upstream server). Mirrors
+`20260925090000_variables.sql`'s split of names in `public` from ciphertext
+in `private`, rather than inventing a second pattern for secrets.
 
-- `public.connections(id, vault_id, name, url, created_by, created_at)`.
+- `public.links(id, vault_id, name, url, created_by, created_at)`.
   RLS: vault members read; only owners insert, update or delete (matches
-  "Add or edit connections" in the access table).
-- `private.connection_secrets(connection_id, key_id, nonce, ciphertext)`.
+  "Add or edit links" in the access table).
+- `private.link_secrets(link_id, key_id, nonce, ciphertext)`.
   No grants, RLS with no policies, same shape as
   `private.variable_secrets`. The credential is encrypted in the web app
   with the existing `VARIABLES_KEYS` before it reaches Postgres; this does
   not get its own key material.
-- `public.connection_tools(connection_id, tool_name, is_write, description)`.
-  Populated by discovery, not typed by hand: adding a connection makes the
+- `public.link_tools(link_id, tool_name, is_write, description)`.
+  Populated by discovery, not typed by hand: adding a link makes the
   web app call the upstream MCP server's `tools/list` with the credential,
   server-side, and store each tool's name plus its declared
   `readOnlyHint`/`destructiveHint` annotation as the starting `is_write`
   guess. An owner can flip the flag later; a tool discovery can't classify
   defaults to a write tool (off), never to read.
-- `public.connection_grants(connection_id, role, tool_name, enabled)`.
+- `public.link_grants(link_id, role, tool_name, enabled)`.
   Per-role allow list. Read tools default enabled for editor and owner
-  (viewers don't call connections directly, per the access table). Write
+  (viewers don't call links directly, per the access table). Write
   tools default disabled until an owner enables them, per role, as design.md
   already says above.
-- `public.connection_calls(id bigint identity, connection_id, agent,
+- `public.link_calls(id bigint identity, link_id, agent,
   tool_name, vault_id, outcome, arg_hash, result_hash, at)`. Append-only
   (trigger, matching `log` and `env_access_log`). Never the arguments or the
   result body, only their hashes.
 
 Discovery and egress both run server-side, never in the database and never
-in a model's context: discovery in the web app when a connection is added,
+in a model's context: discovery in the web app when a link is added,
 proxied calls in `mcp/` at call time.
 
 - **SSRF.** Resolve the upstream host at request time, not once at
-  insert time (DNS can rebind after a connection is added). Refuse
+  insert time (DNS can rebind after a link is added). Refuse
   private, link-local and loopback ranges by default. Re-resolve on every
   redirect hop instead of trusting the first check; a URL that resolved to
-  a public address when the connection was added is re-validated on every
+  a public address when the link was added is re-validated on every
   proxied call, not just the first one.
 - **Credential egress** follows the `reveal_variable` / `read_variables`
   shape: one function-shaped chokepoint decrypts, attaches the credential
@@ -352,13 +357,13 @@ proxied calls in `mcp/` at call time.
 
 Open questions this doesn't resolve:
 
-- Whether discovery runs synchronously in the "add connection" request (the
+- Whether discovery runs synchronously in the "add link" request (the
   upstream might be slow or unreachable) or as a background job with a
   `pending` state in the UI meanwhile.
 - Whether an upstream's own `readOnlyHint: true` is trustworthy enough to
   default that tool on, or whether every newly discovered tool starts
   disabled regardless of what the upstream claims about itself.
-- Key rotation for `connection_secrets`: reuse `VARIABLES_KEYS`'s rotation
+- Key rotation for `link_secrets`: reuse `VARIABLES_KEYS`'s rotation
   script as it stands, or does a compromised upstream credential need
   same-day rotation independent of a vault's environment variable keys?
 
@@ -383,7 +388,7 @@ model:
   key: env:production/ANTHROPIC_API_KEY
 prompt: |
   Summarise what changed this week and what is blocked.
-tools: [linear.list_issues]        # declared connection tools only
+tools: [linear.list_issues]        # declared link tools only
 outputs:
   - write: { path: digests/{date}.md }    # an open folder
   - notify: { channel: discord, webhook: env:production/DISCORD_WEBHOOK }
@@ -394,10 +399,10 @@ limits: { timeout: 120s, max_output_tokens: 4000 }
   (the feed drives this), or a manual run. Incoming webhooks come later.
 - **What a run may do:** read context through the gate as its audience,
   call the model with the vault's key, use Reliquary's own tools (search,
-  write open files, propose), and call the connection tools it declares. It
+  write open files, propose), and call the link tools it declares. It
   **may not** run code, touch git, or reach anything it didn't declare.
 - **Outputs are artifacts:** open-file writes, proposals, notifications, or
-  a declared connection call. A run without one is a failure. Canon never
+  a declared link call. A run without one is a failure. Canon never
   comes straight from a routine; that takes people.
 - **Secrets in routines** are resolved server-side at egress (the model key,
   a webhook URL) and never placed in the prompt.
@@ -413,7 +418,7 @@ limits: { timeout: 120s, max_output_tokens: 4000 }
 - **Run log** (`routine_runs`) is append-only: `queued`, `running`, `ok`,
   `failed`, `skipped`, `missed`, `timed_out`, plus the artifact.
 
-Third-party data comes through [shared connections](#shared-connections).
+Third-party data comes through [links](#links).
 Routines needing real code or repo access are a later decision (a
 sandboxed runner). Until then, those stay in each member's own tooling and
 talk to Reliquary over MCP.
@@ -679,8 +684,8 @@ Carried from the spike and CommonThread, renamed where needed:
 - `files(path, body_encrypted, key_id, tags, audience, author,
   updated_at)`, `folder_policies(prefix, policy, quorum, expires_after)`,
   `proposals`, `approvals`.
-- `connections(name, url, credential_secret_id, tool_allowlist)`,
-  `connection_grants(role or member, tools)`, `connection_calls` (append-only
+- `links(name, url, credential_secret_id, tool_allowlist)`,
+  `link_grants(role or member, tools)`, `link_calls` (append-only
   log).
 - `log(seq bigint identity, vault_id, event, actor, agent, origin, at)`:
   append-only, the feed.
@@ -718,7 +723,7 @@ New in v3:
   a file whose audience excludes some editors; its output inherits no wider
   audience than its reads.
 - **Routine escape:** a routine attempting an undeclared notify target or
-  connection tool, a
+  link tool, a
   code or git action, or putting an `env:` reference into its prompt text.
 - **Environment grants:** an editor granted `development` pulling
   `production`; a revoked member's next pull failing; a service agent
@@ -728,10 +733,10 @@ New in v3:
 - **Policies:** an agent writing a canon file directly; a canon change
   landing one approval short of quorum; an agent's approval counting; a
   proposer's agent approving for them.
-- **Connections:** a credential in any tool result, log or error; a tool
+- **Links:** a credential in any tool result, log or error; a tool
   outside the allowlist; a write tool before an owner enabled it; an
   upstream URL on a private address or redirecting to one; a revoked
-  member's agent calling a connection.
+  member's agent calling a link.
 - **Client engagements:** a requester revealing a variable the client
   didn't grant reveal on; a closed engagement's consultant or agent reading
   anything.
@@ -751,9 +756,9 @@ previous check has held for a week of real use.
 | # | Milestone | Done when |
 |---|---|---|
 | 1 | **Core, MCP and UI.** Vaults, files and folders, canon/open policies with quorum, log, gate, remote MCP with OAuth, web UI for review, plain export | Andrés uses one vault from ChatGPT, Claude Code and Hermes for a week. Each sees the same files; canon changes are approved in the browser; hostile tests green |
-| 2 | **Environment variables** (reordered 2026-09-24: the owner's `.env` need comes first, and connections reuse its secret store) | Andrés's projects run with `reliquary run` and no local `.env` for a week; an agent over MCP never sees a value; every read is in the access log |
-| 3 | **Shared connections** (credentials from the same store) | One upstream MCP (e.g. Linear) is used from all three clients through Reliquary for a week, with the credential never leaving Reliquary |
-| 4 | **Routines** (can use connections) | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
+| 2 | **Environment variables** (reordered 2026-09-24: the owner's `.env` need comes first, and links reuse its secret store) | Andrés's projects run with `reliquary run` and no local `.env` for a week; an agent over MCP never sees a value; every read is in the access log |
+| 3 | **Links** (credentials from the same store) | One upstream MCP (e.g. Linear) is used from all three clients through Reliquary for a week, with the credential never leaving Reliquary |
+| 4 | **Routines** (can use links) | A scheduled routine and a change-triggered routine run for 7 days with every personal machine off, zero missed runs, and every failure notified |
 | 5 | **Team and clients.** Second person, quorum above 1, per-member variable grants, credential requests, emergency access | A teammate connects their own client, pulls the same `development` variables, and loses them on revoke; a real client fills a credential request instead of emailing it; the access logs show all of it |
 | 6 | **Git mirror, version history view** | A one-way mirror stays in sync for a week; a file is restored from its history |
 | 7 | **Chat surfaces** | The Telegram pilot runs on the production gate for a real group |
@@ -763,8 +768,9 @@ previous check has held for a week of real use.
 1. ~~Agent writes: direct or proposals?~~ Decided: per file or folder
    policy (canon or open), with a quorum for canon.
 2. ~~"Vault" or "space"?~~ Decided: **vault** is the container. The
-   encryption layer is the **secret store**, and a **connection** is an
-   upstream MCP. Words in this doc aren't reused for anything else.
+   encryption layer is the **secret store**, and a **link** is an
+   upstream MCP (renamed 2026-09-28 from "connection", which the Connections
+   page already meant).
 3. **OAuth authorization server:** Supabase Auth, if it meets the MCP spec
    (resource indicators, client ID metadata documents); otherwise a small
    one in Next.js. Decide in milestone 1.
@@ -795,8 +801,8 @@ says it's time:
 | Gate cost | Per-query helpers (p95 < 6 ms at 200k rows) | A vault passes millions of files | Combined indexes, partitioning by vault |
 | Quorum | Count of distinct approvers | Teams want "one from legal and one from eng" | Approver groups per folder |
 | Routines | One model call, Edge Function time limits | Multi-step agent work, long runs | A worker queue, or Managed Agents, per vault |
-| Connections | Shared credentials, remote MCP only | People want their own Gmail or calendar, or local tools | Per-member upstream OAuth; a small local relay for stdio servers |
-| Connection proxy | Synchronous pass-through | Long or streaming tool calls | Streaming proxy with its own timeouts |
+| Links | Shared credentials, remote MCP only | People want their own Gmail or calendar, or local tools | Per-member upstream OAuth; a small local relay for stdio servers |
+| Link proxy | Synchronous pass-through | Long or streaming tool calls | Streaming proxy with its own timeouts |
 | Secret store | Supabase Vault, operator can decrypt | A client needs zero-knowledge | Client-side encryption with per-member keys |
 | Version history | Rebuilt from the log's diffs | History views get slow | Periodic snapshots |
 | Multi-tenant | One Supabase project | Noisy neighbours, data residency asks | Per-region or per-customer projects |
