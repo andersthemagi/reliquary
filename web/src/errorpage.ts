@@ -111,6 +111,10 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
     const naming = form.get("action") === "add";
     return say(`${naming ? "Naming an owner of" : "Removing an owner of"} ${path || "a path"} in ${vault}`, `action=${naming ? "add" : "remove"}`);
   }
+  if (rest === "/config/watching") {
+    if (get) return say(`Opening what you watch in ${vault}`);
+    return form.get("action") === "unwatch" ? say(`Stopping a watch in ${vault}`) : say(`Watching ${path || "a path"} in ${vault}`);
+  }
   if (rest === "/search") return say(`Searching ${vault}`);
   if (rest === "/erase") return say(`Erasing ${path || "a file"} in ${vault}`);
   if (rest === "/variables" || rest.startsWith("/variables/")) {

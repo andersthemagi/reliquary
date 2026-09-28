@@ -195,13 +195,19 @@ notify) ride alongside milestone 3 the same way, on the same owner's call
   response, or a tool of their own) answered in favour of a tool of their
   own, `list_flags`, called on request rather than automatically. No tool
   creates or removes a watch: that's still the person, in the web app,
-  same as variables and rules.
+  same as variables and rules;
+- watching in the web app (2026-09-28, `web/src/watching.ts`,
+  `web/test/watching_page.test.mjs`): **Watch** / **Unwatch** in the
+  header of every folder and file page (not the vault root, which isn't a
+  watchable path), and a Settings tab, **Watching**
+  (`/v/:id/config/watching`), listing the person's own watches with a
+  form to watch a typed path. Any member, a viewer too; not owner-gated.
 Not built: category 1, notes addressed `to:` someone (design.md doesn't say
 how `to:` is stored); staleness for files you've read (nothing logs a read);
 tag subscriptions (files have no tags; `create_subscription` refuses the
 kind); path owners in "waiting on you" (follows path ownership above when
-someone does that follow-up); watching or unwatching a path anywhere at
-all, web app included.
+someone does that follow-up); a web page showing a person their own flags
+(`list_flags` is MCP only).
 
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits

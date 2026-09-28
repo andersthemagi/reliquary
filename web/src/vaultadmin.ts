@@ -1,9 +1,10 @@
 // Vault settings at /v/:id/config (docs/parity.md), as tabs: General (rename
 // and default policy), Members (members.ts), Rules (rules.ts, /v/:id/rules),
-// Usage, Export and Danger zone (leave, delete); and erasing a file, reached
-// from the file. (Not /settings: a viewer's Variables page must hold no
-// "/set" link.) Every action here is an owner's, in person, except leaving:
-// the database refuses anyone else
+// Usage, Watching (watching.ts, the person's own), Export and Danger zone
+// (leave, delete); and erasing a file, reached from the file. (Not
+// /settings: a viewer's Variables page must hold no "/set" link.) Every
+// action here is an owner's, in person, except leaving and watching, which
+// are any member's own: the database refuses anyone else
 // (supabase/migrations/20260925120000_vault_admin.sql, and erase_file in the
 // core), and these pages only choose what to offer.
 // Each action goes through a confirmation step:
@@ -14,6 +15,7 @@
 //
 //   GET  /v/:id/config          General; POST saves (after a confirm page)
 //   GET  /v/:id/config/usage    the vault's tier, people and storage
+//   GET  /v/:id/config/watching what you watch here (watching.ts); POST watches or stops
 //   GET  /v/:id/config/export   what an export holds; POST downloads it
 //   GET  /v/:id/config/danger   Leave and Delete
 //   GET  /v/:id/config/delete   confirm; POST deletes
@@ -26,6 +28,7 @@ import { callout, confirmPage, csrfField, html, pageHeader, policyBadge, type Cr
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { crumbs as fileCrumbs, deletePath, vaultShell } from "./files.js";
 import { usagePanel, vaultUsages } from "./plans.js";
+import { watchingRoutes } from "./watching.js";
 
 const q = encodeURIComponent;
 const settingsPath = (id: string, rest = "") => vaultPath(id, `/config${rest}`);
@@ -38,12 +41,14 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 // breadcrumb vault / Settings / tab. Export is an owner's only, so only
 // owners see its tab; Danger zone holds Leave, which is everyone's.
 
-export type SettingsTab = "general" | "members" | "rules" | "usage" | "export" | "danger";
+export type SettingsTab = "general" | "members" | "rules" | "usage" | "watching" | "export" | "danger";
 const TABS: [SettingsTab, string, (id: string) => string][] = [
   ["general", "General", (id) => settingsPath(id)],
   ["members", "Members", (id) => settingsPath(id, "/members")],
   ["rules", "Rules", (id) => vaultPath(id, "/rules")],
   ["usage", "Usage", (id) => settingsPath(id, "/usage")],
+  // The person's own, for every member (watching.ts).
+  ["watching", "Watching", (id) => settingsPath(id, "/watching")],
   ["export", "Export", (id) => settingsPath(id, "/export")],
   ["danger", "Danger zone", (id) => settingsPath(id, "/danger")],
 ];
@@ -409,6 +414,7 @@ export async function adminRoutes(ctx: Ctx, id: string, rest: string): Promise<R
   if (rest === "/config/members" || rest.startsWith("/config/members/")) return membersRoutes(ctx, id, rest);
   if (rest === "/config/leave") return leaveRoutes(ctx, id);
   if (rest === "/config/usage") return get ? usagePage(ctx, id) : notFound(ctx);
+  if (rest === "/config/watching") return watchingRoutes(ctx, id);
   if (rest === "/config/export") return get ? exportPage(ctx, id) : exportDownload(ctx, id);
   if (rest === "/config/danger") return get ? dangerPage(ctx, id) : notFound(ctx);
   if (rest === "/config/delete") return get ? deletePage(ctx, id) : deleteVault(ctx, id);

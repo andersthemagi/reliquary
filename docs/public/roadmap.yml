@@ -213,7 +213,7 @@
   docs: concepts/path-ownership
 
 - title: Flags
-  summary: Telling you and each of your agents what changed since you were last told. Live over MCP now; watching or unwatching a path, and notes addressed to someone, still need the web app.
+  summary: Telling you and each of your agents what changed since you were last told. Live over MCP, and you watch or unwatch folders and files in the web app; notes addressed to someone aren't built yet.
   status: in-progress
   docs: concepts/flags
 

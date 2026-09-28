@@ -2,7 +2,7 @@
 
 A flag tells you, or your agent, about something in a vault that changed since you were last told: a proposal waiting on your review, a change to one of your own proposals, or a change on a path you watch.
 
-**Partly usable.** An agent can list your flags (`list_flags`) and what you watch (`list_subscriptions`) over MCP, and mark flags shown (`advance_flags`). There is still no way to watch or unwatch a path anywhere: not the web app, not the CLI, not MCP (that needs you, in the web app, same as variables and rules). Notes addressed to someone aren't built either.
+**Partly usable.** You watch and unwatch folders and files in the web app (see [Watching a path](#watching-a-path)). An agent can list your flags (`list_flags`) and what you watch (`list_subscriptions`) over MCP, and mark flags shown (`advance_flags`). The web app doesn't show you your flags itself yet: your agents read them. Notes addressed to someone aren't built.
 
 ## What gets flagged
 
@@ -28,6 +28,12 @@ A new connection is told what is waiting on you now, but not what happened befor
 ## Watching a path
 
 Any member of a vault, owner, editor or viewer, can watch its folders and files. Only you, signed in to the web app, start or stop watching. An agent can list what you watch, but can't change it. You can watch up to 100 paths in each vault.
+
+To watch a folder or a file, open it and choose **Watch** at the top of its page. The page then says **Watching**, with **Unwatch** to stop. A file inside a folder you watch says **Watching via** that folder, since the folder's watch already covers it. The vault's top folder has no **Watch**: watch the folders in it instead.
+
+Everything you watch in a vault is on its **Settings**, **Watching** tab, each with **Unwatch**. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. A folder ends in `/` and covers everything in it; a file covers only itself.
+
+At 100 paths in a vault, watching another is refused, and the page says so: stop watching one first.
 
 Watching starts from the moment you ask: earlier changes aren't flagged. Nobody else sees what you watch, and it isn't recorded in the vault's [Activity](activity.md).
 
