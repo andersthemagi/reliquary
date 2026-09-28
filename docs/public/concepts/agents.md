@@ -21,7 +21,8 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - add, edit or delete a link, or set its tool grants;
 - rename a vault or change its default policy;
 - erase a file, export a vault, or delete one;
-- snooze a proposal.
+- snooze a proposal;
+- start or stop watching a path for [flags](flags.md).
 
 **Why:** an agent reads text other people wrote. A file, a comment or a web page can carry instructions (prompt injection), and anything the agent may do, the injected text may try. The ceiling keeps the actions that are irreversible, grant trust or reveal secrets behind a person's click.
 

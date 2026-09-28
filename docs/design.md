@@ -417,24 +417,31 @@ its own word rather than reusing "notify" the way "connection" briefly
 meant two things. Working name: **flag** ("a proposal is flagged for
 you"). Not settled if a better word turns up before this is built.
 
-### Data model sketch
+### Data model, as built (schema and SQL functions, 2026-09-28)
 
-Not yet built:
+`20260928150000_flags.sql`, hostile tests in `supabase/tests/flags_test.sql`:
 
-- `public.notification_watermarks(identity_kind, identity_id, vault_id,
-  last_seq, updated_at)`. `identity_kind` distinguishes a person from a
-  specific agent connection, since a person and several agents of theirs
-  may each want their own watermark: one agent reading a flag on its
-  person's behalf plausibly shouldn't silence it for that person's other
-  agents.
-- A `list_flags`-shaped MCP tool (or folded into an existing read call,
-  see open questions) returning what's newly true since the watermark, in
-  the four categories, then advancing it.
-- Working-set staleness needs to know what you've recently read: reuses
-  or extends whatever `read_file` and `changes_since` already log per
-  caller, rather than a new tracking table, if that signal is enough.
-- Subscriptions: `public.subscriptions(user_id, vault_id, kind, target)`
-  (`kind` a tag or a path prefix).
+- `public.flag_watermarks(id, user_id, vault_id, token_id, last_seq,
+  updated_at)`. Built without the sketched `identity_kind`: a real foreign
+  key to `access_tokens` (null for the person in the web app) already
+  distinguishes a connection from the person, and a deleted connection
+  takes its watermark with it (`unique nulls not distinct (user_id,
+  vault_id, token_id)`) rather than leaving an orphaned `identity_id`.
+- `public.list_flags(vault, limit)` (SQL-callable, not yet an MCP tool)
+  returns categories 2 (your own proposals, and one whose base file
+  changed under it), 3 (`shell_summary`'s review set, reused rather than
+  redefined) and 4 (watched paths), oldest first, and never moves the
+  watermark itself.
+- `public.advance_flags(vault, through)` is the separate call that moves
+  it, forward only, never past the vault's latest entry, matching "a flag
+  advances when it's shown, not on request" above.
+- Working-set staleness for files you've read, and category 1 (addressed
+  notes), are still not built; see below.
+- Subscriptions: `public.subscriptions(id, user_id, vault_id, kind,
+  target, created_at)`, `kind` `'path'` built (a folder or a file);
+  `'tag'` is accepted by the column but refused by `create_subscription`
+  (22023), since no migration gives files tags yet, so a tag subscription
+  could never match anything.
 
 ### Open questions this doesn't resolve
 
@@ -442,14 +449,22 @@ Not yet built:
   rules) or an agent may create one for its person: a read-scoped,
   reversible action, unlike everything actually on the ceiling, so it
   doesn't obviously need a human in the loop the way approving or
-  revealing a secret does.
+  revealing a secret does. Built person-only for now, the safer default,
+  not a final answer.
 - Whether flags ride inside every MCP tool's response (a `flags` field
   alongside the actual answer) or need their own dedicated tool a client
   must think to call: the former reaches an agent that never calls it
-  directly, the latter is cleaner to reason about and test.
+  directly, the latter is cleaner to reason about and test. Nothing in
+  `mcp/` calls `list_flags` yet, so this is still open.
 - Working-set staleness's exact trigger: does re-reading a file that
   changed clear its own staleness flag, or does it need an explicit
-  acknowledgement?
+  acknowledgement? Moot until staleness-from-reads exists at all: nothing
+  logs a read today (`read_file`, `list_files`, `changes_since` are plain
+  selects), so category 2 covers only your own proposals for now.
+- A snooze that runs out on its own returns a proposal to the Inbox but
+  doesn't raise a fresh flag for it, since nothing is logged when a
+  snooze ends. A snooze someone else's comment interrupts does re-flag
+  it, because the comment itself is a logged event.
 
 ## Links
 

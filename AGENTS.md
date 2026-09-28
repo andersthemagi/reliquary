@@ -151,8 +151,30 @@ care. Deliberately not touched: `propose`, `revise_proposal`,
 `edit_and_approve`, `comment_on_proposal` (a path-owning viewer proposes
 nothing since they write directly, and can still approve or reject with
 plain `decide()`, but can't yet use edit-and-approve or comment unless
-they also have ordinary editor or owner access). **Notifications** is not
-yet built; its schema and MCP surface are the next slice.
+they also have ordinary editor or owner access).
+
+**Flags** (design.md's "Notifications"; the working name is flag, not
+notify) ride alongside milestone 3 the same way, on the same owner's call
+(2026-09-28), and aren't part of its exit either. Done so far:
+- schema and SQL-callable functions in `20260928150000_flags.sql`, with
+  hostile tests (`supabase/tests/flags_test.sql`): `flag_watermarks`,
+  one per identity (the person in the web app, or one connection by its
+  token) and vault, closed to direct access, moved only by `advance_flags`
+  and only forward, never by reading; `subscriptions` to paths, the person's
+  own, created and removed in person, listed by their agents too;
+  `list_flags`, which returns proposals waiting on you (`shell_summary`'s
+  review set), changes to your own proposals and to the files under them,
+  and changes on watched paths. Both tables cascade from `vault_members`, so
+  leaving, removal, account deletion and vault deletion take them with it.
+  Built in a separate worktree from path ownership, so it touches neither
+  `path_policies` nor `policy_for`, `write_file`, `propose` or `decide()`.
+Not built: category 1, notes addressed `to:` someone (design.md doesn't say
+how `to:` is stored); staleness for files you've read (nothing logs a read);
+tag subscriptions (files have no tags; `create_subscription` refuses the
+kind); path owners in "waiting on you" (follows path ownership above when
+someone does that follow-up). Nothing in `mcp/` or `web/` calls these yet,
+pending design.md's open question: do flags ride in every response, or get
+a tool of their own?
 
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits
