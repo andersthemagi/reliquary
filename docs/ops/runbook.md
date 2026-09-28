@@ -54,6 +54,15 @@ OAuth issuer: every connector and the CLI signs in again once. Changing only
   a model this way; both were rotated.
 - **Run `reliquary run` from your own terminal** when the process might print
   a value. An agent can read what its commands print.
+- **A new required env var needs a deploy-time check, not just a runtime
+  refusal.** On 2026-09-28, v0.10.0 shipped the link proxy's
+  `LINK_PROXY_SECRET` (`web/src/linkproxy.ts`, refuses to start on Vercel
+  without it, same pattern as `mcp/`'s `VARIABLES_KEYS`), but the variable
+  was never set in Vercel production. The build succeeded, Vercel aliased it
+  to the live domains immediately, and both apps 500'd on every request
+  until the variable was set and the workflow re-run. See "Deploy" below:
+  the deploy workflow now rolls production back automatically when the
+  smoke checks that would have caught this fail right after a deploy.
 
 ## Deploy
 
@@ -89,6 +98,24 @@ change only bumps the minor while below 1.0).
    apps' `/version` answers the release and its commit. A failing check fails
    the run: read it, then fix forward or roll back.
 
+   Vercel aliases a production deployment to the live domains the moment its
+   build succeeds, before any smoke check runs — a build succeeding says
+   nothing about whether the app actually boots (a missing required env var
+   is a runtime failure, not a build one; see "Rules that came from
+   incidents" above, 2026-09-28). So the deploy step first
+   records each project's current production deployment with
+   `scripts/vercel-deploy.sh`; if the smoke checks step then fails, a **Roll
+   back** step points production straight back at it with
+   `scripts/vercel-rollback.sh`, automatically, and the run still fails so a
+   person sees it. This bounds an accidental outage to roughly the smoke
+   checks' own retry window (`DEPLOY_WAIT`, default 300s) instead of
+   production staying broken until someone notices by hand. It only fires
+   right after `scripts/vercel-deploy.sh` itself succeeded (not on a
+   migration failure, and not on the Deploy Hooks fallback path, which can't
+   be rolled back to a pinned commit the same way) and only if a previous
+   production deployment existed to roll back to (never on a project's first
+   deploy).
+
 Without `RELEASE_PLEASE_TOKEN`, the release pull request shows no `test`
 checks (GitHub doesn't run workflows for what `GITHUB_TOKEN` creates): close
 and reopen it just before merging to run them. The `release` workflow then
@@ -123,6 +150,11 @@ set (then re-run it: Actions > publish-cli > Run workflow from tag
 pull request.
 
 ### Redeploy or roll back
+
+If the deploy workflow's own smoke checks just failed right after a deploy,
+it already rolled Vercel back for you (see "Deploy" above) — this section is
+for rolling back by hand later, once a problem the smoke checks didn't catch
+turns up.
 
 Actions > deploy > Run workflow, on `main`, with the tag (`vX.Y.Z`).
 

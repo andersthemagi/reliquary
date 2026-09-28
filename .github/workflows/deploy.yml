@@ -18,6 +18,17 @@
 # today's schema. Fix forward with a new migration if the schema is the
 # problem.
 #
+# Vercel aliases a production deployment to the live domains the moment its
+# build succeeds, before anything checks that it actually boots (a build
+# succeeding says nothing about a missing required env var, for instance:
+# that's a runtime failure). So scripts/vercel-deploy.sh records each
+# project's current production deployment before deploying the new one; if
+# the smoke checks step then fails, the "Roll back" step points production
+# straight back at it with scripts/vercel-rollback.sh, and the run still
+# fails so a person sees it. Automatic, and bounded to roughly the smoke
+# checks' own retry window, instead of production staying broken until
+# someone notices and redeploys by hand.
+#
 # Each stage skips with a notice until its settings exist. A stage with only
 # some of its settings fails, naming what's missing (names only, never
 # values).
@@ -199,6 +210,7 @@ jobs:
         run: supabase db push --db-url "$DB_URL" --yes
 
       - name: Vercel production deploys of the tagged commit (web, mcp)
+        id: vercel_deploy
         if: steps.cfg.outputs.vercel == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -206,6 +218,7 @@ jobs:
           WEB_PROJECT: ${{ vars.VERCEL_PROJECT_WEB || 'reliquary-web' }}
           MCP_PROJECT: ${{ vars.VERCEL_PROJECT_MCP || 'reliquary-mcp' }}
           SHA: ${{ steps.rel.outputs.sha }}
+          ROLLBACK_TARGETS_FILE: rollback-targets.txt
         run: ./scripts/vercel-deploy.sh "$SHA" "$WEB_PROJECT" "$MCP_PROJECT"
 
       - name: Vercel Deploy Hooks (fallback; builds main, not the tag)
@@ -231,6 +244,7 @@ jobs:
         run: sleep "$SETTLE"
 
       - name: Smoke checks (live /version is this release)
+        id: smoke
         if: steps.cfg.outputs.smoke == 'true'
         env:
           WEB_URL: ${{ vars.WEB_URL }}
@@ -240,3 +254,17 @@ jobs:
           EXPECT_VERSION: ${{ steps.tag.outputs.version }}
           EXPECT_COMMIT: ${{ steps.rel.outputs.sha }}
         run: ./scripts/deploy-check.sh
+
+      - name: Roll back (smoke checks failed; production was already serving the new deploy)
+        if: failure() && steps.vercel_deploy.outcome == 'success'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+        run: |
+          if [ ! -s rollback-targets.txt ]; then
+            echo "::warning::no previous production deployment was recorded (first deploy?); nothing to roll back to"
+            exit 0
+          fi
+          mapfile -t targets < rollback-targets.txt
+          echo "::warning::rolling back to the previous release: ${targets[*]}"
+          ./scripts/vercel-rollback.sh "${targets[@]}"
