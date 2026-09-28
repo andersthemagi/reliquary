@@ -18,8 +18,8 @@ alongside it.
 week of real use isn't done, so this is a deliberate exception to "work on
 the current milestone only," not a new default. Alongside it, same
 decision: path ownership (built) and notifications (not yet). Links'
-schema and owner-only management are built (see below); discovery and the
-MCP proxy are not, and are what "milestone 3" still means for exit
+schema, owner-only management and discovery are built (see below); the
+MCP proxy is not, and is what "milestone 3" still means for exit
 purposes.
 
 Milestone 1: **core, MCP and UI** (vaults, files with canon/open
@@ -140,12 +140,30 @@ Milestone 3: **links** (design.md's "Links"; renamed 2026-09-28 from
   `sealLink`/`openLink` (`web/src/secrets.ts`, the same `VARIABLES_KEYS`,
   AAD scoped to the vault only since renaming a link never touches its
   credential) and never rendered back once saved; delete goes through a
-  confirm page. No Grants page yet: `link_tools` stays empty until
-  discovery exists, so there is nothing to grant.
-Not built: discovery (populating `link_tools` from an upstream server's
-`tools/list`) and the MCP proxy (`<link>.<tool>`, credential egress,
-`link_calls` writes) — both server-side, per design.md's open questions
-there. Nothing calls a link's tools yet.
+  confirm page.
+- Discovery (2026-09-28, `20260928180000_link_discovery.sql`,
+  `web/src/discovery.ts`, hostile tests in `supabase/tests/links_test.sql`
+  and `web/test/discovery.test.mjs`, wiring in
+  `web/test/links_page.test.mjs`): design.md's first open question
+  (synchronous or a background job) answered synchronous, in the same
+  request as `create_link` — a slow or unreachable upstream flashes a
+  warning naming why, with a reference in the server log, and keeps the
+  link; there is no rediscovery yet, so retrying today means deleting and
+  re-adding the link. The MCP handshake (`initialize`, `initialized`,
+  paged `tools/list`) is hand-rolled in the web app rather than pulling in
+  the official SDK's client there (mcp/'s server already needs it for a
+  different reason). Address safety is shared with the Client ID
+  Metadata Document fetch (`web/src/netsafety.ts`, extracted from
+  `cimd.ts` the same day). `is_write` comes from a tool's own
+  `readOnlyHint` alone (anything but an explicit `true` stays a write
+  tool, matching design.md); `set_link_tools` seeds a grant only for a
+  newly discovered tool, never overwrites an owner's own flip on
+  rediscovery, and never deletes a stale tool's grant, only the tool row
+  itself.
+Not built: the MCP proxy (`<link>.<tool>`, credential egress, `link_calls`
+writes), server-side per design.md's open questions there. Nothing calls
+a link's tools yet. Also not built: a Grants page (there's something to
+grant now; no page to do it from) and rediscovery by hand.
 
 Also alongside milestone 3, not a numbered milestone of its own (design.md's
 "Path ownership" and "Notifications", owner's decision 2026-09-28): **path

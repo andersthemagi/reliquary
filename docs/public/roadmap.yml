@@ -176,6 +176,12 @@
   status: shipped
   docs: how-to/take-the-welcome-tour
 
+- title: Discovering a link's tools
+  summary: Adding a link calls the upstream server's own tool list and stores each tool's name, description and whether it writes, ready to grant once the MCP proxy exists.
+  status: shipped
+  milestone: M3
+  docs: concepts/links
+
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
@@ -202,7 +208,7 @@
   docs: how-to/self-host
 
 - title: Links
-  summary: A vault's credential to a remote MCP server. An owner adds, edits and deletes one from the web app; an agent can list them over MCP. Using a link's own tools waits on discovery and the proxy.
+  summary: A vault's credential to a remote MCP server. Adding one (from the web app) discovers its tools; an agent can list links over MCP. Granting a tool per role and calling one wait on the MCP proxy.
   status: in-progress
   milestone: M3
   docs: concepts/links
@@ -223,8 +229,8 @@
   summary: "@reliquary-ai/cli on npm, so npx works everywhere without a checkout."
   status: planned
 
-- title: Discovery and the MCP proxy for links
-  summary: Adding a link discovers its tools from the upstream server; agents call granted tools as <link>.<tool>, and never see the credential.
+- title: The MCP proxy for links
+  summary: An agent calls a link's granted tools as <link>.<tool>; Reliquary attaches the credential server-side, and the agent never sees it.
   status: planned
   milestone: M3
 

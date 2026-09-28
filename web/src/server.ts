@@ -46,6 +46,7 @@ import { publicRoute } from "./legal.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
 import { movedConnectionsPath } from "./access.js";
+import { configureDiscovery } from "./discovery.js";
 import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
 import { inSession, pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
@@ -106,6 +107,7 @@ try {
   MODE = configureAuth(process.env, { secure: SECURE, host: HOST, port: PORT });
   configureOAuth();
   configureVariables(process.env);
+  configureDiscovery(process.env);
   configureRateLimits(process.env);
   configureMailer(process.env);
   // Names the setting, never the address.

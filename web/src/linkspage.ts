@@ -1,21 +1,32 @@
 // A vault's Links page (docs/design.md, "Links"): a credential to an
 // upstream MCP server, named and reachable by an agent as `<link>.<tool>`
-// once discovery and the proxy exist (mcp/, not built yet -- see the note
-// this page shows on an empty vault). Add, edit and delete are owners' only,
-// in person; the database enforces this (20260928120000_links.sql) and this
+// once the MCP proxy exists (mcp/, not built yet -- see the note this page
+// shows on an empty vault). Add, edit and delete are owners' only, in
+// person; the database enforces this (20260928120000_links.sql) and this
 // page only chooses what to offer. Credentials are sealed here with the
 // same VARIABLES_KEYS as environment variables (secrets.ts, sealLink/
 // openLink) and never sent back to the browser once saved: the add form has
 // a credential field, the edit form doesn't.
 //
-// Deliberately not built here: a Grants sub-page (public.link_tools stays
-// empty until discovery runs in a later change, so a page of toggles for
-// tools that don't exist yet would be misleading rather than useful).
+// Adding a link also runs discovery (discovery.ts, 20260928180000's
+// set_link_tools): the credential the owner just typed calls the upstream
+// server's own tools/list before it's sealed away, and the result is
+// stored, in the same request, before the flash is chosen. A discovery
+// failure (an unreachable or slow server, a malformed response) doesn't
+// undo the link -- it's flashed as a warning naming why, with a reference
+// in the server log, and the link's tools simply stay empty. There is no
+// rediscovery yet (discovery.ts's own header): retrying today means
+// deleting and re-adding the link.
+//
+// Deliberately not built here: a Grants sub-page (an owner's per-role
+// allow list for a link's tools -- there's something to grant now, but no
+// page yet to do it from).
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { discoverTools, discoveryAllowsLoopback, DiscoveryError } from "./discovery.js";
 import { callout, confirmPage, csrfField, emptyState, html, menu, pageHeader, time, type Raw } from "./html.js";
-import { Refusal } from "./failure.js";
+import { fail, failure, Refusal } from "./failure.js";
 import { vaultShell } from "./files.js";
 import { sealLink, SecretsError, variablesConfigured } from "./secrets.js";
 import { message, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
@@ -114,7 +125,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
       ${formFirst ? addForm : ""}
       ${table}
       ${formFirst ? "" : addForm}
-      <p class="hint">An agent can already list a vault’s links over MCP. Calling a link’s own tools, and discovering what they are, isn’t built yet. <a href="/docs/concepts/links">How links work</a></p>`;
+      <p class="hint">An agent can already list a vault’s links over MCP, and adding one discovers its tools. Granting them per role and calling one isn’t built yet. <a href="/docs/concepts/links">How links work</a></p>`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "links" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -146,10 +157,27 @@ export async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
       ctx.setFlash(`Saved changes to ${name}.`, "success");
     } else {
       const sealed = sealLink(credential, id);
-      await asPerson(ctx.userId, (c) =>
-        c.query(`select public.create_link($1, $2, $3, $4, $5, $6)`, [id, name, url, sealed.keyId, sealed.nonce, sealed.ciphertext]),
-      );
-      ctx.setFlash(`Added ${name}. Its tools aren’t callable yet: discovery isn’t built.`, "success");
+      const newLinkId = await asPerson(ctx.userId, async (c) => {
+        const { rows } = await c.query(`select public.create_link($1, $2, $3, $4, $5, $6) as id`, [id, name, url, sealed.keyId, sealed.nonce, sealed.ciphertext]);
+        return rows[0].id as string;
+      });
+      try {
+        const tools = await discoverTools(url, credential, { allowLoopback: discoveryAllowsLoopback() });
+        await asPerson(ctx.userId, (c) =>
+          c.query(`select public.set_link_tools($1, $2::jsonb)`, [
+            newLinkId,
+            JSON.stringify(tools.map((t) => ({ name: t.name, is_write: t.isWrite, description: t.description }))),
+          ]),
+        );
+        const n = tools.length;
+        ctx.setFlash(`Added ${name}. Discovered ${n} tool${n === 1 ? "" : "s"}.`, "success");
+      } catch (discErr) {
+        const f =
+          discErr instanceof DiscoveryError
+            ? failure({ status: 502, where: "link discovery", why: discErr.message })
+            : fail(discErr, { where: "link discovery", what: `Discovering ${name}’s tools` });
+        ctx.setFlash(`Added ${name}, but its tools couldn’t be discovered. ${f.why} (ref ${f.ref})`, "warning");
+      }
     }
   } catch (err) {
     if (err instanceof SecretsError) return again(refuse(err.message), "credential");
