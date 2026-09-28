@@ -6,6 +6,32 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.10.0](https://github.com/andersthemagi/reliquary/compare/v0.9.0...v0.10.0) (2026-09-28)
+
+
+### Features
+
+* **mcp:** call a link's granted tools as &lt;link&gt;.&lt;tool&gt; ([8f59e88](https://github.com/andersthemagi/reliquary/commit/8f59e884213db5578c0a2812da36d0c9c56c8ced))
+* **web:** a vault's Links page, to add, edit and delete a link ([0df6b2d](https://github.com/andersthemagi/reliquary/commit/0df6b2d1f6d3ff6996ffa158c3a1d082e6649823))
+* **web:** discover a link's tools when it's added ([bdffac5](https://github.com/andersthemagi/reliquary/commit/bdffac594304cb05141e13d1ed4eea5761816861))
+* **web:** grant a link's tools per role from a Grants page ([95f0923](https://github.com/andersthemagi/reliquary/commit/95f0923a618a9a020a8c43f64a0adbd30f8357dc))
+* **web:** name and remove a path's owners from Rules ([e52d3c7](https://github.com/andersthemagi/reliquary/commit/e52d3c76b9f8ea76cd0a6149f7802dac0e59601a))
+* **web:** watch and unwatch folders and files ([c59ffca](https://github.com/andersthemagi/reliquary/commit/c59ffca40e0221c305d03862c728b0e7b4c5d254))
+
+
+### Bug fixes
+
+* **db:** cascade path_owners rows off vault membership ([a84c202](https://github.com/andersthemagi/reliquary/commit/a84c20297736f4c252fe34dbe32dc453131d1ed1))
+* **db:** renumber F417 to F426 after merging origin/main ([293e6a9](https://github.com/andersthemagi/reliquary/commit/293e6a900077af68dd6128f83f2e67c2524e3407))
+* **web:** close three unclosed [@media](https://github.com/media) blocks in style.css ([9051d10](https://github.com/andersthemagi/reliquary/commit/9051d10b324632571a2f48a03146269c86e30f9c))
+
+
+### Security
+
+* **db:** a named path owner's write access now respects their connection's scope ([ef59088](https://github.com/andersthemagi/reliquary/commit/ef59088d12c9a92c60a3e8b83c12386d7fc7bc8d))
+* **db:** the MCP proxy's credential-egress chokepoint for links ([b7b13ad](https://github.com/andersthemagi/reliquary/commit/b7b13adf0958777e98e63ff4cff6e40a7c27947b))
+* **export:** refuse Windows-unsafe file paths and rename them in exports ([54fa289](https://github.com/andersthemagi/reliquary/commit/54fa28942cf21748a36ff974b31411fd1a9fd0c1))
+
 ## [0.9.0](https://github.com/andersthemagi/reliquary/compare/v0.8.0...v0.9.0) (2026-09-28)
 
 
