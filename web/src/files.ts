@@ -27,6 +27,7 @@ import { siteHref } from "./hosts.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage } from "./errorpage.js";
 import { failure } from "./failure.js";
+import { watchControl, watchState } from "./watching.js";
 import {
   canWrite,
   filePath,
@@ -47,7 +48,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "activity" | "rules" | "search" | "variables" | "settings";
+export type Section = "files" | "proposals" | "activity" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // One round trip: the live files, every folder above them, each one's
@@ -99,6 +100,7 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
     { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined },
     { section: "activity", href: vaultPath(v.id, "/activity"), label: "Activity" },
     { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables" },
+    { section: "links", href: vaultPath(v.id, "/links"), label: "Links" },
     { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings" },
   ];
   // Settings holds Rules, so the Rules page marks Settings as current.
@@ -242,6 +244,9 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         ).rows[0] as { default_policy: string; rules: number; open: number });
     const readme = here.find((f) => /^readme\.md$/i.test(f.path.slice(dir.length)));
     const writer = canWrite(v);
+    // Any member watches a folder (watching.ts); the vault's root isn't a
+    // path that can be watched.
+    const watch = dir ? watchControl(ctx, id, dir, await watchState(c, ctx, id, dir)) : undefined;
     const empty = () => {
       if (info?.open) {
         return emptyState({
@@ -263,6 +268,8 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         crumb: dir ? crumbs(id, v, dir, true) : undefined,
         title: dir ? dir.slice(0, -1).split("/").pop()! : v.name,
         path: !!dir,
+        badge: watch?.badge,
+        actions: watch?.action ?? "",
         meta: rule ? ruleLine(ctx, id, rule) : info ? rootRuleLine(id, info.default_policy, info.rules) : undefined,
         // On phones the sidebar's search box is hidden: the header offers it.
         secondary: !dir ? html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a>` : "",
@@ -317,12 +324,15 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
         : "";
     const canon = f.policy === "canon";
     const writable = canWrite(v) && !f.erased_at;
+    const watch = watchControl(ctx, id, path, await watchState(c, ctx, id, path));
     const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
     const body = html`
       ${pageHeader({
         crumb: crumbs(id, v, path, false),
         title: path.split("/").pop()!,
         path: true,
+        badge: watch.badge,
+        actions: watch.action,
         meta: html`${ruleLine(ctx, id, rule)}
           <p class="meta file-meta">Last written by ${who(ctx, f.author, f.agent)} · ${time(f.created_at)}</p>`,
         secondary: moreMenu(id, path, { canon, writable, owner: v.role === "owner" }),

@@ -37,10 +37,14 @@ Under **What applies to a path?**, type any path, like `clients/acme/brief.md`, 
 ## Remove a rule
 
 1. Open the **⋯** menu on the rule's row and choose **Remove**.
-2. Read what changes: which rule the path follows next (the next rule up, or the vault default), how many files change policy, which rules inside it stay, and any proposals waiting there.
+2. Read what changes: which rule the path follows next (the next rule up, or the vault default), how many files change policy, which rules inside it stay, any proposals waiting there, and any named owners, who are removed with it.
 3. Choose **Remove the rule on** followed by the path, or **Cancel**.
 
 A rule saved before paths were checked, on a path like `../x`, never applied to any file. You can still remove it.
+
+## Name a path's owners
+
+A rule's **⋯** menu also has **Owners**: the people who write that path directly while it stays canon for everyone else. See [Path ownership](../concepts/path-ownership.md#name-an-owner).
 
 ## Change the vault default
 

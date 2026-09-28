@@ -62,6 +62,8 @@ const pages = [
   [`${V}/config/danger`, "vault danger zone"],
   [`${V}/config/members`, "vault members"],
   [`${V}/config/members/invite`, "invite someone"],
+  [`${V}/config/watching`, "what you watch in a vault"],
+  [`${V}/rules/owners?path=canon/`, "a rule's named owners"],
   [`${V}/erase?path=notes/md.md`, "erase a file (confirm)"],
 ];
 

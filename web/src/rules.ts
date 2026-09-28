@@ -12,7 +12,8 @@ import { filePath, message, notFound, q, render, vault, vaultPath, who, type Ctx
 // ---------------------------------------------------------------------------
 // Rules
 
-type Rule = { path: string; policy: string; quorum: number; set_by: string | null; set_at: Date | null };
+// owners: how many people are named owners of the rule's path (pathowners.ts).
+type Rule = { path: string; policy: string; quorum: number; set_by: string | null; set_at: Date | null; owners: number };
 
 // The Add form's values: as sent, when saving was refused (the refusal is
 // shown in the form with its reference, the typed values kept and the
@@ -39,9 +40,13 @@ const covers = (folder: string, path: string) => folder.endsWith("/") && folder 
 const parentRule = (list: Rule[], path: string) =>
   list.filter((r) => covers(r.path, path)).sort((a, b) => b.path.length - a.path.length)[0];
 
-const approvals = (n: number) => `${n} approval${n === 1 ? "" : "s"}`;
+export const approvals = (n: number) => `${n} approval${n === 1 ? "" : "s"}`;
+const namedOwners = (n: number) => `${n} named owner${n === 1 ? "" : "s"}`;
 
-const rulesCrumb = (v: Vault, last?: string): CrumbPart[] => [
+// A rule's named owners (pathowners.ts), reached from its row.
+export const ownersPath = (id: string, path: string) => vaultPath(id, `/rules/owners?path=${q(path)}`);
+
+export const rulesCrumb = (v: Vault, last?: string): CrumbPart[] => [
   { label: v.name, href: vaultPath(v.id) },
   { label: "Settings", href: vaultPath(v.id, "/config") },
   { label: "Rules", href: vaultPath(v.id, "/rules") },
@@ -55,7 +60,8 @@ async function loadRules(c: pg.PoolClient, id: string): Promise<{ list: Rule[]; 
               (select l.actor from public.log l where l.vault_id = pp.vault_id and l.event = 'policy.set'
                 and l.path = pp.path order by l.seq desc limit 1) as set_by,
               (select l.at from public.log l where l.vault_id = pp.vault_id and l.event = 'policy.set'
-                and l.path = pp.path order by l.seq desc limit 1) as set_at
+                and l.path = pp.path order by l.seq desc limit 1) as set_at,
+              (select count(*)::int from public.path_owners po where po.vault_id = pp.vault_id and po.path = pp.path) as owners
          from public.path_policies pp where pp.vault_id = $1`,
       [id],
     )
@@ -108,7 +114,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
             return html`<tr>
               <td data-label="Path"><code class="rule-path">${r.path}</code><span class="rule-scope">${r.path.endsWith("/") ? "Folder" : "File"}${
                 parent ? html` · overrides <code>${parent.path}</code>` : ""
-              }</span></td>
+              }</span>${r.owners ? html`<a class="rule-owners" href="${ownersPath(id, r.path)}">${namedOwners(r.owners)}</a>` : ""}</td>
               <td data-label="Policy">${policyBadge(r.policy)}</td>
               <td data-label="Approvals needed" class="num">${r.policy === "canon" ? r.quorum : html`<span class="muted">Not needed</span>`}</td>
               <td data-label="Set by" class="small muted">${r.set_at ? html`${who(ctx, r.set_by, null)} · ${time(r.set_at)}` : ""}</td>
@@ -118,6 +124,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
                     icon: "more",
                     items: [
                       { href: `${vaultPath(id, "/rules")}?change=${q(r.path)}#add-rule`, label: "Change", description: "Policy or approvals needed" },
+                      { href: ownersPath(id, r.path), label: "Owners", description: r.owners ? namedOwners(r.owners) : "Name people who write it directly" },
                       { href: `${vaultPath(id, "/rules")}?remove=${q(r.path)}`, label: "Remove", description: "Asks you to confirm first", danger: true },
                     ],
                   })}</td>`
@@ -211,6 +218,10 @@ async function removePage(ctx: Ctx, id: string, path: string): Promise<Reply> {
         : []),
       ...(waiting
         ? [html`${waiting === 1 ? "1 proposal" : `${waiting} proposals`} waiting there stay${waiting === 1 ? "s" : ""} open; each approval counts against the rule in force when it is given.`]
+        : []),
+      // Named owners hang off the rule (path_owners cascades from path_policies).
+      ...(rule.owners
+        ? [html`Its ${namedOwners(rule.owners)} ${rule.owners === 1 ? "is" : "are"} removed with it. Adding the rule again doesn’t bring them back: name them again from <strong>Owners</strong>.`]
         : []),
       html`The removal is logged in Activity. You can add the rule again at any time.`,
     ];

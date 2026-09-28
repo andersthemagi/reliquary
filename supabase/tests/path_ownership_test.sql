@@ -90,6 +90,33 @@ select t.expect('write: on a path nobody owns, the vault owner still can''t writ
   t.run('ana', format($q$select public.write_file(%L, 'canon/plain.md', 'x')::text$q$, t.id('gone'))), 'ERR 42501');
 
 -- ---------------------------------------------------------------------------
+-- write_file via a scoped connection: a named owner's own access token
+-- must be scoped the same way any editor's or owner's already is
+-- (security(db) fix, 20260928170000_path_owner_connection_scope): a named
+-- owner writing through role_in() bypassed token scope entirely before this.
+
+insert into t.ids select 'else', t.run('ana', $q$select public.create_vault('Elsewhere')$q$)::uuid;
+select test_support.add_member(t.id('else'), t.id('cal'), 'owner', t.id('ana'));
+select t.run('cal', format($q$select public.create_access_token('cal-ro', 30, array[%L]::uuid[], 'read')$q$, t.id('gone')));
+select t.run('cal', format($q$select public.create_access_token('cal-rw', 30, array[%L]::uuid[], 'write')$q$, t.id('gone')));
+select t.run('cal', format($q$select public.create_access_token('cal-else', 30, array[%L]::uuid[], 'write')$q$, t.id('else')));
+
+select t.expect('write: Cal''s read-only token can''t write her owned path',
+  t.run_tok('cal', 'cal-ro', format($q$select public.write_file(%L, 'canon/cal.md', 'ro token')::text$q$, t.id('gone'))), 'ERR 42501');
+select t.expect('write: refused, so the text is unchanged',
+  (select body from public.file_versions fv join public.files f on f.current_version_id = fv.id
+    where f.vault_id = t.id('gone') and f.path = 'canon/cal.md'),
+  'Cal wrote this');
+select t.expect('write: a token of Cal''s scoped only to another vault can''t write it either, live and write-access or not',
+  t.run_tok('cal', 'cal-else', format($q$select public.write_file(%L, 'canon/cal.md', 'wrong vault token')::text$q$, t.id('gone'))), 'ERR 42501');
+select t.expect('write: a token of Cal''s properly scoped to this vault, write access, still can',
+  t.run_tok('cal', 'cal-rw', format($q$select 'ok' from public.write_file(%L, 'canon/cal.md', 'via a scoped token')$q$, t.id('gone'))), 'ok');
+select t.expect('write: Cal''s own unrestricted session still can too (regression check)',
+  t.run('cal', format($q$select 'ok' from public.write_file(%L, 'canon/cal.md', 'Cal again, no token')$q$, t.id('gone'))), 'ok');
+select t.expect('write: policy_for agrees with can_write_path: her read-only token sees this path as still canon, not open',
+  t.run_tok('cal', 'cal-ro', format($q$select policy from private.rule_for(%L, 'canon/cal.md')$q$, t.id('gone'))), 'canon');
+
+-- ---------------------------------------------------------------------------
 -- decide(): quorum counts only the named owner's approval
 
 insert into t.ids select 'shared_p', t.run('ben',

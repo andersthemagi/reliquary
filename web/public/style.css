@@ -1574,6 +1574,9 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
 .rules-table .rule-path { overflow-wrap: anywhere; }
 .rules-table .rule-scope { display: block; margin-top: var(--space-1); color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .rules-table .rule-scope code { font-size: inherit; }
+/* A path's named owners (pathowners.ts): a link on its own line under the scope. */
+.rules-table .rule-owners { display: inline-block; margin-top: var(--space-1); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.owner-form, .watch-add { scroll-margin-top: var(--space-10); }
 .rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }
 .rules-table .rule-actions .action-list { min-width: 240px; }
 .rule-form { scroll-margin-top: var(--space-10); }

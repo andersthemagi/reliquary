@@ -9,7 +9,8 @@ All three are in the [ceiling](agents.md): no agent or token can do them.
 On **Settings**, **Export**, an owner chooses **Download export** to get the vault as a `.tar.gz`:
 
 - `files/`: the current text of every live file, at its path.
-- `reliquary-export.json`: the vault, its default policy and rules, variable names with the environments that have a value, and each file's SHA-256 and size.
+- `renamed/`: a file whose path another system could read as something else (a backslash, a colon, a name ending in a dot or space, a device name like `CON`; only files saved before such paths were refused). Each is saved as a number and the path with those characters as `_`, and the manifest's `renamed` list gives its path in the vault, so nothing lands outside the folder you extract to.
+- `reliquary-export.json`: the vault, its default policy and rules, variable names with the environments that have a value, each file's SHA-256 and size, and the `renamed` list.
 
 Variable values are never exported, only names. The archive is one snapshot, fixed when the export starts. A vault can be exported at most 10 times an hour, and a vault over 100 MiB of text is refused. The export is logged. A download cut off halfway is not a valid archive, so a partial export never looks whole.
 

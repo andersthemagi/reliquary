@@ -134,11 +134,18 @@ Milestone 3: **links** (design.md's "Links"; renamed 2026-09-28 from
 - `list_links` over MCP (2026-09-28, `mcp/src/tools.ts`, hostile tests
   in `mcp/test/links.test.mjs`): name and url, never the credential, any
   member's agent, read-only connections included.
+- The Links web page (2026-09-28, `web/src/linkspage.ts`, its own nav
+  section alongside Variables; tests in `web/test/links_page.test.mjs`):
+  an owner adds, edits and deletes a link; the credential is sealed with
+  `sealLink`/`openLink` (`web/src/secrets.ts`, the same `VARIABLES_KEYS`,
+  AAD scoped to the vault only since renaming a link never touches its
+  credential) and never rendered back once saved; delete goes through a
+  confirm page. No Grants page yet: `link_tools` stays empty until
+  discovery exists, so there is nothing to grant.
 Not built: discovery (populating `link_tools` from an upstream server's
 `tools/list`) and the MCP proxy (`<link>.<tool>`, credential egress,
 `link_calls` writes) — both server-side, per design.md's open questions
-there. Nothing calls a link's tools yet; adding one still needs the web
-app, which doesn't exist either.
+there. Nothing calls a link's tools yet.
 
 Also alongside milestone 3, not a numbered milestone of its own (design.md's
 "Path ownership" and "Notifications", owner's decision 2026-09-28): **path
@@ -156,6 +163,27 @@ care. Deliberately not touched: `propose`, `revise_proposal`,
 nothing since they write directly, and can still approve or reject with
 plain `decide()`, but can't yet use edit-and-approve or comment unless
 they also have ordinary editor or owner access).
+Naming and removing owners is in the web app (2026-09-28,
+`web/src/pathowners.ts`, `web/test/path_owners_page.test.mjs`): a rule's
+**Owners** on Rules (`/v/:id/rules/owners?path=`), every member reading the
+list, each grant and removal behind its own confirm page, and a POST
+without that page's confirm field sent to it rather than acting. No MCP
+tool, on purpose (the ceiling). Not built: the file, editor and proposal
+pages still go by vault role and `rule_for`, not the caller-aware
+`policy_for`, so in the web app a named owner still sees the canon flow
+and a viewer owner gets no Edit or decide buttons (their agents write
+directly over MCP).
+
+Fixed 2026-09-28, in review before the web UI shipped, before any real
+traffic used it (`20260928170000_path_owner_connection_scope.sql`,
+F425): `can_write_path`/`policy_for`'s owner branch checked only a
+`path_owners` row, never `role_in()`'s token-scope check the way
+`can_write()` does — so a named owner's read-only token, or a token
+scoped only to a different vault, could still write their path.
+`private.connection_write_capable()` now gates both; `decide()` was
+never exposed (`require_human()` refuses every token outright). Mutation-
+checked: reverting the gate reproduces exactly the four new hostile
+tests failing, restored.
 
 **Flags** (design.md's "Notifications"; the working name is flag, not
 notify) ride alongside milestone 3 the same way, on the same owner's call
@@ -178,13 +206,19 @@ notify) ride alongside milestone 3 the same way, on the same owner's call
   response, or a tool of their own) answered in favour of a tool of their
   own, `list_flags`, called on request rather than automatically. No tool
   creates or removes a watch: that's still the person, in the web app,
-  same as variables and rules.
+  same as variables and rules;
+- watching in the web app (2026-09-28, `web/src/watching.ts`,
+  `web/test/watching_page.test.mjs`): **Watch** / **Unwatch** in the
+  header of every folder and file page (not the vault root, which isn't a
+  watchable path), and a Settings tab, **Watching**
+  (`/v/:id/config/watching`), listing the person's own watches with a
+  form to watch a typed path. Any member, a viewer too; not owner-gated.
 Not built: category 1, notes addressed `to:` someone (design.md doesn't say
 how `to:` is stored); staleness for files you've read (nothing logs a read);
 tag subscriptions (files have no tags; `create_subscription` refuses the
 kind); path owners in "waiting on you" (follows path ownership above when
-someone does that follow-up); watching or unwatching a path anywhere at
-all, web app included.
+someone does that follow-up); a web page showing a person their own flags
+(`list_flags` is MCP only).
 
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits

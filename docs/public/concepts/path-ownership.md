@@ -2,13 +2,15 @@
 
 A folder or file can name specific people as its owners: open for them, canon (its existing rule) for everyone else.
 
-**Partly usable.** Owners can add, edit and delete their owned path directly, and can approve or reject proposals on it (their approval is the only kind that counts toward its quorum). Owners cannot yet use the one-step edit-and-approve, and cannot yet comment on a proposal for a path they own unless they also have ordinary editor or owner access to the vault: both stay editor/owner-only for now. There is no web app or MCP tool for naming an owner yet: it exists as a database function only.
+**Partly usable.** An owner of the vault names and removes a path's owners in the web app, from **Rules**. Named owners, and their agents over MCP, write and delete the path directly, and their approval is the only kind that counts toward its quorum. The web app's file and proposal pages don't reflect path ownership yet: they still go by your role in the vault. So a named owner who is an editor or owner is still shown **Propose a change** on a canon path they own, and a named owner who is a viewer gets no **Edit** and no approve or reject buttons there. Named owners can't yet use the one-step edit-and-approve, or comment on a proposal for a path they own, unless they also have editor or owner access to the vault.
 
 ## What it changes
 
 - **For a path's named owners**, the path is open: they write and delete it directly, no proposal.
 - **For everyone else** with write access to the vault, the same path stays canon: they propose, and it lands once enough of the *named owners* approve. A non-owner's own approval never counts toward that path's quorum, whatever their vault role.
 - **A path with no named owner** behaves exactly as it always has. Naming an owner only ever narrows who a path's canon rule applies to; it never changes a path nobody owns.
+
+A folder's owners cover what's under it, except where a rule inside it applies instead: a file under `clients/acme/`, which has its own rule, follows the owners of `clients/acme/`, not those of `clients/`.
 
 ## Who can be an owner
 
@@ -22,6 +24,27 @@ A path's owner list goes with vault membership. If a named owner leaves the vaul
 
 The vault `owner` role's own powers (rename, delete, export, members) are a fixed, enumerated list; they don't extend to someone else's owned path. A vault owner who isn't named as a path's owner proposes on it like anyone else. There is no break-glass path today; if one is ever built, it reuses Emergency access (still on the [roadmap](../roadmap.md), not yet built), not a new mechanism.
 
-## Naming an owner
+## See a path's owners
 
-A path needs an existing rule (canon, set on **Settings** or with `set_policy`) before anyone can be named its owner. Naming or removing one is an owner's, in person: no agent, token or connection may do it. The product will require an explicit confirm step for granting one, the same way deleting a vault requires its name typed, once this reaches the web app.
+Open the vault, then **Settings**, **Rules**. A rule with named owners says how many under its path, as a link, like **2 named owners**. Every member sees it and can open the list.
+
+The list shows each owner by email, their role in the vault, and who named them and when. A viewer's row says they write and approve this path only, so nobody mistakes it for a wider role.
+
+## Name an owner
+
+Only an owner of the vault can, in person, in the web app: no agent, token or connection may. The path needs a rule first: see [Set rules](../how-to/set-rules.md).
+
+1. On **Rules**, open the **⋯** menu on the rule's row and choose **Owners**.
+2. Under **Name an owner**, choose a member, then **Name owner…**. Nothing changes yet.
+3. Read the confirm page: who they are, that they and their agents will write the path directly with no review, how its quorum changes, and which rules inside it keep their own owners.
+4. Choose **Name**, their email, **owner of** and the path, or **Cancel**.
+
+It's logged in the vault's [Activity](activity.md). On a path whose rule is open, naming an owner changes nothing until the rule becomes canon, and the page says so.
+
+## Remove an owner
+
+1. On the path's **Owners** page, choose **Remove** on their row.
+2. Read what they go back to: reading only, for a viewer, or proposing like anyone else, for an editor. If they're the last named owner, any editor's or owner's approval counts toward the path's quorum again.
+3. Choose **Remove**, their email, **as owner**, or **Cancel**.
+
+Removing a rule removes its named owners with it. Adding the rule again doesn't bring them back: name them again.

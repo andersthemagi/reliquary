@@ -159,3 +159,42 @@ export const fromDb = (r: { key_id: string; nonce: string; ciphertext: string })
 export function reseal(sealed: Sealed, from: Slot, to: Slot = from): Sealed {
   return seal(open(sealed, from), to);
 }
+
+// A link's credential (docs/design.md, "Links"). Scoped to the vault only,
+// not the link's name: unlike a variable's (vault, environment, name) key,
+// a link's credential is keyed in storage by link_id alone (one row,
+// primary key), and renaming a link (update_link) never touches
+// link_secrets, so there is nothing to reseal on rename. The AAD still
+// binds the ciphertext to its vault, so a row moved to another vault's link
+// fails to decrypt instead of leaking a credential across vaults.
+function linkAad(vaultId: string): Buffer {
+  return Buffer.from(JSON.stringify(["reliquary.link.v1", vaultId]), "utf8");
+}
+
+export function sealLink(value: string, vaultId: string): Sealed {
+  if (!CURRENT) throw new SecretsError("variables are not configured (VARIABLES_KEY)");
+  if (value.includes("\u0000")) throw new SecretsError("a credential can't contain a NUL character");
+  const plain = Buffer.from(value, "utf8");
+  if (plain.length > MAX_VALUE_BYTES) throw new SecretsError("a credential is at most 64 KiB");
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", KEYS.get(CURRENT)!, nonce, { authTagLength: TAG_BYTES });
+  cipher.setAAD(linkAad(vaultId));
+  const ciphertext = Buffer.concat([cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
+  return { keyId: CURRENT, nonce, ciphertext };
+}
+
+export function openLink(sealed: Sealed, vaultId: string): string {
+  if (!CURRENT) throw new SecretsError("variables are not configured (VARIABLES_KEY)");
+  const fail = () => new SecretsError("this link's credential could not be decrypted");
+  const key = KEYS.get(sealed.keyId);
+  if (!key || sealed.nonce.length !== 12 || sealed.ciphertext.length < TAG_BYTES) throw fail();
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, sealed.nonce, { authTagLength: TAG_BYTES });
+    decipher.setAAD(linkAad(vaultId));
+    decipher.setAuthTag(sealed.ciphertext.subarray(sealed.ciphertext.length - TAG_BYTES));
+    const plain = Buffer.concat([decipher.update(sealed.ciphertext.subarray(0, sealed.ciphertext.length - TAG_BYTES)), decipher.final()]);
+    return plain.toString("utf8");
+  } catch {
+    throw fail();
+  }
+}
