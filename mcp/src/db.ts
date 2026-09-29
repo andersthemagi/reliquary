@@ -15,6 +15,21 @@ export type Identity = {
   agent: string; // the token's name, e.g. "Claude Code on MacBook", or the OAuth client's
 };
 
+// DEFAULT_POOL_MAX differs deliberately from web/src/db.ts's (5 here, 3
+// there): chosen together with the TLS handling below in commit f7e54f3
+// ("feat(hosting): Vercel adapters, TLS to Supabase's pooler, PUBLIC_URL
+// origin", 2026-09-24) and documented in docs/research/hosting.md section 2
+// ("small pool per instance (`max` 3 to 5)") and section 5's env table
+// ("DB_POOL_MAX | both | no | 3 web, 5 mcp"). The reason MCP gets more: a
+// request that calls a tool holds one pooled connection for its Session
+// (docs/research/server-load.md, "Second pass"), and one that also passes
+// the rate limit checks out a second, parallel connection to count it
+// ("Third pass": "one more checkout; DB_POOL_MAX is 5") — the web app never
+// holds more than one connection per request. Below this point, through the
+// end of poolConfig(), this file and web/src/db.ts are kept byte-identical;
+// web/test/db_tls.test.mjs pins that.
+const DEFAULT_POOL_MAX = 5;
+
 // Pool settings from the environment. Hosted (Vercel sets VERCEL), the
 // database is Supabase's shared pooler in transaction mode, so:
 //  - TLS is verified against the CA in DATABASE_CA_FILE (the app's
@@ -32,14 +47,12 @@ export type Identity = {
 // Errors name the variable, never its value: DATABASE_URL holds a password.
 // Never pass `name` to a query (no named prepared statements in transaction
 // mode) and never a session-level SET.
-// The same function lives in web/src/db.ts (separate deployables, no shared
-// package); keep them in step.
 const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const URL_TLS_PARAM = /[?&](sslmode|ssl|sslrootcert|sslcert|sslkey|uselibpqcompat)=/i;
 
 export function poolConfig(env: NodeJS.ProcessEnv = process.env, appDir = APP_DIR): pg.PoolConfig {
   const url = env.DATABASE_URL ?? "";
-  const max = Number(env.DB_POOL_MAX ?? 5);
+  const max = Number(env.DB_POOL_MAX ?? DEFAULT_POOL_MAX);
   if (!Number.isInteger(max) || max < 1) throw new Error("DB_POOL_MAX must be a positive integer");
   const config: pg.PoolConfig = {
     connectionString: url,

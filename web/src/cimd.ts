@@ -19,11 +19,7 @@
 //
 // Errors carry our own fixed messages, never the document's content.
 
-import dns from "node:dns";
-import http from "node:http";
-import https from "node:https";
-import net from "node:net";
-import { addressAllowed, isLoopbackHost } from "./netsafety.js";
+import { addressAllowed, isLoopbackHost, safeFetch, type Resolved } from "./netsafety.js";
 
 export type ClientMetadata = {
   clientId: string;
@@ -33,7 +29,6 @@ export type ClientMetadata = {
 
 export class CimdError extends Error {}
 
-type Resolved = { address: string; family: number };
 export type Options = {
   allowLoopback?: boolean;
   timeoutMs?: number;
@@ -79,95 +74,40 @@ function clientUrl(clientId: string, allowLoopback: boolean): URL {
 // ---------------------------------------------------------------------------
 // Fetching
 
-const systemResolve = async (host: string): Promise<Resolved[]> =>
-  (await dns.promises.lookup(host, { all: true, verbatim: true })).map((a) => ({ address: a.address, family: a.family }));
-
+// The request mechanism itself (the DNS-rebinding re-check, redirect
+// refusal, timeout and size-cap bookkeeping) is netsafety.ts's safeFetch,
+// shared with discovery.ts's post(). What's left here is what's actually
+// specific to a client metadata GET: it must be exactly one 200 response,
+// and it must be application/json -- checked before any body is buffered,
+// via onHeaders, so a wrong status or content type never reads a body at
+// all (discovery.ts can't do the same: it has to accept a 202 for a
+// notification and either JSON or SSE for a call, and tells those apart
+// downstream of the fetch itself).
 function get(u: URL, opts: Required<Omit<Options, "resolve" | "beforeFetch">> & Pick<Options, "resolve">): Promise<string> {
-  const resolve = opts.resolve ?? systemResolve;
-  const bare = u.hostname.replace(/^\[|\]$/g, "");
-  if (net.isIP(bare) && !addressAllowed(bare, opts.allowLoopback)) {
-    return Promise.reject(new CimdError("The client’s address isn’t public."));
-  }
-  // Node calls this for every connection it makes to a name (not for IP
-  // literals, checked above), so the addresses checked are the ones used.
-  const lookup = (
-    hostname: string,
-    options: dns.LookupOptions,
-    cb: (err: Error | null, address: string | dns.LookupAddress[], family?: number) => void,
-  ) => {
-    resolve(hostname).then(
-      (addrs) => {
-        if (addrs.length === 0) return cb(new CimdError("The client’s address can’t be found."), "");
-        if (!addrs.every((a) => addressAllowed(a.address, opts.allowLoopback))) {
-          return cb(new CimdError("The client’s address isn’t public."), "");
-        }
-        const wanted = options.family === 6 || options.family === 4 ? addrs.filter((a) => a.family === options.family) : addrs;
-        if (wanted.length === 0) return cb(new CimdError("The client’s address can’t be found."), "");
-        if (options.all) cb(null, wanted.map((a) => ({ address: a.address, family: a.family })));
-        else cb(null, wanted[0].address, wanted[0].family);
-      },
-      () => cb(new CimdError("The client’s address can’t be found."), ""),
-    );
-  };
-
-  return new Promise((resolvePromise, reject) => {
-    let settled = false;
-    const done = (err: Error | null, body?: string) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (err) reject(err instanceof CimdError ? err : new CimdError("The client’s metadata couldn’t be fetched."));
-      else resolvePromise(body!);
-    };
-    const mod = u.protocol === "https:" ? https : http;
-    const req = mod.request(
-      u,
-      {
-        method: "GET",
-        agent: false, // a fresh connection: never reuse a socket to another address
-        lookup: lookup as unknown as net.LookupFunction,
-        headers: { accept: "application/json", "user-agent": "Reliquary (client metadata)" },
-      },
-      (res) => {
-        if (res.statusCode !== 200) {
-          res.resume();
-          return done(
-            new CimdError(
-              res.statusCode && res.statusCode >= 300 && res.statusCode < 400
-                ? "The client’s metadata redirects elsewhere; redirects aren’t followed."
-                : "The client’s metadata couldn’t be fetched.",
-            ),
-          );
-        }
-        if (!/^application\/json\s*(;|$)/i.test(res.headers["content-type"] ?? "")) {
-          res.resume();
-          return done(new CimdError("The client’s metadata isn’t JSON."));
-        }
-        const declared = Number(res.headers["content-length"] ?? 0);
-        if (declared > opts.maxBytes) {
-          res.destroy();
-          return done(new CimdError("The client’s metadata is too large."));
-        }
-        const chunks: Buffer[] = [];
-        let size = 0;
-        res.on("data", (c: Buffer) => {
-          size += c.length;
-          if (size > opts.maxBytes) {
-            res.destroy();
-            done(new CimdError("The client’s metadata is too large."));
-          } else chunks.push(c);
-        });
-        res.on("end", () => done(null, Buffer.concat(chunks).toString("utf8")));
-        res.on("error", (e) => done(e));
-      },
-    );
-    const timer = setTimeout(() => {
-      req.destroy();
-      done(new CimdError("The client’s metadata took too long."));
-    }, opts.timeoutMs);
-    req.on("error", (e) => done(e));
-    req.end();
-  });
+  return safeFetch(u, {
+    method: "GET",
+    headers: { accept: "application/json", "user-agent": "Reliquary (client metadata)" },
+    allowLoopback: opts.allowLoopback,
+    timeoutMs: opts.timeoutMs,
+    maxBytes: opts.maxBytes,
+    resolve: opts.resolve,
+    errorClass: CimdError,
+    messages: {
+      addressNotFound: "The client’s address can’t be found.",
+      addressNotPublic: "The client’s address isn’t public.",
+      redirected: "The client’s metadata redirects elsewhere; redirects aren’t followed.",
+      tooLarge: "The client’s metadata is too large.",
+      timedOut: "The client’s metadata took too long.",
+      requestFailed: "The client’s metadata couldn’t be fetched.",
+    },
+    onHeaders: (res) => {
+      if (res.statusCode !== 200) return new CimdError("The client’s metadata couldn’t be fetched.");
+      if (!/^application\/json\s*(;|$)/i.test(res.headers["content-type"] ?? "")) {
+        return new CimdError("The client’s metadata isn’t JSON.");
+      }
+      return undefined;
+    },
+  }).then((r) => r.body);
 }
 
 const CONTROL = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g;
