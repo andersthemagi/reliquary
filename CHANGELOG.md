@@ -8,6 +8,7 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.12.0](https://github.com/andersthemagi/reliquary/compare/v0.11.1...v0.12.0) (2026-09-29)
 
+The public-facing repo and site get a refresh: a new hero headline ("The canon for humans and agents."), real CI status badges and GitHub's standard community-health files (security policy, code of conduct, contributing guide) on the README, and CodeQL scoped past its test-file false positives.
 
 ### Features
 
