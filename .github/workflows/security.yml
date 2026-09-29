@@ -1,0 +1,53 @@
+# What shouldn't reach a public repo, caught before it does: a live secret
+# in a diff, or a high/critical dependency vulnerability. Runs on every push
+# and pull request, same triggers as test.yml, kept separate since it's a
+# different concern (what's safe to expose, not whether the product works).
+name: security
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    # TruffleHog's official action, default settings: only a VERIFIED secret
+    # (one it confirmed still works against the real service) fails the run,
+    # so a fixture like a fake Postgres URL in a test file never does - the
+    # local run that validated this (2026-09-29) found 5 unverified hits,
+    # all fixtures, 0 verified, across the whole history. Scans the pushed
+    # commits on a push, the PR's diff against its base on a pull request
+    # (the action's own default behaviour from the GitHub Actions context).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: trufflesecurity/trufflehog@main
+
+  audit:
+    # npm audit, full dependency tree, dev included (a compromised
+    # build-time package can still taint what ships). The CLI's own publish
+    # already gates on this (publish-cli.yml, since 2026-09-29); this job
+    # catches web/ and mcp/ too, and catches it on every push and PR, not
+    # only at release time.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [web, mcp, cli]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - working-directory: ${{ matrix.package }}
+        run: |
+          npm ci --no-audit --no-fund
+          npm audit --audit-level=high
