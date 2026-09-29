@@ -13,6 +13,11 @@
   "bugs": {
     "url": "https://github.com/andersthemagi/reliquary/issues"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andersthemagi/reliquary.git",
+    "directory": "cli"
+  },
   "license": "MIT",
   "type": "module",
   "bin": {

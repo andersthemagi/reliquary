@@ -7,12 +7,24 @@
 # tag (e.g. cli-v0.1.0). The tag must match cli/package.json's version
 # (release-please keeps them in step). The CLI's end-to-end tests run first;
 # the package is published without npm provenance, which needs a public
-# source repository (this one is private); add --provenance and the
-# id-token permission back if the repository goes public.
+# source repository (this one is private).
 #
-# Secret: NPM_TOKEN (Settings > Secrets and variables > Actions), an npm
-# granular access token that can publish @reliquary-ai/cli. Until it's set,
-# the workflow skips with a notice.
+# Auth: npm trusted publishing (OIDC, docs.npmjs.com/trusted-publishers),
+# not a stored token. npm CLI tries OIDC first, using the id-token: write
+# permission below, and only falls back to NPM_TOKEN (Settings > Secrets
+# and variables > Actions) if OIDC isn't configured or fails. That fallback
+# exists for exactly one reason: npm's trusted-publisher form lives on the
+# package's own settings page, which can't exist before a first publish
+# creates it, so the very first publish of @reliquary-ai/cli needs a
+# one-time granular token (scoped to that package only). Once it exists:
+# npmjs.com > @reliquary-ai/cli > Settings > Trusted publishing > GitHub
+# Actions, with organization/user andersthemagi, repository reliquary,
+# workflow filename publish-cli.yml, no environment. Then delete NPM_TOKEN
+# (Settings > Secrets and variables > Actions) and revoke the npm token
+# (npmjs.com > Access Tokens) - every publish after that authenticates by
+# OIDC, no secret in this repository at all. Requires npm CLI 11.5.1+ and
+# Node 22.14.0+ (setup-node below), and package.json's repository.url to
+# match this repo exactly (it does).
 name: publish-cli
 
 on:
@@ -22,6 +34,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # npm trusted publishing (OIDC); unused until configured on npm's side
 
 concurrency:
   group: publish-cli
@@ -35,23 +48,9 @@ jobs:
     env:
       CONTAINER_ENGINE: docker
     steps:
-      - name: Is NPM_TOKEN set
-        id: cfg
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::notice title=publish skipped::NPM_TOKEN is not set, so nothing is published"
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/checkout@v7
-        if: steps.cfg.outputs.ready == 'true'
 
       - name: The tag matches cli/package.json
-        if: steps.cfg.outputs.ready == 'true'
         run: |
           want="${GITHUB_REF_NAME#cli-v}"
           have=$(node -p "require('./cli/package.json').version")
@@ -61,22 +60,27 @@ jobs:
           fi
 
       - name: CLI tests
-        if: steps.cfg.outputs.ready == 'true'
         run: TEST_SLOT=0 ./test.sh cli
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
       - name: Pack (dry run)
-        if: steps.cfg.outputs.ready == 'true'
         working-directory: cli
         run: |
           npm ci --no-audit --no-fund
           npm pack --dry-run
 
       - name: Publish
-        if: steps.cfg.outputs.ready == 'true'
         working-directory: cli
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          # The token goes to a user-level .npmrc, never the repository's.
-          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
-          npm publish --access public
+          # setup-node's registry-url wrote an .npmrc reading this var, the
+          # standard token fallback for that action. npm tries OIDC (from
+          # the id-token permission above) first regardless: once a trusted
+          # publisher is configured on npm's side, this env var is never
+          # read even if the secret is still set. Empty when NPM_TOKEN
+          # isn't set, same as no token configured at all.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish

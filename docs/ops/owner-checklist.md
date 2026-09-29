@@ -59,13 +59,26 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
    2026-09-25), the package is publish-ready (`npm pack --dry-run` from
    `cli/` is clean) and three `cli-vX.Y.Z` tags already exist
    (0.1.0-0.3.0), each with a `publish-cli` run that skipped for want of
-   the token. What's left: create the `@reliquary-ai` npm organisation,
-   mint a granular access token scoped to it, add it as the `NPM_TOKEN`
-   repository secret, then Actions > publish-cli > Run workflow from tag
-   `cli-v0.3.0` (the current version; earlier tags are superseded, not
-   worth publishing separately). Later versions publish on their own when
-   their "Release cli vX.Y.Z" pull request is merged. If the repo stays
-   private, npm provenance stays off (see `cli/README.md`).
+   auth. `publish-cli.yml` now authenticates by npm trusted publishing
+   (OIDC) with a one-time token fallback for the bootstrap publish only
+   (its own header comment has the exact npm-side fields):
+   1. Create the `@reliquary-ai` npm organisation (done, 2026-09-29).
+   2. Mint a granular access token scoped to `@reliquary-ai/cli` only
+      (there's nothing to scope it to more narrowly until it exists) and
+      add it as the `NPM_TOKEN` repository secret. Ignore npm's own
+      "use trusted publishing instead" nudge here: that page only exists
+      once the package does, so this one token is unavoidable for the
+      very first publish.
+   3. Actions > publish-cli > Run workflow from tag `cli-v0.3.0` (the
+      current version; earlier tags are superseded, not worth publishing
+      separately).
+   4. Once it exists: npmjs.com > `@reliquary-ai/cli` > Settings >
+      Trusted publishing > GitHub Actions, then delete the `NPM_TOKEN`
+      secret and revoke the npm token. Every publish after that
+      authenticates by OIDC, no secret in this repository at all.
+   Later versions publish on their own when their "Release cli vX.Y.Z"
+   pull request is merged. If the repo stays private, npm provenance
+   stays off regardless of trusted publishing (see `cli/README.md`).
 6. **Pricing**: keep "free for 1 to 10 people" or adopt
    `docs/research/positioning.md` section 5. The landing page reads its
    numbers from `PRICING` in `web/src/site.ts`.

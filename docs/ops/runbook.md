@@ -122,7 +122,10 @@ and reopen it just before merging to run them. The `release` workflow then
 starts the deploy itself.
 
 The CLI: merging "Release cli vX.Y.Z" tags `cli-vX.Y.Z` and runs
-`publish-cli` (skipped until `NPM_TOKEN` exists). It deploys nothing.
+`publish-cli`, which authenticates to npm by trusted publishing (OIDC)
+once configured there, or a one-time `NPM_TOKEN` for the bootstrap
+publish before that page can exist (`publish-cli.yml`'s own header;
+`docs/ops/owner-checklist.md`, "Publish the CLI"). It deploys nothing.
 
 ### The first release (v0.1.0, once)
 
@@ -144,10 +147,11 @@ gh workflow run release.yml --ref main
 ```
 
 Publishing v0.1.0 (by you, so it triggers workflows) runs `deploy` for it;
-pushing `cli-v0.1.0` runs `publish-cli`, which skips until `NPM_TOKEN` is
-set (then re-run it: Actions > publish-cli > Run workflow from tag
-`cli-v0.1.0`). The last line lets release-please start the next release
-pull request.
+pushing `cli-v0.1.0` runs `publish-cli`, which needs npm auth first
+(`docs/ops/owner-checklist.md`, "Publish the CLI"; re-run any tag from
+Actions > publish-cli > Run workflow, the current version's tag, not
+`cli-v0.1.0` once later ones exist). The last line lets release-please
+start the next release pull request.
 
 ### Redeploy or roll back
 
