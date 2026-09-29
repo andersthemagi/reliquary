@@ -6,6 +6,19 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.13.0](https://github.com/andersthemagi/reliquary/compare/v0.12.0...v0.13.0) (2026-09-29)
+
+An owner can now make an invite link for anyone to use, up to a set number of joins, instead of one for a single known address. A gap in feedback's NUL-byte check is closed too.
+
+### Features
+
+* **web:** open invite links, good for anyone up to a use count ([95afd75](https://github.com/andersthemagi/reliquary/commit/95afd75dacf20adda45ae4040b17a590836d3a19))
+
+
+### Bug fixes
+
+* **mcp:** refuse a NUL byte in feedback's context field too ([#46](https://github.com/andersthemagi/reliquary/issues/46)) ([5be8c10](https://github.com/andersthemagi/reliquary/commit/5be8c106a48fa6ff55d3404072fc590db4104861))
+
 ## [0.12.0](https://github.com/andersthemagi/reliquary/compare/v0.11.1...v0.12.0) (2026-09-29)
 
 The public-facing repo and site get a refresh: a new hero headline ("The canon for humans and agents."), real CI status badges and GitHub's standard community-health files (security policy, code of conduct, contributing guide) on the README, and CodeQL scoped past its test-file false positives.
