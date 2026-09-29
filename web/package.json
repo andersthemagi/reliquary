@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@types/markdown-it": "^14.2.0",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.3",
     "@types/pg": "^8.23.1",
     "typescript": "^7.0.2"
   }
