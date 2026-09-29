@@ -265,12 +265,17 @@ notify) ride alongside milestone 3 the same way, on the same owner's call
   watchable path), and a Settings tab, **Watching**
   (`/v/:id/config/watching`), listing the person's own watches with a
   form to watch a typed path. Any member, a viewer too; not owner-gated.
+- a Flags page for the person (2026-09-29, `web/src/flagspage.ts`,
+  `/v/:id/flags`, its own nav section; `web/test/flags_page.test.mjs`):
+  `list_flags`, oldest first, badged by category, each linked to its
+  proposal or file; opening the page calls `advance_flags` for the
+  person's own watermark only, same contract as an MCP client's ("shown
+  in a response, not on request"), never a connection's.
 Not built: category 1, notes addressed `to:` someone (design.md doesn't say
 how `to:` is stored); staleness for files you've read (nothing logs a read);
 tag subscriptions (files have no tags; `create_subscription` refuses the
 kind); path owners in "waiting on you" (follows path ownership above when
-someone does that follow-up); a web page showing a person their own flags
-(`list_flags` is MCP only).
+someone does that follow-up).
 
 Alongside: the public docs, roadmap and llms.txt (see Docs below), a
 pre-alpha notice on every frame, and plans and limits

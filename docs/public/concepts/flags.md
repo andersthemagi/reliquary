@@ -2,7 +2,7 @@
 
 A flag tells you, or your agent, about something in a vault that changed since you were last told: a proposal waiting on your review, a change to one of your own proposals, or a change on a path you watch.
 
-**Partly usable.** You watch and unwatch folders and files in the web app (see [Watching a path](#watching-a-path)). An agent can list your flags (`list_flags`) and what you watch (`list_subscriptions`) over MCP, and mark flags shown (`advance_flags`). The web app doesn't show you your flags itself yet: your agents read them. Notes addressed to someone aren't built.
+**Partly usable.** You watch and unwatch folders and files, and see your own flags, in the web app (see [Watching a path](#watching-a-path) and [Seeing your flags](#seeing-your-flags)). An agent can list your flags (`list_flags`) and what you watch (`list_subscriptions`) over MCP, and mark flags shown (`advance_flags`). Notes addressed to someone aren't built.
 
 ## What gets flagged
 
@@ -24,6 +24,12 @@ You in the web app and each of your [connections](connections.md) are flagged se
 Reading flags doesn't use them up. They're marked shown only once the response carrying them has been delivered, so a call that fails loses nothing.
 
 A new connection is told what is waiting on you now, but not what happened before it was made.
+
+## Seeing your flags
+
+Every vault has a **Flags** section for the person signed in to the web app: what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file.
+
+Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
 
 ## Watching a path
 

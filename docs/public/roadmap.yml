@@ -135,6 +135,10 @@
   status: shipped
   docs: reference/limits
 
+- title: Move to reliquary.redmage.cc
+  summary: The website and docs at reliquary.redmage.cc, the web app at app.reliquary.redmage.cc and MCP at mcp.reliquary.redmage.cc; clients sign in again once.
+  status: shipped
+
 - title: Plans and limits
   summary: Account plans limit the vaults you own; each vault's tier limits its people and storage, with usage in Account and Settings.
   status: shipped
@@ -206,10 +210,6 @@
   status: in-progress
   milestone: M2
 
-- title: Move to reliquary.redmage.cc
-  summary: The website and docs at reliquary.redmage.cc, the web app at app.reliquary.redmage.cc and MCP at mcp.reliquary.redmage.cc; clients sign in again once.
-  status: in-progress
-
 - title: Email from the product domain
   summary: Sign-in codes and invites sent by email from Reliquary's own domain.
   status: in-progress
@@ -225,7 +225,7 @@
   docs: concepts/path-ownership
 
 - title: Flags
-  summary: Telling you and each of your agents what changed since you were last told. Live over MCP, and you watch or unwatch folders and files in the web app; notes addressed to someone aren't built yet.
+  summary: Telling you and each of your agents what changed since you were last told. Live over MCP, with a Flags page and Watch/Unwatch in the web app; notes addressed to someone aren't built yet.
   status: in-progress
   docs: concepts/flags
 
