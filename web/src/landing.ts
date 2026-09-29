@@ -98,8 +98,8 @@ export function landing(theme: Theme): string {
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">
     <p class="eyebrow"><span class="logo" aria-hidden="true"></span>Shared context and credentials for AI teams</p>
-    <h1 id="hero-title">Your agents propose. You approve.</h1>
-    <p class="hero-sub">Stop emailing API keys. Stop re-explaining the project.</p>
+    <h1 id="hero-title">The canon for humans and agents.</h1>
+    <p class="hero-sub">Your agents propose. You approve.</p>
     <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use. Claude, ChatGPT, Cursor and Claude Code read the same approved context. Secrets stay out of the chat.</p>
     ${cta("Get started")}
     <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta.</p>
@@ -181,7 +181,7 @@ ${PRICING.show
   ${cta("Get started")}
 </section>`;
   return sitePage({
-    title: "Your agents propose. You approve.",
+    title: "The canon for humans and agents.",
     description:
       "One shared vault of context and credentials for your team and every AI tool you use. Agents propose, people approve, secrets stay out of the chat. EU-hosted.",
     path: "/",
