@@ -69,8 +69,8 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   const r = await fetchAs(A, "/");
   assert.equal(r.status, 200);
   const h = await r.text();
-  assert.match(h, /<h1 id="hero-title">Your agents propose\. You approve\.<\/h1>/);
-  assert.match(h, /Stop emailing API keys\. Stop re-explaining the project\./);
+  assert.match(h, /<h1 id="hero-title">The canon for humans and agents\.<\/h1>/);
+  assert.match(h, /<p class="hero-sub">Your agents propose\. You approve\.<\/p>/);
   assert.match(h, /Reliquary by Red Mage/);
   assert.match(h, /<h2 id="how-title">How it works<\/h2>/);
   assert.equal((h.match(/<ol class="steps">[\s\S]*?<\/ol>/)[0].match(/<li>/g) ?? []).length, 3, "three steps");
@@ -118,7 +118,7 @@ test("site landing: pricing shows the plans and their limits, clearly marked fre
 
 test("site landing: a title, a description, Open Graph tags and the icon; indexable", async () => {
   const h = await text(A, "/");
-  assert.match(h, /<title>Reliquary by Red Mage: Your agents propose\. You approve\.<\/title>/);
+  assert.match(h, /<title>Reliquary by Red Mage: The canon for humans and agents\.<\/title>/);
   assert.match(h, /<meta name="description" content="[^"]{50,}">/);
   for (const p of ["og:title", "og:description", "og:type", "og:site_name"]) assert.match(h, new RegExp(`<meta property="${p}" content="[^"]+">`), p);
   assert.match(h, new RegExp(`<meta property="og:url" content="${ORIGIN}/">`));
