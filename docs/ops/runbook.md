@@ -63,6 +63,29 @@ OAuth issuer: every connector and the CLI signs in again once. Changing only
   until the variable was set and the workflow re-run. See "Deploy" below:
   the deploy workflow now rolls production back automatically when the
   smoke checks that would have caught this fail right after a deploy.
+- **Squash-merge a single-commit PR, or give a multi-commit PR's merge a
+  title that isn't itself a valid `type(scope): subject` line.** A plain
+  merge commit's body echoes the PR title as its second line (`20260929`,
+  PRs #23/#25/#26); when that title exactly repeats the branch's one
+  commit, release-please counts it twice. A descriptive,
+  non-conventional-commit-shaped title (as past multi-commit PRs used) is
+  silently skipped instead, the way it's meant to be.
+- **Before merging a release PR, read its `CHANGELOG.md` as a person who
+  wasn't in the room would.** release-please only ever emits the raw
+  commit subject per entry; dedupe anything doubled (see above), and add a
+  one- or two-sentence plain-language summary above the bullets for that
+  version. This is the *pending* section (nothing below it is released
+  yet), so it's not the "never edit a released entry" rule in
+  `AGENTS.md`'s Conventions: edit the file directly on the release PR's
+  branch and push, then `gh api repos/:owner/:repo/pulls/:n -X PATCH -f
+  body=...` to update the PR's own description to match (`gh pr edit`
+  fails on this repo with an unrelated Projects-classic GraphQL error; the
+  REST API doesn't hit it). Do this last: release-please regenerates the
+  whole pending section, force-pushing over any hand edit, on *every* push
+  to `main`, hidden commit types included (`20260929`, discovered when a
+  docs-only AGENTS.md commit wiped a changelog cleanup that had just
+  landed). Nothing else should push to `main` between polishing it and
+  merging it.
 
 ## Deploy
 
@@ -208,6 +231,20 @@ stops matching a release (the next deploy's `/version` check says so).
   Server logs never contain tokens, values or file text (tests enforce it).
 - **Database advisors:** Supabase dashboard, Advisors. Expected: "RLS enabled,
   no policy" on the private tables (deny-all by design).
+- **Postgres logs full of `schema "pg_pgrst_no_exposed_schemas" does not
+  exist`:** expected, harmless, and not caused by anything in this repo (the
+  app never uses PostgREST or `@supabase/supabase-js`). Disabling the Data
+  API in Project Settings does not stop it: Supabase confirms PostgREST
+  keeps polling even when disabled
+  ([supabase/discussions#45144](https://github.com/orgs/supabase/discussions/45144)).
+  To silence it, run once in the SQL editor:
+  ```sql
+  create schema if not exists pgrst_no_exposed_schemas;
+  alter role authenticator set pgrst.db_schemas = 'pgrst_no_exposed_schemas';
+  notify pgrst;
+  ```
+  ([Supabase troubleshooting: schema "pg_pgrst_no_exposed_schemas" does not
+  exist](https://supabase.com/docs/guides/troubleshooting/schema-pg_pgrst_no_exposed_schemas-does-not-exist)).
 
 ## Backups and restore
 
