@@ -4,6 +4,13 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.3.2](https://github.com/andersthemagi/reliquary/compare/cli-v0.3.1...cli-v0.3.2) (2026-09-29)
+
+
+### Documentation
+
+* **cli:** document the security posture in the README ([e626207](https://github.com/andersthemagi/reliquary/commit/e626207f12a6eaa2bfdcc2cef4d76b8cc4e00aad))
+
 ## [0.3.1](https://github.com/andersthemagi/reliquary/compare/cli-v0.3.0...cli-v0.3.1) (2026-09-29)
 
 
