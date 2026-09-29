@@ -491,7 +491,7 @@ only, not `body`.
 | Check | How | Pass |
 |---|---|---|
 | End-to-end | `./web/test.sh` | Green |
-| Impeccable detector | `~/Projects/repositio-arcanum/.claude/skills/impeccable/scripts/impeccable detect web/public/style.css` and against the running server's pages (`detect <url>`) | No new findings; note any that the design accepts |
+| A visual-QA detector script (personal tooling, not part of this repo) | Run against `web/public/style.css` and the running server's pages | No new findings; note any that the design accepts |
 | Contrast | Recompute every token pair in both themes (a small script in `web/test/` that parses the `:root` blocks and asserts the table above) | Text ≥4.5, large text and UI parts ≥3 |
 | 375px mobile | Browser at 375 by 812 on Home, a folder, a file, a proposal with a split diff, Tokens, Activity | No page-level horizontal scroll; header actions visible without scrolling; nav row scrolls inside itself |
 | Keyboard | Tab through each page from the top | Skip link to main (add one), visible focus on every control, `<details>` menus open with Enter and Space, the Review popover reachable before the diff, order matches reading order, focus not hidden under the sticky bar or sidebar |

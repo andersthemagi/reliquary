@@ -227,7 +227,7 @@ git). All four: `./test.sh`.
 | F114 | Review and Home quorums in one call | `private.rules_for_pairs` answers the rule and quorum for many (vault, path) pairs with one set-based membership check, agreeing with `rule_for` pair by pair across vaults for owners, editors, viewers and outsiders, and only for vaults the caller (or their token's scope) can read; Review, Home and the changes-requested list take quorums from it, and show each proposal's own vault's quorum | `supabase/tests/efficiency_3_test.sql#rules for pairs:`, `web/test/efficiency_3.test.mjs#waiting lists:` | `docs/public/concepts/proposals-and-review.md` |
 | F115 | Search words for current versions only | Only each file's current version keeps its stored words: a new version gets them, the one it replaces loses them, erasing erases them, a deleted file written again moves them, an approved proposal's version has them; search answers as before; versions stay insert-only (changing text or author, or setting words, is refused; only erasing and clearing words are allowed; API roles change nothing); the backfill clears history's and erased versions' words and keeps current ones, once, and no app role can run it | `supabase/tests/efficiency_3_test.sql#search words:`, `supabase/tests/efficiency_3_test.sql#backfill:` | `docs/public/concepts/vaults-and-files.md` |
 
-## Public site (docs/research/positioning.md, sections 6 and 8)
+## Public site
 
 | ID | Feature | Acceptance criteria | Tests | Docs |
 |---|---|---|---|---|
@@ -235,7 +235,7 @@ git). All four: `./test.sh`.
 | F91 | Legal and trust pages | `/terms`, `/privacy`, `/dpa`, `/subprocessors` and `/security` answer without a session on every instance, each marked "Draft, pending legal review" with a last-updated date; unknown facts are visible placeholders; sub-processors names Supabase and Vercel (Frankfurt), Resend for email (sent from Ireland, stored in the US) and no model providers; security states that agents can read what reaches them and the operator can decrypt, and how to report a vulnerability; public pages keep the app's security headers; every page's footer (public, sign-in, app) links all five | `web/test/site.test.mjs#site legal:`, `web/test/site.test.mjs#site footer:`, `web/test/site.test.mjs#site headers:` | `docs/public/concepts/security.md` |
 | F92 | Indexing | App pages and sign-in carry `noindex`, public pages don't; `robots.txt` allows the site and names the sitemap; `sitemap.xml` lists the public pages at PUBLIC_URL, then the roadmap and the docs (F175); `/.well-known/security.txt` names the contact and an expiry | `web/test/site.test.mjs#site indexing:` | `docs/public/index.md` |
 
-## Members and invites (docs/parity.md, docs/research/positioning.md section 8)
+## Members and invites (docs/parity.md)
 
 | ID | Feature | Acceptance criteria | Tests | Docs |
 |---|---|---|---|---|

@@ -1,10 +1,9 @@
 # Gate spike
 
-Throwaway. Tests one claim from
-[docs/research/org-chatbot-gate.md](../../docs/research/org-chatbot-gate.md):
-that audience-aware read access can be enforced by Postgres RLS so that it
-is correct, fast and explainable. None of this is a migration; the real
-schema starts fresh in `supabase/migrations/`.
+Throwaway. Tests one claim: that audience-aware read access can be
+enforced by Postgres RLS so that it is correct, fast and explainable. None
+of this is a migration; the real schema starts fresh in
+`supabase/migrations/`.
 
 ```bash
 ./run.sh          # hostile tests

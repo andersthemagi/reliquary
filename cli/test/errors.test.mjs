@@ -17,13 +17,13 @@ const BODY = {
 };
 
 test("errors: the server's reason, where and reference are printed with what the CLI was doing", () => {
-  const m = failureMessage(504, BODY, "development in Ocularum v2");
-  assert.match(m, /^Reading development in Ocularum v2 failed: the server answered 504 \(server_error\)\./);
+  const m = failureMessage(504, BODY, "development in Team");
+  assert.match(m, /^Reading development in Team failed: the server answered 504 \(server_error\)\./);
   assert.match(m, /The server says: Reading development in vault 1a2b3c4d failed: 57014 statement timeout/);
   assert.match(m, /\(where: env API: database; ref 7f3a2c9e\)$/);
   assert.doesNotMatch(m, /[Tt]ry again later/);
   // Pushes say so.
-  assert.match(failureMessage(502, BODY, "development in Ocularum v2", "Sending values to"), /^Sending values to development in Ocularum v2 failed/);
+  assert.match(failureMessage(502, BODY, "development in Team", "Sending values to"), /^Sending values to development in Team failed/);
 });
 
 test("errors: an answer with no reason says so instead of a bare status", () => {

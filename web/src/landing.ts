@@ -1,6 +1,5 @@
 // The landing page: what signed-out visitors see at `/` (signed-in people
-// get Home). Copy from docs/research/positioning.md, section 6's outline,
-// kept to what is built today; later work is marked "coming".
+// get Home). Kept to what is built today; later work is marked "coming".
 
 import { appHref } from "./hosts.js";
 import { html, preAlphaNote, type Raw, type Theme } from "./html.js";

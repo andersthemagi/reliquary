@@ -13,7 +13,7 @@ needs, to learn from real use. The real schema starts fresh in
 ## Setup (about 10 minutes)
 
 Needs podman or docker, and an Anthropic API key (not a Claude
-subscription login; see `docs/research/landscape-swot.md`).
+subscription login, which needs an interactive sign-in a bot can't do).
 
 1. **Create the bot.** In Telegram, message @BotFather: `/newbot`, pick a
    name and username, and copy the token. Leave privacy mode on (the
@@ -102,6 +102,5 @@ no backups yet.
 - **Search is full-text only** (no embeddings), plus the 8 newest entries.
 - **Only `/remember` writes.** Canon is added with `admin add-entry`; there
   is no proposal queue or dashboard yet.
-- **No web search.** Outbound tools can leak context into their queries
-  (see `docs/research/org-chatbot-gate.md`), so they wait for a
-  per-space switch.
+- **No web search.** Outbound tools can leak context into their queries, so
+  they wait for a per-space switch.

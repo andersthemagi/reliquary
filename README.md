@@ -30,7 +30,8 @@ the research behind it is in [docs/research/](docs/research/).
 ## In this repo
 
 - `docs/design.md`: the design (v3 draft).
-- `docs/research/`: landscape, SWOT, the gate analysis, pricing.
+- `docs/research/`: hosting and architecture, server load, UX and the
+  design system, testing strategy.
 - `deploy/`: self-hosting with Docker Compose (a preview). Guide:
   `docs/public/how-to/self-host.md`; smoke test: `deploy/test.sh`.
 - `spikes/gate/`: the audience gate and session minting, with hostile tests.

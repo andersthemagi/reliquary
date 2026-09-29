@@ -79,9 +79,8 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
    Later versions publish on their own when their "Release cli vX.Y.Z"
    pull request is merged. If the repo stays private, npm provenance
    stays off regardless of trusted publishing (see `cli/README.md`).
-6. **Pricing**: keep "free for 1 to 10 people" or adopt
-   `docs/research/positioning.md` section 5. The landing page reads its
-   numbers from `PRICING` in `web/src/site.ts`.
+6. **Pricing**: keep "free for 1 to 10 people" or set new numbers. The
+   landing page reads its numbers from `PRICING` in `web/src/site.ts`.
 7. **Sign-ups**: on (anyone can make an account; invites work by link) or
    off (add each invitee in Supabase first). Either way the "Confirm sign
    up" template is one of the pasted ones (Do next, 3).

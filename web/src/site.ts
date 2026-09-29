@@ -48,11 +48,11 @@ export function fill(key: keyof typeof OPERATOR, what: string): Raw {
   return v ? html`${v}` : html`<mark class="placeholder">[to be filled: ${what}]</mark>`;
 }
 
-// Pricing. `show: false` hides the section and its nav link. The model
-// (docs/research/positioning.md, "Pricing"): an account plan limits the
-// vaults a person owns; each vault's tier limits its people and storage, and
-// one vault can be upgraded on its own. The limits are enforced
-// (20260925230000_plans.sql); nothing is billed during the beta.
+// Pricing. `show: false` hides the section and its nav link. The model: an
+// account plan limits the vaults a person owns; each vault's tier limits
+// its people and storage, and one vault can be upgraded on its own. The
+// limits are enforced (20260925230000_plans.sql); nothing is billed during
+// the beta.
 export const PRICING = {
   show: true,
   banner: "Early access: free while in beta",
