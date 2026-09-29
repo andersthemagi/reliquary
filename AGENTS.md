@@ -440,7 +440,12 @@ it there.
     and push, then `gh api repos/:owner/:repo/pulls/:n -X PATCH -f
     body=...` to update the PR's own description to match (`gh pr edit`
     fails on this repo with an unrelated Projects-classic GraphQL error;
-    the REST API doesn't hit it).
+    the REST API doesn't hit it). Do this last: release-please
+    regenerates the whole pending section, force-pushing over any hand
+    edit, on *every* push to `main`, hidden commit types included
+    (`20260929`, discovered when a docs-only AGENTS.md commit wiped a
+    changelog cleanup that had just landed). Nothing else should push to
+    `main` between polishing it and merging it.
 - **0.x is pre-alpha.** Any release may change or remove anything; while
   below 1.0 a breaking change bumps the minor, not the major, and GitHub
   Releases are marked prereleases. 1.0 is a deliberate owner decision (a
