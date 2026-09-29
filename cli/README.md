@@ -164,6 +164,20 @@ login`. 403: your role can't read that environment. 404: no such vault or
 environment for this connection. 503: the server has no key for variables.
 Exit codes: 1 for errors, 2 for usage, and `run` passes the command's own.
 
+## Security
+
+No runtime dependencies: Node's built-ins only, nothing else ships in
+`dist/`. `npm audit` runs clean, and CI fails the release on any high or
+critical finding in the full dependency tree, dev included.
+
+Every command spawns directly, never through a shell. Credentials never
+appear in a process argument, a log, or this CLI's own output; the
+end-to-end tests check both servers' logs for that on every push. Windows
+commands are built the way Node recommends after CVE-2024-27980
+("BatBadBut"): an argument a shim could misread is refused, not passed on.
+
+Report a vulnerability: [reliquary.redmage.cc/security](https://reliquary.redmage.cc/security#disclosure).
+
 ## Publishing
 
 The package is `@reliquary-ai/cli`, published from `cli/` by
