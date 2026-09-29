@@ -123,10 +123,10 @@ select t.expect('resolve: a revoked token still resolves to nobody',
 -- ---------------------------------------------------------------------------
 -- Indexes and timeouts
 
-select t.expect('indexes: every foreign key in public has an index that leads with its columns',
+select t.expect('indexes: every foreign key in public or private has an index that leads with its columns',
   (select coalesce(string_agg(c.conrelid::regclass || '(' || c.conkey::text || ')', ', '), 'none')
      from pg_constraint c
-    where c.contype = 'f' and c.connamespace = 'public'::regnamespace
+    where c.contype = 'f' and c.connamespace in ('public'::regnamespace, 'private'::regnamespace)
       and not exists (
         select 1 from pg_index i
          where i.indrelid = c.conrelid
