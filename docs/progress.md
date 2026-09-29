@@ -110,7 +110,7 @@ Phase 1, the core; interface and phase 2's work in
   typed-name delete), with limits (1000 variables per vault, no NUL in
   values).
 
-Milestone 2 is built; next is its week of real use.
+Milestone 2 is built and has held its week of real use: done, 2026-09-29.
 
 ## Milestone 3: links
 

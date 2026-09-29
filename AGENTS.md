@@ -16,11 +16,13 @@ suite that proves it and the decision that shaped it — is
 [docs/progress.md](docs/progress.md). Read the section for the milestone
 you're touching before changing it.
 
-Current (owner's decision, 2026-09-28): milestone 3 (links) started early,
-alongside path ownership and flags, before milestone 2's week of real use
-finished. That's a deliberate, logged exception to "work on the current
-milestone only," not a new default — check `docs/progress.md` before
-assuming the same is fine for something else mid-flight.
+Current (updated 2026-09-29): milestones 1 and 2 have both held their week
+of real use and are done. Milestone 3 (links) is current; it started early
+(owner's decision, 2026-09-28), alongside path ownership and flags, before
+milestone 2's week had finished. That head start was a deliberate, logged
+exception to "work on the current milestone only," not a new default —
+check `docs/progress.md` before assuming the same is fine for something
+else mid-flight.
 
 All of it needs podman or docker; nothing needs Node installed on the host.
 
