@@ -43,6 +43,7 @@ export function registerFlagsTools(
     async ({ kind, message, vault, context }) =>
       run(async (c) => {
         if (message.includes("\u0000")) throw new ToolError("The message has a NUL character in it, which feedback can't hold. Remove it and send again.");
+        if (context?.includes("\u0000")) throw new ToolError("The context has a NUL character in it, which feedback can't hold. Remove it and send again.");
         const { rows } = await c.query(
           `select public.send_feedback($1, $2, case when $3::text is null then null else private.vault_ref($3) end, $4) as id`,
           [kind, message, vault ?? null, context ?? null],

@@ -91,6 +91,14 @@ test("feedback over MCP: an empty or over-long message, an unknown kind and a NU
   assert.equal((await sql("select count(*)::int as n from public.feedback where user_id = $1", [KIM]))[0].n, before);
 });
 
+test("feedback over MCP: a NUL in context is refused too, and nothing is stored", async () => {
+  const before = (await sql("select count(*)::int as n from public.feedback where user_id = $1", [KIM]))[0].n;
+  const nul = await call(KIM_RW, "send_feedback", { kind: "bug", message: "x", context: "a\u0000b" });
+  assert.equal(nul.isError, true);
+  assert.match(nul.text, /^The context has a NUL character in it, which feedback can't hold\./);
+  assert.equal((await sql("select count(*)::int as n from public.feedback where user_id = $1", [KIM]))[0].n, before);
+});
+
 test("feedback over MCP: list_my_feedback shows status and the operator's reply fenced as data, and never text typed in the web UI", async () => {
   const r = await call(KIM_RO, "list_my_feedback");
   assert.equal(r.isError, false, r.text);
