@@ -2,9 +2,12 @@
 // poolConfig() in src/db.ts, called directly. No connection is made.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { poolConfig } from "../dist/db.js";
 
+const REPO = process.env.REPO_DIR ?? new URL("../..", import.meta.url).pathname;
 const PASSWORD = "not-a-real-password-7f3a";
 const URL = `postgres://reliquary_web.ref:${PASSWORD}@pooler.example:6543/postgres`;
 
@@ -59,4 +62,29 @@ test("db pool: small by default (3 for web), DB_POOL_MAX overrides, nonsense ref
   assert.equal(poolConfig({ DATABASE_URL: URL }).idleTimeoutMillis, 10_000);
   assert.throws(() => poolConfig({ DATABASE_URL: URL, DB_POOL_MAX: "0" }), /DB_POOL_MAX/);
   assert.throws(() => poolConfig({ DATABASE_URL: URL, DB_POOL_MAX: "many" }), /DB_POOL_MAX/);
+});
+
+// mcp/src/db.ts and web/src/db.ts each define poolConfig(); they're meant to
+// be identical (same TLS verification, same DATABASE_TLS/DATABASE_CA_FILE
+// handling) except DEFAULT_POOL_MAX, which differs on purpose (5 for mcp, 3
+// for web — see the comment above DEFAULT_POOL_MAX in either file for why).
+// This pins everything from the "Pool settings from the environment."
+// comment through poolConfig()'s end as byte-identical between the two
+// files, the same spirit as errors_unit.test.mjs's check that
+// mcp/src/failure.ts and web/src/failure.ts are the same file, so a TLS fix
+// landing in one copy and forgotten in the other fails a test instead of
+// silently drifting.
+test("db config: mcp/src/db.ts and web/src/db.ts share identical pool/TLS logic, except DEFAULT_POOL_MAX", () => {
+  const START = "// Pool settings from the environment.";
+  const END = "export const pool = new pg.Pool(poolConfig());";
+  const sharedRegion = (src) => {
+    const s = src.indexOf(START);
+    const e = src.indexOf(END, s);
+    assert.notEqual(s, -1, `"${START}" not found`);
+    assert.notEqual(e, -1, `"${END}" not found`);
+    return src.slice(s, e);
+  };
+  const mcp = readFileSync(join(REPO, "mcp/src/db.ts"), "utf8");
+  const web = readFileSync(join(REPO, "web/src/db.ts"), "utf8");
+  assert.equal(sharedRegion(mcp), sharedRegion(web));
 });
