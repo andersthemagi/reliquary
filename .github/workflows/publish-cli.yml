@@ -62,6 +62,16 @@ jobs:
       - name: CLI tests
         run: TEST_SLOT=0 ./test.sh cli
 
+      - name: Reclaim files the containerized tests wrote as root
+        # cli/test.sh runs npm ci and tsc for the CLI itself in a plain
+        # `docker run` container (no --user), so cli/node_modules and
+        # cli/dist come back owned by root on a GitHub-hosted runner's
+        # real Docker - invisible with rootless podman locally, which
+        # remaps container-root to the host user itself. The next step's
+        # npm ci, run directly on the runner, can't even rmdir
+        # node_modules/.bin to reinstall it otherwise (EACCES).
+        run: sudo chown -R "$(id -u):$(id -g)" cli
+
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
