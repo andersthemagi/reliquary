@@ -6,6 +6,22 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.11.0](https://github.com/andersthemagi/reliquary/compare/v0.10.0...v0.11.0) (2026-09-29)
+
+
+### Features
+
+* **web:** see your flags in the web app ([79eca53](https://github.com/andersthemagi/reliquary/commit/79eca5382c385b105e3464645826e1c56694d01f))
+* **web:** see your flags in the web app ([d0e0668](https://github.com/andersthemagi/reliquary/commit/d0e0668746bb2af9df3d48314abd71c3d0fb4e5c))
+
+
+### Bug fixes
+
+* **db:** index two unindexed foreign keys the performance advisor flagged ([d326af5](https://github.com/andersthemagi/reliquary/commit/d326af55a826a5f732c73b06d89c9ec92facbc03))
+* **db:** index two unindexed foreign keys the performance advisor flagged ([f4a6c1b](https://github.com/andersthemagi/reliquary/commit/f4a6c1bd6fd2588e793205bc63c334bf88876240))
+* **web:** the top nav's shared row overflowed, and rendered tables did too ([fd867b9](https://github.com/andersthemagi/reliquary/commit/fd867b9fbb72632ee67d9bf85af723e506bb12a3))
+* **web:** the top nav's shared row overflowed, and rendered tables did too ([0a14728](https://github.com/andersthemagi/reliquary/commit/0a147287dd7b5a74c2dd311c438748730ae7a459))
+
 ## [0.10.0](https://github.com/andersthemagi/reliquary/compare/v0.9.0...v0.10.0) (2026-09-28)
 
 
