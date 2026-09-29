@@ -3,10 +3,11 @@
 // only load from this origin anyway (CSP img-src 'self').
 //
 // The public docs (docs.ts) use the same renderer and the same limits, with
-// three additions that apply only when rendering a docs page: headings get
-// ids (for the table of contents and links to them), relative links are
-// resolved to absolute paths (so `../concepts/vaults.md` works from any URL),
-// and tables are wrapped to scroll on narrow screens.
+// two additions that apply only when rendering a docs page: headings get
+// ids (for the table of contents and links to them), and relative links are
+// resolved to absolute paths (so `../concepts/vaults.md` works from any URL).
+// Tables wrap to scroll on narrow screens everywhere: a file or a proposal's
+// text is as likely to hold a wide table as a docs page is.
 
 import MarkdownIt from "markdown-it";
 
@@ -61,10 +62,8 @@ md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
   }
   return self.renderToken(tokens, idx, options);
 };
-md.renderer.rules.table_open = (tokens, idx, options, env, self) =>
-  (docEnv(env) ? '<div class="table-wrap">' : "") + self.renderToken(tokens, idx, options);
-md.renderer.rules.table_close = (tokens, idx, options, env, self) =>
-  self.renderToken(tokens, idx, options) + (docEnv(env) ? "</div>" : "");
+md.renderer.rules.table_open = (tokens, idx, options, _env, self) => `<div class="table-wrap">${self.renderToken(tokens, idx, options)}`;
+md.renderer.rules.table_close = (tokens, idx, options, _env, self) => `${self.renderToken(tokens, idx, options)}</div>`;
 
 export function renderMarkdown(source: string): string {
   return md.render(source);

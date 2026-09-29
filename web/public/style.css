@@ -359,23 +359,25 @@ strong { font-weight: 600; }
 .settings-form { max-width: 32rem; }
 .settings-form .actions { margin-top: var(--space-4); }
 
+/* The nav always takes a row of its own under the bar, rather than sharing
+   it with the search box and tools. This used to be a tablet-and-narrower
+   behaviour (a shared single row above 1080px, squeezed narrower still
+   between 901 and 1080px), on the assumption that nav plus search plus
+   tools would fit beside each other on any wider screen. They don't: the
+   bar's own content is capped at --content-max (1280px) no matter how wide
+   the viewport is, and nav alone (a real vault name, not "Short", plus
+   Home/Activity/Connect/Docs) already needs most of that, so a shared row
+   silently overflowed nav's own links behind the search box on every
+   screen, not just narrow ones. Its own row has the full bar width and
+   nothing else to share it with, so it isn't capacity-limited this way. */
+.app-top .top-inner { flex-wrap: wrap; row-gap: 0; }
+.app-top .app-nav {
+  order: 3; width: calc(100% + 2 * var(--space-6)); margin: 0 calc(-1 * var(--space-6));
+  padding: 0 var(--space-4); border-top: 1px solid var(--border); min-height: 44px;
+}
 @media (max-width: 1080px) {
-  .top-search input[type="search"] { width: 11rem; }
   .app-top .top-inner { gap: var(--space-4); }
-}
-/* Tablets: the nav takes a row of its own under the bar. */
-@media (max-width: 900px) {
-  .app-top .top-inner { flex-wrap: wrap; row-gap: 0; }
-  .app-top .app-nav {
-    order: 3; width: calc(100% + 2 * var(--space-6)); margin: 0 calc(-1 * var(--space-6));
-    padding: 0 var(--space-4); border-top: 1px solid var(--border); min-height: 44px;
-  }
   .top-search input[type="search"] { width: 14rem; }
-}
-/* Where the main links share the bar with the tools, the search box gives
-   up the width of the Feedback button. */
-@media (min-width: 901px) and (max-width: 1080px) {
-  .top-search input[type="search"] { width: 8rem; }
 }
 /* Phones: search behind a button; every menu opens full width under the bar. */
 @media (max-width: 640px) {
@@ -718,7 +720,7 @@ a.dir { font-weight: 600; }
 
 .prose {
   border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg);
-  padding: var(--space-6) var(--space-7); line-height: 1.65; overflow-wrap: break-word;
+  padding: var(--space-6) var(--space-7); line-height: 1.65; overflow-wrap: anywhere;
 }
 .prose > * { max-width: var(--measure); }
 .prose > :first-child { margin-top: 0; }
@@ -805,6 +807,7 @@ section { scroll-margin-top: var(--space-5); }
 /* Rendered: proposed and current as they'll read, side by side when there's
    room (current left, like the split), stacked with the proposal first. */
 .rendered { display: grid; gap: var(--space-5) var(--space-6); padding: var(--space-5); }
+.rendered .current, .rendered .proposed { min-width: 0; }
 .pane-label { font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: 600; color: var(--fg-muted); margin: 0 0 var(--space-3); }
 .rendered .prose { padding: var(--space-5) var(--space-6); }
 @media (min-width: 1000px) {
