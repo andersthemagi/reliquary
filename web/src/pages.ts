@@ -22,6 +22,7 @@ import { pendingList, variablesRoutes } from "./variablespage.js";
 import { pendingPushes } from "./variables.js";
 import { linksRoutes } from "./linkspage.js";
 import { linkGrantsRoutes } from "./linkgrants.js";
+import { flags } from "./flagspage.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inboxInviteRoutes, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
@@ -590,6 +591,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && rest === "/search") return search(ctx, id);
   if (rest === "/variables" || rest.startsWith("/variables/")) return variablesRoutes(ctx, id, rest);
   if (rest === "/links") return linksRoutes(ctx, id);
+  if (get && rest === "/flags") return flags(ctx, id);
   const lm = /^\/links\/([^/]+)\/grants$/.exec(rest);
   if (lm) return linkGrantsRoutes(ctx, id, lm[1]);
   if (rest === "/config" || rest.startsWith("/config/") || rest === "/erase") return adminRoutes(ctx, id, rest);
