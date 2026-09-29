@@ -8,6 +8,7 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.11.1](https://github.com/andersthemagi/reliquary/compare/v0.11.0...v0.11.1) (2026-09-29)
 
+Security work ahead of making this repository public: automated scans for leaked secrets, vulnerable dependencies and risky code on every push, and business-strategy or legal-draft content moved out to a private repo. Also two CLI reliability fixes: npm publishing now uses trusted OIDC publishing instead of a stored token, and a CI ownership bug that could break the release build is fixed.
 
 ### Bug fixes
 
