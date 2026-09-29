@@ -5,9 +5,12 @@
 # release.yml starts it itself for the tag. To publish (or retry) a tag
 # that exists: Actions > publish-cli > Run workflow, "Use workflow from" the
 # tag (e.g. cli-v0.1.0). The tag must match cli/package.json's version
-# (release-please keeps them in step). The CLI's end-to-end tests run first;
-# the package is published without npm provenance, which needs a public
-# source repository (this one is private).
+# (release-please keeps them in step). The CLI's end-to-end tests run first,
+# then `npm audit --audit-level=high` on the full dependency tree (the CLI
+# ships with none at runtime, but a compromised build-time dependency could
+# still taint dist/); a high or critical finding fails the run before
+# anything is published. The package is published without npm provenance,
+# which needs a public source repository (this one is private).
 #
 # Auth: npm trusted publishing (OIDC, docs.npmjs.com/trusted-publishers),
 # not a stored token. npm CLI tries OIDC first, using the id-token: write
@@ -82,6 +85,10 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm pack --dry-run
+
+      - name: Audit (high and critical block the release)
+        working-directory: cli
+        run: npm audit --audit-level=high
 
       - name: Publish
         working-directory: cli
