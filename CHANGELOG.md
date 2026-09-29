@@ -6,6 +6,25 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.11.1](https://github.com/andersthemagi/reliquary/compare/v0.11.0...v0.11.1) (2026-09-29)
+
+Security work ahead of making this repository public: automated scans for leaked secrets, vulnerable dependencies and risky code on every push, and business-strategy or legal-draft content moved out to a private repo. Also two CLI reliability fixes: npm publishing now uses trusted OIDC publishing instead of a stored token, and a CI ownership bug that could break the release build is fixed.
+
+### Bug fixes
+
+* **cli:** publish to npm by trusted publishing, not a stored token ([9110119](https://github.com/andersthemagi/reliquary/commit/91101199c3ac0d28df555dc456d644624d097032))
+* **cli:** reclaim root-owned files before the runner's own npm ci ([945e782](https://github.com/andersthemagi/reliquary/commit/945e782155c8b104392955bd482087e8fef5f511))
+
+
+### Security
+
+* **ci:** add CodeQL static analysis ([ed56b9c](https://github.com/andersthemagi/reliquary/commit/ed56b9c0748727a101f6d99ca717c1067cca10b4))
+* **ci:** flag a live secret or a high/critical dependency vulnerability before it hits main ([3f8363e](https://github.com/andersthemagi/reliquary/commit/3f8363e10ccbbc71b356b54827413946edcd1f96))
+* **ci:** stop trufflehog failing on unverified findings ([a8b540c](https://github.com/andersthemagi/reliquary/commit/a8b540ce7d22775698210c42a3baf121606e6ba5))
+* **docs:** move business strategy and draft licensing out; scrub a real vault name from a test fixture ([57e9fc5](https://github.com/andersthemagi/reliquary/commit/57e9fc5d0b57c5b0053b446766db5cc437902148))
+* **docs:** the citation fixes and fixture rename from the last commit ([255e63c](https://github.com/andersthemagi/reliquary/commit/255e63c88096b31d73df1988b9b67ec7043118fb))
+* **publish-cli:** gate npm publish on a clean audit ([e406fc0](https://github.com/andersthemagi/reliquary/commit/e406fc0e1b283f66bc92bb2c861193092421123d))
+
 ## [0.11.0](https://github.com/andersthemagi/reliquary/compare/v0.10.0...v0.11.0) (2026-09-29)
 
 A Flags tab in every vault, so you can see what's changed without asking your agent, plus two layout bugs fixed: nav links that could hide behind the search box, and file or proposal text that could get cut off instead of wrapping.
