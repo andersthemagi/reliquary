@@ -1,6 +1,6 @@
 {
   "name": "@reliquary-ai/cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Reliquary's command line: run a command with a vault's environment variables, pull them into a gitignored .env, or push a .env for a person to approve",
   "keywords": [
     "reliquary",
