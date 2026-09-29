@@ -12,7 +12,7 @@ Each vault has a name, a default policy (open or canon), members with roles, and
 
 ## Files and folders
 
-A file is text at a path, like `clients/acme/brief.md`. Folders are the paths' prefixes: there is nothing to create before writing `clients/acme/brief.md`. Markdown files are shown rendered; every file can be shown as plain text.
+A file is text at a path, like `clients/acme/brief.md`. Folders are the paths' prefixes: there is nothing to create before writing `clients/acme/brief.md`. Markdown files are shown rendered; every file can be shown as plain text. A table in rendered markdown scrolls sideways on a narrow screen rather than spilling off it.
 
 - **Every write makes a new version.** Earlier versions are kept, and the log records who wrote each one, and through which agent.
 - **Open files** can be written directly by owners, editors and their agents. **Canon files** change only through a proposal that people approve. See [Canon, open and rules](canon-and-rules.md).
