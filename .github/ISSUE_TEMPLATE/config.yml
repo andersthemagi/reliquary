@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security issue
-    url: https://reliquary-context.vercel.app/security
+    url: https://reliquary.redmage.cc/security
     about: Report privately by email; see the disclosure section.

@@ -1,5 +1,14 @@
 # Reliquary
 
+[![test](https://github.com/andersthemagi/reliquary/actions/workflows/test.yml/badge.svg)](https://github.com/andersthemagi/reliquary/actions/workflows/test.yml)
+[![security](https://github.com/andersthemagi/reliquary/actions/workflows/security.yml/badge.svg)](https://github.com/andersthemagi/reliquary/actions/workflows/security.yml)
+[![CodeQL](https://github.com/andersthemagi/reliquary/actions/workflows/codeql.yml/badge.svg)](https://github.com/andersthemagi/reliquary/actions/workflows/codeql.yml)
+[![cli on npm](https://img.shields.io/npm/v/%40reliquary-ai%2Fcli.svg?label=cli)](https://www.npmjs.com/package/@reliquary-ai/cli)
+[![server license: FSL-1.1-ALv2](https://img.shields.io/badge/server%20license-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
+[![status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](https://reliquary.redmage.cc/roadmap)
+
+> The canon for humans and agents.
+
 A shared vault of context and credentials for people and every AI tool they
 use. Claude, ChatGPT, Cursor, Claude Code and any other MCP client read the
 same approved context; people review and approve in a web UI. Agents never
