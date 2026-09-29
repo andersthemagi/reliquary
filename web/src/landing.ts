@@ -94,6 +94,9 @@ const faq: Array<[string, Raw]> = [
 ];
 
 export function landing(theme: Theme): string {
+  // Headline "The canon for humans and agents." (2026-09-29): the previous
+  // one, "Your agents propose. You approve.", moved to the sub-line right
+  // below it -- still true and concrete, just not the first thing read.
   const body = html`
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">
