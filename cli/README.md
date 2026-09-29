@@ -1,12 +1,17 @@
 # @reliquary-ai/cli
 
-`reliquary`: a vault's environment variables on this computer. `reliquary login`
-connects it to your account through your browser, then it either runs one command with the variables in its
-environment, or writes them to a `.env` that git ignores. Those are the only
-two ways a value leaves Reliquary for a machine (AGENTS.md, "Secrets never
-reach a model"); nothing here prints a value. It can also send a project's
-`.env` to a vault, where a person applies it in the web UI: an agent can run
-that for you without a value ever passing through the conversation.
+Reliquary is a shared vault for a team's environment variables and secrets:
+people and their AI agents read from the same source instead of passing
+`.env` files around. Repository: [github.com/andersthemagi/reliquary](https://github.com/andersthemagi/reliquary)
+
+This is Reliquary's command line. `reliquary login` connects it to your
+account through your browser, then it either runs one command with the
+variables in its environment, or writes them to a `.env` that git ignores.
+Those are the only two ways a value leaves Reliquary for a machine (AGENTS.md,
+"Secrets never reach a model"); nothing here prints a value. It can also send
+a project's `.env` to a vault, where a person applies it in the web UI: an
+agent can run that for you without a value ever passing through the
+conversation.
 
 The contract it implements is [docs/variables.md](../docs/variables.md)
 ("The CLI's sign-in", "The env API", "CLI"). No runtime dependencies: Node
