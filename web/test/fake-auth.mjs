@@ -46,7 +46,7 @@
 // /auth/v1 call), FAKE_AUTH_USERS ("email=uuid,email=uuid").
 // Synthetic data only. Logs nothing.
 
-import { generateKeyPairSync, randomBytes, randomUUID, sign } from "node:crypto";
+import { generateKeyPairSync, randomBytes, randomInt, randomUUID, sign } from "node:crypto";
 import http from "node:http";
 
 const PORT = Number(process.env.FAKE_AUTH_PORT ?? 9999);
@@ -218,7 +218,7 @@ http
       const email = String(body.email ?? "").toLowerCase();
       if (body.create_user === true && (USERS.has(email) || signups.on)) {
         if (!USERS.has(email)) USERS.set(email, randomUUID());
-        const code = String(100000 + (randomBytes(4).readUInt32BE() % 900000));
+        const code = String(randomInt(100000, 1000000));
         const hash = randomBytes(28).toString("hex");
         pending.push({ email, code, hash, used: false });
         lastEmail.set(email, { code, token_hash: hash });
@@ -229,7 +229,7 @@ http
         // this difference show.
         return json(res, 422, { code: 422, error_code: "otp_disabled", msg: "Signups not allowed for otp" });
       }
-      const code = String(100000 + (randomBytes(4).readUInt32BE() % 900000));
+      const code = String(randomInt(100000, 1000000));
       const hash = randomBytes(28).toString("hex");
       pending.push({ email, code, hash, used: false });
       lastEmail.set(email, { code, token_hash: hash });

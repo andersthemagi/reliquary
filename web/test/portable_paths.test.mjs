@@ -22,7 +22,9 @@ const post = (path, fields) =>
     body: new URLSearchParams(fields).toString(),
   });
 const csrf = async (path) => /name="csrf" value="([0-9a-f]+)"/.exec(await page(path))[1];
-const decode = (s) => s.replaceAll("&#39;", "'").replaceAll("&quot;", '"').replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">");
+// &amp; decodes last: decoding it first would turn a literal "&amp;lt;" in
+// the source into "&lt;", which the next step would wrongly decode again.
+const decode = (s) => s.replaceAll("&#39;", "'").replaceAll("&quot;", '"').replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
 
 before(async () => {
   const r = await fetch(readFileSync(LOGIN_FILE, "utf8").trim(), { redirect: "manual" });

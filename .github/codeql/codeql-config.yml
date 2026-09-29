@@ -1,0 +1,16 @@
+# CodeQL's default JS/TS queries flag test-only patterns as if they were
+# live security code: regex escaping in a test assertion, an intentionally
+# weak key generated to prove the app rejects it, a fake OTP generator in a
+# test fixture. The first real run (2026-09-29) found 23 alerts this way:
+# 19 in test files, reviewed and confirmed false positives one by one, none
+# in a path an attacker can reach. Excluding tests from analysis is the
+# durable fix; a comment on one line wouldn't survive the next test added
+# to the same file.
+name: "Reliquary CodeQL config"
+
+paths-ignore:
+  - "**/test/**"
+  - "**/*.test.mjs"
+  - "**/*.test.ts"
+  - "**/node_modules/**"
+  - "**/dist/**"
