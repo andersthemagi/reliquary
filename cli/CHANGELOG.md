@@ -6,6 +6,7 @@ release-please from conventional commits that touch `cli/`.
 
 ## [0.3.3](https://github.com/andersthemagi/reliquary/compare/cli-v0.3.2...cli-v0.3.3) (2026-09-29)
 
+A real client vault name had leaked into a test fixture; renamed it to a generic one ahead of this repository going public.
 
 ### Security
 
