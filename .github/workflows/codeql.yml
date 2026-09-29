@@ -1,0 +1,35 @@
+# GitHub's own static analysis (SAST), separate from security.yml's secret
+# scan and dependency audit: this looks at the code itself (injection,
+# unsafe deserialization, that class of bug), not what's checked into it or
+# what it depends on. Added 2026-09-29 to satisfy the "Protect Main" branch
+# ruleset GitHub created automatically when the repo went public, which
+# requires a CodeQL result before anything can merge into main.
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "24 7 * * 3"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
