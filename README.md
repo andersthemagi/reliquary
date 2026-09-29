@@ -1,40 +1,65 @@
 # Reliquary
 
-A shared vault of context, automations and credentials for people and any
-agent they use. ChatGPT, Claude Code, Cursor and Hermes connect over one MCP
-URL; people use the web UI. Nobody's machine has to stay on.
+A shared vault of context and credentials for people and every AI tool they
+use. Claude, ChatGPT, Cursor, Claude Code and any other MCP client read the
+same approved context; people review and approve in a web UI. Agents never
+see a variable's value.
 
-Red Mage's internal tool first; a product only once it has earned it.
-
-**Status:** design stage. The v3 draft is [docs/design.md](docs/design.md);
-the research behind it is in [docs/research/](docs/research/).
+**Status:** pre-alpha, invite-only, hosted at
+[reliquary.redmage.cc](https://reliquary.redmage.cc). Milestones 1 (core,
+MCP and UI) and 2 (environment variables) are built; milestone 3 (links, an
+MCP proxy to upstream tools like Linear) is built and in its first week of
+real use. See [docs/design.md](docs/design.md) for the full design and
+build order, and [the public roadmap](https://reliquary.redmage.cc/roadmap)
+for what's shipped and what's next.
 
 ## What it does
 
-- **Shared context.** Each vault has entries, notes and proposals, readable
-  and writable from any MCP client or the browser. Agents propose, people
-  approve, and every change lands in an append-only log with a pull feed.
-- **A gate the database enforces.** Every read returns only what everyone who
-  will see the output may see: the person for their own agent, the declared
-  audience for a routine, everyone present in a group chat.
-- **Routines.** Declarative automations inside a vault, triggered by a
-  schedule or a change. They run on Reliquary with the vault's own model key,
-  and each run must produce an artifact. A watchdog in the database notices
-  silence.
-- **Environment variables.** Shared credentials per environment, Vercel-style,
-  delivered by `reliquary run` or `reliquary env pull`, logged on every
-  access, and never returned to a model. With emergency access, a team
-  carries on if someone disappears.
-- **Your data can leave.** Export and an optional git mirror.
+- **Shared context.** Each vault has files, notes and proposals, readable
+  and writable from any MCP client or the browser. Agents propose changes
+  to canon files, people approve, and every change lands in an append-only
+  log with quorum if you want one.
+- **Secrets that never reach a model.** Environment variables, per project,
+  delivered two ways: `reliquary run` starts your command with the values
+  in its environment, or `reliquary env pull` writes a gitignored `.env`.
+  No MCP tool, log line or error message ever returns a value. Every
+  access is logged.
+- **Links: other people's MCP tools, without handing out the credential.**
+  Connect an upstream MCP server (a project tracker, a support inbox) once;
+  Reliquary holds its credential and proxies the calls your agents are
+  granted, tool by tool, read-only or not.
+- **A gate the database enforces, not the API.** Every permission (who
+  reads what, who approves, who reveals a secret) is a Postgres row-level
+  security policy, checked with a hostile test on every push.
+- **Your data can leave.** Any vault exports as plain markdown files at any
+  time, and deletes for good.
+
+## Try it
+
+- **Hosted:** [reliquary.redmage.cc](https://reliquary.redmage.cc). Invite-only
+  while in pre-alpha; request access from the site.
+- **Self-hosted:** run it on your own server with Docker Compose, no plan
+  limits. See [docs/public/how-to/self-host.md](docs/public/how-to/self-host.md).
+- **CLI:** `npx @reliquary-ai/cli login`, then `reliquary run` or
+  `reliquary env pull`. See
+  [docs/public/how-to/use-the-cli.md](docs/public/how-to/use-the-cli.md).
 
 ## In this repo
 
-- `docs/design.md`: the design (v3 draft).
+- `docs/design.md`: the design (v3 draft) and build order.
+- `docs/public/`: the docs served at `/docs` on the hosted site (tutorials,
+  concepts, how-to guides, reference).
 - `docs/research/`: hosting and architecture, server load, UX and the
   design system, testing strategy.
-- `deploy/`: self-hosting with Docker Compose (a preview). Guide:
+- `supabase/migrations/`: the schema, with hostile tests in
+  `supabase/tests/`.
+- `mcp/`: the remote MCP endpoint.
+- `web/`: the web app (UI, public site, docs).
+- `cli/`: the CLI, published as `@reliquary-ai/cli`.
+- `deploy/`: self-hosting with Docker Compose. Guide:
   `docs/public/how-to/self-host.md`; smoke test: `deploy/test.sh`.
 - `spikes/gate/`: the audience gate and session minting, with hostile tests.
+  Research that informed v3, not the product.
 - `pilot/`: a Telegram bot on the gate. Research, not the product.
 
 ## Lineage
