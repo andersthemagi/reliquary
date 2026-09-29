@@ -6,6 +6,18 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.12.0](https://github.com/andersthemagi/reliquary/compare/v0.11.1...v0.12.0) (2026-09-29)
+
+
+### Features
+
+* **web:** note why the hero headline changed ([#41](https://github.com/andersthemagi/reliquary/issues/41)) ([1c70741](https://github.com/andersthemagi/reliquary/commit/1c7074143d4202c21ea5dd2cd5d00b12ba1d369a))
+
+
+### Security
+
+* **ci:** scope CodeQL past test-file false positives ([26bdf77](https://github.com/andersthemagi/reliquary/commit/26bdf7797676576afb8b33c1ddba1d7f84de4bba))
+
 ## [0.11.1](https://github.com/andersthemagi/reliquary/compare/v0.11.0...v0.11.1) (2026-09-29)
 
 Security work ahead of making this repository public: automated scans for leaked secrets, vulnerable dependencies and risky code on every push, and business-strategy or legal-draft content moved out to a private repo. Also two CLI reliability fixes: npm publishing now uses trusted OIDC publishing instead of a stored token, and a CI ownership bug that could break the release build is fixed.
