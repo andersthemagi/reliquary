@@ -17,19 +17,23 @@ concurrency:
 
 jobs:
   secrets:
-    # TruffleHog's official action, default settings: only a VERIFIED secret
-    # (one it confirmed still works against the real service) fails the run,
-    # so a fixture like a fake Postgres URL in a test file never does - the
-    # local run that validated this (2026-09-29) found 5 unverified hits,
-    # all fixtures, 0 verified, across the whole history. Scans the pushed
-    # commits on a push, the PR's diff against its base on a pull request
-    # (the action's own default behaviour from the GitHub Actions context).
+    # TruffleHog's official action always runs the CLI with --fail, which
+    # exits non-zero on ANY finding, verified or not (confirmed 2026-09-29:
+    # the action failed a plain dependency-bump PR on the same 5 unverified
+    # fixtures the local scan already knew about, 0 verified). extra_args:
+    # --results=verified is what actually restricts that to a verified
+    # secret only, so a fixture like a fake Postgres URL in a test file
+    # doesn't block a PR. Scans the pushed commits on a push, the PR's diff
+    # against its base on a pull request (the action's own default
+    # behaviour from the GitHub Actions context).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --results=verified
 
   audit:
     # npm audit, full dependency tree, dev included (a compromised
