@@ -189,6 +189,23 @@ test("races, limits hold: 12 people accepting at once into a vault with one plac
   assert.equal((await sql(`select count(*)::int as n from private.vault_invites where vault_id = $1 and accepted_at is null and revoked_at is null`, [v]))[0].n, 11);
 });
 
+test("races, limits hold: 12 different people redeeming one open link with 5 uses at once, exactly 5 join", async () => {
+  const v = await newVault(OWNER, "Races open link");
+  const crowd = people.slice(0, 12);
+  const made = await as(db, OWNER, "select public.create_invite($1, null, 'viewer', 5) as t", [v]);
+  assert.ok(made.ok, made.message);
+  const token = made.rows[0].t;
+  const conns = await Promise.all(crowd.map(() => connect()));
+  const t0 = Date.now();
+  const results = await Promise.all(crowd.map((p, i) => as(conns[i], p, "select public.accept_invite($1)::text as v", [token])));
+  await close(conns);
+  log("open-link crowd", codes(results), `${Date.now() - t0} ms`);
+  assert.deepEqual(codes(results), { ok: 5, 55000: 7 });
+  assert.equal((await sql("select count(*)::int as n from public.vault_members where vault_id = $1", [v]))[0].n, 6);
+  const [row] = await sql(`select uses_count, max_uses, accepted_at is not null as exhausted from private.vault_invites where vault_id = $1 and email is null`, [v]);
+  assert.deepEqual(row, { uses_count: 5, max_uses: 5, exhausted: true });
+});
+
 test("races, limits hold: 12 new vaults at once with one left on the plan, exactly the limit is reached", async () => {
   const who = people[22];
   await sql("select private.set_account_plan($1, 'races_small')", [who]);

@@ -22,10 +22,13 @@
 // Nothing here logs; the server logs method, path and status only.
 //
 // Invites (members.ts): a signed-out invitee is sent here with
-// next=/invite?token=... . The pages then say what they were invited to and
-// which address to use, and for exactly the invited address (checked with
-// the database) sign-in may create the account; any other address signs in
-// as usual, never creating one.
+// next=/invite?token=... . The pages then say what they were invited to.
+// For an address-bound invite, sign-in may create the account only for
+// the address it was sent to (checked with the database); any other
+// address signs in as usual, never creating one. For an open link (no
+// address, members.ts's "Generate a link"), sign-in may create the
+// account for whichever address is entered: the link itself is what's
+// scarce, not the address.
 
 import type http from "node:http";
 import {
@@ -43,7 +46,7 @@ import {
 } from "./auth.js";
 import { html, notice, page, type Theme } from "./html.js";
 import { siteHref } from "./hosts.js";
-import { inviteTokenOf, maskEmail, peekInvite, type Peek } from "./invites.js";
+import { inviteTokenOf, maskEmail, peekInvite, roleName, type Peek } from "./invites.js";
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage } from "./errorpage.js";
@@ -116,12 +119,19 @@ const formError = (id: string, error?: string) => (error ? html`<p class="callou
 const invalid = (id: string, error?: string) => (error ? html` aria-invalid="true" aria-describedby="${id}"` : "");
 
 function emailForm(csrf: string, next: string, theme: Theme, error?: string, invite?: Peek): string {
+  const openInvite = invite !== undefined && invite.email === null;
   return page(
     "Sign in",
     html`<div class="signin">
       ${invite
-        ? html`<h1>Join ${invite.vaultName}</h1>
-          <p class="lede">You’ve been invited to <strong>${invite.vaultName}</strong> on Reliquary. Sign in with the address the invite was sent to, <strong>${maskEmail(invite.email)}</strong>: we’ll email it a sign-in link and a 6-digit code. New to Reliquary? The same step makes your account.</p>`
+        ? openInvite
+          ? html`<h1>Join ${invite.vaultName}</h1>
+              <p class="lede">You’ve been invited to collaborate on <strong>${invite.vaultName}</strong> on Reliquary, as ${invite.role === "owner" ? "an" : "a"} ${roleName(invite.role)}.</p>
+              <p>One shared vault of context and credentials for a team and every AI tool they use. Claude, ChatGPT, Cursor and Claude Code read the same approved context. Secrets stay out of the chat.</p>
+              <p>Reliquary is pre-alpha: open to feedback and direction as we harden and improve it.</p>
+              <p class="hint">Enter your email: we’ll send a sign-in link and a 6-digit code, and the same step makes your account.</p>`
+            : html`<h1>Join ${invite.vaultName}</h1>
+              <p class="lede">You’ve been invited to <strong>${invite.vaultName}</strong> on Reliquary. Sign in with the address the invite was sent to, <strong>${maskEmail(invite.email as string)}</strong>: we’ll email it a sign-in link and a 6-digit code. New to Reliquary? The same step makes your account.</p>`
         : html`<h1>Sign in to Reliquary</h1>
           <p class="lede">We’ll email you a sign-in link and a 6-digit code.</p>`}
       ${formError("email-error", error)}
@@ -276,7 +286,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
       { name: "signin_email_ip", kind: "ip", value: i.ip },
     ], i.theme);
     if (limited) return out(limited);
-    const r = await sendSigninEmail(email, invite !== undefined && email.toLowerCase() === invite.email);
+    const r = await sendSigninEmail(email, invite !== undefined && (invite.email === null || email.toLowerCase() === invite.email));
     if (r.unavailable) return out(unavailable(i.theme));
     if (r.signupsOff) {
       // The reason is logged, so it names no address; the page does.

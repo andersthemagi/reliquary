@@ -9,12 +9,16 @@
 insert into t.ids values
   ('fay', '00000000-0000-0000-0000-0000000000f1'),
   ('gil', '00000000-0000-0000-0000-0000000000f2'),
-  ('hal', '00000000-0000-0000-0000-0000000000f3');
+  ('hal', '00000000-0000-0000-0000-0000000000f3'),
+  ('ivy', '00000000-0000-0000-0000-0000000000f4'),
+  ('joy', '00000000-0000-0000-0000-0000000000f5'),
+  ('kai', '00000000-0000-0000-0000-0000000000f6');
 insert into auth.users (id, email) values
   (t.id('ana'), 'ana@example.test'), (t.id('ben'), 'ben@example.test'),
   (t.id('cal'), 'cal@example.test'), (t.id('dee'), 'dee@example.test'),
   (t.id('fay'), 'Fay@Example.Test'), (t.id('gil'), 'gil@example.test'),
-  (t.id('hal'), 'hal@example.test');
+  (t.id('hal'), 'hal@example.test'), (t.id('ivy'), 'ivy@example.test'),
+  (t.id('joy'), 'joy@example.test'), (t.id('kai'), 'kai@example.test');
 
 insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
 insert into t.ids select 'deev', t.run('dee', $q$select public.create_vault('Dee own')$q$)::uuid;
@@ -42,8 +46,11 @@ values (t.id('ana'), 'ana-oauth', 'oauth', 'https://client.example/meta.json', '
        (t.id('ana'), 'ana-cli', 'cli', 'https://app.example/cli/oauth-client.json', 'https://app.example/api/env', now() + interval '30 days', 'read'),
        (t.id('fay'), 'fay-cli', 'cli', 'https://app.example/cli/oauth-client.json', 'https://app.example/api/env', now() + interval '30 days', 'read');
 
-create function t.invite(p_user text, p_vault text, p_email text, p_role text) returns text language sql as $$
-  select t.run(p_user, format($q$select public.create_invite(%L, %L, %L)$q$, t.id(p_vault), p_email, p_role))
+create function t.invite(p_user text, p_vault text, p_email text, p_role text, p_max_uses int default 1) returns text language sql as $$
+  select t.run(p_user, format($q$select public.create_invite(%L, %L, %L, %L)$q$, t.id(p_vault), p_email, p_role, p_max_uses))
+$$;
+create function t.peek_uses(p_token text) returns text language sql as $$
+  select t.run_role('reliquary_web', format($q$select uses_count || '/' || max_uses from private.invite_peek(%L)$q$, p_token))
 $$;
 create function t.accept(p_user text, p_token text, p_agent text default null) returns text language sql as $$
   select t.run(p_user, format($q$select public.accept_invite(%L)::text$q$, p_token), p_agent)
@@ -388,6 +395,77 @@ select t.expect('connections: a member with no other vault loses the connection'
 select t.expect('connections: each cut is logged with the member and token ids',
   (select count(*)::text || ' ' || bool_and(detail ? 'user' and detail ? 'token')::text from public.log
     where vault_id = t.id('team') and event = 'member.connection_revoke'), '4 true');
+
+-- ---------------------------------------------------------------------------
+-- Open invite links (20260929180000_open_invites): no address, a use
+-- count instead of one use. A fresh vault, so nothing here disturbs
+-- 'team' or 'deev's membership used above.
+
+insert into t.ids select 'openv', t.run('dee', $q$select public.create_vault('Open')$q$)::uuid;
+create table t.open_tokens (name text primary key, token text);
+create function t.otk(p_name text) returns text language sql as $$ select token from t.open_tokens where name = p_name $$;
+
+insert into t.open_tokens select 'link2', t.invite('dee', 'openv', null, 'viewer', 2);
+select t.expect('open invite: an owner creates a link with no address and a use count',
+  (t.otk('link2') ~ '^rli_[0-9a-f]{64}$')::text, 'true');
+select t.expect('open invite: stored with no email, the requested max_uses, and zero uses so far',
+  (select (email is null and max_uses = 2 and uses_count = 0)::text from private.vault_invites
+     where token_hash = encode(extensions.digest(t.otk('link2'), 'sha256'), 'hex')),
+  'true');
+select t.expect('open invite: peek reports it usable by anyone, with uses remaining',
+  t.run_role('reliquary_web', format($q$select state || ' ' || coalesce(email, '(none)') || ' ' || uses_count || '/' || max_uses
+                                        from private.invite_peek(%L)$q$, t.otk('link2'))),
+  'pending (none) 0/2');
+
+select t.expect('open invite: someone not pre-specified accepts and joins with the link''s role',
+  t.accept('ivy', t.otk('link2')) || ' ' || t.role_of('openv', 'ivy'), t.id('openv')::text || ' viewer');
+select t.expect('open invite: still usable after one redemption, one use left',
+  t.peek_uses(t.otk('link2')) || ' ' || t.state(t.otk('link2')), '1/2 pending');
+select t.expect('open invite: a second, different person also joins with it',
+  t.accept('joy', t.otk('link2')) || ' ' || t.role_of('openv', 'joy'), t.id('openv')::text || ' viewer');
+select t.expect('open invite: exhausted once its use count is reached',
+  t.peek_uses(t.otk('link2')) || ' ' || t.state(t.otk('link2')), '2/2 accepted');
+select t.expect('open invite: a third person is refused once uses run out, and joins nothing',
+  t.accept('kai', t.otk('link2')) || ' ' || t.role_of('openv', 'kai'), 'ERR 55000 none');
+
+insert into t.open_tokens select 'link1', t.invite('dee', 'openv', null, 'editor');
+select t.expect('open invite: the default use count is 1, same as an address-bound invite',
+  (select max_uses::text from private.vault_invites
+     where token_hash = encode(extensions.digest(t.otk('link1'), 'sha256'), 'hex')), '1');
+select t.expect('open invite: a one-time link dies after its first use, whoever uses it',
+  t.accept('kai', t.otk('link1')) || ' ' || t.role_of('openv', 'kai') || ' ' || t.state(t.otk('link1'))
+  || ' ' || t.accept('ivy', t.otk('link1')),
+  t.id('openv')::text || ' editor accepted ERR 55000');
+
+select t.expect('open invite: a use count outside 1 to 100 is refused',
+  t.invite('dee', 'openv', null, 'viewer', 0) || ' ' || t.invite('dee', 'openv', null, 'viewer', 101)
+  || ' ' || t.invite('dee', 'openv', null, 'viewer', -1), 'ERR 22023 ERR 22023 ERR 22023');
+
+insert into t.open_tokens select 'boundhigh', t.invite('dee', 'openv', 'gil@example.test', 'viewer', 5);
+select t.expect('invite: an address-bound invite is always single-use, even if a higher count is asked for',
+  (select max_uses::text from private.vault_invites
+     where token_hash = encode(extensions.digest(t.otk('boundhigh'), 'sha256'), 'hex')), '1');
+select t.expect('invite: and dies after its one use, as always',
+  t.accept('gil', t.otk('boundhigh')) || ' ' || t.state(t.otk('boundhigh')), t.id('openv')::text || ' accepted');
+
+insert into t.open_tokens select 'link3', t.invite('dee', 'openv', null, 'viewer', 3);
+insert into t.ids select 'link3_invite', id from private.vault_invites
+ where token_hash = encode(extensions.digest(t.otk('link3'), 'sha256'), 'hex');
+select t.expect('open invite: the owner revokes a partially-used link',
+  t.accept('kai', t.otk('link3')) || ' ' || t.peek_uses(t.otk('link3'))
+  || ' ' || t.run('dee', format($q$select 'ok' from public.revoke_invite(%L)$q$, t.id('link3_invite')))
+  || ' ' || t.state(t.otk('link3')),
+  t.id('openv')::text || ' 1/3 ok revoked');
+select t.expect('open invite: revoked stops further redemptions, however many uses were left',
+  t.accept('joy', t.otk('link3')), 'ERR 55000');
+
+insert into t.open_tokens select 'link4', t.invite('dee', 'openv', null, 'editor', 10);
+select t.expect('list invites: a link shows its role and use count, with no address',
+  t.run('dee', format($q$select coalesce(email, '(none)') || ' ' || role || ' ' || uses_count || '/' || max_uses
+                          from public.list_invites(%L) order by created_at desc limit 1$q$, t.id('openv'))),
+  '(none) editor 0/10');
+select t.expect('open invite: never appears in anyone''s inbox: there''s no address to match',
+  t.run('kai', $q$select count(*)::text from public.my_invites()$q$), '0');
 
 -- ---------------------------------------------------------------------------
 -- Deleting a vault with invites

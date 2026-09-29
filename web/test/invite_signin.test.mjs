@@ -110,7 +110,9 @@ before(async () => {
   [{ t: T.newbie }] = await as(ANA, "select public.create_invite($1, 'newbie@example.test', 'editor') as t", [V.id]);
   [{ id: V.two }] = await as(ANA, "select public.create_vault('Invite Signin Two') as id");
   [{ t: T.two }] = await as(ANA, "select public.create_invite($1, 'newbie@example.test', 'viewer') as t", [V.two]);
-  remember(T.newbie, T.two);
+  [{ id: V.open }] = await as(ANA, "select public.create_vault('Invite Signin Open') as id");
+  [{ t: T.open }] = await as(ANA, "select public.create_invite($1, null, 'viewer', 2) as t", [V.open]);
+  remember(T.newbie, T.two, T.open);
   await signups(false);
 });
 
@@ -204,4 +206,62 @@ test("invite sign-in: a used invite no longer lets sign-in make an account", asy
   assert.match(page, /<h1>Sign in to Reliquary<\/h1>/);
   await post("/signin", { csrf: csrfOf(page), email: "newbie@example.test", next: next(T.newbie) }, jar);
   assert.equal((await stats()).lastCreateUser, false);
+});
+
+test("invite sign-in: a signed-out open link explains Reliquary instead of naming an address", async () => {
+  const jar = new Jar();
+  const r = await get(next(T.open), jar);
+  assert.equal(r.status, 303);
+  const page = await (await get(r.headers.get("location"), jar)).text();
+  assert.match(page, /<h1>Join Invite Signin Open<\/h1>/);
+  assert.match(page, /You’ve been invited to collaborate on <strong>Invite Signin Open<\/strong> on Reliquary/);
+  assert.match(page, /Reliquary is pre-alpha/);
+  assert.doesNotMatch(page, /the address the invite was sent to/);
+  assert.doesNotMatch(page, /Reliquary is invite-only/);
+});
+
+test("invite sign-in: with sign-ups on, an open link lets any address entered get an account, sign in and join", async () => {
+  await signups(true);
+  const jar = new Jar();
+  const email = "anyone@example.test";
+  const r = await askForCode(jar, T.open, email);
+  assert.equal(r.status, 200);
+  const codePage = await r.text();
+  assert.equal((await stats()).lastCreateUser, true, "any address may make an account through an open link");
+  await signups(false);
+  const { id } = await fake(`/_user?email=${encodeURIComponent(email)}`);
+  await sql("insert into auth.users (id, email) values ($1, $2)", [id, email]);
+  const { code } = await lastEmail(email);
+  const done = await post("/signin/code", { csrf: csrfOf(codePage), email, code, next: next(T.open) }, jar);
+  assert.equal(done.status, 303);
+  assert.equal(done.headers.get("location"), next(T.open));
+  const invite = await (await get(next(T.open), jar)).text();
+  assert.match(invite, /<button class="primary">Join Invite Signin Open<\/button>/);
+  const joined = await post("/invite", { csrf: csrfOf(invite), token: T.open }, jar);
+  assert.equal(joined.status, 303);
+  assert.equal(joined.headers.get("location"), `/v/${V.open}`);
+  assert.equal(await roleOf(id, V.open), "viewer");
+});
+
+test("invite sign-in: a second, different address also joins the same open link", async () => {
+  await signups(true);
+  const jar = new Jar();
+  const email = "someoneelse@example.test";
+  const r = await askForCode(jar, T.open, email);
+  assert.equal(r.status, 200);
+  const codePage = await r.text();
+  await signups(false);
+  const { id } = await fake(`/_user?email=${encodeURIComponent(email)}`);
+  await sql("insert into auth.users (id, email) values ($1, $2)", [id, email]);
+  const { code } = await lastEmail(email);
+  await post("/signin/code", { csrf: csrfOf(codePage), email, code, next: next(T.open) }, jar);
+  const invite = await (await get(next(T.open), jar)).text();
+  const joined = await post("/invite", { csrf: csrfOf(invite), token: T.open }, jar);
+  assert.equal(joined.status, 303);
+  assert.equal(await roleOf(id, V.open), "viewer");
+  // Its two uses are spent: sign-in may no longer make an account through it.
+  await signups(true);
+  await askForCode(new Jar(), T.open, "toolate@example.test");
+  assert.equal((await stats()).lastCreateUser, false);
+  await signups(false);
 });
