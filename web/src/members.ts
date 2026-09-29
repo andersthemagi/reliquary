@@ -40,7 +40,12 @@ const membersPath = (id: string, rest = "") => vaultPath(id, `/config/members${r
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 type Member = { user_id: string; email: string | null; role: string; added_at: Date };
-type Invite = { id: string; email: string; role: string; created_at: Date; expires_at: Date };
+type Invite = { id: string; email: string | null; role: string; created_at: Date; expires_at: Date; max_uses: number; uses_count: number };
+// A link's label on the Members page and its confirm pages: an address, or
+// how many uses are left on an open link (never "for anyone" alone — the
+// count is what an owner needs to recognise which link is which).
+const inviteWho = (i: Pick<Invite, "email" | "max_uses" | "uses_count">) =>
+  i.email ?? `Anyone (${i.max_uses - i.uses_count} of ${i.max_uses} use${i.max_uses === 1 ? "" : "s"} left)`;
 type Conn = {
   id: string;
   user_id: string;
@@ -92,14 +97,17 @@ const full = (u: VaultUsage | undefined) => !!u && peopleLimited(u) && peopleOve
 // ---------------------------------------------------------------------------
 // The Members tab
 
-type Fresh = { email: string; role: string; link: string; delivery: Delivery; expires: Date };
+// email: the address it was made for, or null for an open link (delivery
+// is never applicable then: there's no address to email it to).
+// maxUses: 1 for an address-bound invite, always.
+type Fresh = { email: string | null; role: string; maxUses: number; link: string; delivery?: Delivery; expires: Date };
 
 async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> {
   return shell(ctx, id, "Members", async (c, v) => {
     const owner = v.role === "owner";
     const members = (await c.query(`select user_id, email, role, added_at from public.list_members($1)`, [id])).rows as Member[];
     const invites = owner
-      ? ((await c.query(`select id, email, role, created_at, expires_at from public.list_invites($1)`, [id])).rows as Invite[])
+      ? ((await c.query(`select id, email, role, created_at, expires_at, max_uses, uses_count from public.list_invites($1)`, [id])).rows as Invite[])
       : [];
     const conns = owner
       ? ((
@@ -142,16 +150,24 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
         primary: invite,
       })}
       ${fresh
-        ? html`<div class="callout ${fresh.delivery.sent || !fresh.delivery.failure ? "success" : "warning"} reveal" role="status" id="invite-link">
-            <p class="callout-title"><strong>Invite for ${fresh.email} (${roleName(fresh.role)})</strong></p>
-            ${fresh.delivery.sent
-              ? html`<p>We emailed them the link. It works once, for that address, until ${time(fresh.expires, { absolute: true })}.</p>`
-              : html`${fresh.delivery.failure
-                  ? html`<p id="invite-email-failed"><strong>The invite is made, but we couldn’t email it.</strong> ${fresh.delivery.failure.what} failed: ${fresh.delivery.failure.why.replace(/\.$/, "")} (where: ${fresh.delivery.failure.where}; ref ${fresh.delivery.failure.ref}).</p>`
-                  : html`<p id="invite-not-emailed">This link wasn’t emailed: ${fresh.delivery.off ?? "no email sender is set up on this server"}.</p>`}
-                <p>Copy this link and send it to them yourself. It works once, only for someone signed in as <strong>${fresh.email}</strong>, until ${time(fresh.expires, { absolute: true })}. It won’t be shown again.</p>
-                <p class="secret">${fresh.link}</p>`}
-          </div>`
+        ? fresh.email && fresh.delivery
+          ? html`<div class="callout ${fresh.delivery.sent || !fresh.delivery.failure ? "success" : "warning"} reveal" role="status" id="invite-link">
+              <p class="callout-title"><strong>Invite for ${fresh.email} (${roleName(fresh.role)})</strong></p>
+              ${fresh.delivery.sent
+                ? html`<p>We emailed them the link. It works once, for that address, until ${time(fresh.expires, { absolute: true })}.</p>`
+                : html`${fresh.delivery.failure
+                    ? html`<p id="invite-email-failed"><strong>The invite is made, but we couldn’t email it.</strong> ${fresh.delivery.failure.what} failed: ${fresh.delivery.failure.why.replace(/\.$/, "")} (where: ${fresh.delivery.failure.where}; ref ${fresh.delivery.failure.ref}).</p>`
+                    : html`<p id="invite-not-emailed">This link wasn’t emailed: ${fresh.delivery.off ?? "no email sender is set up on this server"}.</p>`}
+                  <p>Copy this link and send it to them yourself. It works once, only for someone signed in as <strong>${fresh.email}</strong>, until ${time(fresh.expires, { absolute: true })}. It won’t be shown again.</p>
+                  <p class="secret">${fresh.link}</p>`}
+            </div>`
+          : html`<div class="callout success reveal" role="status" id="invite-link">
+              <p class="callout-title"><strong>Link for anyone (${roleName(fresh.role)})</strong></p>
+              <p>Copy this link and send it to whoever you’re inviting. Anyone who opens it can join ${
+                fresh.maxUses === 1 ? "once" : `up to ${fresh.maxUses} times, one join per person`
+              }, until ${time(fresh.expires, { absolute: true })}. It won’t be shown again.</p>
+              <p class="secret">${fresh.link}</p>
+            </div>`
         : ""}
       ${noRoom && u ? peopleFullNote(u, v.name) : ""}
       ${owner && owners === 1 && members.length > 1
@@ -178,9 +194,9 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
           <h2>Pending invites</h2>
           ${invites.length
             ? html`<div class="table-wrap"><table class="table-stack token-list invite-list">
-                <thead><tr><th>Email</th><th>Role</th><th>Sent</th><th>Expires</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                <thead><tr><th>Who</th><th>Role</th><th>Sent</th><th>Expires</th><th><span class="sr-only">Actions</span></th></tr></thead>
                 <tbody>${invites.map(
-                  (i) => html`<tr><td>${i.email}</td><td class="small" data-label="Role">${roleName(i.role)}</td>
+                  (i) => html`<tr><td>${inviteWho(i)}</td><td class="small" data-label="Role">${roleName(i.role)}</td>
                     <td class="small" data-label="Sent">${time(i.created_at)}</td>
                     <td class="small" data-label="Expires">${time(i.expires_at)}</td>
                     <td class="num row-actions"><a class="button danger" href="${membersPath(id, `/invites/${i.id}/revoke`)}">Revoke</a></td></tr>`,
@@ -218,7 +234,8 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
 // Inviting: a page of its own, reached from the Members tab's header. A
 // full vault gets the reason and the way to make room instead of the form.
 
-type InviteDraft = { error?: string; email?: string; role?: string };
+const MAX_USES_CAP = 100;
+type InviteDraft = { error?: string; email?: string; role?: string; maxUses?: string };
 
 async function invitePage(ctx: Ctx, id: string, d: InviteDraft = {}): Promise<Reply> {
   return shell(
@@ -229,7 +246,7 @@ async function invitePage(ctx: Ctx, id: string, d: InviteDraft = {}): Promise<Re
       const head = html`${pageHeader({
         crumb: membersCrumb(id, v, "Invite someone"),
         title: "Invite someone",
-        description: `A link that lets one person join ${v.name}, with the role you choose.`,
+        description: `A link to join ${v.name}, with the role you choose.`,
       })}${d.error ? callout("danger", d.error) : ""}`;
       if (v.role !== "owner") return html`${head}${d.error ? "" : callout("info", "Only owners invite people.")}`;
       const u = await usageOf(c, id);
@@ -242,15 +259,18 @@ async function invitePage(ctx: Ctx, id: string, d: InviteDraft = {}): Promise<Re
         <form method="post" action="${membersPath(id, "/invite")}" class="panel choice-form invite-form">
           ${csrfField(ctx.csrf)}
           <label for="ie">Email</label>
-          <input id="ie" type="text" name="email" value="${d.email ?? ""}" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="254" required aria-describedby="ie-hint">
-          <p class="hint" id="ie-hint">They sign in with this address (a new account is made if they have none).</p>
+          <input id="ie" type="text" name="email" value="${d.email ?? ""}" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="254" aria-describedby="ie-hint">
+          <p class="hint" id="ie-hint">One person, at this address (a new account is made if they have none). Leave it blank to make a link anyone can open instead.</p>
+          <label for="iu">Uses (a link with no address only)</label>
+          <input id="iu" type="number" name="max_uses" value="${d.maxUses ?? "1"}" min="1" max="${MAX_USES_CAP}" inputmode="numeric" aria-describedby="iu-hint">
+          <p class="hint" id="iu-hint">How many different people may join with it. Ignored, and always 1, for an invite to one address.</p>
           <fieldset>
             <legend>Role</legend>
             ${ROLES.map(
               (r) => html`<label class="choice"><input type="radio" name="role" value="${r}"${r === role ? raw(" checked") : ""}> <span>${ROLE_TEXT[r]}</span></label>`,
             )}
           </fieldset>
-          <p class="hint">${mailerOn() ? "We’ll email them a link, and show it to you if the email can’t be sent." : "You’ll get a link to send them."} It works once, for that address only, for 7 days.${
+          <p class="hint">${mailerOn() ? "We’ll email them a link, and show it to you if the email can’t be sent." : "You’ll get a link to send them."} With no address, you get the link to send yourself instead. It lasts 7 days.${
             u && peopleLimited(u) ? ` ${v.name} has ${placesText(u)}.` : ""
           }</p>
           <div class="actions"><button class="primary">Create invite link</button><a class="button quiet" href="${membersPath(id)}">Cancel</a></div>
@@ -261,27 +281,35 @@ async function invitePage(ctx: Ctx, id: string, d: InviteDraft = {}): Promise<Re
 }
 
 async function createInvite(ctx: Ctx, id: string): Promise<Reply> {
-  const email = (ctx.form.get("email") ?? "").trim().toLowerCase();
+  const emailInput = (ctx.form.get("email") ?? "").trim().toLowerCase();
+  const email = emailInput === "" ? null : emailInput;
   const role = ctx.form.get("role") ?? "";
-  let made: { token: string; name: string } | null;
+  const maxUsesInput = (ctx.form.get("max_uses") ?? "1").trim();
+  const maxUses = Number.parseInt(maxUsesInput, 10);
+  if (email === null && (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > MAX_USES_CAP)) {
+    return invitePage(ctx, id, { error: `A link's use count is 1 to ${MAX_USES_CAP}.`, email: emailInput, role, maxUses: maxUsesInput });
+  }
+  let made: { token: string; name: string; maxUses: number } | null;
   try {
     made = await asPerson(ctx.userId, async (c) => {
       const v = await vault(c, ctx, id);
       if (!v) return null;
-      const token = (await c.query(`select public.create_invite($1, $2, $3) as t`, [id, email, role])).rows[0].t as string;
-      return { token, name: v.name };
+      const row = (await c.query(`select public.create_invite($1, $2, $3, $4) as t`, [id, email, role, maxUses])).rows[0] as { t: string };
+      return { token: row.t, name: v.name, maxUses: email === null ? maxUses : 1 };
     });
   } catch (err) {
     // Refused: the form again, with what was typed and the reason.
     const e = err as { code?: string; message?: string };
     const error = e.code === "54000" ? `${(e.message ?? "Too many invites").replace(/^./, (s) => s.toUpperCase())}.` : message(err);
-    return invitePage(ctx, id, { error, email, role });
+    return invitePage(ctx, id, { error, email: emailInput, role, maxUses: maxUsesInput });
   }
   if (!made) return notFound(ctx);
   const link = inviteLink(ctx.url.origin, made.token);
   const expires = new Date(Date.now() + 7 * 86400_000);
-  const delivery = await deliverInvite({ to: email, link, token: made.token, vaultName: made.name, role, expiresAt: expires }, publicSiteOrigin(new URL(link).origin));
-  return membersPage(ctx, id, { email, role, link, delivery, expires });
+  const delivery = email
+    ? await deliverInvite({ to: email, link, token: made.token, vaultName: made.name, role, expiresAt: expires }, publicSiteOrigin(new URL(link).origin))
+    : undefined;
+  return membersPage(ctx, id, { email, role, maxUses: made.maxUses, link, delivery, expires });
 }
 
 // ---------------------------------------------------------------------------
@@ -351,21 +379,26 @@ async function revokeInvitePage(ctx: Ctx, id: string, iid: string): Promise<Repl
     if (v.role !== "owner") {
       return html`${pageHeader({ crumb: membersCrumb(id, v, "Revoke invite"), title: "Revoke invite" })}${callout("info", "Only owners revoke invites.")}`;
     }
-    const i = (await c.query(`select id, email, role, created_at, expires_at from public.list_invites($1) where id = $2`, [id, iid]))
+    const i = (await c.query(`select id, email, role, created_at, expires_at, max_uses, uses_count from public.list_invites($1) where id = $2`, [id, iid]))
       .rows[0] as Invite | undefined;
     if (!i) return null;
+    const who = inviteWho(i);
     return confirmPage({
-      title: `Revoke the invite for ${i.email}`,
+      title: `Revoke the invite for ${who}`,
       crumb: membersCrumb(id, v, "Revoke invite"),
-      lede: html`The link for <strong>${i.email}</strong> (${roleName(i.role)}) stops working at once, so they can’t join ${v.name} with it.`,
+      lede: html`The link for <strong>${who}</strong> (${roleName(i.role)}) stops working at once, so it can’t be used to join ${v.name} again.`,
       consequences: [
-        "Nobody has joined with it yet, so nobody loses access.",
+        i.uses_count > 0
+          ? `Already joined with it: nobody loses access. Only the ${
+              i.max_uses - i.uses_count === 1 ? "one use" : `${i.max_uses - i.uses_count} uses`
+            } left stop working.`
+          : "Nobody has joined with it yet, so nobody loses access.",
         "Its place is free again for another invite.",
-        "To invite them later, make a new invite: it has a new link.",
+        "To invite again later, make a new invite: it has a new link.",
       ],
       action: membersPath(id, `/invites/${i.id}/revoke`),
       csrf: ctx.csrf,
-      button: `Revoke invite for ${i.email}`,
+      button: `Revoke invite for ${who}`,
       cancel: membersPath(id),
     });
   });

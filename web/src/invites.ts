@@ -81,7 +81,9 @@ export type Peek = {
   vaultId: string;
   vaultName: string;
   role: string;
-  email: string;
+  email: string | null; // null: an open link, good for anyone who holds it
+  maxUses: number;
+  usesCount: number;
   expiresAt: Date;
 };
 
@@ -91,13 +93,19 @@ export type Peek = {
 export async function peekInvite(token: string): Promise<Peek | undefined> {
   if (!INVITE_TOKEN.test(token)) return undefined;
   const { rows } = await pool.query(
-    "select state, vault_id, vault_name, role, email, expires_at from private.invite_peek($1)",
+    "select state, vault_id, vault_name, role, email, expires_at, max_uses, uses_count from private.invite_peek($1)",
     [token],
   );
   const r = rows[0];
   if (!r) return undefined;
-  return { state: r.state, vaultId: r.vault_id, vaultName: r.vault_name, role: r.role, email: r.email, expiresAt: r.expires_at };
+  return {
+    state: r.state, vaultId: r.vault_id, vaultName: r.vault_name, role: r.role, email: r.email,
+    maxUses: r.max_uses, usesCount: r.uses_count, expiresAt: r.expires_at,
+  };
 }
+
+// Uses left on a link: 1, always, for an address-bound invite.
+export const usesLeft = (p: Peek): number => p.maxUses - p.usesCount;
 
 // The token of an invite page URL (`/invite?token=...`), for the sign-in
 // page's `next`.
@@ -150,18 +158,23 @@ export function invitePageBody(ctx: Ctx, token: string, p: Peek | undefined, me:
     return html`${head(`Invite to ${p.vaultName}`)}<p class="lede">${why} Ask the person who invited you for a new one.</p>
       <p><a href="/">Your vaults</a></p>`;
   }
-  const mine = me !== null && me === p.email;
+  // An open link (no address) is anyone's to take, whoever they're signed
+  // in as; an address-bound invite is only its address's.
+  const mine = p.email === null || (me !== null && me === p.email);
+  const left = usesLeft(p);
   return html`${head(`Join ${p.vaultName}`)}
     ${error ? html`<p class="callout danger" role="alert">${error}</p>` : ""}
     <p class="lede">You’ve been invited to <strong>${p.vaultName}</strong> as ${p.role === "owner" ? "an" : "a"} <strong>${roleName(p.role)}</strong>.</p>
-    <p>${ROLE_TEXT[p.role]}. The invite is valid until ${when(p.expiresAt)}.</p>
+    <p>${ROLE_TEXT[p.role]}. The invite is valid until ${when(p.expiresAt)}${
+      p.maxUses > 1 ? html` and can still be used ${left} more time${left === 1 ? "" : "s"}` : ""
+    }.</p>
     ${mine
       ? html`<form method="post" action="/invite" class="actions">
           ${csrfField(ctx.csrf)}<input type="hidden" name="token" value="${token}">
           <button class="primary">Join ${p.vaultName}</button><a class="button quiet" href="/">Not now</a>
         </form>`
       : html`<div class="callout attention" role="alert">
-          <p>This invite is for <strong>${maskEmail(p.email)}</strong>, and you’re signed in as <strong>${me ?? "an account with no email"}</strong>.</p>
+          <p>This invite is for <strong>${maskEmail(p.email as string)}</strong>, and you’re signed in as <strong>${me ?? "an account with no email"}</strong>.</p>
           ${authMode() === "supabase"
             ? html`<p>Sign out, then open the invite link again and sign in with the address it was sent to.</p>
               <form method="post" action="/signout">${csrfField(ctx.csrf)}<button class="quiet">Sign out</button></form>`

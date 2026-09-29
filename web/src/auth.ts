@@ -508,12 +508,13 @@ export type SigninResult = { ok: true; cookies: string[]; newAccount: boolean } 
 // whether the address has an account: any 4xx (no such user, signups off,
 // rate limited) is the same as success. Only an outage is reported.
 //
-// createUser: only for the address a live invite was sent to (signin.ts
-// checks that with the database first). Supabase then makes the account if
-// there is none, provided the project allows sign-ups; if it doesn't,
-// `signupsOff` says so, so the invitee gets a clear answer. That tells the
-// holder of the invite link whether its address has an account, and nobody
-// else anything.
+// createUser: only while a live invite backs the address (signin.ts checks
+// that with the database first) — either it was sent to this exact
+// address, or it's an open link (no address), good for whichever one is
+// entered. Supabase then makes the account if there is none, provided the
+// project allows sign-ups; if it doesn't, `signupsOff` says so, so the
+// invitee gets a clear answer. That tells the holder of the invite link
+// whether its address has an account, and nobody else anything.
 export async function sendSigninEmail(email: string, createUser = false): Promise<{ unavailable: boolean; signupsOff?: boolean }> {
   try {
     const r = await gotrue("/otp", { email, create_user: createUser });
