@@ -8,6 +8,7 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.13.0](https://github.com/andersthemagi/reliquary/compare/v0.12.0...v0.13.0) (2026-09-29)
 
+An owner can now make an invite link for anyone to use, up to a set number of joins, instead of one for a single known address. A gap in feedback's NUL-byte check is closed too.
 
 ### Features
 
