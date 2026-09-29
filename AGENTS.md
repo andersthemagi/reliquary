@@ -423,6 +423,24 @@ it there.
     `BREAKING CHANGE: <what to do>` footer;
   - commits touching `cli/` go to the CLI's own release (`cli/CHANGELOG.md`,
     tags `cli-vX.Y.Z`).
+  - **squash-merge a single-commit PR**, or give a multi-commit PR's merge
+    a title that isn't itself a valid `type(scope): subject` line. A plain
+    merge commit's body echoes the PR title as its second line
+    (`20260929`, PRs #23/#25/#26); when that title exactly repeats the
+    branch's one commit, release-please counts it twice. A descriptive,
+    non-conventional-commit-shaped title (as past multi-commit PRs used)
+    is silently skipped instead, the way it's meant to be.
+  - **before merging a release PR, read its `CHANGELOG.md` as a person
+    who wasn't in the room would.** release-please only ever emits the
+    raw commit subject per entry; dedupe anything doubled (see above),
+    and add a one- or two-sentence plain-language summary above the
+    bullets for that version. This is the *pending* section (nothing
+    below it is released yet), so it's not the "never edit a released
+    entry" rule below: edit the file directly on the release PR's branch
+    and push, then `gh api repos/:owner/:repo/pulls/:n -X PATCH -f
+    body=...` to update the PR's own description to match (`gh pr edit`
+    fails on this repo with an unrelated Projects-classic GraphQL error;
+    the REST API doesn't hit it).
 - **0.x is pre-alpha.** Any release may change or remove anything; while
   below 1.0 a breaking change bumps the minor, not the major, and GitHub
   Releases are marked prereleases. 1.0 is a deliberate owner decision (a
