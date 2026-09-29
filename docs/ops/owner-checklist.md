@@ -55,12 +55,17 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
 
 ## Decide
 
-5. **CLI licence** (`cli/package.json` says `UNLICENSED`, which makes a
-   public package unusable), then publish: create the `@reliquary-ai` npm
-   scope, add the `NPM_TOKEN` secret, then Actions > publish-cli > Run
-   workflow from tag `cli-v0.1.0` (cut with v0.1.0). Later CLI versions
-   publish when their "Release cli vX.Y.Z" pull request is merged. If the repo
-   stays private, drop provenance (see `cli/README.md`).
+5. **Publish the CLI**: the licence is decided (MIT, `236c7db`,
+   2026-09-25), the package is publish-ready (`npm pack --dry-run` from
+   `cli/` is clean) and three `cli-vX.Y.Z` tags already exist
+   (0.1.0-0.3.0), each with a `publish-cli` run that skipped for want of
+   the token. What's left: create the `@reliquary-ai` npm organisation,
+   mint a granular access token scoped to it, add it as the `NPM_TOKEN`
+   repository secret, then Actions > publish-cli > Run workflow from tag
+   `cli-v0.3.0` (the current version; earlier tags are superseded, not
+   worth publishing separately). Later versions publish on their own when
+   their "Release cli vX.Y.Z" pull request is merged. If the repo stays
+   private, npm provenance stays off (see `cli/README.md`).
 6. **Pricing**: keep "free for 1 to 10 people" or adopt
    `docs/research/positioning.md` section 5. The landing page reads its
    numbers from `PRICING` in `web/src/site.ts`.
