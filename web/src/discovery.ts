@@ -39,11 +39,8 @@
 // loopback, exactly like CIMD_ALLOW_LOOPBACK (cimd.ts); refused when VERCEL
 // or SELF_HOSTED is set.
 
-import dns from "node:dns";
-import http from "node:http";
-import https from "node:https";
-import net from "node:net";
-import { addressAllowed, isLoopbackHost } from "./netsafety.js";
+import type http from "node:http";
+import { isLoopbackHost, safeFetch, type Resolved } from "./netsafety.js";
 import { BUILD } from "./version.js";
 
 export class DiscoveryError extends Error {}
@@ -62,7 +59,6 @@ export const discoveryAllowsLoopback = (): boolean => ALLOW_LOOPBACK;
 
 export type DiscoveredTool = { name: string; isWrite: boolean; description: string | null };
 
-type Resolved = { address: string; family: number };
 export type DiscoveryOptions = {
   allowLoopback?: boolean;
   timeoutMs?: number;
@@ -75,108 +71,55 @@ const MAX_TOOLS = 500;
 const MAX_PAGES = 20;
 const PROTOCOL_VERSION = "2025-06-18";
 
-const systemResolve = async (host: string): Promise<Resolved[]> =>
-  (await dns.promises.lookup(host, { all: true, verbatim: true })).map((a) => ({ address: a.address, family: a.family }));
-
 type RawResponse = { status: number; headers: http.IncomingHttpHeaders; body: string };
 
-// One safe POST: address-checked exactly like cimd.ts's client metadata
-// fetch (a custom DNS `lookup` Node calls for every connection by name, so
-// the address checked is the address connected to), no redirects followed,
-// response capped and timed out.
+// The request mechanism itself (the DNS-rebinding re-check, redirect
+// refusal, timeout and size-cap bookkeeping) is netsafety.ts's safeFetch,
+// shared with cimd.ts's get(). What's left here is what's actually specific
+// to a link's MCP call: it's a POST with a JSON-RPC body, and its response
+// is read in full whatever its status or content type turns out to be
+// (200 vs. a notification's 202; JSON vs. SSE) -- call() and parseJsonRpc()
+// below decide what that means, not the fetch itself.
 function post(
   u: URL,
   body: string,
   headers: Record<string, string>,
   opts: Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve">,
 ): Promise<RawResponse> {
-  const resolve = opts.resolve ?? systemResolve;
-  const bare = u.hostname.replace(/^\[|\]$/g, "");
-  if (net.isIP(bare) && !addressAllowed(bare, opts.allowLoopback)) {
-    return Promise.reject(new DiscoveryError("This link’s address isn’t public."));
-  }
-  const lookup = (
-    hostname: string,
-    lookupOpts: dns.LookupOptions,
-    cb: (err: Error | null, address: string | dns.LookupAddress[], family?: number) => void,
-  ) => {
-    resolve(hostname).then(
-      (addrs) => {
-        if (addrs.length === 0) return cb(new DiscoveryError("This link’s address can’t be found."), "");
-        if (!addrs.every((a) => addressAllowed(a.address, opts.allowLoopback))) {
-          return cb(new DiscoveryError("This link’s address isn’t public."), "");
-        }
-        const wanted = lookupOpts.family === 6 || lookupOpts.family === 4 ? addrs.filter((a) => a.family === lookupOpts.family) : addrs;
-        if (wanted.length === 0) return cb(new DiscoveryError("This link’s address can’t be found."), "");
-        if (lookupOpts.all) cb(null, wanted.map((a) => ({ address: a.address, family: a.family })));
-        else cb(null, wanted[0].address, wanted[0].family);
-      },
-      () => cb(new DiscoveryError("This link’s address can’t be found."), ""),
-    );
-  };
-
-  return new Promise((resolvePromise, reject) => {
-    let settled = false;
-    const done = (err: Error | null, res?: RawResponse) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (err) reject(err instanceof DiscoveryError ? err : new DiscoveryError("This link’s server couldn’t be reached."));
-      else resolvePromise(res!);
-    };
-    // Tests only: a link's url is always https (create_link/update_link's own
-    // check, no test bypass there), but a loopback fixture needs no real
-    // certificate, so with the same allowLoopback that opened the address
-    // above, a loopback target is still spoken to over plain HTTP. Refused
-    // in anything but a test the same way allowLoopback itself is
-    // (LINK_DISCOVERY_ALLOW_LOOPBACK, refused with VERCEL or SELF_HOSTED).
-    const plainLoopback = opts.allowLoopback && isLoopbackHost(u.hostname);
-    const useHttp = u.protocol === "https:" && plainLoopback;
-    const mod = useHttp ? http : u.protocol === "https:" ? https : http;
-    // node:http's own request() refuses a URL whose protocol isn't "http:"
-    // (ERR_INVALID_PROTOCOL), so the plain-http case needs its own URL with
-    // the scheme rewritten; everything else about it (host, port, path) is
-    // untouched.
-    const reqUrl = useHttp ? new URL(u.href.replace(/^https:/, "http:")) : u;
-    const req = mod.request(
-      reqUrl,
-      {
-        method: "POST",
-        agent: false, // a fresh connection: never reuse a socket to another address
-        lookup: lookup as unknown as net.LookupFunction,
-        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "content-length": Buffer.byteLength(body), ...headers },
-      },
-      (res) => {
-        const status = res.statusCode ?? 0;
-        if (status >= 300 && status < 400) {
-          res.resume();
-          return done(new DiscoveryError("This link’s server redirected; redirects aren’t followed."));
-        }
-        const declared = Number(res.headers["content-length"] ?? 0);
-        if (declared > MAX_BYTES) {
-          res.destroy();
-          return done(new DiscoveryError("This link’s server sent too large a response."));
-        }
-        const chunks: Buffer[] = [];
-        let size = 0;
-        res.on("data", (c: Buffer) => {
-          size += c.length;
-          if (size > MAX_BYTES) {
-            res.destroy();
-            done(new DiscoveryError("This link’s server sent too large a response."));
-          } else chunks.push(c);
-        });
-        res.on("end", () => done(null, { status, headers: res.headers, body: Buffer.concat(chunks).toString("utf8") }));
-        res.on("error", (e) => done(e));
-      },
-    );
-    const timer = setTimeout(() => {
-      req.destroy();
-      done(new DiscoveryError("This link’s server took too long to respond."));
-    }, opts.timeoutMs);
-    req.on("error", (e) => done(e));
-    req.write(body);
-    req.end();
+  // Tests only: a link's url is always https (create_link/update_link's own
+  // check, no test bypass there), but a loopback fixture needs no real
+  // certificate, so with the same allowLoopback that safeFetch checks the
+  // address with, a loopback target is still spoken to over plain HTTP.
+  // Refused in anything but a test the same way allowLoopback itself is
+  // (LINK_DISCOVERY_ALLOW_LOOPBACK, refused with VERCEL or SELF_HOSTED).
+  const plainLoopback = opts.allowLoopback && isLoopbackHost(u.hostname);
+  const useHttp = u.protocol === "https:" && plainLoopback;
+  // node:http's own request() refuses a URL whose protocol isn't "http:"
+  // (ERR_INVALID_PROTOCOL), so the plain-http case needs its own URL with
+  // the scheme rewritten; everything else about it (host, port, path) is
+  // untouched.
+  const reqUrl = useHttp ? new URL(u.href.replace(/^https:/, "http:")) : u;
+  return safeFetch(reqUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "content-length": Buffer.byteLength(body), ...headers },
+    body,
+    allowLoopback: opts.allowLoopback,
+    timeoutMs: opts.timeoutMs,
+    maxBytes: MAX_BYTES,
+    resolve: opts.resolve,
+    errorClass: DiscoveryError,
+    messages: {
+      addressNotFound: "This link’s address can’t be found.",
+      addressNotPublic: "This link’s address isn’t public.",
+      redirected: "This link’s server redirected; redirects aren’t followed.",
+      tooLarge: "This link’s server sent too large a response.",
+      timedOut: "This link’s server took too long to respond.",
+      requestFailed: "This link’s server couldn’t be reached.",
+    },
+    // No onHeaders: unlike cimd.ts's get(), a response is read in full
+    // whatever its status or content type is -- call() and parseJsonRpc()
+    // below need the raw status (200 vs. 202) and either a JSON or an SSE
+    // body to interpret it correctly.
   });
 }
 
