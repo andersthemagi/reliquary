@@ -71,13 +71,6 @@ for what's shipped and what's next.
   Research that informed v3, not the product.
 - `pilot/`: a Telegram bot on the gate. Research, not the product.
 
-## Lineage
-
-v3 of the CommonThread prototype (`andersthemagi/commonthread-project-brain`,
-built 2026-09-23 through Stripe Projects). The prototype proved the
-propose/approve/log loop over MCP. v2 (commit `4b11c25`) mixed Andrés's
-personal routine infrastructure with the product; v3 separates them.
-
 ## Stack
 
 Supabase (Postgres with RLS, Auth, Vault, `pg_cron`, `pgmq`, `pg_net`, Edge
