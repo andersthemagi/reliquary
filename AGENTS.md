@@ -100,6 +100,11 @@ Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-st
   ./mcp/test.sh` and commit the snapshot with a `Changes-behaviour` trailer.
 - New test files seed their own data or use unique paths; never depend on
   another file's side effects. Flaky means failing: fix, don't retry.
+- **Before adding, changing, or sweeping tests, run the `test-audit` skill**
+  (`.claude/skills/test-audit/SKILL.md`): its authoring gate and junk-pattern
+  checklist catch low-value or duplicate tests that traceability and the
+  guard above don't — a test that re-proves an access rule SQL already
+  covers, or keeps a test-only export alive for no real caller.
 
 ## Docs
 

@@ -122,3 +122,26 @@ the reviewer reads it next to the diff.
 | MCP contract | `mcp/test/contract.test.mjs`, `mcp/test/contract.snapshot.json` | Mutation-checked: rewording one tool description fails it |
 | Web routes contract | `web/test/routes.test.mjs` | 22 pages and the 404 cases |
 | Gap filled: delete | `supabase/tests/delete_test.sql`, `web/test/delete.test.mjs` | Delete had only negative tests. Mutation-checked: dropping the canon check in `delete_file` fails three tests |
+
+## 5. Junk-pattern auditing (2026-09-29)
+
+The policy above catches missing and drifting tests, not low-value ones.
+Prompted by [openclaw's test-audit
+skill](https://github.com/openclaw/openclaw/blob/main/.agents/skills/test-audit/SKILL.md)
+(Vitest-specific, not directly reusable), added
+[`.claude/skills/test-audit/SKILL.md`](../../.claude/skills/test-audit/SKILL.md):
+an authoring gate (four questions plus a junk-pattern checklist) and an audit
+workflow, reshaped around this repo's own layering — access rules owned by
+SQL, MCP and web proving wiring rather than the rule again — instead of
+inventing a parallel one. AGENTS.md "Testing" points to it.
+
+Considered and rejected: an automated scanner for assertion-free tests (the
+most mechanical junk pattern). A prototype flagging `test()` bodies with no
+`assert.*` call, run against all 105 files and 1213 top-level tests in
+`mcp/test`, `web/test` and `cli/test`, found zero real hits — the 4 flagged
+cases all delegated to a well-named shared assertion helper
+(`createsExactly(...)`, `noValues(...)`), which is the pattern to prefer, not
+junk. Wiring that into `./test.sh` or CI would only produce false-positive
+failures on legitimate shared fixtures. This suite is already disciplined
+enough that the remaining value is judgment, not a grep; the skill stays
+manual rather than gated.
