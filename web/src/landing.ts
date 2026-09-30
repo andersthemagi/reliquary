@@ -69,7 +69,7 @@ const differentiators: Array<[string, string]> = [
 const audiences: Array<[string, string]> = [
   [
     "Agencies and consultancies",
-    "One vault per client: context the whole team's agents read, approvals on anything that becomes fact, credentials used without being pasted, and one log to show the client.",
+    "One vault per client: everyone on your team only sees what they're scoped to, approvals on anything that becomes fact, credentials used without being pasted, and one log to show the client.",
   ],
   [
     "Solo builders",
@@ -77,7 +77,7 @@ const audiences: Array<[string, string]> = [
   ],
   [
     "Small product teams",
-    "Some people use Claude, some ChatGPT, some Cursor. Give them the same reviewed context, and keep keys out of chat messages.",
+    "Some people use Claude, some ChatGPT, some Cursor. Give everyone the same reviewed context, scoped to what they need, and keep keys out of chat messages.",
   ],
 ];
 
@@ -94,18 +94,25 @@ const faq: Array<[string, Raw]> = [
 ];
 
 export function landing(theme: Theme): string {
-  // Headline "The canon for humans and agents." (2026-09-29): the previous
-  // one, "Your agents propose. You approve.", moved to the sub-line right
-  // below it -- still true and concrete, just not the first thing read.
+  // Headline "The canon for humans and agents." (2026-09-29): kept. It's
+  // distinctive and the H1 shouldn't just repeat what "How it works"
+  // explains a few scrolls down. But three independent read-throughs
+  // (synthetic ICP reader-check, 2026-09-30) all misread "canon" as a
+  // wiki/fandom term until several sections in, because the sub-line never
+  // actually named it. Fixed narrowly: the sub-line now says "canon"
+  // itself instead of leaving the reader to connect the two, and "Who it's
+  // for" (previously after "What makes it different") moved up next to the
+  // Problem section, since all three reads recognized themselves in their
+  // own audience card and had to scroll past two sections to reach it.
   const body = html`
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">
     <p class="eyebrow"><span class="logo" aria-hidden="true"></span>Shared context and credentials for AI teams</p>
     <h1 id="hero-title">The canon for humans and agents.</h1>
-    <p class="hero-sub">Your agents propose. You approve.</p>
-    <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use. Claude, ChatGPT, Cursor and Claude Code read the same approved context. Secrets stay out of the chat.</p>
+    <p class="hero-sub">Your agents propose changes to canon. You approve them.</p>
+    <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use: Claude, ChatGPT, Cursor, Claude Code and more. People and agents alike only see what they're scoped to. Secrets stay out of the chat.</p>
     ${cta("Get started")}
-    <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta.</p>
+    <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta: tell us about your team and we'll set up your first vault with you.</p>
     ${preAlphaNote()}
   </div>
   ${proposalCard}
@@ -120,6 +127,15 @@ export function landing(theme: Theme): string {
   </ul>
 </section>
 
+<section class="site-section" aria-labelledby="who-title">
+  <h2 id="who-title">Who it's for</h2>
+  <div class="grid-3">
+    ${audiences.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
+  </div>
+  <p class="not-for"><strong>What Reliquary is not:</strong> an AI model or chatbot, search over your Drive and Slack, or a memory that writes itself.</p>
+  <p class="muted small">Works with Claude, Claude Code, ChatGPT, Cursor and any MCP client. For client work, invites, credential requests and client guests are coming.</p>
+</section>
+
 <section class="site-section" id="how" aria-labelledby="how-title">
   <h2 id="how-title">How it works</h2>
   <ol class="steps">
@@ -132,15 +148,6 @@ export function landing(theme: Theme): string {
   <div class="grid-2">
     ${differentiators.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
   </div>
-</section>
-
-<section class="site-section" aria-labelledby="who-title">
-  <h2 id="who-title">Who it's for</h2>
-  <div class="grid-3">
-    ${audiences.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
-  </div>
-  <p class="not-for"><strong>What Reliquary is not:</strong> an AI model or chatbot, search over your Drive and Slack, or a memory that writes itself.</p>
-  <p class="muted small">Works with Claude, Claude Code, ChatGPT, Cursor and any MCP client. For client work, invites, credential requests and client guests are coming.</p>
 </section>
 
 <section class="site-section trust" aria-labelledby="trust-title">
