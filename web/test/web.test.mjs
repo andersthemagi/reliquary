@@ -186,6 +186,39 @@ test("edit: an open file saves, attributed to me without an agent", async () => 
   assert.match(await page(`${V}/activity`), /notes\/web\.md<\/a><\/td>\s*<td class="small">you<\/td>/);
 });
 
+test("edit: a stale save shows a conflict page with both texts, and saving again from it succeeds", async () => {
+  let token = await csrf(`${V}/new`);
+  await post(`${V}/file`, { csrf: token, action: "create", path: "notes/conflict.md", content: "original", reason: "x" });
+
+  // Two browsers open the editor on the same version.
+  const editPage = await page(`${V}/edit?path=notes%2Fconflict.md`);
+  const version = /name="expected_version" value="([0-9a-f-]{36})"/.exec(editPage)[1];
+  token = /name="csrf" value="([0-9a-f]+)"/.exec(editPage)[1];
+
+  // The first browser saves.
+  const first = await post(`${V}/file`, { csrf: token, action: "write", path: "notes/conflict.md", content: "from A", expected_version: version });
+  assert.equal(first.status, 303);
+
+  // The second, still holding the version it loaded, saves next: refused,
+  // and nothing it typed is lost.
+  const second = await post(`${V}/file`, { csrf: token, action: "write", path: "notes/conflict.md", content: "from B", expected_version: version });
+  assert.equal(second.status, 200);
+  const conflict = await text(second);
+  assert.match(conflict, /Someone saved conflict\.md first/);
+  assert.match(conflict, /saved a new version of this file/);
+  assert.match(conflict, /<div class="file">from A<\/div>/);
+  assert.match(conflict, /<textarea id="content" name="content">from B<\/textarea>/);
+  assert.match(await page(`${V}/file?path=notes%2Fconflict.md&tab=source`), /from A/);
+
+  // Saving again from the conflict page carries the now-current version, so
+  // it succeeds.
+  const newVersion = /name="expected_version" value="([0-9a-f-]{36})"/.exec(conflict)[1];
+  const conflictCsrf = /name="csrf" value="([0-9a-f]+)"/.exec(conflict)[1];
+  const again = await post(`${V}/file`, { csrf: conflictCsrf, action: "write", path: "notes/conflict.md", content: "from B", expected_version: newVersion });
+  assert.equal(again.status, 303);
+  assert.match(await page(`${V}/file?path=notes%2Fconflict.md&tab=source`), /from B/);
+});
+
 test("create under canon becomes a proposal and opens it", async () => {
   const token = await csrf(`${V}/new`);
   const r = await post(`${V}/file`, { csrf: token, action: "create", path: "canon/new.md", content: "x", reason: "new canon file" });

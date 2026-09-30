@@ -443,7 +443,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
     if (!v || !canWrite(v)) return null;
     const f = (
       await c.query(
-        `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.body
+        `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, fv.body
            from public.files f join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
         [id, path],
@@ -453,7 +453,12 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
     const canon = f.policy === "canon";
     // No delete here: it lives in the file page's More menu, behind a
     // confirm page, away from Save. On canon the required "Why" comes before
-    // the text, so it's on screen with the header's button.
+    // the text, so it's on screen with the header's button. expected_version
+    // is the version the form loaded: an open file's Save compares it
+    // against the current one (public.write_file), so a save from a stale
+    // copy is refused instead of silently overwriting someone else's edit
+    // (a proposal's staleness already goes through base_version_id, so
+    // canon carries no expected_version here).
     const body = html`
       ${pageHeader({
         crumb: crumbs(id, v, path, false, canon ? "Propose a change" : "Edit"),
@@ -467,6 +472,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="path" value="${path}">
         <input type="hidden" name="action" value="${canon ? "propose" : "write"}">
+        ${canon ? "" : html`<input type="hidden" name="expected_version" value="${f.version}">`}
         ${canon ? html`<label for="r">Why this change</label>
           <p class="hint" id="r-hint">Reviewers see this after the diff.</p>
           <input id="r" type="text" name="reason" required aria-describedby="r-hint">` : ""}
@@ -523,12 +529,56 @@ export async function newFile(ctx: Ctx, id: string): Promise<Reply> {
   return render(ctx, "New file", data.shell, "vaults");
 }
 
+// A stale save (public.write_file's RLF01): the file's current text and who
+// saved it, next to the edit the person just tried to make, still in an
+// editable box with the current version so Save tries again from there.
+// Nothing typed is lost; nothing is written until they choose to.
+async function conflictReply(ctx: Ctx, id: string, path: string, typed: string): Promise<Reply> {
+  const data = await asPerson(ctx.userId, async (c) => {
+    const v = await vault(c, ctx, id);
+    if (!v || !canWrite(v)) return null;
+    const cur = (
+      await c.query(
+        `select fv.id as version, fv.body, fv.author, fv.agent, f.updated_at
+           from public.files f join public.file_versions fv on fv.id = f.current_version_id
+          where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
+        [id, path],
+      )
+    ).rows[0];
+    if (!cur) return null;
+    const body = html`
+      ${pageHeader({ crumb: crumbs(id, v, path, false, "Edit"), title: `Someone saved ${path.split("/").pop()} first`, path: true })}
+      ${callout(
+        "warning",
+        html`${who(ctx, cur.author, cur.agent)} saved a new version of this file at ${time(cur.updated_at)}, while you were editing. Your edit hasn't been saved: it's still in the box below, unchanged. Compare it with the current version, then save again to save yours over it.`,
+      )}
+      <section class="panel" aria-label="Current version">
+        <h2 class="pane-label">Current version, by ${who(ctx, cur.author, cur.agent)}</h2>
+        <div class="file">${cur.body}</div>
+      </section>
+      <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="edit-file">
+        ${csrfField(ctx.csrf)}
+        <input type="hidden" name="path" value="${path}">
+        <input type="hidden" name="action" value="write">
+        <input type="hidden" name="expected_version" value="${cur.version}">
+        <label for="content">Your edit, not yet saved</label>
+        <textarea id="content" name="content">${typed}</textarea>
+        <div class="actions"><button class="primary">Save over the current version</button>
+          <a class="button quiet" href="${filePath(id, path)}">Discard your edit</a></div>
+      </form>`;
+    return { shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
+  });
+  if (!data) return notFound(ctx);
+  return render(ctx, `Conflict editing ${path}`, data.shell, "vaults");
+}
+
 export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
   const f = ctx.form;
   const path = (f.get("path") ?? "").trim();
   const content = (f.get("content") ?? "").replaceAll("\r\n", "\n");
   const reason = f.get("reason") ?? "";
   const action = f.get("action") ?? "";
+  const expectedVersion = f.get("expected_version") || null;
   if (!["create", "write", "delete", "propose", "propose-delete"].includes(action)) {
     const f = failure({ status: 400, where: "web app (the file form)", why: "The form named no action (create, write, delete, propose or propose-delete), so nothing was changed." });
     // No signed-in frame: it names the person, a lookup this refusal
@@ -554,7 +604,7 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
         return r.pid ? ({ kind: "proposed", pid: r.pid as string } as const) : ({ kind: "write" } as const);
       }
       if (action === "write") {
-        await c.query(`select public.write_file(v.id, $2, $3) from ${V}`, [id, path, content]);
+        await c.query(`select public.write_file(v.id, $2, $3, $4) from ${V}`, [id, path, content, expectedVersion]);
         return { kind: "write" } as const;
       }
       if (action === "delete") {
@@ -578,6 +628,7 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
     return { redirect: filePath(id, path) };
   } catch (err) {
     if ((err as { code?: string }).code === "RLV01") return notFound(ctx);
+    if ((err as { code?: string }).code === "RLF01" && action === "write") return conflictReply(ctx, id, path, content);
     ctx.setFlash(message(err));
     return { redirect: path ? filePath(id, path) : vaultPath(id) };
   }
