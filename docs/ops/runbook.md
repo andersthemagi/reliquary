@@ -63,13 +63,20 @@ OAuth issuer: every connector and the CLI signs in again once. Changing only
   until the variable was set and the workflow re-run. See "Deploy" below:
   the deploy workflow now rolls production back automatically when the
   smoke checks that would have caught this fail right after a deploy.
-- **Squash-merge a single-commit PR, or give a multi-commit PR's merge a
-  title that isn't itself a valid `type(scope): subject` line.** A plain
-  merge commit's body echoes the PR title as its second line (`20260929`,
-  PRs #23/#25/#26); when that title exactly repeats the branch's one
-  commit, release-please counts it twice. A descriptive,
-  non-conventional-commit-shaped title (as past multi-commit PRs used) is
-  silently skipped instead, the way it's meant to be.
+- **(Superseded 2026-09-30, kept for the history.)** Squash-merge a
+  single-commit PR, or give a multi-commit PR's merge a title that isn't
+  itself a valid `type(scope): subject` line. A plain merge commit's body
+  echoes the PR title as its second line (`20260929`, PRs #23/#25/#26);
+  when that title exactly repeats the branch's one commit, release-please
+  counts it twice. A descriptive, non-conventional-commit-shaped title (as
+  past multi-commit PRs used) is silently skipped instead, the way it's
+  meant to be. This asked every contributor to know an unwritten
+  GitHub-merge-title rule to avoid a silent changelog bug, and it had
+  already caused it once by the time it was noticed. Replaced by: merge
+  commits and rebase merges are now disabled at the repo level, every PR
+  squash-merges with the PR title as the commit subject, and a CI check
+  (`.github/workflows/pr-title.yml`) lints that title before merge is even
+  possible. See `AGENTS.md`'s Conventions section.
 - **Before merging a release PR, read its `CHANGELOG.md` as a person who
   wasn't in the room would.** release-please only ever emits the raw
   commit subject per entry; dedupe anything doubled (see above), and add a

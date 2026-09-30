@@ -1,0 +1,49 @@
+# Every PR is squash-merged with the PR title as the squash commit's
+# subject (merge commits and rebase merges are disabled at the repo level),
+# so the title, not any individual commit inside the PR, is the one
+# conventional-commit line release-please ever sees. This lints it on open
+# and on every edit, instead of finding out at merge time.
+#
+# Types match release-please-config.json's changelog-sections (the ones
+# release-please would otherwise silently drop into "Miscellaneous" or, for
+# an unrecognised type, refuse to parse). AGENTS.md's Conventions section
+# has the full policy and the incident this replaced
+# (docs/ops/runbook.md, "Rules that came from incidents").
+name: pr-title
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: read
+  statuses: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            security
+            perf
+            revert
+            docs
+            refactor
+            style
+            test
+            build
+            ci
+            chore
+          requireScope: false
+          # "feat!:" / "fix(web)!:" — a breaking change footer alone isn't
+          # visible in a title, so the ! is how release-please (and this
+          # check) can tell from the subject line alone.
+          wip: false
+          validateSingleCommit: false
