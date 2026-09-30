@@ -35,7 +35,7 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
 const steps: Array<[string, Raw]> = [
   [
     "Connect any AI tool with one URL",
-    html`Paste Reliquary's MCP URL into Claude, ChatGPT or Claude Code and sign in. Other MCP clients use a scoped, expiring token you can revoke.`,
+    html`Paste Reliquary's MCP (Model Context Protocol) URL into Claude, ChatGPT or Claude Code and sign in. Other MCP clients use a scoped, expiring token you can revoke.`,
   ],
   [
     "Agents read and propose",
