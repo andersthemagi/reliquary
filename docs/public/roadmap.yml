@@ -229,6 +229,11 @@
   status: in-progress
   docs: concepts/flags
 
+- title: Compare-and-swap writes
+  summary: A write or delete against a stale version refuses instead of overwriting someone else's edit. The web editor does this automatically; agents pass expected_version.
+  status: shipped
+  docs: concepts/vaults-and-files
+
 # Planned ------------------------------------------------------------------
 
 - title: Publish the CLI to npm

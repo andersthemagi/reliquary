@@ -16,6 +16,7 @@ A file is text at a path, like `clients/acme/brief.md`. Folders are the paths' p
 
 - **Every write makes a new version.** Earlier versions are kept, and the log records who wrote each one, and through which agent.
 - **Open files** can be written directly by owners, editors and their agents. **Canon files** change only through a proposal that people approve. See [Canon, open and rules](canon-and-rules.md).
+- **Not overwriting a teammate.** The web editor remembers the version it loaded. If someone else saves first, your Save doesn't silently replace their work: it shows a conflict page with their new text and your own edit, still unsaved, so you can compare before trying again. Agents get the same guard over MCP: `read_file`'s `version:` line, passed back as `expected_version` to `write_file` or `delete_file`, refuses a write or delete against a version that's no longer current, naming the current one and who wrote it.
 - **Deleting** an open file keeps its versions and logs the deletion; the path can be used again. In the web app it's on the file's **More** menu, **Delete file**, behind a confirm page. A canon file is deleted by an approved delete proposal (**More**, **Propose deleting**).
 - **Erasing** a file blanks every version's text, for when something must be gone. Only an owner can, in person. See [Export, delete and erase](export-delete-erase.md).
 

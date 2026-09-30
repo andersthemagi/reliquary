@@ -310,16 +310,31 @@ and no agent is handed a step before its blockers are done, all as
 database predicates that don't depend on an agent behaving. Three gated
 phases, each its own set of small pull requests:
 
-- **Phase 1: compare-and-swap writes.** Starts now. `read_file` returns a
-  file's current version id; `write_file` and `delete_file` take an
-  optional expected version and refuse a stale one, naming the current
-  version and its last writer.
+- **Phase 1: compare-and-swap writes.** Built, 2026-09-30:
+  `read_file` returns a file's current version in a `version:` line
+  outside the quoted text (`mcp/src/tools-shared.ts`, `vaultfiles-tools.ts`);
+  `write_file` and `delete_file` take an optional `expected_version`
+  (SQL: `20260930100000_compare_and_swap.sql`, dropping and re-creating
+  both functions; the file's row is locked before its version is
+  compared, in `20260925240100_lock_order.sql`'s order) and refuse a
+  stale one with SQLSTATE `RLF01` (not `40001`, so a driver never
+  auto-retries it), naming the current version and its last writer;
+  the same two tools take it over MCP, with an actionable refusal
+  ("Conflict: ...", a new case in `tools-shared.ts`'s `explain()`);
+  the web editor carries the version it loaded and shows a dedicated
+  conflict page on a stale save, both texts kept, instead of losing the
+  edit (`web/src/files.ts`'s `conflictReply()`). Hostile tests in
+  `supabase/tests/compare_and_swap_test.sql`, races in
+  `web/test/races.test.mjs` (exactly one of many simultaneous writers
+  from one base wins; a stale write racing an erasure never deadlocks).
+  Registry: `tests/features.md` F437-F439.
 - **Phase 2: path claims** (who's working a path, with a lease). Waits for
-  phase 1 to ship and see 14 days of real use, and the maintainer
-  confirming phase 2 should start.
+  phase 1's 14 days of real use, and the maintainer confirming phase 2
+  should start.
 - **Phase 3: work plans** (steps with blockers, waiting without polling).
   Waits for claims to be used by a second person for 30 days, and the
   maintainer confirming phase 3 should start.
 
 Design for phases 2 and 3 is being settled in docs/design.md (tracking
-issue's CL-0.2); nothing from those phases is built yet.
+issue's CL-0.2, blocked on CL-0.4's reference spike); nothing from those
+phases is built yet.
