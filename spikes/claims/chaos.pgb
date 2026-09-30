@@ -1,0 +1,17 @@
+select coalesce(c.o_id,0) as tid,
+       format('select complete_task(%s, %s, %L)::int as ok', c.o_id, c.o_fence, c.o_secret) as cq
+  from (select 1) d left join lateral claim_next('00000000-0000-0000-0000-000000000001'::uuid, gen_random_uuid(), 'agent-' || :client_id, interval '1 second') c on true \gset
+\if :tid > 0
+\set roll random(1, 100)
+\if :roll <= 30
+insert into outcomes (kind, ok) values ('crash', 0);
+\elif :roll <= 50
+select pg_sleep(1.3);
+:cq \gset
+insert into outcomes (kind, ok) values ('stall', :ok);
+\else
+select pg_sleep(0.05);
+:cq \gset
+insert into outcomes (kind, ok) values ('normal', :ok);
+\endif
+\endif

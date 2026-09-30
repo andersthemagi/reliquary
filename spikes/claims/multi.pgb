@@ -1,0 +1,5 @@
+-- One agent of one person of one vault asks for work, as fast as it can.
+\set v random(1, :vaults)
+\set p random(1, 5)
+\set a random(1, 2)
+select o_state from bench_multi(:v, :p, :a);

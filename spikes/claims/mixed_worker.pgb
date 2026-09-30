@@ -1,0 +1,19 @@
+-- An honest agent: follows the hint, completes what it claims (10% abandoned).
+select set_config('app.token', '00000000-0000-0000-0000-' || lpad(:client_id::text, 12, '0'), false),
+       set_config('app.member', '00000000-0000-0000-0000-' || lpad(:client_id::text, 12, '0'), false);
+select (r.o_state = 'granted')::int as g, (r.o_state = 'plan_complete')::int as pc, coalesce(r.o_check_ms, 500) as ms,
+       format('select agent_complete_step(%s, %s, %L)::int as ok', r.o_id, r.o_fence, r.o_secret) as cq
+  from agent_request_work('00000000-0000-0000-0000-000000000001'::uuid, 'mix/p', 'honest') r \gset
+\if :g
+  \set roll random(1, 100)
+  \if :roll <= 10
+    \set abandoned 1
+  \else
+    select pg_sleep(0.2);
+    :cq \gset
+  \endif
+\elif :pc
+  \sleep 500 ms
+\else
+  \sleep :ms ms
+\endif

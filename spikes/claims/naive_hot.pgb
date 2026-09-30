@@ -1,0 +1,2 @@
+\set r random(1, 200)
+select o_granted from naive_claim('00000000-0000-0000-0000-000000000001'::uuid, 'canon/file-' || :r || '.md', gen_random_uuid(), 'agent-' || :client_id, interval '60 seconds', 0);

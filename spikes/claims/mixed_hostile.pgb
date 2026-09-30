@@ -1,0 +1,6 @@
+-- A hostile agent: ignores every hint, asks as fast as it can, never works.
+-- If it is granted a step it simply sits on it until the lease runs out.
+-- 100 connections, but only 5 people: it is one person's many agents.
+select set_config('app.token', '00000000-0000-0000-0000-' || lpad((:client_id + 1000)::text, 12, '0'), false),
+       set_config('app.member', '00000000-0000-0000-0000-' || lpad((5000 + :client_id % 5)::text, 12, '0'), false);
+select o_state from agent_request_work('00000000-0000-0000-0000-000000000001'::uuid, 'mix/p', 'hostile');

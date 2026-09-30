@@ -1,0 +1,7 @@
+select coalesce(c.o_id,0) as tid,
+       format('select complete_task(%s, %s, %L)::int as ok', c.o_id, c.o_fence, c.o_secret) as cq
+  from (select 1) d left join lateral claim_next('00000000-0000-0000-0000-000000000001'::uuid, gen_random_uuid(), 'drain-' || :client_id, interval '30 seconds') c on true \gset
+\if :tid > 0
+:cq \gset
+insert into outcomes (kind, ok) values ('drain', :ok);
+\endif
