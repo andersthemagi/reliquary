@@ -1,0 +1,1 @@
+select o_state from bench_old(:client_id, 'load/p');

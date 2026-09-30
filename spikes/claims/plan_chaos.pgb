@@ -1,0 +1,15 @@
+select coalesce(c.o_id,0) as sid,
+       format('select complete_step(%s, %s, %L)::int as ok', c.o_id, c.o_fence, c.o_secret) as cq
+  from (select 1) d left join lateral claim_ready_step('00000000-0000-0000-0000-000000000001'::uuid, 'big', gen_random_uuid(), 'agent-' || :client_id, interval '1 second') c on true \gset
+\if :sid > 0
+\set roll random(1, 100)
+\if :roll <= 25
+insert into outcomes (kind, ok) values ('crash', 0);
+\else
+select pg_sleep(0.02);
+:cq \gset
+insert into outcomes (kind, ok) values ('normal', :ok);
+\endif
+\else
+\sleep 5 ms
+\endif

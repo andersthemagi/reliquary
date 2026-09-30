@@ -1,0 +1,25 @@
+-- One worker. -D spin=1 ignores the hint and polls every 10 ms; -D spin=0 sleeps
+-- for the "check again in" time the server gave. -D crash=N abandons N% of claims.
+select (r.o_state = 'granted')::int as g, (r.o_state = 'plan_complete')::int as pc,
+       coalesce(r.o_check_ms, 0) as ms,
+       format('select complete_step(%s, %s, %L)::int as ok', r.o_id, r.o_fence, r.o_secret) as cq
+  from request_work('00000000-0000-0000-0000-000000000001'::uuid, 'hack/big',
+                    ('00000000-0000-0000-0000-' || lpad(:client_id::text, 12, '0'))::uuid,
+                    'agent-' || :client_id) r \gset
+\if :g
+  \set roll random(1, 100)
+  \if :roll <= :crash
+    \set abandoned 1
+  \else
+    select pg_sleep(0.2);
+    :cq \gset
+  \endif
+\elif :pc
+  \sleep 500 ms
+\else
+  \if :spin
+    \sleep 10 ms
+  \else
+    \sleep :ms ms
+  \endif
+\endif
