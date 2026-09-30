@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { at, fileBlock, freshNonce, makeRun, ok, PATH, refuse, TEXT, type FileRow, VAULT, VAULT_REF } from "./tools-shared.js";
+import { at, fileBlock, freshNonce, makeRun, ok, PATH, refuse, TEXT, type FileRow, VAULT, VAULT_REF, VERSION } from "./tools-shared.js";
 
 // Sizes as the database words them (private.size_text): decimal units.
 function size(n: number): string {
@@ -276,12 +276,14 @@ export function registerVaultFileTools(
     "write_file",
     {
       title: "Write an open file",
-      description: "Create or replace a file whose policy is open. Canon files can't be written directly: use propose.",
-      inputSchema: { vault: VAULT, path: PATH, content: TEXT },
+      description:
+        "Create or replace a file whose policy is open. Canon files can't be written directly: use propose. " +
+        "expected_version (read_file's version: line) refuses the write if the file changed since, instead of silently overwriting it.",
+      inputSchema: { vault: VAULT, path: PATH, content: TEXT, expected_version: VERSION.optional() },
     },
-    async ({ vault, path, content }) =>
+    async ({ vault, path, content, expected_version }) =>
       run(async (c) => {
-        await c.query("select public.write_file(private.vault_ref($1), $2, $3)", [vault, path, content]);
+        await c.query("select public.write_file(private.vault_ref($1), $2, $3, $4)", [vault, path, content, expected_version ?? null]);
         return ok(`Wrote ${path}. The change is logged as ${id.agent}.`);
       }),
   );
@@ -291,12 +293,13 @@ export function registerVaultFileTools(
     {
       title: "Delete an open file",
       description:
-        "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true.",
-      inputSchema: { vault: VAULT, path: PATH },
+        "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true. " +
+        "expected_version (read_file's version: line) refuses the delete if the file changed since.",
+      inputSchema: { vault: VAULT, path: PATH, expected_version: VERSION.optional() },
     },
-    async ({ vault, path }) =>
+    async ({ vault, path, expected_version }) =>
       run(async (c) => {
-        await c.query("select public.delete_file(private.vault_ref($1), $2)", [vault, path]);
+        await c.query("select public.delete_file(private.vault_ref($1), $2, $3)", [vault, path, expected_version ?? null]);
         return ok(`Deleted ${path}. The change is logged as ${id.agent}.`);
       }),
   );

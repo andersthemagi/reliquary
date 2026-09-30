@@ -35,6 +35,7 @@ export const PATH = z.string().max(1024);
 export const TEXT = z.string().max(1_000_000);
 export const REASON = z.string().max(4000);
 export const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/);
+export const VERSION = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 
 // Turns errors into messages the agent can act on: a first line in words
 // (our own migrations' messages, which don't echo free-form input), then the
@@ -87,6 +88,12 @@ export function explain(err: unknown): ToolResult {
       // says how the person gets their account admitted.
       case "RLP02":
         lead = `Not admitted: ${e.message}`;
+        break;
+      // A stale expected_version (20260930100000_compare_and_swap.sql): the
+      // message already names the current version and its last writer;
+      // read_file gets a fresh one to decide from.
+      case "RLF01":
+        lead = `Conflict: ${e.message}. Call read_file again, then decide whether to write over the new version.`;
         break;
       // An hourly count (feedback, 20260926163000_feedback.sql): the
       // message says the limit and when there is room again.

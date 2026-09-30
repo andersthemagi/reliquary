@@ -154,3 +154,19 @@ Still to do, from the token side:
   not just the trailer.
 - **`tools/list` has no headroom again.** The next tool needs the budget
   raised on purpose, same as every pass so far.
+
+## Fifth pass (compare-and-swap)
+
+2026-09-30, CL-1.3 of the compare-and-swap/claims/work-plans effort
+(tracking issue #52). No new tools: `write_file` and `delete_file` each
+gained an optional `expected_version` field (a `pattern`-constrained
+string) and a longer description explaining it, so `tools/list` grew from
+10,417 to 10,770 bytes, over its 10,600-byte budget. Raised the budget to
+10,900, just above the actual, per this doc's own rule. Every other tool's
+budget is unchanged: nothing else's response changed shape.
+
+Still to do, from the token side:
+
+- **`tools/list` has no headroom again.** Phase 2 (path claims) will add
+  several more tools once its gate opens; the budget will need raising
+  again then, same as every pass so far.

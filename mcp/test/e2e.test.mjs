@@ -85,6 +85,39 @@ test("read: the version id changes on every write", async () => {
   await ben.close();
 });
 
+test("write: a stale expected_version is refused with a refusal an agent can act on", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  await call(ben, "write_file", { vault: "Team", path: "notes/swap.md", content: "one" });
+  const stale = /version: ([0-9a-f-]{36})\n/.exec((await call(ben, "read_file", { vault: "Team", path: "notes/swap.md" })).text)[1];
+  await call(ben, "write_file", { vault: "Team", path: "notes/swap.md", content: "two" });
+  const current = /version: ([0-9a-f-]{36})\n/.exec((await call(ben, "read_file", { vault: "Team", path: "notes/swap.md" })).text)[1];
+  const r = await call(ben, "write_file", { vault: "Team", path: "notes/swap.md", content: "three", expected_version: stale });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /^Conflict: this file changed since you read it \(you had version \S+\); the current version is \S+ by \S+\. Call read_file again, then decide whether to write over the new version\./);
+  assert.match(r.text, new RegExp(`current version is ${current} by`));
+  await ben.close();
+});
+
+test("write: the current expected_version succeeds", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  await call(ben, "write_file", { vault: "Team", path: "notes/swap2.md", content: "one" });
+  const current = /version: ([0-9a-f-]{36})\n/.exec((await call(ben, "read_file", { vault: "Team", path: "notes/swap2.md" })).text)[1];
+  const r = await call(ben, "write_file", { vault: "Team", path: "notes/swap2.md", content: "two", expected_version: current });
+  assert.equal(r.isError, false, r.text);
+  await ben.close();
+});
+
+test("delete: a stale expected_version is refused with a refusal an agent can act on", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  await call(ben, "write_file", { vault: "Team", path: "notes/swap3.md", content: "one" });
+  const stale = /version: ([0-9a-f-]{36})\n/.exec((await call(ben, "read_file", { vault: "Team", path: "notes/swap3.md" })).text)[1];
+  await call(ben, "write_file", { vault: "Team", path: "notes/swap3.md", content: "two" });
+  const r = await call(ben, "delete_file", { vault: "Team", path: "notes/swap3.md", expected_version: stale });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /^Conflict: this file changed since you read it/);
+  await ben.close();
+});
+
 test("search: finds by content within the caller's vault", async () => {
   const ben = await connect(env.BEN_TOKEN);
   const r = await call(ben, "search", { vault: "Team", query: "standup" });

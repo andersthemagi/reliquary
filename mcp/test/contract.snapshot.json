@@ -109,7 +109,7 @@
   {
     "name": "delete_file",
     "title": "Delete an open file",
-    "description": "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true.",
+    "description": "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true. expected_version (read_file's version: line) refuses the delete if the file changed since.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -120,6 +120,10 @@
         "path": {
           "type": "string",
           "maxLength": 1024
+        },
+        "expected_version": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{36}$"
         }
       },
       "required": [
@@ -521,7 +525,7 @@
   {
     "name": "write_file",
     "title": "Write an open file",
-    "description": "Create or replace a file whose policy is open. Canon files can't be written directly: use propose.",
+    "description": "Create or replace a file whose policy is open. Canon files can't be written directly: use propose. expected_version (read_file's version: line) refuses the write if the file changed since, instead of silently overwriting it.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -536,6 +540,10 @@
         "content": {
           "type": "string",
           "maxLength": 1000000
+        },
+        "expected_version": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{36}$"
         }
       },
       "required": [
