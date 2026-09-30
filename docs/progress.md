@@ -300,3 +300,26 @@ Concurrency on limits, invites and deletion is tested in
 interleavings that stop one operation on an advisory-lock barrier (no
 sleeps), so a lock-order deadlock shows on every run
 (`20260925240100_lock_order.sql`).
+
+## Alongside milestone 3: compare-and-swap writes, claims and work plans
+
+Not a numbered milestone of its own, on the same owner's call as path
+ownership and flags (2026-09-30, tracking issue #52): compare-and-swap
+writes, path claims and work plans, so no agent overwrites another's edit
+and no agent is handed a step before its blockers are done, all as
+database predicates that don't depend on an agent behaving. Three gated
+phases, each its own set of small pull requests:
+
+- **Phase 1: compare-and-swap writes.** Starts now. `read_file` returns a
+  file's current version id; `write_file` and `delete_file` take an
+  optional expected version and refuse a stale one, naming the current
+  version and its last writer.
+- **Phase 2: path claims** (who's working a path, with a lease). Waits for
+  phase 1 to ship and see 14 days of real use, and the maintainer
+  confirming phase 2 should start.
+- **Phase 3: work plans** (steps with blockers, waiting without polling).
+  Waits for claims to be used by a second person for 30 days, and the
+  maintainer confirming phase 3 should start.
+
+Design for phases 2 and 3 is being settled in docs/design.md (tracking
+issue's CL-0.2); nothing from those phases is built yet.

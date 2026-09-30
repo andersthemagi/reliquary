@@ -24,6 +24,15 @@ exception to "work on the current milestone only," not a new default —
 check `docs/progress.md` before assuming the same is fine for something
 else mid-flight.
 
+Also (owner's decision, 2026-09-30, tracking issue #52): compare-and-swap
+writes, path claims and work plans start now too, another deliberate,
+logged exception, in three gated phases — phase 1 (compare-and-swap
+writes) starts immediately; phase 2 (claims) waits for phase 1 to ship and
+see 14 days of real use, plus the maintainer confirming phase 2 should
+start; phase 3 (work plans) waits for claims to be used by a second person
+for 30 days, plus the maintainer confirming phase 3 should start. See
+`docs/progress.md` for what's built so far.
+
 All of it needs podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session
