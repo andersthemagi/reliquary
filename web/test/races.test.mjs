@@ -259,6 +259,26 @@ test("races, limits hold: writes, deletes and erasures at once on the same files
   assert.equal(counter, scan);
 });
 
+test("races, one wins: 12 connections write the same file from one base version, exactly one succeeds", async () => {
+  const v = await newVault(OWNER, "Races compare and swap");
+  const seed = await as(db, OWNER, "select public.write_file($1, 'swap.md', 'base') as v", [v]);
+  assert.ok(seed.ok, seed.message);
+  const base = seed.rows[0].v;
+  const conns = await Promise.all(Array.from({ length: 12 }, () => connect()));
+  const results = await Promise.all(
+    conns.map((c, i) => as(c, OWNER, "select public.write_file($1, 'swap.md', $2, $3)::text", [v, `writer ${i}`, base])),
+  );
+  await close(conns);
+  log("compare-and-swap crowd", codes(results));
+  assert.deepEqual(codes(results), { ok: 1, RLF01: 11 });
+  const winner = results.findIndex((r) => r.ok);
+  const [row] = await sql(
+    `select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.vault_id = $1 and f.path = 'swap.md'`,
+    [v],
+  );
+  assert.equal(row.body, `writer ${winner}`);
+});
+
 // ---------------------------------------------------------------------------
 // Forced interleavings
 
@@ -311,6 +331,30 @@ test("races, lock order: a write and an erasure of the same file, interleaved, d
   }
   log("write vs erase", outcomes);
   assert.deepEqual(outcomes, ["ok/ok (blocked)", "ok/ok (blocked)", "ok/ok (blocked)"]);
+  const { counter, scan } = await counted(v);
+  assert.equal(counter, scan);
+});
+
+test("races, lock order: a stale write and an erasure of the same file, interleaved, don't deadlock", async () => {
+  const v = await newVault(OWNER, "Races stale write erase");
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const seeded = await as(db, OWNER, "select public.write_file($1, 'x.md', 'first') as v", [v]);
+    assert.ok(seeded.ok, seeded.message);
+    const stale = seeded.rows[0].v;
+    // A second write moves the file past the version the racing write
+    // holds, so it's already stale before the erasure ever starts.
+    assert.ok((await as(db, OWNER, "select public.write_file($1, 'x.md', 'second')", [v])).ok);
+    // The erasure holds x.md's row and stops before it commits; the stale
+    // write's own version check queues on the same row.
+    const [e, w, wState] = await interleave(
+      (c) => as(c, OWNER, "select public.erase_file($1, 'x.md')::text", [v], "files"),
+      (c) => as(c, OWNER, "select public.write_file($1, 'x.md', 'stale', $2)::text", [v, stale]),
+    );
+    outcomes.push(`${outcome(e)}/${outcome(w)} (${wState})`);
+  }
+  log("stale write vs erase", outcomes);
+  assert.deepEqual(outcomes, ["ok/RLF01 (blocked)", "ok/RLF01 (blocked)", "ok/RLF01 (blocked)"]);
   const { counter, scan } = await counted(v);
   assert.equal(counter, scan);
 });
