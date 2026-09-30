@@ -168,6 +168,7 @@ const OWN_CODES: Record<string, string> = {
   RLP01: "plan limit reached",
   RLP02: "account not admitted",
   RLA01: "session ended",
+  RLF01: "stale file version",
 };
 
 export function sqlstateName(code: string, message = ""): string {
@@ -192,6 +193,9 @@ export function sqlstateStatus(code: string): number {
   // A session its person signed out everywhere after, or a deleted
   // account's (20260926140100_sign_out_everywhere.sql): sign in again.
   if (code === "RLA01") return 401;
+  // A stale expected_version on write_file/delete_file
+  // (20260930100000_compare_and_swap.sql): re-read, then decide.
+  if (code === "RLF01") return 409;
   if (code === "57014" || code === "55P03") return 504;
   if (code === "40001" || code === "40P01") return 503;
   if (code === "25006") return 503;
