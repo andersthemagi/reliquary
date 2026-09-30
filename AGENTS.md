@@ -138,6 +138,28 @@ it there.
 - Conventional commits (`feat(feed): ...`, `fix(rls): ...`). Trailers
   (`Changes-behaviour:`, `Test-refactor:`, `Co-Authored-By:`) go together in
   the last paragraph, no blank line between them.
+- **A commit is one reviewable change.** Roughly what Google's [Small
+  CLs](https://google.github.io/eng-practices/review/developer/small-cls.html)
+  guide argues for: about 100 changed lines is normal, 1000 is a sign to
+  split. One thing means one thing — a refactor and the feature or fix it
+  enables are different commits even inside the same PR, because a reviewer
+  (human or agent) reads them as separate claims about what changed and
+  why. When a change genuinely needs several steps, stack them as separate
+  commits in the same PR rather than squashing unrelated work into one; see
+  `2820364`, `b517aa0` and `7644621` for the shape this looks like in
+  practice here.
+- **Every PR is squash-merged.** GitHub is configured so the squash
+  commit's subject is always the PR title, never an individual commit
+  message; merge commits and rebase merges are disabled at the repo level.
+  That means release-please only ever reads one conventional-commit line
+  per PR — **the PR title**, not what any commit inside it says — so the
+  title, not the commits, is what has to be `type(scope): subject`-shaped.
+  A GitHub Action lints this on open and on edit (`.github/workflows/pr-title.yml`).
+  This replaced a dual squash/merge-commit policy that depended on a
+  contributor knowing an unwritten GitHub-merge-title rule; it had already
+  caused a duplicated changelog entry and a changelog wipe before it was
+  replaced 2026-09-30. Full incident history: `docs/ops/runbook.md`, "Rules
+  that came from incidents."
 - **Commit types write the changelog.** Pushes to `main` only test; a bot
   (release-please, `.github/workflows/release.yml`) keeps a "Release vX.Y.Z"
   pull request whose `CHANGELOG.md` is built from commit subjects, and only
@@ -154,9 +176,16 @@ it there.
     `BREAKING CHANGE: <what to do>` footer;
   - commits touching `cli/` go to the CLI's own release (`cli/CHANGELOG.md`,
     tags `cli-vX.Y.Z`).
-  - **squash-merge a single-commit PR, and read the release PR's
-    `CHANGELOG.md` before merging it.** Two incidents, exact procedure and
-    dates: `docs/ops/runbook.md`, "Rules that came from incidents."
+  - **Read the release PR's `CHANGELOG.md` before merging it,** as a person
+    who wasn't in the room would. Exact procedure: `docs/ops/runbook.md`,
+    "Rules that came from incidents."
+- **Comments say why, never what.** A well-named function and its types
+  already say what; a comment earns its place only for a hidden
+  constraint, an invariant, or the reasoning behind a non-obvious choice —
+  see `mcp/src/tools-shared.ts`'s file header, or `poolConfig()` in
+  `mcp/src/db.ts` and `web/src/db.ts`, for the pattern already in use. A
+  comment that would confuse no one if deleted along with the code it
+  explains shouldn't be there.
 - **0.x is pre-alpha.** Any release may change or remove anything; while
   below 1.0 a breaking change bumps the minor, not the major, and GitHub
   Releases are marked prereleases. 1.0 is a deliberate owner decision (a

@@ -139,7 +139,8 @@ narrows, its docs page may need a matching edit.
 
 Commit and open a PR only when authorized, following AGENTS.md
 "Conventions" (conventional commits, trailers together in the last
-paragraph, squash-merge a single-commit PR). No separate audit tooling or
+paragraph, a conventional-commit-shaped PR title since that's what gets
+squash-merged as the changelog line). No separate audit tooling or
 bot is wired up for this — CI already runs `guard` (registry + test-guard)
 and `test` (`./test.sh`) on every push and PR.
 
