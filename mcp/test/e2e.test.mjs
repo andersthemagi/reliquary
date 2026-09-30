@@ -69,8 +69,20 @@ test("read: canon file comes back as marked data with its policy", async () => {
   const r = await call(cal, "read_file", { vault: "Team", path: "canon/pricing.md" });
   assert.equal(r.isError, false);
   assert.match(r.text, /policy: canon/);
+  assert.match(r.text, /version: [0-9a-f-]{36}\n/);
   assert.match(r.text, /BEGIN-([0-9a-f]{12})\nDay rate is 800 EUR\.\nEND-\1$/);
   await cal.close();
+});
+
+test("read: the version id changes on every write", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  const versionOf = async () => /version: ([0-9a-f-]{36})\n/.exec((await call(ben, "read_file", { vault: "Team", path: "notes/versioned.md" })).text)[1];
+  await call(ben, "write_file", { vault: "Team", path: "notes/versioned.md", content: "one" });
+  const v1 = await versionOf();
+  await call(ben, "write_file", { vault: "Team", path: "notes/versioned.md", content: "two" });
+  const v2 = await versionOf();
+  assert.notEqual(v1, v2);
+  await ben.close();
 });
 
 test("search: finds by content within the caller's vault", async () => {
