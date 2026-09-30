@@ -154,7 +154,10 @@ before(async () => {
       for each statement execute function test_races.stop('members');
     drop trigger if exists zz_races_stop on public.variable_values;
     create trigger zz_races_stop after insert or update on public.variable_values
-      for each statement execute function test_races.stop('values');`);
+      for each statement execute function test_races.stop('values');
+    drop trigger if exists zz_races_stop on public.path_claims;
+    create trigger zz_races_stop after insert or update or delete on public.path_claims
+      for each statement execute function test_races.stop('path_claims');`);
 });
 
 after(async () => {
@@ -163,6 +166,7 @@ after(async () => {
              drop trigger if exists zz_races_stop on public.log;
              drop trigger if exists zz_races_stop on public.vault_members;
              drop trigger if exists zz_races_stop on public.variable_values;
+             drop trigger if exists zz_races_stop on public.path_claims;
              drop schema if exists test_races cascade;`).catch(() => {});
   await Promise.all(open.map((c) => c.end().catch(() => {})));
 });
@@ -475,6 +479,106 @@ test("races, lock order: deleting a vault while a variable in it is being rotate
     outcomes.push(`${outcome(ro)}/${outcome(de)}`);
   }
   log("rotate vs delete_vault", outcomes);
+  assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
+});
+
+// CL-2.2: claim_path's insert, when it re-grants an expired path, takes the
+// path_claims row then (its holder changing) a FOR KEY SHARE lock on the
+// vault_members row through the foreign key check. delete_vault cascades
+// the opposite way, vault_members then (through path_claims' own foreign
+// key) any claim. 20260930210000_claims_lock_order.sql makes delete_vault
+// delete path_claims itself, first, in the same fixed-order block as
+// files and variable values, before either lock order can interleave.
+
+test("races, lock order: renewing a claim while its vault is deleted, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const name = `Races delete renew ${round}`;
+    const v = await newVault(OWNER, name);
+    const who = people[round];
+    await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, who, OWNER]);
+    const claimed = await as(db, who, "select o_fence, o_secret from public.claim_path($1, 'x.md', 'holder')", [v]);
+    assert.ok(claimed.ok, claimed.message);
+    const { o_fence: fence, o_secret: secret } = claimed.rows[0];
+    // The renewal holds x.md's claim and stops before it commits.
+    const [re, de] = await interleave(
+      (c) => as(c, who, "select public.renew_claim($1, 'x.md', $2, $3)::text", [v, fence, secret], "path_claims"),
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name]),
+    );
+    outcomes.push(`${outcome(re)}/${outcome(de)}`);
+  }
+  log("renew vs delete_vault", outcomes);
+  assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
+});
+
+test("races, lock order: deleting a vault while a claim in it is renewed, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const name = `Races delete renew reverse ${round}`;
+    const v = await newVault(OWNER, name);
+    const who = people[3 + round];
+    await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, who, OWNER]);
+    const claimed = await as(db, who, "select o_fence, o_secret from public.claim_path($1, 'x.md', 'holder')", [v]);
+    assert.ok(claimed.ok, claimed.message);
+    const { o_fence: fence, o_secret: secret } = claimed.rows[0];
+    // The deletion deletes x.md's claim and stops before it commits the
+    // rest; the renewal's own row lookup queues on the same row.
+    const [de, re] = await interleave(
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name], "path_claims"),
+      (c) => as(c, who, "select public.renew_claim($1, 'x.md', $2, $3)::text", [v, fence, secret]),
+    );
+    outcomes.push(`${outcome(de)}/${outcome(re)}`);
+  }
+  log("delete_vault vs renew", outcomes);
+  assert.deepEqual(outcomes, ["ok/P0002", "ok/P0002", "ok/P0002"]);
+});
+
+// erase_file only ever touches path_claims through a holder-clearing
+// update (no foreign key re-check: MATCH SIMPLE skips it when a column
+// goes null), so it never takes the vault_members lock delete_vault's
+// cascade does. These two prove the single shared row just queues.
+
+test("races, lock order: erasing a file while a new claimant races in, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const v = await newVault(OWNER, `Races erase claim race ${round}`);
+    const holder = people[6 + round];
+    const racer = people[9 + round];
+    await sql("select test_support.add_member($1, $2, 'editor', $3), test_support.add_member($1, $4, 'editor', $3)", [v, holder, OWNER, racer]);
+    assert.ok((await as(db, OWNER, "select public.write_file($1, 'x.md', 'seed')", [v])).ok);
+    const claimed = await as(db, holder, "select o_fence from public.claim_path($1, 'x.md', 'holder')", [v]);
+    assert.ok(claimed.ok, claimed.message);
+    // The erasure clears the existing claim and stops before it commits.
+    const [er, cl] = await interleave(
+      (c) => as(c, OWNER, "select public.erase_file($1, 'x.md')::text", [v], "path_claims"),
+      (c) => as(c, racer, "select o_fence from public.claim_path($1, 'x.md', 'racer')", [v]),
+    );
+    outcomes.push(`${outcome(er)}/${outcome(cl)}`);
+    if (cl.ok) assert.equal(cl.rows[0].o_fence, claimed.rows[0].o_fence + 1);
+  }
+  log("erase vs new claimant", outcomes);
+  assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
+});
+
+test("races, lock order: a claim is renewed while the file at its path is erased, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const v = await newVault(OWNER, `Races renew erase ${round}`);
+    const who = people[12 + round];
+    await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, who, OWNER]);
+    assert.ok((await as(db, OWNER, "select public.write_file($1, 'x.md', 'seed')", [v])).ok);
+    const claimed = await as(db, who, "select o_fence, o_secret from public.claim_path($1, 'x.md', 'holder')", [v]);
+    assert.ok(claimed.ok, claimed.message);
+    const { o_fence: fence, o_secret: secret } = claimed.rows[0];
+    // The renewal holds x.md's claim (unchanged holder) and stops before
+    // it commits; the erasure's own clearing update queues on the row.
+    const [re, er] = await interleave(
+      (c) => as(c, who, "select public.renew_claim($1, 'x.md', $2, $3)::text", [v, fence, secret], "path_claims"),
+      (c) => as(c, OWNER, "select public.erase_file($1, 'x.md')::text", [v]),
+    );
+    outcomes.push(`${outcome(re)}/${outcome(er)}`);
+  }
+  log("renew vs erase", outcomes);
   assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
 });
 
