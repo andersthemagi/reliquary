@@ -61,8 +61,8 @@ const differentiators: Array<[string, string]> = [
     "Memory tools don't hold secrets and secret managers don't hold context. A project needs both, with one invite and one access log.",
   ],
   [
-    "EU-hosted, bring your own model",
-    "Data sits in Frankfurt. Reliquary runs no model and resells no inference, so it stays cheap and your AI provider stays your choice.",
+    "Never locked into one AI vendor",
+    "Use whichever AI is best for the job today, and switch when a better one comes along. Reliquary holds no model of its own and resells no inference, so your provider is always your choice, not ours. Data sits in Frankfurt.",
   ],
 ];
 
@@ -104,6 +104,15 @@ export function landing(theme: Theme): string {
   // for" (previously after "What makes it different") moved up next to the
   // Problem section, since all three reads recognized themselves in their
   // own audience card and had to scroll past two sections to reach it.
+  //
+  // Vendor lock-in, stated as a problem and a differentiator (2026-09-30,
+  // owner's call): the earlier copy leaned on "works with Claude, ChatGPT,
+  // Cursor" three times as if listing vendors were the differentiator on
+  // its own -- research says that's close to table stakes now. The actual
+  // argument is sharper than the vendor list: betting on one AI vendor
+  // means inheriting their risk (pricing, outages, who they're allowed to
+  // serve), and the fix is being able to switch, not just being told the
+  // product happens to work with several tools today.
   const body = html`
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">
@@ -112,7 +121,7 @@ export function landing(theme: Theme): string {
     <p class="hero-sub">Your agents propose changes to canon. You approve them.</p>
     <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use: Claude, ChatGPT, Cursor, Claude Code and more. People and agents alike only see what they're scoped to. Secrets stay out of the chat.</p>
     ${cta("Get started")}
-    <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta: tell us about your team and we'll set up your first vault with you.</p>
+    <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta: tell us about your team and we'll set up your first vault with you, usually within 24 to 48 hours.</p>
     ${preAlphaNote()}
   </div>
   ${proposalCard}
@@ -124,6 +133,7 @@ export function landing(theme: Theme): string {
     <li>Every person has their own AI memory, so the project's truth drifts.</li>
     <li>Agents write things nobody checked, and the next agent believes them.</li>
     <li>API keys travel by email and sit in <code>.env</code> files any agent can read.</li>
+    <li>Bet everything on one AI vendor, and their risk becomes yours: pricing, outages, even who they're allowed to serve.</li>
   </ul>
 </section>
 
@@ -187,7 +197,7 @@ ${PRICING.show
 
 <section class="site-section closing" aria-labelledby="closing-title">
   <h2 id="closing-title">Try it on your next project</h2>
-  <p>Reliquary is invite-only while in beta. Tell us about your team and the AI tools you use, and we'll set up your first vault with you.</p>
+  <p>Reliquary is invite-only while in beta. Tell us about your team and the AI tools you use, and we'll set up your first vault with you, usually within 24 to 48 hours.</p>
   ${cta("Get started")}
 </section>`;
   return sitePage({
