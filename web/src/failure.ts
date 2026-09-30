@@ -169,6 +169,10 @@ const OWN_CODES: Record<string, string> = {
   RLP02: "account not admitted",
   RLA01: "session ended",
   RLF01: "stale file version",
+  RLC01: "path already claimed",
+  RLC02: "stale claim",
+  RLC03: "claim limit reached",
+  RLC04: "claim past its hold limit",
 };
 
 export function sqlstateName(code: string, message = ""): string {
@@ -196,6 +200,11 @@ export function sqlstateStatus(code: string): number {
   // A stale expected_version on write_file/delete_file
   // (20260930100000_compare_and_swap.sql): re-read, then decide.
   if (code === "RLF01") return 409;
+  // Path claims (20260930200000_path_claims.sql): a conflict (already
+  // claimed, or a stale fence/secret/connection) is 409; a limit
+  // (connection or person cap, the hold limit) is 403.
+  if (code === "RLC01" || code === "RLC02") return 409;
+  if (code === "RLC03" || code === "RLC04") return 403;
   if (code === "57014" || code === "55P03") return 504;
   if (code === "40001" || code === "40P01") return 503;
   if (code === "25006") return 503;
