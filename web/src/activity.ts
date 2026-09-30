@@ -58,12 +58,17 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["link.grant", "Changed a link’s tool grants"],
   ["path_owner.add", "Named a path’s owner"],
   ["path_owner.remove", "Removed a path’s owner"],
+  ["claim.grant", "Claimed a path"],
+  ["claim.renew", "Renewed a claim"],
+  ["claim.release", "Released a claim"],
+  ["claim.break", "Broke a claim"],
 ];
 export const EVENT_GROUPS: readonly [string, string][] = [
   ["file.", "Any file change"],
   ["proposal.", "Any proposal event"],
   ["variable.", "Any variable change"],
   ["link.", "Any link change"],
+  ["claim.", "Any claim event"],
 ];
 const EVENTS = EVENT_LABELS;
 const GROUPS = EVENT_GROUPS;

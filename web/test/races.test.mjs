@@ -279,6 +279,22 @@ test("races, one wins: 12 connections write the same file from one base version,
   assert.equal(row.body, `writer ${winner}`);
 });
 
+test("races, one wins: 12 connections claim the same free path at once, exactly one succeeds", async () => {
+  const v = await newVault(OWNER, "Races claim path");
+  const crowd = people.slice(0, 12);
+  for (const p of crowd) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  assert.ok((await as(db, OWNER, "select public.write_file($1, 'claimed.md', 'x')", [v])).ok);
+  const conns = await Promise.all(crowd.map(() => connect()));
+  const results = await Promise.all(
+    crowd.map((p, i) => as(conns[i], p, "select o_secret from public.claim_path($1, 'claimed.md', $2)", [v, `racer ${i}`])),
+  );
+  await close(conns);
+  log("claim crowd", codes(results));
+  assert.deepEqual(codes(results), { ok: 1, RLC01: 11 });
+  const [row] = await sql(`select fence from public.path_claims where vault_id = $1 and path = 'claimed.md'`, [v]);
+  assert.equal(row.fence, 1);
+});
+
 // ---------------------------------------------------------------------------
 // Forced interleavings
 
