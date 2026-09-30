@@ -22,20 +22,21 @@ The research behind this draft is in `docs/research/`
 7. [Context](#context)
 8. [Path ownership](#path-ownership)
 9. [Notifications](#notifications)
-10. [Links](#links)
-11. [Routines](#routines)
-12. [Environment variables](#environment-variables)
-13. [Continuity](#continuity)
-14. [Client engagements](#client-engagements)
-15. [Git mirror and export](#git-mirror-and-export)
-16. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
-17. [Architecture](#architecture)
-18. [Data model](#data-model)
-19. [Hostile tests](#hostile-tests)
-20. [Build order](#build-order)
-21. [Open decisions](#open-decisions)
-22. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
-23. [Out of scope](#out-of-scope)
+10. [Claims and work plans](#claims-and-work-plans)
+11. [Links](#links)
+12. [Routines](#routines)
+13. [Environment variables](#environment-variables)
+14. [Continuity](#continuity)
+15. [Client engagements](#client-engagements)
+16. [Git mirror and export](#git-mirror-and-export)
+17. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
+18. [Architecture](#architecture)
+19. [Data model](#data-model)
+20. [Hostile tests](#hostile-tests)
+21. [Build order](#build-order)
+22. [Open decisions](#open-decisions)
+23. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
+24. [Out of scope](#out-of-scope)
 
 ## What changed from v2
 
@@ -465,6 +466,279 @@ you"). Not settled if a better word turns up before this is built.
   doesn't raise a fresh flag for it, since nothing is logged when a
   snooze ends. A snooze someone else's comment interrupts does re-flag
   it, because the comment itself is a logged event.
+
+## Claims and work plans
+
+Written 2026-09-30, settling CL-0.2 of the claims, waiting and work
+plans effort (tracking issue #52; the exception is logged in
+[AGENTS.md](../AGENTS.md#build-order) and [progress.md](progress.md)).
+Settled shape, nothing built: phase 1 (compare-and-swap writes) already
+shipped ahead of this section; phases 2 (claims) and 3 (work plans)
+start when the maintainer decides to, informed by real use, not a
+calendar. Validated first in a throwaway PostgreSQL 16 model, not
+Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
+Twelve points, each with the reason it was decided that way.
+
+### 1. Names
+
+`work_plan`, `step` and `claim`, not `plan` (already a billing plan,
+[Plans and limits](public/concepts/plans-and-limits.md)) or `task` (an
+MCP-spec extension). Tools: `claim_path`, `renew_claim`, `release_claim`,
+`list_claims`, `register_work_plan`, `work_plan_status`, `claim_step`,
+`complete_step`, `release_step`, and person-only `break_claim`,
+`cancel_step`, `skip_step`: the last three follow the same ceiling as
+approving and revealing a secret, an agent's role never executes them.
+
+### 2. Ownership proof and identity
+
+A connection is not a session: two browser windows, or two agent
+processes, sharing one token or one person look identical to the
+database unless something distinguishes them. `claim()` returns a random
+secret once; only its hash is stored, the same shape as a link's
+credential or an access token. Renewing, releasing or completing a claim
+needs that secret, the claim's fence (a counter that bumps on every
+grant, so a stale holder that wakes up after a reclaim can't mistake
+itself for the current one), the same connection and the same person.
+Both identities come from the request's own verified claims (the token
+id and the user id), never an argument the caller supplies, the same
+reason `private.uid()` and `private.agent()` already work that way
+everywhere: an argument is something a caller can lie about. The
+holder's label (what shows on the Claims page) is self-reported and
+quoted as data, never trusted for identity.
+
+### 3. Claim rules
+
+How long a claim holds exclusive use of a path is a rule, not a
+constant: a vault default plus optional overrides by path prefix, the
+same specificity resolution `path_policies` already uses (exact path,
+then longest folder prefix). Default 48 hours. Every check-in restarts
+the lease, so a working agent never loses its claim mid-task and a
+silent one loses it after exactly one lease, with no cron dependency:
+expiry is judged by the database clock the next time anyone tries to
+claim, the same lazy-expiry pattern access tokens and OAuth grants use.
+A caller may ask for a shorter lease, never a longer one than the rule's
+maximum, and never below one minute (shorter is indistinguishable from a
+caller bypassing the point of leasing at all). No amount of checking in
+holds a claim past the rule's hold limit, so a claim can't be kept alive
+forever. Only a person, in the web app, sets rules: an agent never can,
+matching who sets folder rules and variable grants today.
+
+Three presets ship as starting points, to tune once the pilot shows a
+problem, not because they were measured: **Hackathon** (lease 30
+minutes, longest check-again hint 1 minute, place in line 15 minutes),
+**Team** (8 hours, 15 minutes, 2 hours), **Org** (48 hours, 1 hour, 6
+hours). The rule also carries the guard settings of item 12 below: the
+minimum gap between full evaluations (starting point a quarter of the
+longest hint), the most steps one connection may hold (1) and one
+person's agents together (5), the hold limit (Org: 7 days), the free
+lapses before a cooldown starts (1) and the cooldown's cap (the lease
+itself). Total load is agents divided by the gap, so the default gap is
+long (minutes) and a short one is opt-in per vault, bounded below by a
+floor (starting point 10 seconds): the spike's own load numbers (below)
+are why, since a short gap multiplies the call rate directly.
+
+### 4. Who may claim
+
+Whoever can write the path, the same `can_write_path` check `write_file`
+already runs, so a claim never grants access a write wouldn't already
+have. A read-only connection cannot claim, for the same reason it cannot
+write. Breaking someone else's claim needs a person present
+(`require_human`), the same ceiling as revealing a secret or managing
+members: an agent can walk away from its own claim, never force another
+one open.
+
+### 5. Claims do not block writes
+
+Compare-and-swap (shipped, phase 1) protects the *write*: it refuses a
+save whose base changed underneath it. A claim says who is *working* on
+a path: a courtesy and a coordination signal, not an access gate. The
+two are independent on purpose: a claim without a write still expires
+harmlessly, and a write without a claim still has to pass its
+`expected_version` check. A later per-folder rule could require a claim
+before a write is accepted at all, but that's a new rule to add later,
+not something this phase does.
+
+### 6. Plan format
+
+A fenced block in the plan file itself, not a separate table a person
+never sees while reading the plan: the same reasoning that put path
+rules in a UI form rather than a sidecar file. A strict, small syntax
+(the grammar itself is settled in CL-3.1, not here). Registration reads
+the file's *current* version and refuses anything but an approved
+(applied) version on a canon path, so a plan can't be registered from a
+draft still awaiting review, or from a version a concurrent edit already
+superseded.
+
+### 7. Step states
+
+Stored: `open`, `claimed`, `done`, `cancelled`. Computed, never stored,
+so nothing can drift out of sync with the graph: `ready` (open, every
+blocker done), `blocked` (open, a blocker not done yet),
+`blocked_by_cancelled` (a blocker is cancelled, so it can never become
+done). A cancelled step never counts as done: a step waiting on it
+stays blocked forever unless a person cancels it too, matching the
+spike's own finding that a cancelled blocker needs its own computed
+state, not a silent pass-through. A step may carry `gate: review`, which
+holds its dependents until a person approves it directly or its linked
+proposal is applied, for a step whose output needs a person's judgement
+before anything downstream should start, not just before it's marked
+done.
+
+### 8. Limits
+
+Categories needing a first-release default: active claims per vault,
+steps per plan, blockers per step, label and title length, one place in
+line per person per plan, a cap on a person's places across the vault,
+and the MCP rate limit. All chosen without measurement, the same spirit
+as the presets in item 3, meant to change the moment the pilot shows a
+problem. The rate limit is settled with numbers, because the spike
+measured it directly: `request_work` gets its own bucket of 30 calls a
+minute per token (the general limit stays 120, untouched), each vault
+gets a budget of 300 `request_work` calls a minute across all its
+people and agents together, and the default gap between full
+evaluations is 15 minutes with a 10 second floor (item 3).
+
+**Open, owner: maintainer.** The other categories above (active claims
+per vault, steps per plan, blockers per step, label length, title
+length, and the per-person place-in-line cap) have no chosen number
+yet. Proposed here, by analogy with the nearest existing limits
+(`REASON`'s 4000 characters for a proposal reason or comment; a vault
+name's 100 characters; membership's 20 invites an hour): a label of 200
+characters, a title of 200 characters, 500 active claims per vault, 500
+steps per plan, 50 blockers per step, and 3 places in line per person
+across a vault. Flagged on the tracking issue (a comment on #58) for the
+maintainer to confirm or override before CL-2.x/CL-3.x build against
+them, not guessed silently, per the tracking issue's own instruction.
+
+### 9. Events
+
+One dot each, matching the existing activity-label convention
+(`file.write`, `proposal.approve`): `claim.grant`, `claim.renew`,
+`claim.release`, `claim.break`, `claim.expire`, `work_plan.register`,
+`step.claim`, `step.complete`, `step.release`, `step.cancel`,
+`step.skip`, `queue.join`, `queue.leave`, `queue.expire`.
+
+### 10. Export, erasure, deletion
+
+Claims and steps are state, not content: they describe who's doing
+what, not a vault's substance, so neither is exported, the same
+distinction export already draws for the log. `delete_vault` removes
+them, cascading the same way memberships and variables already do.
+`erase_file` releases any claim on the path it erases, since a claim on
+a path whose content no longer exists is meaningless. The log keeps its
+entries regardless: append-only means append-only, and a claim's
+history is exactly the kind of "what happened" the log exists to
+answer.
+
+### 11. Waiting without spinning
+
+Asking for work (`request_work`, the tool behind the tickets in item 3)
+always answers at once, never blocks, in one of: `granted`; `wait` (the
+agent's place in line, how many steps are ready, and a suggested time to
+check again); `at_capacity` (finish or give back what you hold first);
+`cooling_down` (with how long); `blocked_by_cancelled` (a person has to
+act, stop polling); `plan_complete` (stop polling); `refused` (too many
+places in line already); `no_such_plan`. A waiting caller holds a place
+in line. The fairness rule: the k-th oldest *live* place may claim only
+if at least k steps are ready, first come, first served, and no step
+sits idle while fewer agents are waiting than steps are ready. A place
+stays live only while its holder keeps checking in, within the rule's
+place-in-line time, so an agent that vanishes drops out of line and one
+that returns late starts at the back, never cutting in ahead of whoever
+waited. The suggested time is the earliest claimed step's lease end,
+capped by the rule's longest hint, a suggestion, not a promise: a step
+can finish earlier. The server cannot wake a sleeping agent: nothing
+here can push, so the tool descriptions have to tell the agent plainly
+to stop and return at the suggested time; bringing it back is the
+agent's own harness's job, or a person's, the same limit MCP's
+request/response shape already puts on [Notifications](#notifications).
+
+### 12. The agent is not trusted
+
+No rule may depend on an agent behaving, and none needs a model: every
+one is a predicate the database checks in the same statement as the
+change, the same design principle [Notifications](#notifications) and
+every access rule already follow, taken further here because claims and
+work plans are coordination machinery an agent could otherwise game to
+starve others of work, not just a single path's access:
+
+- **(a) One way in.** An agent's database role executes only the
+  agent-facing functions (`agent_request_work`, `agent_complete_step`,
+  `agent_checkin_step`, `agent_release_step`, `agent_leave_queue`, and
+  their claim equivalents) and holds no privilege on any table directly;
+  a function that ignores the queue is simply not executable by that
+  role, so there is no path around the rules to find.
+- **(b) Identity from the session, never an argument** (item 2, applied
+  here too).
+- **(c) A step is claimable only if** it is open or its lease has
+  lapsed, its *stored* count of unfinished blockers is 0, the caller's
+  person is next in line by the rule of item 11, and neither the
+  connection nor the person is over its cap, all four checked in the
+  one statement that grants the claim.
+- **(d) Cheap refusal.** A caller that comes back before its minimum gap
+  gets its last answer from one indexed read and writes nothing: the
+  spike's own numbers (below) are why this matters, since without it a
+  hammering caller costs as much as a real evaluation.
+- **(e) The unit of fairness is the person, not the connection or the
+  agent.** One place in line per person per plan; one cap on what a
+  person's agents hold together; a claim that lapses unfinished is a
+  strike against the *person*, not the connection that happened to hold
+  it. The first lapse is free; later ones earn a cooldown that doubles
+  up to a cap; finishing a step clears the count. Keying by person
+  rather than connection is the one change the spike's own hostile-crowd
+  run found necessary: keyed by connection, a crowd spread across many
+  connections got its share of every grant even while the fairness rule
+  was followed to the letter, the finding that changed the design, per
+  the spike's results.
+- **(f) Readiness is a stored count**, decremented in step order when a
+  blocker completes, never a live join across the plan's edges: a
+  step's claimability never depends on reading another plan, and a test
+  checks the stored counts against the graph's actual state after every
+  scenario, the same invariant-checking habit `storage_scan` already
+  brings to the byte counter.
+- **(g) Refreshing a place in line changes no indexed column**, and the
+  table keeps spare room, so polling for status never grows an index,
+  the same "reading shouldn't cost like writing" instinct behind (d).
+
+**Validated in the spike** (full numbers in `spikes/claims/README.md`):
+10,000 contended claim attempts on 200 paths gave exactly 200 grants,
+against 14 to 40 duplicates for a naive read-then-write version. A
+120-step dependency graph under crashes had 0 claims past an unfinished
+blocker; with the gate removed, 221. Following the suggested wait time
+made about 25 times fewer calls with abandoned claims and about 11 times
+fewer without. The hostile-agent design's 70 assertions across 15 groups
+all passed, and removing any one of its 15 guards in turn broke a named
+assertion: 15 of 15 caught, re-verified when the spike was installed
+into this repo (CL-0.4). At 100 agents asking as fast as they can, the
+guarded design held 53,992 calls a second at 1.9 ms against 6,172 at 16
+ms for the earlier, connection-keyed one; the same shape held at 500
+agents and across 5,000 simulated vaults.
+
+### What this doesn't show
+
+- **The hosted path.** Nothing in the spike goes through the MCP server,
+  the serverless functions or Supabase's transaction-mode pooler. The
+  existing per-token limit (120 tool calls a minute, `mcp/src/ratelimit.ts`)
+  already bounds a single hostile connection to 2 calls a second
+  regardless of anything claims add; each call costs about 3 pooler
+  round trips today (`docs/research/server-load.md`'s own measured
+  count), so that total is the ceiling CL-3.10/CL-3.11's load tests need
+  to measure, not the SQL.
+- **RLS and this project's own tables.** The spike's agent role stands
+  in for the eventual API role; Reliquary's real tables, foreign keys
+  and RLS policies aren't there.
+- **Real agents.** Whether one actually follows a suggested check-again
+  time, rather than polling anyway, is what the hand-run pilot (CL-0.3)
+  has to show: the spike can only prove the server-side mechanics are
+  sound, not that an agent behaves.
+- **Busywork that looks like progress.** A check-in can't be told apart
+  from real work; `max_hold` bounds how long that can go on, but nothing
+  here detects it.
+- **Item 8's unset limits**, until the maintainer settles them.
+
+**Accept:** every item above has a decision and a reason, except item
+8's remaining limit categories, marked open with an owner (the
+maintainer, via a comment on #58) rather than guessed.
 
 ## Links
 
