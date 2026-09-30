@@ -35,7 +35,7 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
 const steps: Array<[string, Raw]> = [
   [
     "Connect any AI tool with one URL",
-    html`Paste Reliquary's MCP URL into Claude, ChatGPT or Claude Code and sign in. Other MCP clients use a scoped, expiring token you can revoke.`,
+    html`Paste Reliquary's MCP (Model Context Protocol) URL into Claude, ChatGPT or Claude Code and sign in. Other MCP clients use a scoped, expiring token you can revoke.`,
   ],
   [
     "Agents read and propose",
@@ -61,15 +61,15 @@ const differentiators: Array<[string, string]> = [
     "Memory tools don't hold secrets and secret managers don't hold context. A project needs both, with one invite and one access log.",
   ],
   [
-    "EU-hosted, bring your own model",
-    "Data sits in Frankfurt. Reliquary runs no model and resells no inference, so it stays cheap and your AI provider stays your choice.",
+    "Never locked into one AI vendor",
+    "Use whichever AI is best for the job today, and switch when a better one comes along. Reliquary holds no model of its own and resells no inference, so your provider is always your choice, not ours. Data sits in Frankfurt.",
   ],
 ];
 
 const audiences: Array<[string, string]> = [
   [
     "Agencies and consultancies",
-    "One vault per client: context the whole team's agents read, approvals on anything that becomes fact, credentials used without being pasted, and one log to show the client.",
+    "One vault per client: everyone on your team only sees what they're scoped to, approvals on anything that becomes fact, credentials used without being pasted, and one log to show the client.",
   ],
   [
     "Solo builders",
@@ -77,7 +77,7 @@ const audiences: Array<[string, string]> = [
   ],
   [
     "Small product teams",
-    "Some people use Claude, some ChatGPT, some Cursor. Give them the same reviewed context, and keep keys out of chat messages.",
+    "Some people use Claude, some ChatGPT, some Cursor. Give everyone the same reviewed context, scoped to what they need, and keep keys out of chat messages.",
   ],
 ];
 
@@ -87,25 +87,41 @@ const faq: Array<[string, Raw]> = [
   ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no model. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
   ["Do I need to host anything?", html`No. Reliquary is hosted in the EU, and nothing depends on your machine staying on.`],
   ["Which AI provider sees my data?", html`Only the ones you connect, and only what their agent reads through your account. They process it under your own agreement with them. See <a href="/subprocessors">sub-processors</a>.`],
+  ["Is it for regulated data?", html`Not yet. Reliquary has no SOC 2 report or SSO today. Don't store health or payment card data in it.`],
   ["Can my agents see my secrets?", html`Not through Reliquary: no MCP tool returns a variable's value. <code>reliquary run</code> puts values into one process, and an agent that can run commands in that process could read them there. The <a href="/security">security page</a> says what that means.`],
   ["How is it different from Claude Projects or ChatGPT memory?", html`It works across vendors, people approve changes before they become fact, and it holds credentials as well as context.`],
   ["Can I leave?", html`Yes. An owner can export a whole vault as plain markdown files at any time, and delete it for good.`],
-  ["Is it for regulated data?", html`Not yet. Reliquary has no SOC 2 report or SSO today. Don't store health or payment card data in it.`],
 ];
 
 export function landing(theme: Theme): string {
-  // Headline "The canon for humans and agents." (2026-09-29): the previous
-  // one, "Your agents propose. You approve.", moved to the sub-line right
-  // below it -- still true and concrete, just not the first thing read.
+  // Headline "The canon for humans and agents." (2026-09-29): kept. It's
+  // distinctive and the H1 shouldn't just repeat what "How it works"
+  // explains a few scrolls down. But three independent read-throughs
+  // (synthetic ICP reader-check, 2026-09-30) all misread "canon" as a
+  // wiki/fandom term until several sections in, because the sub-line never
+  // actually named it. Fixed narrowly: the sub-line now says "canon"
+  // itself instead of leaving the reader to connect the two, and "Who it's
+  // for" (previously after "What makes it different") moved up next to the
+  // Problem section, since all three reads recognized themselves in their
+  // own audience card and had to scroll past two sections to reach it.
+  //
+  // Vendor lock-in, stated as a problem and a differentiator (2026-09-30,
+  // owner's call): the earlier copy leaned on "works with Claude, ChatGPT,
+  // Cursor" three times as if listing vendors were the differentiator on
+  // its own -- research says that's close to table stakes now. The actual
+  // argument is sharper than the vendor list: betting on one AI vendor
+  // means inheriting their risk (pricing, outages, who they're allowed to
+  // serve), and the fix is being able to switch, not just being told the
+  // product happens to work with several tools today.
   const body = html`
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">
     <p class="eyebrow"><span class="logo" aria-hidden="true"></span>Shared context and credentials for AI teams</p>
     <h1 id="hero-title">The canon for humans and agents.</h1>
-    <p class="hero-sub">Your agents propose. You approve.</p>
-    <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use. Claude, ChatGPT, Cursor and Claude Code read the same approved context. Secrets stay out of the chat.</p>
+    <p class="hero-sub">Your agents propose changes to canon. You approve them.</p>
+    <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use: Claude, ChatGPT, Cursor, Claude Code and more. People and agents alike only see what they're scoped to. Secrets stay out of the chat.</p>
     ${cta("Get started")}
-    <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta.</p>
+    <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta: tell us about your team and we'll set up your first vault with you, usually within 24 to 48 hours.</p>
     ${preAlphaNote()}
   </div>
   ${proposalCard}
@@ -117,7 +133,17 @@ export function landing(theme: Theme): string {
     <li>Every person has their own AI memory, so the project's truth drifts.</li>
     <li>Agents write things nobody checked, and the next agent believes them.</li>
     <li>API keys travel by email and sit in <code>.env</code> files any agent can read.</li>
+    <li>Bet everything on one AI vendor, and their risk becomes yours: pricing, outages, even who they're allowed to serve.</li>
   </ul>
+</section>
+
+<section class="site-section" aria-labelledby="who-title">
+  <h2 id="who-title">Who it's for</h2>
+  <div class="grid-3">
+    ${audiences.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
+  </div>
+  <p class="not-for"><strong>What Reliquary is not:</strong> an AI model or chatbot, search over your Drive and Slack, or a memory that writes itself.</p>
+  <p class="muted small">Works with Claude, Claude Code, ChatGPT, Cursor and any MCP client. For client work, invites, credential requests and client guests are coming.</p>
 </section>
 
 <section class="site-section" id="how" aria-labelledby="how-title">
@@ -132,15 +158,6 @@ export function landing(theme: Theme): string {
   <div class="grid-2">
     ${differentiators.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
   </div>
-</section>
-
-<section class="site-section" aria-labelledby="who-title">
-  <h2 id="who-title">Who it's for</h2>
-  <div class="grid-3">
-    ${audiences.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
-  </div>
-  <p class="not-for"><strong>What Reliquary is not:</strong> an AI model or chatbot, search over your Drive and Slack, or a memory that writes itself.</p>
-  <p class="muted small">Works with Claude, Claude Code, ChatGPT, Cursor and any MCP client. For client work, invites, credential requests and client guests are coming.</p>
 </section>
 
 <section class="site-section trust" aria-labelledby="trust-title">
@@ -180,7 +197,7 @@ ${PRICING.show
 
 <section class="site-section closing" aria-labelledby="closing-title">
   <h2 id="closing-title">Try it on your next project</h2>
-  <p>Reliquary is invite-only while in beta. Tell us about your team and the AI tools you use, and we'll set up your first vault with you.</p>
+  <p>Reliquary is invite-only while in beta. Tell us about your team and the AI tools you use, and we'll set up your first vault with you, usually within 24 to 48 hours.</p>
   ${cta("Get started")}
 </section>`;
   return sitePage({

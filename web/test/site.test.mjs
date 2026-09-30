@@ -70,7 +70,7 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   assert.equal(r.status, 200);
   const h = await r.text();
   assert.match(h, /<h1 id="hero-title">The canon for humans and agents\.<\/h1>/);
-  assert.match(h, /<p class="hero-sub">Your agents propose\. You approve\.<\/p>/);
+  assert.match(h, /<p class="hero-sub">Your agents propose changes to canon\. You approve them\.<\/p>/);
   assert.match(h, /Reliquary by Red Mage/);
   assert.match(h, /<h2 id="how-title">How it works<\/h2>/);
   assert.equal((h.match(/<ol class="steps">[\s\S]*?<\/ol>/)[0].match(/<li>/g) ?? []).length, 3, "three steps");
