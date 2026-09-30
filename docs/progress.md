@@ -307,8 +307,13 @@ Not a numbered milestone of its own, on the same owner's call as path
 ownership and flags (2026-09-30, tracking issue #52): compare-and-swap
 writes, path claims and work plans, so no agent overwrites another's edit
 and no agent is handed a step before its blockers are done, all as
-database predicates that don't depend on an agent behaving. Three gated
-phases, each its own set of small pull requests:
+database predicates that don't depend on an agent behaving. Three phases,
+each its own set of small pull requests. Moving from one phase to the
+next has no fixed day-count gate (an earlier version of this required 14
+days of phase 1 use before phase 2 and 30 days of phase 2 use before
+phase 3; dropped the same day, owner's decision): usage is tracked
+informally below as each phase ships, and the maintainer decides when to
+start the next one.
 
 - **Phase 1: compare-and-swap writes.** Built, 2026-09-30:
   `read_file` returns a file's current version in a `version:` line
@@ -328,12 +333,12 @@ phases, each its own set of small pull requests:
   `web/test/races.test.mjs` (exactly one of many simultaneous writers
   from one base wins; a stale write racing an erasure never deadlocks).
   Registry: `tests/features.md` F437-F439.
-- **Phase 2: path claims** (who's working a path, with a lease). Waits for
-  phase 1's 14 days of real use, and the maintainer confirming phase 2
-  should start.
+- **Phase 2: path claims** (who's working a path, with a lease). Not
+  started; starts when the maintainer decides to, informed by how phase 1
+  holds up in real use.
 - **Phase 3: work plans** (steps with blockers, waiting without polling).
-  Waits for claims to be used by a second person for 30 days, and the
-  maintainer confirming phase 3 should start.
+  Not started; starts when the maintainer decides to, informed by how
+  claims hold up once phase 2 ships.
 
 Design for phases 2 and 3 is being settled in docs/design.md (tracking
 issue's CL-0.2, blocked on CL-0.4's reference spike); nothing from those
