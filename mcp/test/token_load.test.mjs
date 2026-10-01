@@ -42,7 +42,9 @@ async function measure(c, name, args, label = name) {
 // Budgets in bytes, set just above what the compact formats produce, so a
 // regression shows and small wording changes don't.
 const BUDGET = {
-  "tools/list": 10900,
+  // Raised for claim_path, renew_claim, release_claim and list_claims
+  // (CL-2.4, F441): four more tool schemas in every tools/list response.
+  "tools/list": 13700,
   list_vaults: 200,
   list_files: 1800,
   "list_files prefix=canon/": 400,

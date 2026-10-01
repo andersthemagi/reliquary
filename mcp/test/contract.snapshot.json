@@ -56,6 +56,40 @@
     }
   },
   {
+    "name": "claim_path",
+    "title": "Claim a path",
+    "description": "Lease a path to say you're working on it: a courtesy and a coordination signal, not an access gate (write_file's own expected_version still guards the write). Whoever could write the path may claim it; a read-only connection can't. Default and maximum lease 48 hours; a request past that is clamped, not refused. Refused if someone already holds it, naming them and when it frees up. Returns a secret, once: keep it and the fence this returns, from this connection -- renew_claim and release_claim need both, and nothing else can prove the claim is yours.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "label": {
+          "description": "Shown to people on the Claims page, e.g. what you're doing. Self-reported, never trusted for identity",
+          "type": "string",
+          "maxLength": 200
+        },
+        "ttl_minutes": {
+          "description": "Default (and today's maximum) 48 hours",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 43200
+        }
+      },
+      "required": [
+        "vault",
+        "path"
+      ]
+    },
+    "annotations": null
+  },
+  {
     "name": "comment_on_proposal",
     "title": "Comment on a proposal",
     "description": "Comment on a proposal's thread as your person. Words only: a comment can't approve, reject or change it (revise_proposal changes your own).",
@@ -132,6 +166,26 @@
       ]
     },
     "annotations": null
+  },
+  {
+    "name": "list_claims",
+    "title": "List claims",
+    "description": "Active claims in a vault: path, holder, label, when granted and when the lease ends.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "vault"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true
+    }
   },
   {
     "name": "list_files",
@@ -422,6 +476,80 @@
     "annotations": {
       "readOnlyHint": true
     }
+  },
+  {
+    "name": "release_claim",
+    "title": "Release a claim",
+    "description": "Give up a claim before it expires, freeing the path for anyone. Needs the exact fence and secret claim_path returned, from this same connection and person.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "secret": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "vault",
+        "path",
+        "fence",
+        "secret"
+      ]
+    },
+    "annotations": null
+  },
+  {
+    "name": "renew_claim",
+    "title": "Renew a claim",
+    "description": "Restart a claim's lease, from the secret and fence claim_path (or the last renew_claim) returned. Needs the same connection and person; a stale fence or secret, a different connection, or an already-expired claim is refused. No amount of renewing holds a claim past its hold limit (7 days from the original grant).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "secret": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "ttl_minutes": {
+          "description": "Default (and today's maximum) 48 hours",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 43200
+        }
+      },
+      "required": [
+        "vault",
+        "path",
+        "fence",
+        "secret"
+      ]
+    },
+    "annotations": null
   },
   {
     "name": "revise_proposal",

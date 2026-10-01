@@ -6,6 +6,9 @@
 //   vaultfiles-tools.ts  vault + file tools (list_vaults, create_vault,
 //                        list_files, read_file, search, write_file,
 //                        delete_file)
+//   claims-tools.ts      claim_path, renew_claim, release_claim,
+//                        list_claims (break_claim needs a person present,
+//                        so no tool here offers it)
 //   proposals-tools.ts   propose, list_proposals, revise_proposal,
 //                        changes_since, read_proposal, comment_on_proposal
 //   variables-tools.ts   list_variables
@@ -21,6 +24,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type pg from "pg";
+import { registerClaimsTools } from "./claims-tools.js";
 import { asIdentity, type Identity } from "./db.js";
 import { registerFlagsTools } from "./flags-tools.js";
 import { registerLinksTools } from "./links-tools.js";
@@ -45,6 +49,7 @@ export async function registerTools(
   wrapRegisterTool(server);
 
   registerVaultFileTools(server, id, runAs);
+  registerClaimsTools(server, id, runAs);
   registerProposalsTools(server, id, runAs);
   registerVariablesTools(server, id, runAs);
   registerFlagsTools(server, id, runAs);
