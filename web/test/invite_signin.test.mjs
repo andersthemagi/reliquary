@@ -56,6 +56,7 @@ const csrfOf = (html) => /name="csrf" value="([0-9a-f]+)"/.exec(html)?.[1];
 const fake = async (path, init) => (await fetch(FAKE + path, init)).json();
 const stats = () => fake("/_stats");
 const otpRace = (on) => fake("/_otp_race", { method: "POST", body: JSON.stringify({ on }) });
+const failOtp = (status) => fake("/_fail_otp", { method: "POST", body: JSON.stringify({ status }) });
 const signups = (on) => fake("/_signups", { method: "POST", body: JSON.stringify({ on }) });
 const lastEmail = async (email) => {
   const m = await fake(`/_last_email?email=${encodeURIComponent(email)}`);
@@ -119,6 +120,7 @@ before(async () => {
 
 after(async () => {
   await otpRace(false);
+  await failOtp(0);
   await signups(false);
 });
 
@@ -203,6 +205,19 @@ test("invite sign-in: a double-tapped sign-up shows the code page, not 'Sign-in 
     assert.equal(done.status, 303);
   } finally {
     await otpRace(false);
+    await signups(false);
+  }
+});
+
+test("invite sign-in: a double-tapped sign-up still shows 'Sign-in is unavailable' when the retry fails too", async () => {
+  await signups(true);
+  await failOtp(500);
+  try {
+    const r = await askForCode(new Jar(), T.open, "both-fail@example.test");
+    assert.equal(r.status, 503);
+    assert.match(await r.text(), /Sign-in is unavailable/);
+  } finally {
+    await failOtp(0);
     await signups(false);
   }
 });
