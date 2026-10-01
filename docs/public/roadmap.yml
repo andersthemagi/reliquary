@@ -234,6 +234,11 @@
   status: shipped
   docs: concepts/vaults-and-files
 
+- title: Claims
+  summary: A lease saying who's working a path, and for how long. Agents claim, renew, release and list claims over MCP; a person sees and breaks one, and sets how long they last by path, in the web app.
+  status: shipped
+  docs: concepts/claims
+
 # Planned ------------------------------------------------------------------
 
 - title: Publish the CLI to npm

@@ -333,13 +333,48 @@ start the next one.
   `web/test/races.test.mjs` (exactly one of many simultaneous writers
   from one base wins; a stale write racing an erasure never deadlocks).
   Registry: `tests/features.md` F437-F439.
-- **Phase 2: path claims** (who's working a path, with a lease). Not
-  started; starts when the maintainer decides to, informed by how phase 1
-  holds up in real use.
+- **Phase 2: path claims** (who's working a path, with a lease). Built,
+  2026-10-01, across five pull requests (CL-2.1 through CL-2.7; CL-2.2 and
+  CL-2.3 are the same table's own lock-order and hostile-test passes, not
+  separate features):
+  `public.path_claims` (`20260930200000_path_claims.sql`): `claim_path`,
+  `renew_claim`, `release_claim` (the holder, from the same connection and
+  person, proven by a secret returned once and hashed, never trusted from
+  an argument) and person-only `break_claim`; a claim never gates a write
+  (compare-and-swap, phase 1, still does that); erasing a file releases
+  its claim, and `delete_vault` deletes a vault's claims itself, in the
+  same fixed lock order as files and variable values
+  (`20260930210000_claims_lock_order.sql`, forced-interleaving races in
+  `web/test/races.test.mjs`). Hostile tests, including the table's own
+  closure (no direct write, secret hash and holder token never a
+  selectable column) and cross-vault invisibility:
+  `supabase/tests/path_claims_test.sql`.
+  MCP (`mcp/src/claims-tools.ts`, CL-2.4): `claim_path`, `renew_claim`,
+  `release_claim`, `list_claims`; `read_file` shows an active claim.
+  `break_claim` isn't offered over MCP (the same ceiling as approving or
+  revealing a secret). A holder's self-reported label is fenced as data
+  everywhere it's shown, including in a lost-race refusal, which
+  re-reads it after a savepoint rather than repeating the SQL error's own
+  unfenced copy (`mcp/test/claims.test.mjs`).
+  Web (`web/src/claimspage.ts`, CL-2.5): a vault's Claims page (path,
+  holder, time left) with Break behind a confirm page, owners and editors
+  only (`web/test/claims_page.test.mjs`).
+  Claim rules (`20260930220000_claim_rules.sql`, CL-2.7): `public.
+  claim_rules` (vault and path prefix, same specificity as
+  `path_policies`), `set_claim_rule` (owner, in person), presets
+  (Hackathon, Team, Org) and a control on the Rules page
+  (`web/src/claimrulespage.ts`); with no rule, a claim still behaves
+  exactly as phase 2 shipped it (48 hour lease, 7 day hold limit, 1
+  claim per connection, 5 per person) --- those were always this phase's
+  defaults, now overridable rather than fixed. Stores five columns phase
+  3 will need (place in line, check-again hint, minimum gap, free
+  lapses, cooldown cap) that nothing reads yet.
+  `supabase/tests/claim_rules_test.sql`, `web/test/claim_rules_page.test.mjs`.
+  Registry: `tests/features.md` F440-F443. Docs: `docs/public/concepts/claims.md`,
+  `docs/public/concepts/agents.md`'s ceiling list, `docs/public/roadmap.yml`.
 - **Phase 3: work plans** (steps with blockers, waiting without polling).
   Not started; starts when the maintainer decides to, informed by how
-  claims hold up once phase 2 ships.
+  claims hold up in real use now that phase 2 has shipped.
 
-Design for phases 2 and 3 is being settled in docs/design.md (tracking
-issue's CL-0.2, blocked on CL-0.4's reference spike); nothing from those
-phases is built yet.
+Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
+plans", CL-0.2); phase 2 is built as of this entry, phase 3 is not.
