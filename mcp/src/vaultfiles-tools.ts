@@ -225,15 +225,19 @@ export function registerVaultFileTools(
       run(async (c) => {
         const { rows } = await c.query(
           `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.body,
-                  fv.author, fv.agent, f.updated_at, fv.id as version
+                  fv.author, fv.agent, f.updated_at, fv.id as version,
+                  pc.holder as claim_holder, pc.holder_label as claim_label, pc.expires_at as claim_expires
              from ${VAULT_REF}
              cross join lateral (select * from public.files f
                                   where f.vault_id = v.id and f.path = $2 and f.deleted_at is null offset 0) f
-             join public.file_versions fv on fv.id = f.current_version_id`,
+             join public.file_versions fv on fv.id = f.current_version_id
+             left join public.path_claims pc on pc.vault_id = v.id and pc.path = f.path and pc.expires_at > now()`,
           [vault, path],
         );
         if (rows.length === 0) return refuse("No file at that path. Use list_files to see the vault's.");
-        return ok(fileBlock(rows[0], { from: from_line, to: to_line, maxBytes: max_bytes ?? READ_DEFAULT_BYTES }));
+        const r = rows[0];
+        const claim = r.claim_holder ? { holder: r.claim_holder, label: r.claim_label, expires: r.claim_expires } : null;
+        return ok(fileBlock({ ...r, claim }, { from: from_line, to: to_line, maxBytes: max_bytes ?? READ_DEFAULT_BYTES }));
       }),
   );
 

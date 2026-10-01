@@ -170,3 +170,21 @@ Still to do, from the token side:
 - **`tools/list` has no headroom again.** Phase 2 (path claims) will add
   several more tools once its gate opens; the budget will need raising
   again then, same as every pass so far.
+
+## Sixth pass (claim tools)
+
+2026-10-01, CL-2.4 of the same effort. Four new tools: `claim_path`,
+`renew_claim`, `release_claim` and `list_claims` (20260930200000_path_claims.sql,
+design.md "Claims and work plans"). `tools/list` grew from 10,770 to
+13,583 bytes, well over its 10,900-byte budget. Raised to 13,700, just
+above the actual, per this doc's own rule. No existing tool's own budget
+changed; `read_file`'s response can now carry a `claimed by ... until ...`
+line and a fenced label when the path has an active claim, but the Load
+vault's fixture file (`notes/n01.md`) never does, so its measured 2,000-byte
+budget is untouched too.
+
+Still to do, from the token side:
+
+- **`tools/list` has no headroom again.** Phase 3 (work plans) will add
+  several more tools once its gate opens; the budget will need raising
+  again then, same as every pass so far.
