@@ -18,6 +18,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Proposals and review](concepts/proposals-and-review.md)
 - [The top bar, inbox and account](concepts/inbox-and-account.md)
 - [Flags](concepts/flags.md)
+- [Claims](concepts/claims.md)
 - [Agents and the ceiling](concepts/agents.md)
 - [Connections](concepts/connections.md)
 - [Links](concepts/links.md)
