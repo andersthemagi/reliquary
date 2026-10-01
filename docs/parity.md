@@ -91,6 +91,7 @@ and, for the agent, its token's vaults and access.
 | Renew or release your own claim | none | `renew_claim`, `release_claim` | agent; the claim's own holder, from the same connection, with its secret and fence | **Gap**, left on purpose, same reason as claiming: these follow the agent that made the claim |
 | See a vault's active claims (path, holder, time left) | a vault's **Claims** section | `list_claims` | both, any connection (read-only is enough) | Both sides read the same `path_claims` rows; the web page also links each to the file it's on |
 | Break someone else's claim | its **Claims** section, **Break** (confirm first) | none | person, owners and editors | **Ceiling**: `break_claim` is `require_human`, the same ceiling as approving or revealing a secret (design.md "Claims and work plans" item 1) |
+| Set, change or remove a claim rule (lease, hold limit, caps, by path) | the **Rules** page, Claim rules section | none | person (owner) | **Ceiling**, the same as a canon/open rule: `set_claim_rule` is `require_human`, owners only. Agents read the result through `claim_path`'s own lease and refusals, not this tool |
 
 ## Fixed in this change
 

@@ -4,6 +4,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { claimRulesSection, loadClaimRules } from "./claimrulespage.js";
 import { confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge, time, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
@@ -81,6 +82,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
     if (!v) return null;
     const { list, def } = await loadRules(c, id);
     const checked = check ? await ruleFor(c, id, check) : null;
+    const claimRules = await loadClaimRules(c, id);
     const owner = v.role === "owner";
     // "Change" fills the form with the rule as it is.
     const changing = change !== null ? list.find((r) => r.path === change) : undefined;
@@ -166,7 +168,8 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       ${table}
       ${formFirst ? "" : addForm}
       ${checker}
-      <p class="hint rules-help">Canon changes need approval from people; agents can only propose them.${owner ? "" : " Only owners change rules."} <a href="/docs/how-to/set-rules">How rules work</a></p>`;
+      <p class="hint rules-help">Canon changes need approval from people; agents can only propose them.${owner ? "" : " Only owners change rules."} <a href="/docs/how-to/set-rules">How rules work</a></p>
+      ${claimRulesSection(ctx, id, owner, claimRules)}`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "rules" }, body) };
   });
   if (!data) return notFound(ctx);
