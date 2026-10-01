@@ -62,6 +62,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["claim.renew", "Renewed a claim"],
   ["claim.release", "Released a claim"],
   ["claim.break", "Broke a claim"],
+  ["claim_rule.set", "Changed a claim rule"],
 ];
 export const EVENT_GROUPS: readonly [string, string][] = [
   ["file.", "Any file change"],
