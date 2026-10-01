@@ -86,7 +86,7 @@ services:
       GOTRUE_DISABLE_SIGNUP: "false"
       GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
       GOTRUE_MAILER_AUTOCONFIRM: "false"
-      GOTRUE_MAILER_OTP_EXP: "600"
+      GOTRUE_MAILER_OTP_EXP: "3600"
       GOTRUE_MAILER_OTP_LENGTH: "6"
       # Every email Auth sends: web/emails/*.html (written by web/emails/build.mjs,
       # the same files the hosted service's dashboard gets), fetched from the

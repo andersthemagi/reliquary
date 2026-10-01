@@ -492,7 +492,7 @@ only.)
    method removed, Verification method added, Verification method removed:
    turn it on, then subject and body as above.
 5. Check: **Authentication > Sign In / Providers**, Email OTP expiration is
-   600 seconds (the emails say "within 10 minutes"). Then sign in to the app
+   3600 seconds (the emails say "within an hour"). Then sign in to the app
    once: the email has the big code, a **Sign in** button, and the link
    written out, all to `https://app.reliquary.redmage.cc/auth/confirm`.
 

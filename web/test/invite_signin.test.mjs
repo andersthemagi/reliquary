@@ -55,6 +55,7 @@ const post = async (path, fields, jar) =>
 const csrfOf = (html) => /name="csrf" value="([0-9a-f]+)"/.exec(html)?.[1];
 const fake = async (path, init) => (await fetch(FAKE + path, init)).json();
 const stats = () => fake("/_stats");
+const otpRace = (on) => fake("/_otp_race", { method: "POST", body: JSON.stringify({ on }) });
 const signups = (on) => fake("/_signups", { method: "POST", body: JSON.stringify({ on }) });
 const lastEmail = async (email) => {
   const m = await fake(`/_last_email?email=${encodeURIComponent(email)}`);
@@ -117,6 +118,7 @@ before(async () => {
 });
 
 after(async () => {
+  await otpRace(false);
   await signups(false);
 });
 
@@ -181,6 +183,28 @@ test("invite sign-in: with sign-ups on, the invited address gets an account, sig
   assert.equal(joined.status, 303);
   assert.equal(joined.headers.get("location"), `/v/${V.id}`);
   assert.equal(await roleOf(id), "editor");
+});
+
+test("invite sign-in: a double-tapped sign-up shows the code page, not 'Sign-in is unavailable', and the first code works", async () => {
+  await signups(true);
+  await otpRace(true);
+  try {
+    const jar = new Jar();
+    const r = await askForCode(jar, T.open, "racer@example.test");
+    assert.equal(r.status, 200);
+    const codePage = await r.text();
+    assert.doesNotMatch(codePage, /unavailable/i);
+    const stat = await stats();
+    assert.equal(stat.lastCreateUser, false);
+    const { id } = await fake("/_user?email=racer%40example.test");
+    await sql("insert into auth.users (id, email) values ($1, 'racer@example.test') on conflict (id) do nothing", [id]);
+    const { code } = await lastEmail("racer@example.test");
+    const done = await post("/signin/code", { csrf: csrfOf(codePage), email: "racer@example.test", code, next: next(T.open) }, jar);
+    assert.equal(done.status, 303);
+  } finally {
+    await otpRace(false);
+    await signups(false);
+  }
 });
 
 test("invite sign-in: an address that already has an account signs in and joins, with sign-ups off", async () => {

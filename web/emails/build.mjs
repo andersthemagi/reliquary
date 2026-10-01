@@ -142,10 +142,10 @@ export const TEMPLATES = [
     html: () =>
       layout({
         subject: "Your Reliquary sign-in code",
-        preheader: "Your code to sign in to Reliquary. It works once, within 10 minutes.",
+        preheader: "Your code to sign in to Reliquary. It works once, within an hour.",
         title: "Sign in to Reliquary",
         body: [
-          p("Enter this code on the sign-in page to finish signing in. It works once, within 10 minutes."),
+          p("Enter this code on the sign-in page to finish signing in. It works once, within an hour."),
           code("{{ .Token }}"),
           p("Or sign in on the device you're reading this on:"),
           button(confirm("email"), "Sign in"),
@@ -170,7 +170,7 @@ export const TEMPLATES = [
         preheader: "Your code to confirm this address and finish making your Reliquary account.",
         title: "Confirm your email",
         body: [
-          p("Enter this code on the sign-in page to confirm this address and finish making your Reliquary account. It works once, within 10 minutes."),
+          p("Enter this code on the sign-in page to confirm this address and finish making your Reliquary account. It works once, within an hour."),
           code("{{ .Token }}"),
           p("Or confirm and sign in on the device you're reading this on:"),
           button(confirm("email"), "Confirm and sign in"),
