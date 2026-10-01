@@ -6,6 +6,28 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.14.0](https://github.com/andersthemagi/reliquary/compare/v0.13.0...v0.14.0) (2026-10-01)
+
+
+### Features
+
+* **claims:** claim rules -- setter, presets and the web control (CL-2.7) ([#100](https://github.com/andersthemagi/reliquary/issues/100)) ([d14db01](https://github.com/andersthemagi/reliquary/commit/d14db0169832df3455d7945ff37d7ab153fdd5d9)), closes [#69](https://github.com/andersthemagi/reliquary/issues/69)
+* **claims:** lock order against delete_vault and erase_file (CL-2.2) ([#96](https://github.com/andersthemagi/reliquary/issues/96)) ([f6e225c](https://github.com/andersthemagi/reliquary/commit/f6e225c44a9f90410f6c0bef233984801423d2e9)), closes [#65](https://github.com/andersthemagi/reliquary/issues/65)
+* **claims:** path claims table and functions (CL-2.1) ([#95](https://github.com/andersthemagi/reliquary/issues/95)) ([07f8bb1](https://github.com/andersthemagi/reliquary/commit/07f8bb1c04cb09cc94fab0340bdd6220261db68c)), closes [#63](https://github.com/andersthemagi/reliquary/issues/63)
+* **db:** write_file and delete_file accept an expected version ([#85](https://github.com/andersthemagi/reliquary/issues/85)) ([bc0223a](https://github.com/andersthemagi/reliquary/commit/bc0223a518a305089088c079d0d78b8dc2b9dd2a)), closes [#57](https://github.com/andersthemagi/reliquary/issues/57)
+* **mcp:** claim tools over MCP, and read_file shows an active claim (CL-2.4) ([#98](https://github.com/andersthemagi/reliquary/issues/98)) ([9a4d7ec](https://github.com/andersthemagi/reliquary/commit/9a4d7ec989137ceecdc821f761d227b20b681c01)), closes [#67](https://github.com/andersthemagi/reliquary/issues/67)
+* **mcp:** read_file returns the file's current version id ([#84](https://github.com/andersthemagi/reliquary/issues/84)) ([a9520d5](https://github.com/andersthemagi/reliquary/commit/a9520d5a39908028abaffef5de115c0ee3b80027)), closes [#56](https://github.com/andersthemagi/reliquary/issues/56)
+* **mcp:** write_file and delete_file take expected_version ([#87](https://github.com/andersthemagi/reliquary/issues/87)) ([6f4fec0](https://github.com/andersthemagi/reliquary/commit/6f4fec0f413de9ae516c89fc0d9441478a57653a)), closes [#59](https://github.com/andersthemagi/reliquary/issues/59)
+* **web:** a vault's Claims page, and the Break action (CL-2.5) ([#99](https://github.com/andersthemagi/reliquary/issues/99)) ([a3f8991](https://github.com/andersthemagi/reliquary/commit/a3f8991b01a7558aef59064012654ecf1bbb21f5)), closes [#68](https://github.com/andersthemagi/reliquary/issues/68)
+* **web:** reframe the landing page from reader-check findings ([#51](https://github.com/andersthemagi/reliquary/issues/51)) ([6089bb2](https://github.com/andersthemagi/reliquary/commit/6089bb24de8221f43fb67860a1589b9d7d494194))
+* **web:** the editor carries the file's version and shows a conflict ([#88](https://github.com/andersthemagi/reliquary/issues/88)) ([1d83642](https://github.com/andersthemagi/reliquary/commit/1d8364290e41c021b519e4b53fb637eafd2d10db)), closes [#60](https://github.com/andersthemagi/reliquary/issues/60)
+
+
+### Bug fixes
+
+* **signin:** double-tapped invite sign-up no longer shows 'Sign-in is unavailable' ([#102](https://github.com/andersthemagi/reliquary/issues/102)) ([1ef93d2](https://github.com/andersthemagi/reliquary/commit/1ef93d2c696ea11f1f662ab154aa8140851f9a45))
+* **signin:** double-tapped invite sign-up no longer shows "Sign-in is unavailable" ([1ef93d2](https://github.com/andersthemagi/reliquary/commit/1ef93d2c696ea11f1f662ab154aa8140851f9a45))
+
 ## [0.13.0](https://github.com/andersthemagi/reliquary/compare/v0.12.0...v0.13.0) (2026-09-29)
 
 An owner can now make an invite link for anyone to use, up to a set number of joins, instead of one for a single known address. A gap in feedback's NUL-byte check is closed too.
