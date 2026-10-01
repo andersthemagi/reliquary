@@ -21,12 +21,16 @@ What people and their agents can each do, where, and who may: every rule here is
 | Edit, then approve | the proposal's page | none | person, owners and editors |
 | Snooze or unsnooze in the Inbox | the proposal's page or row | none | person |
 | Follow changes | **Activity**, a file's **History** | `changes_since` | both |
+| Claim a path, renew or release your own [claim](../concepts/claims.md) | none | `claim_path`, `renew_claim`, `release_claim` | agent, owners and editors (whoever could write the path) |
+| See a vault's active claims | its **Claims** section | `list_claims` | both |
+| Break someone else's claim | **Claims**, **Break** | none | person, owners and editors |
 
 ## Vault settings, members and access
 
 | Action | Web app | MCP tool | Who may |
 |---|---|---|---|
 | Set or remove a rule | **Settings**, **Rules** | none | person, owners |
+| Set, change or remove a [claim rule](../concepts/claims.md#claim-rules) | **Rules**, **Claim rules** | none | person, owners |
 | Name or remove a path's [owners](../concepts/path-ownership.md) | **Rules**, a rule's **⋯**, **Owners** | none | person, owners |
 | Watch or unwatch a folder or file for [flags](../concepts/flags.md) | its page's **Watch**; **Settings**, **Watching** | none (`list_subscriptions` lists them) | person, any member, their own only |
 | Rename a vault or change its default policy | **Settings**, **General** | none | person, owners |

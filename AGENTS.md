@@ -26,9 +26,9 @@ else mid-flight.
 
 Also (owner's decision, 2026-09-30, tracking issue #52): compare-and-swap
 writes, path claims and work plans start now too, another deliberate,
-logged exception, in three phases — phase 1 (compare-and-swap writes) is
-shipped. Phase 2 (claims) and phase 3 (work plans) start whenever the
-maintainer decides to start them: no fixed day-count gate (an earlier
+logged exception, in three phases — phase 1 (compare-and-swap writes) and
+phase 2 (claims) are shipped (2026-10-01). Phase 3 (work plans) starts
+whenever the maintainer decides to: no fixed day-count gate (an earlier
 version of this required 14 and 30 days respectively; dropped the same
 day, same decision). Usage is tracked informally in `docs/progress.md` as
 each phase ships, for the maintainer's own judgement, not as a formal
