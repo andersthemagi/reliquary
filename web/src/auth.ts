@@ -517,7 +517,17 @@ export type SigninResult = { ok: true; cookies: string[]; newAccount: boolean } 
 // whether its address has an account, and nobody else anything.
 export async function sendSigninEmail(email: string, createUser = false): Promise<{ unavailable: boolean; signupsOff?: boolean }> {
   try {
-    const r = await gotrue("/otp", { email, create_user: createUser });
+    let r;
+    try {
+      r = await gotrue("/otp", { email, create_user: createUser });
+    } catch (err) {
+      if (!(createUser && err instanceof Unavailable)) throw err;
+      // A double-tap on a new account's sign-up races two account creations
+      // and the loser answers 500. The winner's email is already on its way,
+      // so ask once more without creating: the throttle's 429 reads as
+      // success and the first email stays valid.
+      r = await gotrue("/otp", { email, create_user: false });
+    }
     if (createUser && r.status === 422) {
       const code = String(r.json?.error_code ?? "");
       const msg = String(r.json?.msg ?? r.json?.message ?? "");

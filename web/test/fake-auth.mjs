@@ -25,6 +25,10 @@
 //   POST /_signups                { on: true|false }: whether /otp with create_user: true
 //                                 makes an account for an unknown address (off at start,
 //                                 as in the hosted project)
+//   POST /_otp_race               { on }: a double-tapped sign-up: /otp with create_user: true
+//                                 makes the account and emails the code, then answers 500
+//                                 (the losing request); a repeat with create_user: false
+//                                 within the throttle answers 429 and sends nothing
 //   GET  /_user?email=...         { id } of that account, or null
 //   POST /_users                  { email }: makes that account if it has none; { id }
 //   POST /_fail_global_logout     { status }: answer global logouts with that status
@@ -83,6 +87,7 @@ const failUserUpdate = { status: 0, body: {} }; // /_fail_user_update: answer PU
 const failGlobal = { status: 0 }; // /_fail_global_logout: answer global logouts with this status instead
 const TTL = 3600;
 const signups = { on: false };
+const otpRace = { on: false }; // /_otp_race
 
 function accessToken(sub, email, sessionId) {
   const now = Math.floor(Date.now() / 1000);
@@ -122,6 +127,10 @@ http
     if (p === "/_signups" && req.method === "POST") {
       signups.on = (await readJson(req)).on === true;
       return json(res, 200, signups);
+    }
+    if (p === "/_otp_race" && req.method === "POST") {
+      otpRace.on = (await readJson(req)).on === true;
+      return json(res, 200, otpRace);
     }
     if (p === "/_user") {
       const id = USERS.get(String(url.searchParams.get("email") ?? "").toLowerCase());
@@ -216,12 +225,16 @@ http
       stats.otp++;
       stats.lastCreateUser = body.create_user;
       const email = String(body.email ?? "").toLowerCase();
+      if (otpRace.on && body.create_user === false && lastEmail.has(email)) {
+        return json(res, 429, { code: 429, error_code: "over_email_send_rate_limit", msg: "For security purposes, you can only request this after 60 seconds." });
+      }
       if (body.create_user === true && (USERS.has(email) || signups.on)) {
         if (!USERS.has(email)) USERS.set(email, randomUUID());
         const code = String(randomInt(100000, 1000000));
         const hash = randomBytes(28).toString("hex");
         pending.push({ email, code, hash, used: false });
         lastEmail.set(email, { code, token_hash: hash });
+        if (otpRace.on) return json(res, 500, { code: 500, error_code: "unexpected_failure", msg: "Database error saving new user" });
         return json(res, 200, {});
       }
       if (body.create_user !== false || !USERS.has(email)) {

@@ -16,7 +16,7 @@ If you get one you didn't ask for, ignore it. Nothing changes unless someone use
 
 | Subject | When | What's in it |
 |---|---|---|
-| Your Reliquary sign-in code | You ask to sign in | A 6-digit code, and a **Sign in** button for the device you read it on. Both work once, within 10 minutes. |
+| Your Reliquary sign-in code | You ask to sign in | A 6-digit code, and a **Sign in** button for the device you read it on. Both work once, within an hour. |
 | Confirm your email for Reliquary | You sign in for the first time, from an invite | The same code and button; using either confirms the address and makes your account. |
 | You have a Reliquary account | Whoever runs the site made an account for you | A **Sign in** button that works once. After that, sign in with your address and a code. |
 | Reliquary has no password to reset | Someone asked to reset your password | Why there's nothing to reset, and a **Sign in** button that works once. |
