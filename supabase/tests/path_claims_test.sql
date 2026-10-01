@@ -196,3 +196,64 @@ select t.expect_true('caps: four more connections of the same person reach the p
 select t.run('ben', format($q$select public.create_access_token('caps-6', 30, array[%L]::uuid[], 'write')$q$, t.id('caps')));
 select t.expect('caps: a sixth connection of the same person is refused by the person cap, not the connection cap',
   t.run_tok('ben', 'caps-6', t.caps_claim_sql('notes/6.md')), 'ERR RLC03');
+
+-- ---------------------------------------------------------------------------
+-- release_claim: the same identity check renew_claim already has, untested
+-- until now (a different connection of the same person must not release)
+
+select t.seed('notes/g.md');
+select t.save('g', t.run('ben', t.claim_sql('notes/g.md')));
+select t.expect('release: a different connection (even the same person) is refused',
+  t.run_tok('ben', 'ben-rw', t.release_sql('notes/g.md', (t.row('notes/g.md')).fence, t.val('g'))), 'ERR RLC02');
+select t.run('ben', t.release_sql('notes/g.md', (t.row('notes/g.md')).fence, t.val('g')));
+
+-- ---------------------------------------------------------------------------
+-- label limits: length-capped, and left no row behind when refused
+
+select t.seed('notes/h.md');
+select t.expect('claim: a label over 200 characters is refused',
+  t.run('ben', t.claim_sql('notes/h.md', repeat('x', 201))), 'ERR 22023');
+select t.expect_true('claim: the refused label left no row behind',
+  (t.row('notes/h.md')) is null);
+select t.expect_true('claim: exactly 200 characters is accepted',
+  (t.run('ben', t.claim_sql('notes/h.md', repeat('x', 200)))) ~ '^[0-9a-f]{64}$');
+
+-- A NUL byte can't be tested through claim_path's own validation: Postgres
+-- refuses to hold one in any text value at all (SQLSTATE 22021, "invalid
+-- byte sequence"), before the function body ever runs -- the same reason
+-- the MCP layer, not SQL, is where feedback's message and context fields
+-- check for one (mcp/src/flags-tools.ts). This pins that guarantee against
+-- the column claim labels actually live in (as the table owner, bypassing
+-- the grants above, so the privilege check doesn't hide it), rather than
+-- against a string Postgres would never let us construct in the first place.
+select t.owner_error('claim: a label can never hold a NUL byte, independent of any check here',
+  $q$insert into public.path_claims (vault_id, path, holder_label)
+    values ('00000000-0000-0000-0000-000000000000', 'nul-test.md', convert_from('\x610062'::bytea, 'UTF8'))$q$);
+
+-- ---------------------------------------------------------------------------
+-- the table itself: closed to direct writes, two columns never selectable,
+-- and invisible outside the vault (RLS, not app-level filtering)
+
+select t.expect('tables: no direct insert into path_claims',
+  t.run('ben', format($q$insert into public.path_claims (vault_id, path, holder) values (%L, 'direct.md', %L) returning 'x'$q$,
+    t.id('claims'), t.id('ben'))), 'ERR 42501');
+select t.expect('tables: no direct insert into path_claims, even for an agent',
+  t.run('ben', format($q$insert into public.path_claims (vault_id, path, holder) values (%L, 'direct2.md', %L) returning 'x'$q$,
+    t.id('claims'), t.id('ben')), 'Claude Code'), 'ERR 42501');
+select t.expect('tables: no direct update of a claim',
+  t.run('ben', format($q$update public.path_claims set expires_at = now() + interval '1 day' where vault_id = %L and path = 'notes/e.md' returning 'x'$q$,
+    t.id('claims'))), 'ERR 42501');
+select t.expect('tables: no direct delete of a claim',
+  t.run('ben', format($q$delete from public.path_claims where vault_id = %L and path = 'notes/e.md' returning 'x'$q$,
+    t.id('claims'))), 'ERR 42501');
+select t.expect('tables: the secret hash is not a selectable column, even to the holder',
+  t.run('ben', format($q$select secret_hash from public.path_claims where vault_id = %L and path = 'notes/e.md'$q$, t.id('claims'))),
+  'ERR 42501');
+select t.expect('tables: the holder token is not a selectable column, even to the holder',
+  t.run('ben', format($q$select holder_token::text from public.path_claims where vault_id = %L and path = 'notes/e.md'$q$, t.id('claims'))),
+  'ERR 42501');
+
+select t.expect('rls: an outsider sees no claims in a vault they are not in',
+  t.run('dee', format($q$select count(*)::text from public.path_claims where vault_id = %L$q$, t.id('claims'))), '0');
+select t.expect('rls: a connection scoped to another vault sees no claims here either',
+  t.run_tok('ben', 'caps-6', format($q$select count(*)::text from public.path_claims where vault_id = %L$q$, t.id('claims'))), '0');
