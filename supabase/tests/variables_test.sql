@@ -127,8 +127,6 @@ create function t.reveal_sql(p_vault text, p_name text, p_env text) returns text
 $$ select format($q$select public.reveal_variable(%L, %L, %L)::text$q$, t.id(p_vault), p_name, p_env) $$;
 create function t.err(p_json text) returns text language sql as
 $$ select case when p_json like 'ERR %' then p_json else coalesce(p_json::jsonb ->> 'error', 'ok') end $$;
-create function t.refusals(p_vault text) returns bigint language sql as
-$$ select count(*) from public.env_access_log where vault_id = t.id(p_vault) and action = 'refused' $$;
 
 -- ---------------------------------------------------------------------------
 -- Environments
