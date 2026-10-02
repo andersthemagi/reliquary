@@ -67,6 +67,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["step.claim", "Claimed a step"],
   ["step.complete", "Completed a step"],
   ["step.release", "Released a step"],
+  ["step.checkin", "Checked in on a step"],
   ["step.cancel", "Cancelled a step"],
   ["step.skip", "Skipped a step"],
 ];

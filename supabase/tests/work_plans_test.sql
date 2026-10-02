@@ -246,3 +246,56 @@ select t.expect('rls: an outsider sees no work plans in a vault they are not in'
   t.run('dee', format($q$select count(*)::text from public.work_plans where vault_id = %L$q$, t.id('wp'))), '0');
 select t.expect('rls: a connection scoped to another vault sees no steps here either',
   t.run_tok('ana', 'wp-other-tok', format($q$select count(*)::text from public.work_plan_steps where vault_id = %L$q$, t.id('wp'))), '0');
+
+-- ---------------------------------------------------------------------------
+-- checkin_step (20261002210000_work_plan_checkin): restarts a claimed
+-- step's lease without finishing it, the same identity check complete_step
+-- and release_step already have
+
+create function t.checkin_sql(p_path text, p_key text, p_fence int, p_secret text, p_ttl int default null) returns text language sql as $$
+  select format($q$select public.checkin_step(%L, %L, %L, %L, %L, %L)::text$q$, t.id('wp'), p_path, p_key, p_fence, p_secret, p_ttl)
+$$;
+
+select t.run('ben', t.seed_sql('plans/checkin.md'));
+select t.save('checkin-version', (select current_version_id::text from public.files where vault_id = t.id('wp') and path = 'plans/checkin.md'));
+select t.run('ben', t.register_sql('plans/checkin.md', t.val('checkin-version'), '[{"key":"x","title":"X"}]'::jsonb));
+select t.save('x', t.run('ben', t.claim_sql('plans/checkin.md', 'x', 'Ben''s agent')));
+
+select t.expect('checkin: a stale fence is refused',
+  t.run('ben', t.checkin_sql('plans/checkin.md', 'x', 999, t.val('x'))), 'ERR RLW03');
+select t.expect('checkin: a stale secret is refused',
+  t.run('ben', t.checkin_sql('plans/checkin.md', 'x', (t.step('plans/checkin.md', 'x')).fence, 'wrong-secret')), 'ERR RLW03');
+select t.expect('checkin: a different connection (even the same person) is refused',
+  t.run_tok('ana', 'wp-ro', t.checkin_sql('plans/checkin.md', 'x', (t.step('plans/checkin.md', 'x')).fence, t.val('x'))), 'ERR RLW03');
+select t.expect('checkin: an unknown step is refused',
+  t.run('ben', t.checkin_sql('plans/checkin.md', 'zzz', 1, t.val('x'))), 'ERR P0002');
+select t.expect('checkin: an unregistered plan is refused',
+  t.run('ben', t.checkin_sql('plans/nope.md', 'x', 1, t.val('x'))), 'ERR P0002');
+
+select t.save('x-expires-before', (t.step('plans/checkin.md', 'x')).expires_at::text);
+select t.run('ben', t.checkin_sql('plans/checkin.md', 'x', (t.step('plans/checkin.md', 'x')).fence, t.val('x')));
+select t.expect_true('checkin: the right fence, secret, connection and person extends the lease',
+  (t.step('plans/checkin.md', 'x')).expires_at > t.val('x-expires-before')::timestamptz);
+
+update public.work_plan_steps set expires_at = now() - interval '1 second' where id = (t.step('plans/checkin.md', 'x')).id;
+select t.expect('checkin: a lapsed lease is refused',
+  t.run('ben', t.checkin_sql('plans/checkin.md', 'x', (t.step('plans/checkin.md', 'x')).fence, t.val('x'))), 'ERR RLW03');
+
+-- Un-lapse it directly (checkin_step itself refuses to, by design) so the
+-- hold limit below is isolated from the lapse check above.
+update public.work_plan_steps set expires_at = now() + interval '5 minutes' where id = (t.step('plans/checkin.md', 'x')).id;
+
+-- ---------------------------------------------------------------------------
+-- checkin_step's hold limit: counted from the original claim_step grant
+-- (claimed_at), not the last check-in, the same shape renew_claim already
+-- gives path claims
+
+update public.work_plan_steps set claimed_at = now() - interval '6 days 23 hours' where id = (t.step('plans/checkin.md', 'x')).id;
+select t.save('x-claimed', (t.step('plans/checkin.md', 'x')).claimed_at::text);
+select t.run('ben', t.checkin_sql('plans/checkin.md', 'x', (t.step('plans/checkin.md', 'x')).fence, t.val('x'), 120));
+select t.expect_true('hold limit: a check-in is capped at the original claim plus 7 days, not the full request',
+  abs(extract(epoch from ((t.step('plans/checkin.md', 'x')).expires_at - (t.val('x-claimed')::timestamptz + interval '7 days')))) < 1);
+
+update public.work_plan_steps set claimed_at = now() - interval '8 days' where id = (t.step('plans/checkin.md', 'x')).id;
+select t.expect('hold limit: past it, a check-in is refused outright',
+  t.run('ben', t.checkin_sql('plans/checkin.md', 'x', (t.step('plans/checkin.md', 'x')).fence, t.val('x'), 120)), 'ERR RLW04');
