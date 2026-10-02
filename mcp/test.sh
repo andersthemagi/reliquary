@@ -77,11 +77,11 @@ link_proxy_secret=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
   -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
 until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
 # Tool calls: 3 per 2-second window (so a test can wait one out) and 5 a
-# day per token; 3 401s a minute per address.
+# day per token, 1 of them a thread write; 3 401s a minute per address.
 "$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$rlport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
-  -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60" \
+  -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2" \
   -e PORT=$rlport "$node" node dist/server.js >/dev/null
 until curl -sf "http://127.0.0.1:$rlport/healthz" >/dev/null; do
   [ "$("$engine" inspect -f '{{.State.Running}}' "$rl")" = true ] || { "$engine" logs "$rl"; echo "rate-limit server exited"; exit 1; }
