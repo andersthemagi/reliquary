@@ -49,10 +49,11 @@ test("tools: the expected set, and no way to approve", async () => {
   const c = await connect(env.ANA_TOKEN);
   const names = (await c.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(names, [
-    "advance_flags", "changes_since", "claim_path", "comment_on_proposal", "create_vault", "delete_file", "list_claims",
-    "list_files", "list_flags", "list_links", "list_my_feedback", "list_proposals", "list_subscriptions", "list_threads",
-    "list_variables", "list_vaults", "open_thread", "post_message", "propose", "read_file", "read_proposal", "read_thread",
-    "release_claim", "renew_claim", "revise_proposal", "search", "send_feedback", "write_file",
+    "advance_flags", "changes_since", "checkin_step", "claim_path", "claim_step", "comment_on_proposal", "complete_step",
+    "create_vault", "delete_file", "list_claims", "list_files", "list_flags", "list_links", "list_my_feedback",
+    "list_proposals", "list_subscriptions", "list_threads", "list_variables", "list_vaults", "open_thread", "post_message",
+    "propose", "read_file", "read_proposal", "read_thread", "register_work_plan", "release_claim", "release_step",
+    "renew_claim", "revise_proposal", "search", "send_feedback", "work_plan_status", "write_file",
   ]);
   await c.close();
 });

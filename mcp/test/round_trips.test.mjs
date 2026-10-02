@@ -20,6 +20,8 @@ const VAULT = `Round trips ${process.pid}`;
 
 const db = new pg.Pool({ connectionString: TEST_DATABASE_URL, max: 1 });
 const n = { roundTrips: 0 };
+// The first word of each query sent, in order.
+const sent = [];
 const wrapped = new WeakSet();
 db.on("acquire", (client) => {
   if (wrapped.has(client)) return;
@@ -27,6 +29,7 @@ db.on("acquire", (client) => {
   const query = client.query.bind(client);
   client.query = (...args) => {
     n.roundTrips++;
+    sent.push(String(typeof args[0] === "string" ? args[0] : args[0]?.text).trim().split(/\s/)[0]);
     return query(...args);
   };
 });
@@ -52,11 +55,14 @@ after(async () => {
   await db.end();
 });
 
-// The tool's own queries: everything the call sent but begin-with-resolve and commit.
+// The tool's own queries: everything the call sent but begin-with-resolve,
+// commit, and after a call that succeeded, the flags hint's count (one
+// query; its own test is below).
 async function own(name, args) {
   const start = n.roundTrips;
   const r = await client.callTool({ name, arguments: args });
-  return { queries: n.roundTrips - start - 2, text: r.content[0].text, isError: r.isError === true };
+  const isError = r.isError === true;
+  return { queries: n.roundTrips - start - (isError ? 2 : 3), text: r.content[0].text, isError };
 }
 
 test("round trips: every tool that names a vault finds it in its own query (one query each, was two)", async () => {
@@ -123,4 +129,15 @@ test("round trips: an empty result in a vault that exists is not \"no vault\"", 
   assert.equal((await own("changes_since", { vault: VAULT, cursor: 1e12 })).text, "No changes after 1000000000000.");
   assert.equal((await own("list_proposals", { vault: VAULT, status: "rejected" })).text, "No rejected proposals.");
   assert.equal((await own("read_file", { vault: VAULT, path: "missing.md" })).text, "No file at that path. Use list_files to see the vault's.");
+});
+
+test("round trips: the flags hint is one more query, after the tool's own and before commit; none after a failed call or one naming no vault", async () => {
+  const queries = async (name, args) => {
+    const start = sent.length;
+    await client.callTool({ name, arguments: args });
+    return sent.slice(start);
+  };
+  assert.deepEqual(await queries("list_files", { vault: VAULT }), ["begin;", "select", "savepoint", "commit"]);
+  assert.deepEqual(await queries("list_files", { vault: "No such vault" }), ["begin;", "select", "rollback"]);
+  assert.deepEqual(await queries("list_vaults", {}), ["begin;", "select", "commit"]);
 });

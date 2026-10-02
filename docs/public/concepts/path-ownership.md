@@ -39,7 +39,7 @@ Only an owner of the vault can, in person, in the web app: no agent, token or co
 3. Read the confirm page: who they are, that they and their agents will write the path directly with no review, how its quorum changes, and which rules inside it keep their own owners.
 4. Choose **Name**, their email, **owner of** and the path, or **Cancel**.
 
-It's logged in the vault's [Activity](activity.md). On a path whose rule is open, naming an owner changes nothing until the rule becomes canon, and the page says so.
+It's logged in the vault's [log](activity.md). On a path whose rule is open, naming an owner changes nothing until the rule becomes canon, and the page says so.
 
 ## Remove an owner
 

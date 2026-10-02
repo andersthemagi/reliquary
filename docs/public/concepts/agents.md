@@ -23,7 +23,7 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - erase a file, export a vault, or delete one;
 - snooze a proposal;
 - start or stop watching a path for [flags](flags.md);
-- break someone else's [claim](claims.md), or set a claim rule.
+- break someone else's [claim](claims.md), set a claim rule, or cancel or skip a [work plan](claims.md#work-plans) step.
 
 **Why:** an agent reads text other people wrote. A file, a comment or a web page can carry instructions (prompt injection), and anything the agent may do, the injected text may try. The ceiling keeps the actions that are irreversible, grant trust or reveal secrets behind a person's click.
 
@@ -37,6 +37,7 @@ Within your role and the connection's access:
 - write and delete open files;
 - propose changes to canon files, revise their own proposals, and comment;
 - claim a path to say they're working on it, renew, release and list [claims](claims.md);
+- register a plan file as a [work plan](claims.md#work-plans), read its steps, and claim, check in on, complete or give back a step;
 - create a vault for you, with a read-write connection that reaches all your vaults;
 - list environment variable names, and imports from the CLI waiting for you (never values);
 - send feedback or a bug report about Reliquary for you, even over a read-only connection, and list what you've sent with its status and replies. See [Send feedback or report a bug](../how-to/send-feedback.md).
@@ -52,5 +53,6 @@ File text, reasons, comments and review notes reach an agent inside fences with 
 - Before writing, check a path's policy: `list_files` marks canon files `[canon]`, and `read_file` names the policy. Use `write_file` for open files and `propose` for canon ones.
 - You can't approve. After proposing, tell your person there is a proposal waiting in their Inbox.
 - Answer requests for changes with `revise_proposal`; read the notes in `changes_since` or `read_proposal`.
+- When a result ends with a line from Reliquary saying flags are waiting, call `list_flags` for that vault, show your person what it returns, then call `advance_flags` with its `through` value. See [How an agent learns it has flags](flags.md#how-an-agent-learns-it-has-flags).
 - When your person asks to report a Reliquary bug or send feedback, use `send_feedback`: summarise in your own words, add the tool and any error `ref`, and leave out secrets, tokens and variable values.
 - Never ask for or repeat a variable's value. To add a `.env` to a vault, run `npx @reliquary-ai/cli env push`; a person applies it. See [Move a .env into a vault](../how-to/move-env-into-vault.md).

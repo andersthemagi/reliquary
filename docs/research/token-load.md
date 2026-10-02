@@ -189,14 +189,73 @@ Still to do, from the token side:
   several more tools once its gate opens; the budget will need raising
   again then, same as every pass so far.
 
-## Threads pass (thread tools)
+## Seventh pass (work plan registration and status)
+
+2026-10-02, CL-3.4 of the same effort. Two new tools: `register_work_plan`
+and `work_plan_status` (20261002200000_work_plans.sql). `tools/list` is now
+15,018 bytes, over its 13,700-byte budget. Raised to 15,100, just above the
+actual, per this doc's own rule. No existing tool's budget
+changed. The two new tools have no budget of their own yet: their responses
+depend on the plan's size (a status line plus a fenced title per step), and
+the Load vault has no plan fixture to measure; a 500-step plan, the most the
+database allows, would be on the order of 40 KB.
+
+Still to do, from the token side:
+
+- **`tools/list` has no headroom again.** The step tools (`claim_step`,
+  `checkin_step`, `complete_step`, `release_step`) are the next four.
+- **`work_plan_status` has no cap on its answer.** It lists every step, as
+  `list_claims` lists every claim. If real plans run long, a `state` filter
+  or a page is the fix.
+
+## Eighth pass (work plan step tools)
+
+2026-10-02, CL-3.4 again. Four new tools: `claim_step`, `checkin_step`,
+`complete_step` and `release_step` (20261002200000_work_plans.sql,
+20261002210000_work_plan_checkin.sql). `tools/list` is now 18,586 bytes
+(about 4,650 tokens), over its 15,100-byte budget. Raised to 18,700, just
+above the actual. The four descriptions were trimmed once already (the
+first draft made it 18,746). No response of an existing tool changed.
+
+Still to do, from the token side:
+
+- **`tools/list` has grown by about 5 KB across the six work plan tools.**
+  Every conversation with a Reliquary connection pays for it. If an agent
+  rarely works plans, a client that loads tools on demand would save it;
+  nothing here does that today.
+- **The step tools' own responses are one or two lines**, so they have no
+  budget of their own, like `renew_claim` and `release_claim`.
+
+## Ninth pass (the flags hint)
+
+2026-10-02. A successful call that names a vault now ends with one more
+text block while flags wait for the connection there: `Reliquary: 3 flags
+are waiting for you in this vault. Call list_flags.` (design.md,
+"Notifications"). With a one-digit count that line is 70 bytes (about 18
+tokens), on every call until the agent calls `list_flags` and
+`advance_flags`; nothing at all once it has.
+
+Flags wait for Fay's connection in the seeded Load vault (her Loader
+agent's proposals and her comments on them), so the first run with the
+hint carried those 70 bytes on every measured call, and `propose` went to
+170 bytes, over its 150. No budget was raised. `token_load.test.mjs` now
+catches the connection up on its flags first, as an agent following the
+hint would, then measures each tool, and measures the hint once on its
+own line (budget 100). Every tool's own response is byte for byte what it
+was: `list_files` 1,609, `search` "workshop" 3,548, `list_proposals` 974,
+`read_proposal` 1,877, `changes_since` 4,520, `list_variables` 126, as in
+the passes above. `tools/list` is unchanged: no tool's
+description or schema changed.
+
+## Tenth pass (thread tools)
 
 2026-10-02. Four new tools: `open_thread`, `post_message`, `list_threads`
 and `read_thread` (20261004100000_threads.sql onwards), and a clause more in
 `list_flags`' description for thread flags (20261005100000_thread_flags.sql).
 Resolving and reopening ride on `post_message`'s `status` instead of being
-two more tools. `tools/list` grew from 13,655 to 16,695 bytes, over its
-13,700-byte budget. Raised to 16,700, just above the actual. The first
+two more tools. `tools/list` grew by 3,040 bytes (13,655 to 16,695 with the
+thread tools alone) and with the work plan tools is now 21,698, over its
+18,700-byte budget. Raised to 21,700, just above the actual. The first
 draft's descriptions made it 17,284; they were cut to what an agent must
 know (delivery by flags, no secrets, a message decides nothing, side
 threads) and the citation syntax, said once. No existing tool's budget

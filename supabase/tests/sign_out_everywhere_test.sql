@@ -13,18 +13,12 @@ insert into public.access_tokens (user_id, name, kind, client_id, resource, expi
 values (t.id('ana'), 'ana-app', 'oauth', 'https://client.example/meta.json', 'https://mcp.example/mcp', now() + interval '30 days'),
        (t.id('ben'), 'ben-app', 'oauth', 'https://client.example/meta.json', 'https://mcp.example/mcp', now() + interval '30 days');
 
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
 create function t.live(p_user text) returns text language sql as
 $$ select count(*)::text from public.access_tokens where user_id = t.id(p_user) and revoked_at is null $$;
 -- A browser session of p_user whose JWT was issued p_age seconds ago (its iat), checked as the web app does.
 create function t.session(p_user text, p_age int) returns text language sql as $$
   select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
     'iat', floor(extract(epoch from now())) - p_age), $q$select private.check_session()::text || 'ok'$q$)
-$$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
 $$;
 
 -- ---------------------------------------------------------------------------

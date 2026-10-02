@@ -37,9 +37,11 @@ async function measure(c, name, args, label = name) {
 const BUDGET = {
   // Raised for claim_path, renew_claim, release_claim and list_claims
   // (CL-2.4, F441): four more tool schemas in every tools/list response.
-  // Raised again for open_thread, post_message, list_threads and
-  // read_thread (F622-F624).
-  "tools/list": 16700,
+  // Raised again for register_work_plan and work_plan_status (CL-3.4, F530),
+  // and for claim_step, checkin_step, complete_step and release_step (F531),
+  // and for open_thread, post_message, list_threads and read_thread
+  // (F622-F624).
+  "tools/list": 21700,
   list_vaults: 200,
   list_files: 1800,
   "list_files prefix=canon/": 400,
@@ -58,6 +60,9 @@ const BUDGET = {
   propose: 150,
   comment_on_proposal: 200,
   delete_file: 150,
+  // The flags hint (tools-shared.ts), the one line a call gains while flags
+  // wait for the connection in its vault.
+  "flags hint": 100,
 };
 
 test("token load: every tool's response on the Load vault stays within its budget", async () => {
@@ -65,6 +70,16 @@ test("token load: every tool's response on the Load vault stays within its budge
   const { tools } = await c.listTools();
   const out = [{ label: "tools/list", text: JSON.stringify(tools) }];
   const v = "Load";
+  // Flags wait for Fay's connection in Load (her Loader agent's proposals,
+  // her comments on them), so every call there ends with the flags hint
+  // until the agent catches up. The hint is measured once, on its own line;
+  // the tools after catching up, as an agent that follows the hint would.
+  const hinted = await c.callTool({ name: "list_variables", arguments: { vault: v } });
+  assert.match(hinted.content.at(-1).text, /^Reliquary: .* waiting for you in this vault\. Call list_flags\.$/);
+  out.push({ label: "flags hint", text: hinted.content.at(-1).text });
+  const listed = await c.callTool({ name: "list_flags", arguments: { vault: v, limit: 200 } });
+  const through = Number(/through: (\d+)/.exec(listed.content[0].text)[1]);
+  assert.equal(Boolean((await c.callTool({ name: "advance_flags", arguments: { vault: v, through } })).isError), false);
   out.push(await measure(c, "list_vaults", {}));
   out.push(await measure(c, "list_files", { vault: v }));
   out.push(await measure(c, "list_files", { vault: v, prefix: "canon/" }, "list_files prefix=canon/"));

@@ -28,9 +28,23 @@ Reading flags doesn't use them up. They're marked shown only once the response c
 
 A new connection is told what is waiting on you now, but not what happened before it was made.
 
+## How an agent learns it has flags
+
+MCP has no push: Reliquary can't wake an agent or interrupt it. So when flags wait for a connection in a vault, each successful call it makes there (a call that names the vault, or a proposal in it) ends with one more line:
+
+```
+Reliquary: 3 flags are waiting for you in this vault. Call list_flags.
+```
+
+The line gives the count, up to "more than 20", and nothing else. It never holds a vault's name, a path, a proposal's text or anything else someone typed, so it can't carry instructions. The agent then calls `list_flags`, shows you what it returns, and calls `advance_flags`. The line stops until something new is flagged. Reliquary tells every agent this when it connects.
+
+The line repeats on every call until the agent calls `advance_flags`: seeing it uses nothing up. It isn't added to `list_flags` or `advance_flags` themselves, to a call that failed, or to a call that names no vault, like `list_vaults`. A read-only connection gets it too.
+
+It only reaches an agent that is making calls in that vault. An agent that is idle, or working in another vault, finds out on its next call there. Nothing wakes it.
+
 ## Seeing your flags
 
-Every vault has a **Flags** section for the person signed in to the web app: what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file.
+In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
 
 Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
 
@@ -40,11 +54,11 @@ Any member of a vault, owner, editor or viewer, can watch its folders and files.
 
 To watch a folder or a file, open it and choose **Watch** at the top of its page. The page then says **Watching**, with **Unwatch** to stop. A file inside a folder you watch says **Watching via** that folder, since the folder's watch already covers it. The vault's top folder has no **Watch**: watch the folders in it instead.
 
-Everything you watch in a vault is on its **Settings**, **Watching** tab, each with **Unwatch**. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. A folder ends in `/` and covers everything in it; a file covers only itself.
+Everything you watch in a vault is on its **Settings**, **Watching** tab, each with **Unwatch**. The vault's [Changes](activity.md#changes) has a **Watching** view of what changed on those paths, including changes from before you started watching; flags only count from the moment you ask. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. A folder ends in `/` and covers everything in it; a file covers only itself.
 
 At 100 paths in a vault, watching another is refused, and the page says so: stop watching one first.
 
-Watching starts from the moment you ask: earlier changes aren't flagged. Nobody else sees what you watch, and it isn't recorded in the vault's [Activity](activity.md).
+Watching starts from the moment you ask: earlier changes aren't flagged. Nobody else sees what you watch, and it isn't recorded in the vault's [log](activity.md).
 
 Watching a tag isn't possible yet, because files don't carry tags.
 

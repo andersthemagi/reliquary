@@ -1,8 +1,9 @@
 // Helpers shared by every MCP tool domain module (vaultfiles-tools.ts,
-// proposals-tools.ts, variables-tools.ts, flags-tools.ts, links-tools.ts):
-// the response shape, the error-to-message translation, the vault-lookup
-// SQL fragment, the fenced-text nonce, the tool-name-aware register()
-// wrapper, and the input-size ceilings the database also enforces.
+// proposals-tools.ts, variables-tools.ts, flags-tools.ts, links-tools.ts,
+// claims-tools.ts, workplan-tools.ts): the response shape, the
+// error-to-message translation, the vault-lookup SQL fragment, the
+// fenced-text nonce, the tool-name-aware register() wrapper, and the
+// input-size ceilings the database also enforces.
 //
 // Text written by people or agents (files, reasons, notes, comments) is
 // always returned between markers, with its provenance, because it must read
@@ -36,6 +37,15 @@ export const TEXT = z.string().max(1_000_000);
 export const REASON = z.string().max(4000);
 export const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 export const VERSION = z.string().regex(/^[0-9a-fA-F-]{36}$/);
+// What a claim hands back and asks for again: a 32-byte secret in hex, and
+// the fence counter.
+export const SECRET = z.string().regex(/^[0-9a-f]{64}$/);
+export const FENCE = z.number().int().min(1);
+// A caller may ask for a shorter lease and a longer one is clamped by the
+// vault's claim rule in the database, not refused; this is only a sane
+// ceiling on the argument itself, the same spirit as every other
+// input-size check here.
+export const TTL_MINUTES = z.number().int().min(1).max(60 * 24 * 30);
 
 // Turns errors into messages the agent can act on: a first line in words
 // (our own migrations' messages, which don't echo free-form input), then the
@@ -115,6 +125,19 @@ export function explain(err: unknown): ToolResult {
       case "RLC04":
         lead = `Past its hold limit: ${e.message}`;
         break;
+      // Work plan steps (20261002200000_work_plans.sql). No case for RLW01
+      // (already claimed) for the same reason as RLC01: its message embeds
+      // the holder's label, and claim_step catches it itself to re-fence
+      // that label. RLW02-RLW04 name a step key and a count, never a label.
+      case "RLW02":
+        lead = `Step not available: ${e.message}. Call work_plan_status to see which steps are ready.`;
+        break;
+      case "RLW03":
+        lead = `Stale step claim: ${e.message}. Call work_plan_status to see the step's current state.`;
+        break;
+      case "RLW04":
+        lead = `Refused: ${e.message}`;
+        break;
       // An hourly count (feedback, 20260926163000_feedback.sql): the
       // message says the limit and when there is room again.
       case "54000":
@@ -145,25 +168,111 @@ const callWhat = (name: string): string => `Calling ${name}`;
 // Applied once, to the McpServer all domain modules register onto, before
 // any of them calls server.registerTool: every tool registered afterwards
 // (the fixed ones and the dynamic <link>.<tool> ones alike) runs through
-// this wrapper, whichever module registered it.
+// this wrapper, whichever module registered it. It also adds the flags
+// hint (below) to a successful call that named a vault.
 export function wrapRegisterTool(server: McpServer): void {
   const register = server.registerTool.bind(server) as (...a: unknown[]) => unknown;
   (server as unknown as { registerTool: (...a: unknown[]) => unknown }).registerTool = (name: unknown, config: unknown, handler: unknown) =>
     register(name, config, (args: unknown, extra: unknown) =>
       withRequest(callWhat(String(name)), `mcp tool ${String(name)}`, () =>
-        toolName.run(String(name), () => (handler as (a: unknown, e: unknown) => unknown)(args, extra)),
+        toolName.run(String(name), async () => {
+          const call = () => (handler as (a: unknown, e: unknown) => Promise<ToolResult>)(args, extra);
+          const target = hintTarget(String(name), args);
+          if (!target) return call();
+          const h: Hint = { ...target, waiting: 0 };
+          const result = await flagsHint.run(h, call);
+          if (result.isError || h.waiting === 0) return result;
+          const hinted: ToolResult = { ...result, content: [...result.content, { type: "text", text: hintText(h.waiting) }] };
+          return hinted;
+        }),
       ),
     );
 }
 
+// The flags hint (docs/design.md, "Notifications"). MCP has no push, so an
+// agent learns that something waits on its person only by asking
+// (list_flags), and one that never asks never learns. Flags don't ride in
+// every response; one fixed line does, when the call succeeded and flags
+// wait for this connection in the vault it named. The line is the server's
+// own words and a count, never a name, path, title or anything else people
+// or agents wrote: those reach an agent only fenced as data, and this line
+// isn't fenced. It moves no watermark, so the hint repeats until the agent
+// calls list_flags and advance_flags.
+type Hint = { vault?: string; proposal?: string; waiting: number; counted?: boolean };
+const flagsHint = new AsyncLocalStorage<Hint>();
+
+// list_flags and advance_flags are how an agent acts on the hint, so they
+// never carry it. A dotted name is an upstream <link>.<tool>, whose `vault`
+// argument, if it has one, is the upstream server's, not a Reliquary vault.
+const NO_HINT = new Set(["list_flags", "advance_flags"]);
+
+function hintTarget(name: string, args: unknown): Omit<Hint, "waiting"> | null {
+  if (NO_HINT.has(name) || name.includes(".")) return null;
+  const a = (args ?? {}) as { vault?: unknown; proposal_id?: unknown };
+  if (typeof a.vault === "string") return { vault: a.vault };
+  if (typeof a.proposal_id === "string") return { proposal: a.proposal_id };
+  return null;
+}
+
+// list_flags is asked for 21, so 21 means more than 20 (flags_waiting).
+function hintText(n: number): string {
+  const count = n > 20 ? "more than 20 flags are" : n === 1 ? "1 flag is" : `${n} flags are`;
+  return `Reliquary: ${count} waiting for you in this vault. Call list_flags.`;
+}
+
+// Sent to every client at initialize (server.ts), so an agent knows what
+// the hint asks before it first sees one.
+export const INSTRUCTIONS =
+  'When a tool result ends with a line starting "Reliquary:" that says flags are waiting, call list_flags for that vault, show your person what it returns, then call advance_flags with its through value.';
+
+const HINT_TIMEOUT_MS = 250;
+
+// The count, in the call's own transaction after its work and before its
+// commit: one more round trip, on the connection the call already holds.
+// The savepoint keeps a failed or timed-out count from aborting the call's
+// own work, and rolling back to it undoes the count's statement timeout
+// before the commit. The vault's name or id is inlined, escaped, because a
+// parameterised query can't carry four statements; a NUL can't reach
+// Postgres in a query's text, and a call that named one never resolved a
+// vault anyway. Best effort: a count that fails is logged with a reference
+// and the call answers as it would have without it.
+async function countWaitingFlags(c: pg.PoolClient): Promise<void> {
+  const h = flagsHint.getStore();
+  if (!h || h.counted) return;
+  h.counted = true;
+  const ref = h.vault ?? h.proposal ?? "";
+  if (ref.includes("\u0000")) return;
+  const count = h.vault !== undefined
+    ? `select public.flags_waiting(private.vault_ref(${c.escapeLiteral(ref)})) as n`
+    : `select public.flags_waiting(p.vault_id) as n from public.proposals p where p.id = ${c.escapeLiteral(ref)}::uuid`;
+  try {
+    const results = (await c.query(
+      `savepoint flags_hint; set local statement_timeout = ${HINT_TIMEOUT_MS}; ${count}; rollback to savepoint flags_hint`,
+    )) as unknown as pg.QueryResult[];
+    h.waiting = Number(results[2]?.rows[0]?.n ?? 0);
+  } catch (err) {
+    fail(err, { where: "MCP flags hint", what: "Counting the flags waiting for this connection" });
+    // If this fails too, the transaction is lost and its commit would
+    // quietly roll back: the call must fail rather than report work that
+    // didn't happen.
+    await c.query("rollback to savepoint flags_hint");
+  }
+}
+
 // A tool call's own `run`: runs its queries as the identity, turning any
 // error into an `explain()`ed refusal instead of throwing through the SDK.
+// A successful call that named a vault counts its flags hint before its
+// transaction commits.
 export function makeRun(
   runAs: <T>(fn: (c: pg.PoolClient) => Promise<T>) => Promise<T>,
 ): (fn: (c: pg.PoolClient) => Promise<ToolResult>) => Promise<ToolResult> {
   return async (fn) => {
     try {
-      return await runAs(fn);
+      return await runAs(async (c) => {
+        const result = await fn(c);
+        if (!result.isError) await countWaitingFlags(c);
+        return result;
+      });
     } catch (err) {
       return explain(err);
     }

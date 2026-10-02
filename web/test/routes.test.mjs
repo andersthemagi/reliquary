@@ -46,6 +46,8 @@ const pages = [
   [`${V}/proposals?status=closed`, "closed proposals"],
   [`${V}/activity`, "vault activity"],
   [`${V}/log`, "vault activity (old URL)"],
+  [`${V}/changes`, "vault changes"],
+  [`${V}/changes?before=1`, "vault changes, past the last page"],
   [`${V}/rules`, "rules"],
   [`${V}/rules?check=canon/pricing.md`, "rules checker"],
   [`${V}/search?q=standup`, "search"],
