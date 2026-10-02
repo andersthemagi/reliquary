@@ -188,3 +188,22 @@ Still to do, from the token side:
 - **`tools/list` has no headroom again.** Phase 3 (work plans) will add
   several more tools once its gate opens; the budget will need raising
   again then, same as every pass so far.
+
+## Seventh pass (work plan registration and status)
+
+2026-10-02, CL-3.4 of the same effort. Two new tools: `register_work_plan`
+and `work_plan_status` (20261002200000_work_plans.sql). `tools/list` is now
+15,018 bytes, over its 13,700-byte budget. Raised to 15,100, just above the
+actual, per this doc's own rule. No existing tool's budget
+changed. The two new tools have no budget of their own yet: their responses
+depend on the plan's size (a status line plus a fenced title per step), and
+the Load vault has no plan fixture to measure; a 500-step plan, the most the
+database allows, would be on the order of 40 KB.
+
+Still to do, from the token side:
+
+- **`tools/list` has no headroom again.** The step tools (`claim_step`,
+  `checkin_step`, `complete_step`, `release_step`) are the next four.
+- **`work_plan_status` has no cap on its answer.** It lists every step, as
+  `list_claims` lists every claim. If real plans run long, a `state` filter
+  or a page is the fix.

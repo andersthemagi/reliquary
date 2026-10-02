@@ -17,10 +17,12 @@
   "propose": "An owner's or editor's agent with read-write access",
   "read_file": "Any member's agent, within its connection's vaults (read-only is enough)",
   "read_proposal": "Any member's agent, within its connection's vaults (read-only is enough)",
+  "register_work_plan": "Whoever could write the plan file's path: an owner's or editor's agent with read-write access, or a path's named owner. A read-only connection or a viewer can't register",
   "release_claim": "The claim's own holder, from the same connection, with its secret and fence; nobody else",
   "renew_claim": "The claim's own holder, from the same connection, with its secret and fence; nobody else",
   "revise_proposal": "The proposer's agent (the person whose agent proposed counts as the proposer), with read-write access",
   "search": "Any member's agent, within its connection's vaults (read-only is enough)",
   "send_feedback": "Any connection, read-only ones included: it sends feedback to the people who run this Reliquary and writes nothing to a vault. A vault it names must be within the connection",
+  "work_plan_status": "Any member's agent, within its connection's vaults (read-only is enough)",
   "write_file": "An owner's or editor's agent with read-write access, for open files only"
 }

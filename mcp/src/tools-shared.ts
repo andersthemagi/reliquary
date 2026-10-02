@@ -1,9 +1,9 @@
 // Helpers shared by every MCP tool domain module (vaultfiles-tools.ts,
 // proposals-tools.ts, variables-tools.ts, flags-tools.ts, links-tools.ts,
-// claims-tools.ts): the response shape, the error-to-message translation,
-// the vault-lookup SQL fragment, the fenced-text nonce, the tool-name-aware
-// register() wrapper, and the input-size ceilings the database also
-// enforces.
+// claims-tools.ts, workplan-tools.ts): the response shape, the
+// error-to-message translation, the vault-lookup SQL fragment, the
+// fenced-text nonce, the tool-name-aware register() wrapper, and the
+// input-size ceilings the database also enforces.
 //
 // Text written by people or agents (files, reasons, notes, comments) is
 // always returned between markers, with its provenance, because it must read

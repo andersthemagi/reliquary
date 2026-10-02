@@ -163,8 +163,8 @@ test("flow: a client with a metadata document goes from a 401 to tools/list", as
   assert.deepEqual(names, [
     "advance_flags", "changes_since", "claim_path", "comment_on_proposal", "create_vault", "delete_file", "list_claims",
     "list_files", "list_flags", "list_links", "list_my_feedback", "list_proposals", "list_subscriptions", "list_variables",
-    "list_vaults", "propose", "read_file", "read_proposal", "release_claim", "renew_claim", "revise_proposal", "search",
-    "send_feedback", "write_file",
+    "list_vaults", "propose", "read_file", "read_proposal", "register_work_plan", "release_claim", "renew_claim",
+    "revise_proposal", "search", "send_feedback", "work_plan_status", "write_file",
   ]);
   await c.close();
 });

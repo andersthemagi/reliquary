@@ -92,6 +92,8 @@ and, for the agent, its token's vaults and access.
 | See a vault's active claims (path, holder, time left) | a vault's **Claims** section | `list_claims` | both, any connection (read-only is enough) | Both sides read the same `path_claims` rows; the web page also links each to the file it's on |
 | Break someone else's claim | its **Claims** section, **Break** (confirm first) | none | person, owners and editors | **Ceiling**: `break_claim` is `require_human`, the same ceiling as approving or revealing a secret (design.md "Claims and work plans" item 1) |
 | Set, change or remove a claim rule (lease, hold limit, caps, by path) | the **Rules** page, Claim rules section | none | person (owner) | **Ceiling**, the same as a canon/open rule: `set_claim_rule` is `require_human`, owners only. Agents read the result through `claim_path`'s own lease and refusals, not this tool |
+| Register a plan file's steps as a work plan | none yet | `register_work_plan` | whoever could write the path (a read-only connection or a viewer can't) | **Gap**, not decided: the web app can't register a plan yet. Whether a person should (a **Register** action on the tasks page) or registration stays with agents is the owner's call. The database function already takes any writer, a person included |
+| See a plan's steps: state, what blocks each, who holds it | none yet | `work_plan_status` | both, any connection (read-only is enough) | **Gap**: the web app's view of tasks is its own change. Both sides read the same rows through the same RLS |
 
 ## Fixed in this change
 
