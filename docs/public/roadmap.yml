@@ -53,7 +53,7 @@
   version: 0.1.0
 
 - title: Activity and history
-  summary: An append-only log of every change, filterable, across vaults or per file.
+  summary: A plain-language Changes feed for each vault, and an append-only log of every change, filterable, across vaults or per file.
   status: shipped
   milestone: M1
   docs: concepts/activity
