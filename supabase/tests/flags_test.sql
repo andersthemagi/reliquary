@@ -218,12 +218,12 @@ select t.expect('flags: reading again without advancing shows the same flags',
   t.flags('ben', 'team'), 'responsibility review proposal.open canon/a.md');
 select t.expect('watermark: none is stored until an identity advances; reading never stores one',
   (select count(*)::text from public.flag_watermarks), '0');
-select t.expect('flags: each flag carries its seq, category, reason, event, path, proposal, who and when, and the answer its watermark, through and more',
+select t.expect('flags: each flag carries its seq, category, reason, event, path, proposal, thread and message, who and when, and the answer its watermark, through and more',
   (select string_agg(k, ',' order by k) from jsonb_object_keys((t.flag_json('ben', 'team')::jsonb -> 'flags') -> 0) k)
   || ' / ' || (select string_agg(k, ',' order by k) from jsonb_object_keys(t.flag_json('ben', 'team')::jsonb) k)
   || ' / ' || ((t.flag_json('ben', 'team')::jsonb -> 'flags' -> 0 ->> 'proposal_id') = t.id('p1')::text)::text
   || ' ' || ((t.flag_json('ben', 'team')::jsonb -> 'flags' -> 0 ->> 'actor') = t.id('ana')::text)::text,
-  'actor,agent,at,category,event,path,proposal_id,reason,seq,watching / flags,more,through,watermark / true true');
+  'actor,agent,at,category,event,message_id,path,proposal_id,reason,seq,thread_id,watching / flags,more,through,watermark / true true');
 select t.catch_up('ben', 'team'), t.catch_up('ana', 'team'), t.catch_up('ana', 'team', 'ana-agent'), t.catch_up('cal', 'team');
 select t.expect('flags: once advanced, what was shown isn''t shown again',
   t.flags('ben', 'team') || ' ' || t.flags('ana', 'team', 'ana-agent'), 'none none');

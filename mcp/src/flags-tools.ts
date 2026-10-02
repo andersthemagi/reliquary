@@ -100,7 +100,7 @@ export function registerFlagsTools(
     {
       title: "List flags",
       description:
-        "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, or a change on a path they watch. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
+        "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, a change on a path they watch, or a new message in a thread for the whole vault or one they take part in. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
       inputSchema: {
         vault: VAULT,
         limit: z.number().int().min(1).max(200).optional().describe("Flags, default 50"),
@@ -125,6 +125,8 @@ export function registerFlagsTools(
             agent: string | null;
             at: string;
             watching: string | null;
+            thread_id: string | null;
+            message_id: number | null;
           }[];
         };
         if (r.flags.length === 0) {
@@ -141,6 +143,9 @@ export function registerFlagsTools(
           ];
           if (f.proposal_id) bits.push(`proposal ${f.proposal_id}`);
           if (f.watching) bits.push(`watching ${f.watching}`);
+          // Ids only: a thread's title and messages are people's words, and
+          // a flag line isn't fenced as data (20261005100000_thread_flags.sql).
+          if (f.thread_id) bits.push(`thread ${f.thread_id}  message ${f.message_id}`);
           return `  ${bits.join("  ")}`;
         });
         const out = [
