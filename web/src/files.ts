@@ -329,7 +329,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const canon = f.policy === "canon";
     const writable = (await writablePath(c, v, path)) && !f.erased_at;
     const watch = watchControl(ctx, id, path, await watchState(c, ctx, id, path));
-    const claim = await claimBanner(c, ctx, v, path, "view");
+    const claim = await claimBanner(c, ctx, v, path, "view", filePath(id, path, tab === "preview" ? undefined : tab));
     const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
     const body = html`
       ${pageHeader({
@@ -456,7 +456,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
     ).rows[0];
     if (!f) return null;
     const canon = f.policy === "canon";
-    const claim = await claimBanner(c, ctx, v, path, canon ? "propose" : "write");
+    const claim = await claimBanner(c, ctx, v, path, canon ? "propose" : "write", filePath(id, path));
     // No delete here: it lives in the file page's More menu, behind a
     // confirm page, away from Save. On canon the required "Why" comes before
     // the text, so it's on screen with the header's button. expected_version
