@@ -24,6 +24,10 @@ What people and their agents can each do, where, and who may: every rule here is
 | Claim a path, renew or release your own [claim](../concepts/claims.md) | none | `claim_path`, `renew_claim`, `release_claim` | agent, owners and editors (whoever could write the path) |
 | See a vault's active claims | **Settings**, **Diagnostics**, **Claims** | `list_claims` | both |
 | Break someone else's claim | **Diagnostics**, **Claims**, **Break** | none | person, owners and editors |
+| Register a plan file as a [work plan](../concepts/claims.md#work-plans) | none yet | `register_work_plan` | agent, owners and editors (whoever could write the path) |
+| See a work plan's steps | none yet | `work_plan_status` | agent, any member |
+| Claim a step, check in on it, complete it or give it back | none | `claim_step`, `checkin_step`, `complete_step`, `release_step` | agent; claiming: whoever could write the path; the rest: the step's holder |
+| Cancel or skip a step | none yet | none | person, owners and editors |
 
 ## Vault settings, members and access
 

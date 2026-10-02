@@ -17,15 +17,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { at, freshNonce, makeRun, ok, PATH, peopleLabeler, refuse, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
-
-const SECRET = z.string().regex(/^[0-9a-f]{64}$/);
-const FENCE = z.number().int().min(1);
-// 48 hours is today's fixed lease and hold limit (no claim_rules table
-// yet, CL-2.7); a caller may ask for less, and more is clamped there,
-// not refused -- this is just a sane ceiling on the argument itself,
-// the same spirit as every other input-size check in tools-shared.ts.
-const TTL_MINUTES = z.number().int().min(1).max(60 * 24 * 30);
+import { at, FENCE, freshNonce, makeRun, ok, PATH, peopleLabeler, refuse, SECRET, ToolError, TTL_MINUTES, VAULT, VAULT_REF } from "./tools-shared.js";
 
 export function registerClaimsTools(
   server: McpServer,
