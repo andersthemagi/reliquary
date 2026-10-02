@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import pg from "pg";
 import { Session, tokenRef } from "../dist/db.js";
-import { queryTerms, searchHits, snippet } from "../dist/tools.js";
+import { queryTerms, searchHits, snippet } from "../dist/vaultfiles-tools.js";
 
 const { GUS_RW, TEST_DATABASE_URL } = process.env;
 const VAULT = `Search lines ${process.pid}`;
