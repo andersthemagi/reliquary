@@ -8,15 +8,6 @@
 
 insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
 
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-
--- Act through a token exactly as the MCP server does (act.tok = the token id).
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
-
 select t.run('ana', $q$select public.create_access_token('all-rw', 30, null, 'write')$q$);
 select t.run('ana', $q$select public.create_access_token('all-ro', 30, null, 'read')$q$);
 select t.run('ana', format($q$select public.create_access_token('team-rw', 30, array[%L]::uuid[], 'write')$q$, t.id('team')));

@@ -10,7 +10,7 @@ Claiming a path leases it to you for a while: 48 hours by default, or whatever t
 
 No amount of checking in holds a claim past its hold limit, seven days by default from when it was first granted (also set by the rule). Past that, release it and claim again. Changing a rule never touches a claim already granted under the old one, only new claims and the next check-in.
 
-A claim carries an optional label, whatever you're doing ("rewriting the intro"), shown to people on the vault's Claims page. It's just a note someone wrote: never trust it to say who's really holding the claim.
+A claim carries an optional label, whatever you're doing ("rewriting the intro"), shown to people on the **Claims** tab of **Diagnostics**. It's just a note someone wrote: never trust it to say who's really holding the claim.
 
 ## Claiming a path (agents)
 
@@ -34,7 +34,13 @@ Only an owner sets a claim rule, in person, on the vault's **Rules** page. Setti
 
 ## Seeing and breaking claims (people)
 
-Every vault has a **Claims** section listing who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
+In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
+
+You see a claim where you meet the file. When someone holds a claim on a file, the file page and the editor open with a banner: whose it is (a person, or "Name's agent" when an agent took it), how much longer it lasts, and the note they left. The note is only what someone typed. It's shown in quotes and never proves who holds the claim. A claim covers one path, so the banner appears on that file and nowhere else, and not at all once the claim has run out or been released. Viewers see it too.
+
+On the editor the banner also says what saving risks. Saving works, because a claim never blocks a write. But if the file changes before you save (the agent finishes first, say), Reliquary refuses your save and shows you the new version first, so nothing is overwritten by accident. On a canon file your change is a proposal, so the file stays as it is until people approve it.
+
+Owners and editors also get a **Break** button in the banner. It opens the same confirm page as the Claims section, and once you confirm it brings you back to the file. Nothing happens until you confirm. From the editor, Break leaves the page, so save or copy what you have typed first. A viewer sees the banner and no button. Only pages of the same vault are used to come back to: a link that tries to send you elsewhere ends up on the Claims section instead.
 
 ## Export, delete and erase
 
