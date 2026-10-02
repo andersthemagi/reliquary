@@ -11,24 +11,14 @@ import { appendFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { randomBytes } from "node:crypto";
 import pg from "pg";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { call as call_ } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const { EVE_HOME_RW, EVE_ALL_RO, TEST_SUPER_URL, MCP_ERROR_REFS_FILE } = process.env;
 const MARK = `SEKRIT-${randomBytes(6).toString("hex")}`;
 const DETAILS = /^\(what: Calling ([a-z_]+); where: ([^;]+)(?:; why: ([^;]+))?; ref ([0-9a-f]{8})\)$/;
 
-async function call(token, name, args = {}) {
-  const c = new Client({ name: "errors", version: "0.0.0" });
-  await c.connect(new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
-  try {
-    const r = await c.callTool({ name, arguments: args });
-    return { text: r.content.map((x) => x.text).join("\n"), isError: Boolean(r.isError) };
-  } finally {
-    await c.close();
-  }
-}
+const call = (token, name, args = {}) => call_(URL_, token, name, args);
 
 // The two lines of a tool error, the reference recorded for mcp/test.sh.
 function parsed(text) {

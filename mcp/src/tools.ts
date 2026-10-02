@@ -80,11 +80,3 @@ function trimToolList(server: McpServer): void {
     return list as { tools: [] };
   });
 }
-
-// Re-exported so mcp/test/search_lines.test.mjs (which imports these three
-// from ../dist/tools.js) keeps working unchanged: the search-line-picking
-// helpers now live in vaultfiles-tools.ts, alongside the search tool that
-// uses them.
-export { queryTerms, searchHits, SEARCH_SQL, snippet, type SearchHit } from "./vaultfiles-tools.js";
-// excerpt() moved to tools-shared.ts (fileBlock() there uses it too).
-export { excerpt } from "./tools-shared.js";

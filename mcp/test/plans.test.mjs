@@ -6,22 +6,12 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { call as call_ } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const { PAT_RW } = process.env;
 
-async function call(name, args = {}) {
-  const c = new Client({ name: "plans", version: "0.0.0" });
-  await c.connect(new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${PAT_RW}` } } }));
-  try {
-    const r = await c.callTool({ name, arguments: args });
-    return { text: r.content.map((x) => x.text).join("\n"), isError: Boolean(r.isError) };
-  } finally {
-    await c.close();
-  }
-}
+const call = (name, args = {}) => call_(URL_, PAT_RW, name, args);
 
 test("plans: list_vaults notes a vault near its storage limit, with its usage", async () => {
   const r = await call("list_vaults");

@@ -3,8 +3,6 @@
 -- the limit and its Retry-After, a refused request counting nothing, a
 -- token's grant as its key, and pruning.
 
-create function t.sha(p text) returns text language sql as
-$$ select encode(sha256(convert_to(p, 'UTF8')), 'hex') $$;
 -- A call of private.rate_limit_hit as SQL text, one bucket.
 create function t.hit(p_bucket text, p_key text, p_window int, p_limit int, p_cost int default 1) returns text
 language sql as $$

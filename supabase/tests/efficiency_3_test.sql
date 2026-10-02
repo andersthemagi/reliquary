@@ -16,16 +16,6 @@ insert into t.ids select 'dteam', t.run('dee', $q$select public.create_vault('Te
 select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
 select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
 
-create function t.q(p_sql text) returns text language plpgsql as $$
-declare v text;
-begin
-  execute p_sql into v;
-  return v;
-end $$;
-create function t.sha(p text) returns text language sql as
-$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
-create function t.s256(p text) returns text language sql as
-$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
 create function t.tok(p_name text) returns uuid language sql as
 $$ select id from public.access_tokens where name = p_name and kind = 'pat' $$;
 create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$

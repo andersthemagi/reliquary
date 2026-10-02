@@ -27,10 +27,6 @@ create function t.setv(p_user text, p_vault text, p_name text, p_env text, p_tag
 $$;
 
 -- OAuth plumbing, as the web app's token endpoint does it.
-create function t.sha(p text) returns text language sql as
-$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
-create function t.s256(p text) returns text language sql as
-$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
 create function t.c(p text) returns text language sql as $$
   select case p
     when 'cli' then 'https://app.example/cli/oauth-client.json'
@@ -131,8 +127,6 @@ create function t.reveal_sql(p_vault text, p_name text, p_env text) returns text
 $$ select format($q$select public.reveal_variable(%L, %L, %L)::text$q$, t.id(p_vault), p_name, p_env) $$;
 create function t.err(p_json text) returns text language sql as
 $$ select case when p_json like 'ERR %' then p_json else coalesce(p_json::jsonb ->> 'error', 'ok') end $$;
-create function t.refusals(p_vault text) returns bigint language sql as
-$$ select count(*) from public.env_access_log where vault_id = t.id(p_vault) and action = 'refused' $$;
 
 -- ---------------------------------------------------------------------------
 -- Environments

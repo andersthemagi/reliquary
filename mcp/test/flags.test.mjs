@@ -11,9 +11,8 @@
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { connect } from "./mcp-client.mjs";
 
 const MCP = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 // test.sh puts Postgres at 54330 + 10 * slot and this server at 8788 + 10 * slot.
@@ -62,8 +61,7 @@ before(async () => {
   [{ t: niaToken }] = await as({ user: NIA }, "select public.create_access_token('Nia agent', 7) as t");
   [{ id: proposalId }] = await as({ user: OMAR }, "select public.propose($1, 'canon/plan.md', 'draft', 'why') as id", [vault]);
   await as({ user: OMAR }, "select public.write_file($1, 'notes/scratch.md', 'hi') as id", [vault]);
-  client = new Client({ name: "flags-test", version: "0.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(MCP, { requestInit: { headers: { Authorization: `Bearer ${niaToken}` } } }));
+  client = await connect(MCP, niaToken, "flags-test");
 });
 
 after(async () => {
