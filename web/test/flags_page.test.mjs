@@ -115,15 +115,58 @@ test("flags page: a vault you're not in is 404", async () => {
   assert.equal((await get(flagsUrl(V.ola))).status, 404);
 });
 
+// Diagnostics (src/diagnostics.ts): Settings' tab for working out why
+// something happened. This file's seed has flags waiting, which is what the
+// landing page must leave alone.
+
+test("diagnostics: Settings has a Diagnostics tab, and its page says what it is for and offers Flags, Claims and the Log, none of them current", async () => {
+  assert.match(await page(`/v/${V.main}/config`), new RegExp(`<a href="/v/${V.main}/diagnostics">Diagnostics</a>`));
+  const h = await page(`/v/${V.main}/diagnostics`);
+  assert.match(h, /<h1>Settings<\/h1>/);
+  assert.match(h, /<p class="page-desc">For working out why something happened; most people never need it\.<\/p>/);
+  assert.match(h, new RegExp(`<a href="/v/${V.main}/diagnostics" aria-current="page">Diagnostics</a>`), "the Settings tab is current");
+  assert.match(h, new RegExp(`href="/v/${V.main}/config" aria-current="page">Settings`), "the sidebar's Settings is current");
+  const inner = /<nav class="tabs" aria-label="Diagnostics">([\s\S]*?)<\/nav>/.exec(h)?.[1];
+  assert.ok(inner, "the inner tabs");
+  assert.deepEqual([...inner.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)</g)].map((m) => [m[1], m[2]]), [
+    [`/v/${V.main}/flags`, "Flags"],
+    [`/v/${V.main}/claims`, "Claims"],
+    [`/v/${V.main}/activity`, "Log"],
+  ]);
+  assert.doesNotMatch(inner, /aria-current/, "no inner tab is the current page here");
+});
+
+test("diagnostics: opening the landing page marks no flags shown", async () => {
+  const waiting = async () => (await as(FRAN, "select public.list_flags($1, 200) as r", [V.main]))[0].r.flags.length;
+  const before = await waiting();
+  assert.ok(before > 0, "this vault has flags waiting for Fran");
+  assert.equal((await get(`/v/${V.main}/diagnostics`)).status, 200);
+  assert.equal(await waiting(), before);
+});
+
+test("diagnostics: a vault you're not in is 404", async () => {
+  assert.equal((await get(`/v/${V.ola}/diagnostics`)).status, 404);
+});
+
+test("diagnostics: /flags is the same page inside Diagnostics, with Flags and Diagnostics current and the headings in order", async () => {
+  // A vault with nothing waiting, so this opens nothing of the seed's.
+  const h = await page(flagsUrl(V.empty));
+  assert.match(h, new RegExp(`<a href="/v/${V.empty}/diagnostics" aria-current="page">Diagnostics</a>`), "the Settings tab");
+  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.empty}/flags" aria-current="page">Flags</a><a href="/v/${V.empty}/claims">Claims</a><a href="/v/${V.empty}/activity">Log</a></nav>`));
+  assert.match(h, new RegExp(`href="/v/${V.empty}/config" aria-current="page">Settings`), "the sidebar's Settings");
+  assert.match(h, /For working out why something happened; most people never need it\./);
+  assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, "one h1");
+  assert.ok(h.indexOf("<h1>Settings</h1>") < h.indexOf("<h2>Flags</h2>"), "Settings, then Flags");
+});
+
 test("flags page: a vault with nothing waiting says so", async () => {
   const h = await page(flagsUrl(V.empty));
-  assert.match(h, /<h1>Flags<\/h1>/);
+  assert.match(h, /<h2>Flags<\/h2>/);
   assert.match(h, /<strong>Nothing new<\/strong>/);
 });
 
 test("flags page: shows what waits on Fran, oldest first, none of it Fran's own actions", async () => {
   const h = await page(flagsUrl(V.main));
-  assert.match(h, new RegExp(`<a href="/v/${V.main}/flags" aria-current="page">Flags</a>`), "its own section in the vault's nav");
   const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
   assert.equal(rows.length, 5, h);
 

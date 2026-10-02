@@ -1119,6 +1119,20 @@ form.confirm .actions:first-child { margin-top: 0; }
   .table-stack tr:hover > td { background: transparent; }
 }
 
+/* Tasks (tasks.ts): every group's table has the same columns, and a badge
+   keeps its own width in a stacked row. */
+.task-table { table-layout: fixed; }
+.task-table th:nth-child(1) { width: 30%; }
+.task-table th:nth-child(2) { width: 20%; }
+.task-table td .badge, .plan-table td .badge { justify-self: start; white-space: normal; padding-block: 2px; }
+@media (max-width: 640px) { .task-table { table-layout: auto; } }
+/* Cancel and Skip stack in a narrow column beside the details. */
+@media (min-width: 641px) {
+  .task-table th:nth-child(4) { width: 6.5rem; }
+  .task-table td.row-actions .button { display: flex; justify-content: center; }
+  .task-table td.row-actions .button + .button { margin-top: var(--space-2); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
@@ -1640,6 +1654,13 @@ label.choice-card input:focus-visible { outline: none; }
 /* Settings tabs (vaultadmin.ts settingsHeader): the first h2 under the tabs
    sits close, the rest keep the page rhythm. */
 .page-head.has-tabs + h2, .page-head.has-tabs + .section-head > h2 { margin-top: var(--space-2); }
+/* Diagnostics (diagnostics.ts): Flags, Claims and the log are a second row
+   under the Settings tabs, lighter than them so the two read as two levels. */
+.diag-tabs > .tabs { box-shadow: none; gap: var(--space-1); margin: var(--space-2) 0 var(--space-5); }
+.diag-tabs > .tabs a { min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); }
+.diag-tabs > .tabs a[aria-current="page"] { background: var(--bg-muted); }
+.diag-tabs > .tabs a[aria-current="page"]::after { content: none; }
+.diag-tabs + h2 { margin-top: 0; }
 /* A section heading with a quiet line at its right: "People · 3 of 10 places". */
 .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-5); margin: var(--space-8) 0 var(--space-4); }
 .section-head > h2 { margin: 0; }
@@ -1840,3 +1861,23 @@ table.env-log td[data-label="Environment"] { white-space: nowrap; }
 .welcome-actions form { margin: 0; }
 .welcome-skip { margin: var(--space-4) 0 0; text-align: center; }
 @media (max-width: 640px) { .welcome { margin: var(--space-3) 0; padding: var(--space-4); } }
+
+/* Changes (changes.ts): a heading per day, a line per change, the sentence
+   first and when it happened after it (below it on phones, as .rows does). */
+.feed-day h2 { margin: var(--space-6) 0 var(--space-3); font-size: var(--text-md); line-height: var(--lh-md); }
+.chips + .feed-day h2, .hint + .feed-day h2 { margin-top: var(--space-5); }
+.feed .change { align-items: baseline; }
+.change-what { min-width: 0; overflow-wrap: anywhere; }
+.change-agent { margin-left: var(--space-1); color: var(--fg-muted); font-size: var(--text-sm); }
+.change-when { flex: none; color: var(--fg-muted); font-size: var(--text-sm); white-space: nowrap; }
+
+/* Changes: Everyone, Mine, Watching, as links with one marked (changes.ts). */
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.chip {
+  display: inline-flex; align-items: center; min-height: var(--control-sm); padding: 0 var(--space-4);
+  border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--bg-subtle);
+  color: var(--fg); font-size: var(--text-sm); text-decoration: none;
+}
+.chip:hover { border-color: var(--border-strong); }
+.chip[aria-current="true"] { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 600; }
+.chips + .hint { margin: var(--space-3) 0 0; }

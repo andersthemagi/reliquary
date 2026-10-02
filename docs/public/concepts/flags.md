@@ -30,7 +30,7 @@ A new connection is told what is waiting on you now, but not what happened befor
 
 ## Seeing your flags
 
-Every vault has a **Flags** section for the person signed in to the web app: what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file.
+In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
 
 Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
 
@@ -40,11 +40,11 @@ Any member of a vault, owner, editor or viewer, can watch its folders and files.
 
 To watch a folder or a file, open it and choose **Watch** at the top of its page. The page then says **Watching**, with **Unwatch** to stop. A file inside a folder you watch says **Watching via** that folder, since the folder's watch already covers it. The vault's top folder has no **Watch**: watch the folders in it instead.
 
-Everything you watch in a vault is on its **Settings**, **Watching** tab, each with **Unwatch**. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. A folder ends in `/` and covers everything in it; a file covers only itself.
+Everything you watch in a vault is on its **Settings**, **Watching** tab, each with **Unwatch**. The vault's [Changes](activity.md#changes) has a **Watching** view of what changed on those paths, including changes from before you started watching; flags only count from the moment you ask. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. A folder ends in `/` and covers everything in it; a file covers only itself.
 
 At 100 paths in a vault, watching another is refused, and the page says so: stop watching one first.
 
-Watching starts from the moment you ask: earlier changes aren't flagged. Nobody else sees what you watch, and it isn't recorded in the vault's [Activity](activity.md).
+Watching starts from the moment you ask: earlier changes aren't flagged. Nobody else sees what you watch, and it isn't recorded in the vault's [log](activity.md).
 
 Watching a tag isn't possible yet, because files don't carry tags.
 

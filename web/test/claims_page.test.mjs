@@ -140,18 +140,48 @@ test("claims page: a vault you're not in is 404", async () => {
 
 test("claims page: a vault with nothing claimed says so", async () => {
   const h = await page(noa, claimsUrl(V.empty));
-  assert.match(h, /<h1>Claims<\/h1>/);
+  assert.match(h, /<h2>Claims<\/h2>/);
   assert.match(h, /<strong>No active claims<\/strong>/);
 });
 
-test("claims page: lists the path (linked to the file), holder and label, and its own section in the vault nav", async () => {
+test("claims page: lists the path (linked to the file), holder and label", async () => {
   const h = await page(noa, claimsUrl(V.main));
-  assert.match(h, new RegExp(`<a href="/v/${V.main}/claims" aria-current="page">Claims<span class="count">1</span></a>`), "its own section in the vault's nav, with the active count");
   const row = /<tr><td data-label="Path">[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(row, new RegExp(`<a href="/v/${V.main}/file\\?path=notes%2Fdraft\\.md">notes/draft\\.md</a>`));
   assert.match(row, /edda@example\.test/);
   assert.match(row, /<span class="token-client">tidying this up<\/span>/);
   assert.match(h, /Your agents see and take the same claims over MCP/);
+});
+
+// Claims is a tab of Diagnostics (src/diagnostics.ts): the page at its old
+// address, now behind Settings' frame.
+
+test("diagnostics: /claims is the same page inside Diagnostics, with Claims and Diagnostics current and the headings in order", async () => {
+  const h = await page(noa, claimsUrl(V.main));
+  assert.match(h, new RegExp(`<a href="/v/${V.main}/diagnostics" aria-current="page">Diagnostics</a>`), "the Settings tab");
+  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.main}/flags">Flags</a><a href="/v/${V.main}/claims" aria-current="page">Claims</a><a href="/v/${V.main}/activity">Log</a></nav>`));
+  assert.match(h, new RegExp(`href="/v/${V.main}/config" aria-current="page">Settings`), "the sidebar's Settings");
+  assert.match(h, /For working out why something happened; most people never need it\./);
+  assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, "one h1");
+  assert.ok(h.indexOf("<h1>Settings</h1>") < h.indexOf("<h2>Claims</h2>"), "Settings, then Claims");
+});
+
+test("diagnostics: Flags and Claims, and a count of active claims, are not in the vault's navigation", async () => {
+  const h = await page(noa, `/v/${V.main}`);
+  assert.deepEqual(await active(V.main), ["notes/draft.md"], "this vault has an active claim to count");
+  const navs = h.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
+  assert.equal(navs.length, 2, "the wide sidebar and the phone tabs");
+  for (const nav of navs) {
+    assert.doesNotMatch(nav, /\/flags|\/claims|Flags|Claims/);
+    assert.doesNotMatch(nav, /class="count"/, "no count badge");
+  }
+});
+
+test("diagnostics: a viewer has the Diagnostics tab and its page", async () => {
+  assert.match(await page(rex, `/v/${V.main}/config`), new RegExp(`<a href="/v/${V.main}/diagnostics">Diagnostics</a>`));
+  const h = await page(rex, `/v/${V.main}/diagnostics`);
+  assert.match(h, new RegExp(`<a href="/v/${V.main}/claims">Claims</a>`));
+  assert.equal((await get(rex, `/v/${V.main}/claims`)).status, 200);
 });
 
 test("claims page: a viewer sees the list but no Break action", async () => {
@@ -164,6 +194,12 @@ test("claims page: a viewer sees the list but no Break action", async () => {
 test("break: the confirm page says what happens, and opening it breaks nothing", async () => {
   const h = await page(noa, `${claimsUrl(V.main)}?break=${encodeURIComponent("notes/draft.md")}`);
   assert.match(h, /<h1>Break the claim on notes\/draft\.md\?<\/h1>/);
+  assert.match(
+    h,
+    new RegExp(`<li><a href="/v/${V.main}/config">Settings</a></li><li><a href="/v/${V.main}/diagnostics">Diagnostics</a></li><li><a href="/v/${V.main}/claims">Claims</a></li><li aria-current="page">Break</li>`),
+    "it sits under Claims, in Diagnostics",
+  );
+  assert.doesNotMatch(h, /aria-label="Diagnostics"/, "a confirm page has no tabs");
   assert.match(h, /edda@example\.test \(tidying this up\) loses this claim; they, and their agent, can claim <code>notes\/draft\.md<\/code> again once they’re ready\./);
   assert.match(h, /<li>Nothing about the file itself changes: a claim is a courtesy signal, not an access gate\.<\/li>/);
   const { fields } = formFields(h, "Break the claim on notes/draft.md");

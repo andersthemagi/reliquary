@@ -21,6 +21,7 @@
 // response.
 
 import { asPerson } from "./db.js";
+import { NAME } from "./dotenv.js";
 import { html, page, pageHeader, plural, type CrumbPart, type Raw, type Tab } from "./html.js";
 import { notFound, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
@@ -37,7 +38,7 @@ import {
 import { log } from "./accesslog.js";
 import { decideImport, importForm, importPost, importsPage, reviewImport } from "./imports.js";
 
-export const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+export { NAME };
 export const ENV = /^[a-z][a-z0-9_-]{0,31}$/;
 
 export const q = encodeURIComponent;
