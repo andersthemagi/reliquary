@@ -413,9 +413,12 @@ $$;
 select t.expect('list: by default, vault-wide threads and side threads addressed to the caller''s person',
   t.run('ben', t.list_sql()), (select string_agg(title, ',' order by title) from public.threads th
     where th.vault_id = t.id('v1') and th.title not in ('Twenty')));
-select t.expect('list: so a side thread addressed only to others isn''t listed by default, even to its opener',
-  t.run('ana', t.list_sql()), (select string_agg(title, ',' order by title) from public.threads th
-    where th.vault_id = t.id('v1') and th.title not in ('Twenty', 'For Ben', 'Invoices')));
+select t.expect('list: so a side thread addressed only to others isn''t listed by default',
+  t.run('cal', t.list_sql()), (select string_agg(title, ',' order by title) from public.threads th
+    where th.vault_id = t.id('v1') and th.title not in ('Twenty', 'For Ben')));
+select t.expect('list: unless the caller''s person opened it: by default its opener lists it, addressed to them or not',
+  t.run('ana', t.list_sql(), 'Claude'), (select string_agg(title, ',' order by title) from public.threads th
+    where th.vault_id = t.id('v1')));
 select t.expect('list: asked for all, the caller''s agent lists every thread, side threads marked as side',
   t.run('cal', format($q$select count(*) || ' ' || string_agg(title, ',' order by title) filter (where scope = 'side')
     from public.list_threads(%L, p_all => true, p_limit => 200)$q$, t.id('v1')), 'Hermes'),

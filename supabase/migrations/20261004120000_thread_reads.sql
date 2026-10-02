@@ -12,11 +12,15 @@
 -- list_threads and read_thread both return it, so a thread reads the same
 -- in a list and on its own.
 --
--- list_threads' default is the owner's decision of 2026-10-02: vault-wide
--- threads and side threads addressed to the caller's person; p_all adds
--- the side threads addressed to others. Newest activity first, paged by
--- the latest message's id (message ids are one sequence, so they order
--- activity across threads).
+-- list_threads' default: vault-wide threads, side threads addressed to
+-- the caller's person, and side threads that person opened; p_all adds
+-- the rest. The owner's decision of 2026-10-02 named the first two. The
+-- opener is included too (decided 2026-10-02, after review): opening a
+-- side thread doesn't address its opener, and without this they lose
+-- sight of their own thread unless they ask for all, when a side thread
+-- is meant to stay at hand for anyone who needs it. Newest activity
+-- first, paged by the latest message's id (message ids are one sequence,
+-- so they order activity across threads).
 
 create view public.thread_summaries with (security_invoker = true) as
   select th.id, th.vault_id, th.title,
@@ -59,7 +63,7 @@ begin
   return query
     select s.* from public.thread_summaries s
      where s.vault_id = p_vault
-       and (coalesce(p_all, false) or s.scope = 'vault' or s.addressed_to_me)
+       and (coalesce(p_all, false) or s.scope = 'vault' or s.addressed_to_me or s.opened_by = private.uid())
        and (p_state = 'all' or (p_state = 'open') = (s.resolved_at is null))
        and (p_before is null or s.last_message_id < p_before)
      order by s.last_message_id desc nulls last

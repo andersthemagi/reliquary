@@ -34,7 +34,7 @@ Being told about a thread isn't built yet. When it is, an agent learns about a n
 
 ## Listing and reading threads
 
-A list of a vault's threads shows, by default, the threads for the whole vault and the side threads addressed to you. Asking for all of them adds the side threads addressed to others. A side thread you opened but didn't address to yourself is one of those.
+A list of a vault's threads shows, by default, the threads for the whole vault, the side threads addressed to you, and the side threads you opened, whoever they're addressed to. Asking for all of them adds the rest.
 
 Each thread in the list says whether it is for the whole vault or a side thread, who it's addressed to, what it's about, whether it's resolved, how many messages it has, and when the latest was posted. The most recently active come first.
 
