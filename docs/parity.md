@@ -18,6 +18,35 @@ still be refused.
 doesn't name in its MCP column, or if the column names a tool that no longer
 exists.
 
+## What the table does not say
+
+The table answers "may they?": what a person and an agent can each do, and
+where the ceiling or a gap stops one side. It does not answer "would a
+person want it?". A capability can exist on both sides and still belong to
+one audience. Flags, claims and the full activity log are logging for
+diagnosing a problem. The web UI mirrored them because this table asks for
+every action on both surfaces, and the vault sidebar listed them right
+after Proposals (docs/design.md, "Who each surface is for").
+
+So each surface is also classed by who it is for. This changes nothing the
+table requires. It changes where the web UI puts the page.
+
+- **person**: something a person reads or acts on. It leads the primary
+  navigation and a page's default view.
+- **agent**: a mechanism for agents. A person rarely needs to see it.
+- **diagnostic**: logging a person opens to find out what went wrong. One
+  click away under Diagnostics, never deleted.
+
+| Surface | Class | Note |
+|---|---|---|
+| Tasks (a plan's steps) | person | The web UI says task. Agents work the same steps over MCP, where the names stay `work_plan` and `step` |
+| Threads | person | Conversation inside one vault, opened and posted to by people and by their agents |
+| Changes (content events) | person | The plain-language half of Activity |
+| Inbox | person | What waits on you. Person-only already, in the table below |
+| Activity (the full log) | diagnostic | `/v/:v/activity` keeps resolving |
+| Flags | agent | How an agent learns something on its next tool call. Its web page is diagnostic, and `/v/:v/flags` keeps resolving |
+| Claims | agent | An agent's own coordination signal, in the table below. Its web table, with Break, is diagnostic, and `/v/:v/claims` keeps resolving |
+
 ## The table
 
 Routes: `:v` is a vault id, `:p` a proposal id. "Both" means a person in the
@@ -81,16 +110,16 @@ and, for the agent, its token's vaults and access.
 | Add, edit or delete a link | `/v/:v/links` (add and edit inline; delete confirms) | none | owner | **Ceiling**: `create_link`, `update_link` and `delete_link` are `require_human`, owners only |
 | Set a link's tool grants (which role may use a discovered tool) | `/v/:v/links/:id/grants` | none | owner | **Ceiling**: `set_link_grant` is `require_human`, owners only. Members read a link's grants within their role, on both sides, once discovery has run (`web/src/linkgrants.ts`) |
 | Call a granted link's tool | none (the web app never calls one directly, only proxies mcp/'s already-authorized call) | `<link>.<tool>` | any connection whose role is granted that tool (read-only is enough for a read tool; a write tool also needs a write-capable connection) | No web UI action, on purpose: calling a link's tool is an agent's job. Each granted (link, tool) pair registers as its own MCP tool, per identity (`private.list_callable_link_tools()`), so `tools/list` only ever offers one that would actually succeed (`20260928190000_link_proxy.sql`, `mcp/src/tools.ts`) |
-| List what's changed that hasn't been shown yet (flags) | none yet | `list_flags` | both, any connection (read-only is enough) | Web UI not built yet. Categories: a proposal waiting on your person, a change to one of their own proposals, a change on a watched path (`20260928150000_flags.sql`) |
-| Mark flags shown | none yet | `advance_flags` | both, any connection (read-only is enough) | Not in the ceiling: a watermark is the connection's own bookkeeping, never a write to the vault |
+| List what's changed that hasn't been shown yet (flags) | `/v/:v/flags` (Settings, Diagnostics, Flags) | `list_flags` | both, any connection (read-only is enough) | Categories: a proposal waiting on your person, a change to one of their own proposals, a change on a watched path (`20260928150000_flags.sql`). The web page marks them shown for the person only, never for a connection |
+| Mark flags shown | opening the Flags page (Settings, Diagnostics, Flags) | `advance_flags` | both, any connection (read-only is enough) | Not in the ceiling: a watermark is the connection's own bookkeeping, never a write to the vault |
 | List watched paths | `/v/:v/config/watching` (Settings, Watching) | `list_subscriptions` | both, any connection (read-only is enough) | The person's own only (RLS), in both |
 | Watch or unwatch a path | a folder's or file's page (**Watch** / **Unwatch**, POST `/v/:v/config/watching`), and `/v/:v/config/watching` | none | person (any member, a viewer too) | **Ceiling**: `create_subscription` and `delete_subscription` are `require_human`, the same conservative default as variables and rules (design.md leaves whether an agent should be allowed to as an open question) |
 | Name or remove a path's owner | `/v/:v/rules/owners?path=` (a rule's **⋯**, **Owners**; `&add=` and `&remove=` confirm, then POST) | none | owner | **Ceiling**: `set_path_owner` and `remove_path_owner` are `require_human`, owners only (`20260928130000_path_ownership.sql`) |
 | Write, delete or decide on a path you're named owner of | none yet | `write_file`, `delete_file`; approving still needs the person | the path's named owners, whatever their vault role | Not a new tool: `write_file`/`delete_file` already pass a path's named owners even when `can_write()` alone would refuse them (a viewer may be named); approving is still the ceiling, same as everywhere else |
 | Claim a path, to say you're working on it | none | `claim_path` | agent; whoever could write the path (a read-only connection can't) | **Gap**, left on purpose: claiming is an agent's own coordination signal, not something a person does to themself. A claim never blocks `write_file`, which still checks `expected_version` on its own |
 | Renew or release your own claim | none | `renew_claim`, `release_claim` | agent; the claim's own holder, from the same connection, with its secret and fence | **Gap**, left on purpose, same reason as claiming: these follow the agent that made the claim |
-| See a vault's active claims (path, holder, time left) | a vault's **Claims** section | `list_claims` | both, any connection (read-only is enough) | Both sides read the same `path_claims` rows; the web page also links each to the file it's on |
-| Break someone else's claim | its **Claims** section, **Break** (confirm first) | none | person, owners and editors | **Ceiling**: `break_claim` is `require_human`, the same ceiling as approving or revealing a secret (design.md "Claims and work plans" item 1) |
+| See a vault's active claims (path, holder, time left) | `/v/:v/claims` (Settings, Diagnostics, Claims) | `list_claims` | both, any connection (read-only is enough) | Both sides read the same `path_claims` rows; the web page also links each to the file it's on |
+| Break someone else's claim | `/v/:v/claims`, **Break** (confirm first) | none | person, owners and editors | **Ceiling**: `break_claim` is `require_human`, the same ceiling as approving or revealing a secret (design.md "Claims and work plans" item 1) |
 | Set, change or remove a claim rule (lease, hold limit, caps, by path) | the **Rules** page, Claim rules section | none | person (owner) | **Ceiling**, the same as a canon/open rule: `set_claim_rule` is `require_human`, owners only. Agents read the result through `claim_path`'s own lease and refusals, not this tool |
 
 ## Fixed in this change

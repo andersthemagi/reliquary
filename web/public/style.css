@@ -1654,6 +1654,13 @@ label.choice-card input:focus-visible { outline: none; }
 /* Settings tabs (vaultadmin.ts settingsHeader): the first h2 under the tabs
    sits close, the rest keep the page rhythm. */
 .page-head.has-tabs + h2, .page-head.has-tabs + .section-head > h2 { margin-top: var(--space-2); }
+/* Diagnostics (diagnostics.ts): Flags, Claims and the log are a second row
+   under the Settings tabs, lighter than them so the two read as two levels. */
+.diag-tabs > .tabs { box-shadow: none; gap: var(--space-1); margin: var(--space-2) 0 var(--space-5); }
+.diag-tabs > .tabs a { min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); }
+.diag-tabs > .tabs a[aria-current="page"] { background: var(--bg-muted); }
+.diag-tabs > .tabs a[aria-current="page"]::after { content: none; }
+.diag-tabs + h2 { margin-top: 0; }
 /* A section heading with a quiet line at its right: "People · 3 of 10 places". */
 .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-5); margin: var(--space-8) 0 var(--space-4); }
 .section-head > h2 { margin: 0; }

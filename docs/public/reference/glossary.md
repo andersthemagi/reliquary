@@ -28,7 +28,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Erase.** Blanking every version of a file's text, while the log keeps its entries. Owners only, in person. See [Export, delete and erase](../concepts/export-delete-erase.md#erase-a-file).
 
-**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. Not shown anywhere yet. See [Flags](../concepts/flags.md).
+**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. You see yours under **Settings**, **Diagnostics**, **Flags**. See [Flags](../concepts/flags.md).
 
 **Import.** A whole `.env` brought in at once, pasted in the web app or sent from the CLI, waiting for a person to apply it. See [Imports](../concepts/imports.md).
 
