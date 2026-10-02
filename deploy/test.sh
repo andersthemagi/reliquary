@@ -39,16 +39,14 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/rlq-deploy-$slot-XXXXXX")
 envfile=$work/test.env
 svc_pid=""
 
-# Rootless podman without pasta or slirp4netns can't give containers a
-# network of their own; the stack then shares the host's (compose.hostnet.yml).
-network=${DEPLOY_TEST_NETWORK:-}
-if [ -z "$network" ]; then
-  network=bridge
-  if [[ $(basename "$engine") == podman ]] &&
-     [ "$("$engine" info --format '{{.Host.Security.Rootless}}')" = true ] &&
-     ! command -v pasta >/dev/null && ! command -v slirp4netns >/dev/null; then
-    network=host
-  fi
+# Rootless podman needs pasta or slirp4netns to give containers a network of
+# their own; without either, compose can't bring the stack up isolated from
+# the host.
+if [[ $(basename "$engine") == podman ]] &&
+   [ "$("$engine" info --format '{{.Host.Security.Rootless}}')" = true ] &&
+   ! command -v pasta >/dev/null && ! command -v slirp4netns >/dev/null; then
+  echo "deploy test: rootless podman needs pasta or slirp4netns for container networking; install one and retry" >&2
+  exit 1
 fi
 
 # A compose, in order of preference.
@@ -72,7 +70,6 @@ else
     "$compose_image" docker compose)
 fi
 files=(-f "$here/compose/compose.yml" -f "$here/test/compose.test.yml")
-[ "$network" = host ] && files+=(-f "$here/test/compose.hostnet.yml")
 compose() { "${compose_cmd[@]}" -p "$project" --env-file "$envfile" "${files[@]}" "$@"; }
 
 cleanup() {
@@ -90,13 +87,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "== deploy test: project $project, network $network, compose: ${compose_cmd[0]} ${compose_cmd[1]}"
+echo "== deploy test: project $project, compose: ${compose_cmd[0]} ${compose_cmd[1]}"
 compose down -v --remove-orphans >/dev/null 2>&1 || true
 
 echo "== setup"
-if [ "$network" = host ]; then smtp_host=127.0.0.1 smtp_port=$T_SMTP; else smtp_host=mailpit smtp_port=1025; fi
 PUBLIC_URL=http://127.0.0.1:$T_WEB MCP_RESOURCE=http://127.0.0.1:$T_MCP/mcp \
-  SMTP_HOST=$smtp_host SMTP_PORT=$smtp_port SMTP_SENDER=reliquary@example.com \
+  SMTP_HOST=mailpit SMTP_PORT=1025 SMTP_SENDER=reliquary@example.com \
   WEB_BIND=127.0.0.1:$T_WEB MCP_BIND=127.0.0.1:$T_MCP \
   "$here/setup.sh" "$envfile"
 # The test's own settings (no secret): image tag, ports, commit.
@@ -104,8 +100,6 @@ PUBLIC_URL=http://127.0.0.1:$T_WEB MCP_RESOURCE=http://127.0.0.1:$T_MCP/mcp \
   echo "RELIQUARY_TAG=$tag"
   echo "GIT_COMMIT=$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo unknown)"
   for v in T_PG T_AUTH T_WEB T_MCP T_SMTP T_MAILAPI; do echo "$v=${!v}"; done
-  # On the host's network, Auth finds the web app's email templates on loopback.
-  if [ "$network" = host ]; then echo "EMAIL_TEMPLATES_URL=http://127.0.0.1:$T_WEB/_selfhost/email"; fi
 } >>"$envfile"
 
 echo "== build"
