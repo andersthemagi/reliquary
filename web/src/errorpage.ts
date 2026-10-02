@@ -114,6 +114,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
     if (tm[2] && did[tm[2]]) return say(`${did[tm[2]]} ${thread}`);
   }
   if (rest === "/activity" || rest === "/log") return say(`Opening the activity of ${vault}`);
+  if (rest === "/diagnostics") return say(`Opening the diagnostics of ${vault}`);
   if (rest === "/rules") return say(get ? `Opening the rules of ${vault}` : `Saving a rule for ${path || "a path"} in ${vault}`);
   if (rest === "/rules/owners") {
     if (get) return say(`Opening the owners of ${path || "a path"} in ${vault}`);

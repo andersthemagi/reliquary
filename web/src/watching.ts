@@ -18,6 +18,7 @@ import { Refusal } from "./failure.js";
 import { vaultShell } from "./files.js";
 import { filePath, message, notFound, render, treePath, UUID, vault, vaultPath, type Ctx, type Reply } from "./pages.js";
 import { settingsHeader } from "./vaultadmin.js";
+import { watchCovers } from "./watchrule.js";
 
 export const watchingPath = (id: string) => vaultPath(id, "/config/watching");
 
@@ -31,7 +32,7 @@ export async function watchState(c: pg.PoolClient, ctx: Ctx, id: string, path: s
     await c.query(
       `select id, target, created_at from public.subscriptions
         where vault_id = $1 and user_id = $2 and kind = 'path'
-          and (target = $3 or (right(target, 1) = '/' and starts_with($3, target)))
+          and ${watchCovers("target", "$3")}
         order by (target = $3) desc, length(target) desc`,
       [id, ctx.userId, path],
     )

@@ -1,8 +1,9 @@
 // Helpers shared by every MCP tool domain module (vaultfiles-tools.ts,
-// proposals-tools.ts, variables-tools.ts, flags-tools.ts, links-tools.ts):
-// the response shape, the error-to-message translation, the vault-lookup
-// SQL fragment, the fenced-text nonce, the tool-name-aware register()
-// wrapper, and the input-size ceilings the database also enforces.
+// proposals-tools.ts, variables-tools.ts, flags-tools.ts, links-tools.ts,
+// claims-tools.ts, workplan-tools.ts): the response shape, the
+// error-to-message translation, the vault-lookup SQL fragment, the
+// fenced-text nonce, the tool-name-aware register() wrapper, and the
+// input-size ceilings the database also enforces.
 //
 // Text written by people or agents (files, reasons, notes, comments) is
 // always returned between markers, with its provenance, because it must read
@@ -36,6 +37,15 @@ export const TEXT = z.string().max(1_000_000);
 export const REASON = z.string().max(4000);
 export const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 export const VERSION = z.string().regex(/^[0-9a-fA-F-]{36}$/);
+// What a claim hands back and asks for again: a 32-byte secret in hex, and
+// the fence counter.
+export const SECRET = z.string().regex(/^[0-9a-f]{64}$/);
+export const FENCE = z.number().int().min(1);
+// A caller may ask for a shorter lease and a longer one is clamped by the
+// vault's claim rule in the database, not refused; this is only a sane
+// ceiling on the argument itself, the same spirit as every other
+// input-size check here.
+export const TTL_MINUTES = z.number().int().min(1).max(60 * 24 * 30);
 
 // Turns errors into messages the agent can act on: a first line in words
 // (our own migrations' messages, which don't echo free-form input), then the
@@ -114,6 +124,19 @@ export function explain(err: unknown): ToolResult {
         break;
       case "RLC04":
         lead = `Past its hold limit: ${e.message}`;
+        break;
+      // Work plan steps (20261002200000_work_plans.sql). No case for RLW01
+      // (already claimed) for the same reason as RLC01: its message embeds
+      // the holder's label, and claim_step catches it itself to re-fence
+      // that label. RLW02-RLW04 name a step key and a count, never a label.
+      case "RLW02":
+        lead = `Step not available: ${e.message}. Call work_plan_status to see which steps are ready.`;
+        break;
+      case "RLW03":
+        lead = `Stale step claim: ${e.message}. Call work_plan_status to see the step's current state.`;
+        break;
+      case "RLW04":
+        lead = `Refused: ${e.message}`;
         break;
       // An hourly count (feedback, 20260926163000_feedback.sql): the
       // message says the limit and when there is room again.

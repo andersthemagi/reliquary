@@ -6,7 +6,7 @@ Every page of the web app has the same bar at the top. From the left: the Reliqu
 
 - **Home**: how many vaults you own of your plan's limit, what needs your review when something does, and your vaults as a table: your role, files, open proposals and when each last changed, the most recently active first. On a phone each vault is a block of labelled lines.
 - **Vaults**: a menu of the vaults you're in, with your role in each. Inside a vault it shows that vault's name. **New vault** is at the bottom. It appears once you're in a vault.
-- **Activity**: every change across your vaults. See [Activity](activity.md).
+- **Activity**: every change across your vaults. See [Changes and the log](activity.md).
 - **Connect**: set up Claude, ChatGPT, Cursor, VS Code or the CLI.
 - **Docs**: these pages.
 
@@ -33,7 +33,7 @@ The **Inbox** button counts what needs you. The count is hidden when nothing doe
 ### Join or decline an invite
 
 - **Join** makes you a member of the vault with the role the owner chose, and opens it. It is the same as opening the invite link, which then stops working.
-- **Decline** ends the invite: its link stops working and it leaves your Inbox and the owners' list of invites. The vault's **Activity** shows the owners that an invite was declined, never your address. To join later, ask an owner for a new invite.
+- **Decline** ends the invite: its link stops working and it leaves your Inbox and the owners' list of invites. The vault's **Log** shows the owners that an invite was declined, never your address. To join later, ask an owner for a new invite.
 
 Only you can answer an invite to your address, signed in to the web app. Nobody else can use it, even with its id, and neither can an agent, token, connected app or CLI sign-in. Your address must be confirmed: until it is, invites don't show in your Inbox, so use the link instead. If the vault is full, **Join** says so and the invite keeps waiting; choose **Join** again once an owner makes room.
 

@@ -49,12 +49,6 @@ exception when others then
   perform set_config('role', 'none', true);
   return case when p_detail then v_detail else v_state || ' ' || v_msg end;
 end $$;
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
 create function t.new_vault(p_user text, p_key text, p_name text) returns text language sql as $$
   insert into t.ids select p_key, v::uuid from (select t.run(p_user, format($q$select public.create_vault(%L)$q$, p_name)) v) x
    where v !~ '^ERR' returning 'ok'

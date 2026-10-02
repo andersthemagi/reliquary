@@ -38,13 +38,6 @@ select t.setv('ana', 'keep', 'KEEP_KEY', 'development');
 select t.run('ana', format($q$select public.reveal_variable(%L, 'API_KEY', 'development')::text$q$, t.id('gone')));
 insert into t.ids select 'gone_var', id from public.variables where vault_id = t.id('gone') and name = 'API_KEY';
 
--- Tokens, used the way the MCP server does (act.tok = the token id).
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
 select t.run('ana', format($q$select public.create_access_token('only-gone', 30, array[%L]::uuid[], 'write')$q$, t.id('gone')));
 select t.run('ana', format($q$select public.create_access_token('both', 30, array[%L, %L]::uuid[], 'write')$q$,
   t.id('gone'), t.id('keep')));

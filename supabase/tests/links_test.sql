@@ -17,14 +17,6 @@ select test_support.add_member(t.id('gone'), t.id('ben'), 'editor', t.id('ana'))
 select test_support.add_member(t.id('gone'), t.id('cal'), 'viewer', t.id('ana'));
 select t.run('ana', format($q$select public.create_access_token('all-rw', 30, array[%L]::uuid[], 'write')$q$, t.id('gone')));
 
--- Tokens, used the way the MCP server does (act.tok = the token id).
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
-
 -- A fake sealed credential: 12-byte nonce, and a "ciphertext" that is a
 -- marker (hex of 'CIPHERTEXT-MARKER-' || p_tag), so a test can prove it
 -- never leaves through anything but a table grant that doesn't exist.
