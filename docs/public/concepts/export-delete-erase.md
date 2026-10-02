@@ -14,11 +14,11 @@ On **Settings**, **Export**, an owner chooses **Download export** to get the vau
 
 Variable values are never exported, only names. The archive is one snapshot, fixed when the export starts. A vault can be exported at most 10 times an hour, and a vault over 100 MiB of text is refused. The export is logged. A download cut off halfway is not a valid archive, so a partial export never looks whole.
 
-Not yet in the export: earlier versions, proposals and the log.
+Not yet in the export: earlier versions, proposals, [threads](threads.md) and the log.
 
 ## Delete a vault
 
-On **Settings**, **Danger zone**, an owner chooses **Delete vault** and deletes it by typing its name. Deletion is immediate and can't be undone: files, versions, proposals, comments, rules, members, invites, variables and both logs are gone. Only who deleted it, when, and counts are kept, without the vault's name.
+On **Settings**, **Danger zone**, an owner chooses **Delete vault** and deletes it by typing its name. Deletion is immediate and can't be undone: files, versions, proposals, comments, threads, rules, members, invites, variables and both logs are gone. Only who deleted it, when, and counts are kept, without the vault's name.
 
 Every other member sees a one-time notice on Home ("<name> was deleted by <email> on <date>") within 30 days. Tokens that reached only that vault are revoked. Export first if you might need anything.
 

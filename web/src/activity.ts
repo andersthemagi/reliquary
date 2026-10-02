@@ -35,6 +35,11 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["proposal.edit", "Edited a proposal"],
   ["proposal.stale", "Went stale"],
   ["proposal.comment", "Commented on a proposal"],
+  ["thread.open", "Opened a thread"],
+  ["thread.post", "Posted in a thread"],
+  ["thread.resolve", "Resolved a thread"],
+  ["thread.reopen", "Reopened a thread"],
+  ["thread.redact", "Redacted a message"],
   ["policy.set", "Changed a rule"],
   ["member.set", "Changed members"],
   ["member.leave", "Left the vault"],
@@ -132,6 +137,13 @@ export const EVENT_KIND: Record<string, EventKind> = {
   "step.checkin": "diagnostic",
   "step.cancel": "diagnostic",
   "step.skip": "diagnostic",
+  // Thread events log ids only: no path, proposal or title for a Changes
+  // line to link or say, so threads are read on their own page.
+  "thread.open": "diagnostic",
+  "thread.post": "diagnostic",
+  "thread.resolve": "diagnostic",
+  "thread.reopen": "diagnostic",
+  "thread.redact": "diagnostic",
 };
 export const CONTENT_EVENTS: readonly string[] = Object.entries(EVENT_KIND)
   .filter(([, kind]) => kind === "content")
@@ -140,6 +152,7 @@ export const CONTENT_EVENTS: readonly string[] = Object.entries(EVENT_KIND)
 export const EVENT_GROUPS: readonly [string, string][] = [
   ["file.", "Any file change"],
   ["proposal.", "Any proposal event"],
+  ["thread.", "Any thread event"],
   ["variable.", "Any variable change"],
   ["link.", "Any link change"],
   ["claim.", "Any claim event"],
