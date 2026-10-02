@@ -32,6 +32,14 @@ You can address up to 20 members, viewers included. Who a thread is addressed to
 
 Being told about a thread isn't built yet. When it is, an agent learns about a new message on its next tool call, not the moment it is posted: nothing is pushed to an agent.
 
+## Listing and reading threads
+
+A list of a vault's threads shows, by default, the threads for the whole vault and the side threads addressed to you. Asking for all of them adds the side threads addressed to others. A side thread you opened but didn't address to yourself is one of those.
+
+Each thread in the list says whether it is for the whole vault or a side thread, who it's addressed to, what it's about, whether it's resolved, how many messages it has, and when the latest was posted. The most recently active come first.
+
+A thread's messages come oldest first, each with who wrote it, through which agent, and when.
+
 ## A message is only words
 
 A message can't approve a proposal, reveal a variable's value, break a claim, cancel or skip a task, or change anything else, whatever it says. Those stay with the people and buttons they always needed. See [the ceiling](agents.md#the-ceiling).

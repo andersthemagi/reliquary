@@ -274,9 +274,9 @@ insert into t.ids select 'to_two', t.run('ana', t.open_sql('v1',
 select t.expect('addressees: a side thread is addressed to members, a viewer included, each once',
   (select string_agg(user_id::text, ',' order by user_id) from public.thread_addressees where thread_id = t.id('to_two')),
   t.id('ben') || ',' || t.id('cal'));
+insert into t.ids select 'everyone', t.run('ben', t.open_sql('v1', $a$'Everyone', 'hi', p_addressees => '{}'$a$))::uuid;
 select t.expect('addressees: none, or an empty list, is the whole vault',
-  (select count(*)::text from public.thread_addressees where thread_id in (t.id('plan'),
-     t.run('ben', t.open_sql('v1', $a$'Everyone', 'hi', p_addressees => '{}'$a$))::uuid)), '0');
+  (select count(*)::text from public.thread_addressees where thread_id in (t.id('plan'), t.id('everyone'))), '0');
 select t.expect('addressees: an outsider can''t be addressed',
   t.run('ana', t.open_sql('v1', format($a$'x', 'y', p_addressees => array[%L]::uuid[]$a$, t.id('dee')))), 'ERR 22023');
 select t.expect('addressees: nor an empty entry',
@@ -403,6 +403,96 @@ select t.expect_true('grants: no one signed in calls the helpers or reads the li
   and not has_function_privilege('authenticated', 'private.lock_thread_vault(uuid, text)', 'execute')
   and not has_function_privilege('authenticated', 'private.thread_limit_refusal(uuid, text, bigint, bigint)', 'execute')
   and not has_function_privilege('authenticated', 'private.threads_per_vault_cap()', 'execute'));
+
+-- Listing and reading (20261004120000_thread_reads) ---------------------------
+
+create function t.list_sql(p_extra text default '') returns text language sql as $$
+  select format('select string_agg(title, '','' order by title) from public.list_threads(%L, p_limit => 200%s)', t.id('v1'), p_extra)
+$$;
+
+select t.expect('list: by default, vault-wide threads and side threads addressed to the caller''s person',
+  t.run('ben', t.list_sql()), (select string_agg(title, ',' order by title) from public.threads th
+    where th.vault_id = t.id('v1') and th.title not in ('Twenty')));
+select t.expect('list: so a side thread addressed only to others isn''t listed by default, even to its opener',
+  t.run('ana', t.list_sql()), (select string_agg(title, ',' order by title) from public.threads th
+    where th.vault_id = t.id('v1') and th.title not in ('Twenty', 'For Ben', 'Invoices')));
+select t.expect('list: asked for all, the caller''s agent lists every thread, side threads marked as side',
+  t.run('cal', format($q$select count(*) || ' ' || string_agg(title, ',' order by title) filter (where scope = 'side')
+    from public.list_threads(%L, p_all => true, p_limit => 200)$q$, t.id('v1')), 'Hermes'),
+  (select count(*) from public.threads where vault_id = t.id('v1')) || ' For Ben,Invoices,Twenty');
+select t.expect('list: so does a read-only connection',
+  t.run_tok('ana', 'ana-ro', format($q$select count(*) from public.list_threads(%L, true, p_limit => 200)$q$, t.id('v1'))),
+  (select count(*)::text from public.threads where vault_id = t.id('v1')));
+select t.expect('list: a side thread says who it is addressed to, and whether that''s the caller''s person',
+  t.run('cal', format($q$select scope || ' ' || array_to_string(addressees, ',') || ' ' || addressed_to_me
+    from public.list_threads(%L, true, p_limit => 200) where id = %L$q$, t.id('v1'), t.id('to_two'))),
+  'side ' || t.id('ben') || ',' || t.id('cal') || ' true');
+select t.expect('list: a vault-wide thread is addressed to no one',
+  t.run('cal', format($q$select scope || ' ' || cardinality(addressees) || ' ' || addressed_to_me
+    from public.list_threads(%L, p_limit => 200) where id = %L$q$, t.id('v1'), t.id('plan'))),
+  'vault 0 false');
+select t.expect('list: what a thread is about, a task with its plan''s path and its key',
+  t.run('ben', format($q$select string_agg(coalesce(anchor_kind, '-') || ' ' || coalesce(anchor_path, anchor_plan_path || '#' || anchor_step_key,
+      anchor_proposal::text, '-'), ', ' order by title)
+    from public.list_threads(%L, p_limit => 200) where id in (%L, %L, %L, %L)$q$,
+    t.id('v1'), t.id('on_path'), t.id('on_task'), t.id('on_prop'), t.id('plan'))),
+  'path notes/brief.md, task plans/launch.md#copy, proposal ' || t.id('p1') || ', - -');
+select t.expect('list: who opened it, through which agent, how many messages and the latest',
+  t.run('ana', format($q$select (opened_by = %L)::text || ' ' || agent || ' ' || messages || ' ' || (last_message_id = %s)::text
+    from public.list_threads(%L, p_limit => 200) where id = %L$q$,
+    t.id('ben'), (select max(id) from public.thread_messages where thread_id = t.id('by_agent')), t.id('v1'), t.id('by_agent'))),
+  'true Hermes 1 true');
+select t.expect('list: open or resolved',
+  t.run('ana', format($q$select string_agg(title, ',') from public.list_threads(%L, true, 'resolved', 200)$q$, t.id('v1'))) || ' / ' ||
+  t.run('ana', format($q$select (count(*) filter (where resolved_at is null) = count(*))::text from public.list_threads(%L, true, 'open', 200)$q$, t.id('v1'))),
+  'Launch plan / true');
+select t.expect('list: a state that isn''t one is refused',
+  t.run('ana', format($q$select count(*) from public.list_threads(%L, p_state => 'closed')$q$, t.id('v1'))), 'ERR 22023');
+select t.expect('list: most recent activity first, a page at a time, the pages adding up to the whole',
+  t.run('ana', format($q$
+    with whole as (select id, last_message_id from public.list_threads(%1$L, true, 'all', 200)),
+         first as (select id, last_message_id from public.list_threads(%1$L, true, 'all', 4)),
+         rest as (select id from public.list_threads(%1$L, true, 'all', 200, (select min(last_message_id) from first)))
+    select ((select array_agg(id order by last_message_id desc) from whole)
+          = (select array_agg(id order by last_message_id desc) from first) || (select array_agg(id) from rest))::text
+      || ' ' || (select count(*) from first)$q$, t.id('v1'))),
+  'true 4');
+select t.expect('list: an outsider learns nothing',
+  t.run('dee', format($q$select count(*) from public.list_threads(%L)$q$, t.id('v1'))), 'ERR P0002');
+select t.expect('list: nor does a connection scoped to another vault',
+  t.run_tok('ana', 'ana-v2', format($q$select count(*) from public.list_threads(%L)$q$, t.id('v1'))), 'ERR P0002');
+select t.expect('list: nor anonymous',
+  t.run(null, format($q$select count(*) from public.list_threads(%L)$q$, t.id('v1'))), 'ERR 42501');
+select t.expect('list: an outsider reads no thread''s summary either',
+  t.run('dee', format($q$select count(*) from public.thread_summaries where vault_id = %L$q$, t.id('v1'))), '0');
+
+select t.expect('read thread: its messages in order, each with its author, agent and time',
+  t.run('cal', format($q$select string_agg(m ->> 'body' || ' (' || coalesce(m ->> 'agent', '-') || ')', ' | ' order by (m ->> 'id')::bigint)
+      || ' ' || bool_and(m ->> 'author' = %L and m ? 'at')
+    from jsonb_array_elements(public.read_thread(%L) -> 'messages') m$q$, t.id('ben'), t.id('plan'))),
+  'Who writes the copy? (-) | I can take it (-) | Drafted: copy/launch.md (Hermes) | Back on it (-) | Still room here (-) true');
+select t.expect('read thread: the thread reads as it is listed',
+  t.run('cal', format($q$select (public.read_thread(%L) -> 'thread' = (select to_jsonb(l) from public.list_threads(%L, true, 'all', 200) l where l.id = %L))::text$q$,
+    t.id('to_two'), t.id('v1'), t.id('to_two'))),
+  'true');
+select t.expect('read thread: a page at a time, after the last message read',
+  t.run('cal', format($q$select jsonb_array_length(a -> 'messages') || ' ' || (a ->> 'more') || ' / '
+      || (select string_agg(m ->> 'body', ',') from jsonb_array_elements(public.read_thread(%1$L, (a -> 'messages' -> 1 ->> 'id')::bigint, 2) -> 'messages') m)
+      || ' / ' || (public.read_thread(%1$L, (a -> 'messages' -> 1 ->> 'id')::bigint, 3) ->> 'more')
+    from public.read_thread(%1$L, null, 2) a$q$, t.id('plan'))),
+  '2 true / Drafted: copy/launch.md,Back on it / false');
+select t.expect('read thread: a viewer reads a side thread addressed to someone else',
+  t.run('cal', format($q$select public.read_thread(%L) -> 'thread' ->> 'scope'$q$, t.id('side'))), 'side');
+select t.expect('read thread: a redacted message keeps its place, author and time, with no body, saying who redacted it',
+  t.run('cal', format($q$select (m -> 'body' = 'null'::jsonb)::text || ' ' || (m ->> 'redacted_by' = %L)::text || ' ' || (m ->> 'author' = %L)::text
+    from jsonb_array_elements(public.read_thread(%L) -> 'messages') m$q$, t.id('ana'), t.id('ana'), t.id('side'))),
+  'true true true');
+select t.expect('read thread: an outsider learns nothing',
+  t.run('dee', format($q$select public.read_thread(%L)::text$q$, t.id('plan'))), 'ERR P0002');
+select t.expect('read thread: nor anyone, about a thread that doesn''t exist',
+  t.run('ana', $q$select public.read_thread('00000000-0000-0000-0000-000000000000')::text$q$), 'ERR P0002');
+select t.expect('read thread: nor anonymous',
+  t.run(null, format($q$select public.read_thread(%L)::text$q$, t.id('plan'))), 'ERR 42501');
 
 -- Membership doesn't touch the record ---------------------------------------
 
