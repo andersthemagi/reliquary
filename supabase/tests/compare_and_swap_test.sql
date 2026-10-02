@@ -11,13 +11,6 @@ select test_support.add_member(t.id('swap'), t.id('cal'), 'viewer', t.id('ana'))
 select t.run('ana', format($q$select public.set_policy(%L, 'canon/', 'canon', 1)$q$, t.id('swap')));
 select t.run('ana', format($q$select public.create_access_token('swap-ro', 30, array[%L]::uuid[], 'read')$q$, t.id('swap')));
 
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
-
 -- The current version at a path, in Swap.
 create function t.cas_version(p_path text) returns uuid language sql as
 $$ select current_version_id from public.files where vault_id = t.id('swap') and path = p_path $$;

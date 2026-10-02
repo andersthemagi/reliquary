@@ -13,12 +13,6 @@ select test_support.add_member(t.id('claims'), t.id('cal'), 'viewer', t.id('ana'
 select t.run('ana', format($q$select public.create_access_token('claims-ro', 30, array[%L]::uuid[], 'read')$q$, t.id('claims')));
 select t.run('ben', format($q$select public.create_access_token('ben-rw', 30, array[%L]::uuid[], 'write')$q$, t.id('claims')));
 
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
 -- The error message p_sql raises as p_user (NULL if it doesn't raise); for
 -- checking a refusal names something t.expect's SQLSTATE-only result can't.
 create function t.err(p_user text, p_sql text) returns text

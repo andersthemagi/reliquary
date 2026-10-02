@@ -74,6 +74,16 @@ exception when others then
   return 'ERR ' || sqlstate;
 end $$;
 
+-- Look up an access token's id by name.
+create function t.tok(p_name text) returns uuid language sql as
+$$ select id from public.access_tokens where name = p_name $$;
+
+-- Run p_sql acting through a token, the way the MCP server does.
+create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
+  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
+    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
+$$;
+
 create function t.expect(p_name text, p_got text, p_want text) returns void
 language sql as $$
   insert into t.results values (p_name, p_got is not distinct from p_want,
