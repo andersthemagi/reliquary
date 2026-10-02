@@ -80,7 +80,6 @@ export const preAlphaNote = () =>
 export type Nav =
   | "home"
   | "inbox"
-  | "review" // the old name of the inbox: marks Inbox as current
   | "vaults"
   | "activity"
   | "connect"
@@ -209,7 +208,7 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
   const total = s?.total ?? 0;
   const inbox = s
     ? html`<details class="menu-wrap inbox">
-      <summary class="button quiet icon-button" aria-label="${total ? `Inbox, ${total} waiting` : "Inbox, nothing waiting"}"${current("inbox", "review")}>${ICON_INBOX}${total ? html`<span class="count" aria-hidden="true">${total > 99 ? "99+" : total}</span>` : ""}</summary>
+      <summary class="button quiet icon-button" aria-label="${total ? `Inbox, ${total} waiting` : "Inbox, nothing waiting"}"${current("inbox")}>${ICON_INBOX}${total ? html`<span class="count" aria-hidden="true">${total > 99 ? "99+" : total}</span>` : ""}</summary>
       <div class="menu inbox-menu">
         <p class="menu-head"><span class="menu-label">Inbox</span><a href="/inbox">View all</a></p>
         ${s.items.length
