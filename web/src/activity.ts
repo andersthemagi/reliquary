@@ -16,6 +16,7 @@
 import type pg from "pg";
 import { emptyState, html, raw, time, type Raw } from "./html.js";
 import { personRef, UUID } from "./personref.js";
+import { watchCovers } from "./watchrule.js";
 
 export const PAGE_SIZE = 50;
 
@@ -76,6 +77,71 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["step.cancel", "Cancelled a step"],
   ["step.skip", "Skipped a step"],
 ];
+
+// Who an event is for. Content events are what a person reading a vault wants
+// to hear about: files written, deleted or erased, and proposals opened,
+// decided, revised or commented on. They make up the Changes feed
+// (changes.ts). Diagnostic events explain how the vault is run (members,
+// rules, variables, claims, plan steps) and stay in the full log, under
+// Diagnostics. Every event in EVENT_LABELS is sorted here, once;
+// web/test/activity_labels.test.mjs fails on one that isn't, so a new
+// event is sorted on its way in.
+export type EventKind = "content" | "diagnostic";
+export const EVENT_KIND: Record<string, EventKind> = {
+  "file.write": "content",
+  "file.delete": "content",
+  "file.erase": "content",
+  "proposal.open": "content",
+  "proposal.approve": "content",
+  "proposal.request_changes": "content",
+  "proposal.reject": "content",
+  "proposal.revise": "content",
+  "proposal.edit": "content",
+  // Follows from someone else's write, and the proposer already hears it
+  // as a flag ("File changed").
+  "proposal.stale": "diagnostic",
+  "proposal.comment": "content",
+  "policy.set": "diagnostic",
+  "member.set": "diagnostic",
+  "member.leave": "diagnostic",
+  "invite.create": "diagnostic",
+  "invite.accept": "diagnostic",
+  "invite.revoke": "diagnostic",
+  "invite.decline": "diagnostic",
+  "member.connection_revoke": "diagnostic",
+  "vault.create": "diagnostic",
+  "vault.rename": "diagnostic",
+  "vault.default_policy": "diagnostic",
+  "vault.export": "diagnostic",
+  "variable.set": "diagnostic",
+  "variable.rotate": "diagnostic",
+  "variable.delete": "diagnostic",
+  "environment.create": "diagnostic",
+  "environment.rename": "diagnostic",
+  "environment.delete": "diagnostic",
+  "link.create": "diagnostic",
+  "link.update": "diagnostic",
+  "link.delete": "diagnostic",
+  "link.grant": "diagnostic",
+  "path_owner.add": "diagnostic",
+  "path_owner.remove": "diagnostic",
+  "claim.grant": "diagnostic",
+  "claim.renew": "diagnostic",
+  "claim.release": "diagnostic",
+  "claim.break": "diagnostic",
+  "claim_rule.set": "diagnostic",
+  "work_plan.register": "diagnostic",
+  "step.claim": "diagnostic",
+  "step.complete": "diagnostic",
+  "step.release": "diagnostic",
+  "step.checkin": "diagnostic",
+  "step.cancel": "diagnostic",
+  "step.skip": "diagnostic",
+};
+export const CONTENT_EVENTS: readonly string[] = Object.entries(EVENT_KIND)
+  .filter(([, kind]) => kind === "content")
+  .map(([event]) => event);
+
 export const EVENT_GROUPS: readonly [string, string][] = [
   ["file.", "Any file change"],
   ["proposal.", "Any proposal event"],
@@ -119,9 +185,11 @@ export function parseFilters(p: URLSearchParams): Filters {
   return f;
 }
 
-export type Scope = { vaultId?: string; file?: string };
+// `events` narrows to those event names (the Changes feed asks for CONTENT_EVENTS);
+// `watching` to events on paths the reader watches (watchrule.ts).
+export type Scope = { vaultId?: string; file?: string; events?: readonly string[]; watching?: boolean };
 
-type Row = {
+export type Row = {
   seq: string;
   vault_id: string;
   vault: string;
@@ -160,6 +228,12 @@ export async function queryActivity(
   const vaultId = scope.vaultId ?? f.vault;
   if (vaultId) add("l.vault_id = $?::uuid", vaultId);
   if (scope.file) add("l.path = $?", scope.file);
+  if (scope.events) add("l.event = any($?::text[])", [...scope.events]);
+  if (scope.watching) {
+    where.push(
+      `exists (select 1 from public.subscriptions s where s.vault_id = l.vault_id and s.user_id = $1 and s.kind = 'path' and ${watchCovers("s.target", "l.path")})`,
+    );
+  }
   if (f.who) add("l.actor = $?::uuid", f.who);
   if (f.agent === "people") where.push("l.agent is null");
   else if (f.agent === "agents") where.push("l.agent is not null");

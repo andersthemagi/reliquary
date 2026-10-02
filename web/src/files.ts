@@ -24,6 +24,7 @@ import {
   type MenuItem,
   type Raw,
 } from "./html.js";
+import { claimBanner } from "./claimbanner.js";
 import { siteHref } from "./hosts.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage } from "./errorpage.js";
@@ -49,7 +50,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "activity" | "flags" | "claims" | "rules" | "search" | "variables" | "links" | "settings";
+export type Section = "files" | "proposals" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // One round trip: the live files, every folder above them, each one's
@@ -65,11 +66,10 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
                  from p left join r on r.path = p.path) as files,
               (select coalesce(json_object_agg(d.path, coalesce(r.policy, 'open')), '{}')
                  from d left join r on r.path = d.path) as dirs,
-              (select count(*)::int from public.proposals where vault_id = $1 and status = 'open') as open,
-              (select count(*)::int from public.path_claims where vault_id = $1 and expires_at > now()) as claims`,
+              (select count(*)::int from public.proposals where vault_id = $1 and status = 'open') as open`,
       [v.id],
     )
-  ).rows[0] as { files: [string, string][]; dirs: Record<string, string>; open: number; claims: number };
+  ).rows[0] as { files: [string, string][]; dirs: Record<string, string>; open: number };
   const files = shell.files.map(([path, policy]) => ({ path, policy }));
   const dirPolicy = new Map<string, string>(Object.entries(shell.dirs));
   const open = shell.open;
@@ -100,15 +100,14 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
   const sections: { section: Section; href: string; label: string; count?: number }[] = [
     { section: "files", href: vaultPath(v.id), label: "Files" },
     { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined },
-    { section: "activity", href: vaultPath(v.id, "/activity"), label: "Activity" },
-    { section: "flags", href: vaultPath(v.id, "/flags"), label: "Flags" },
-    { section: "claims", href: vaultPath(v.id, "/claims"), label: "Claims", count: shell.claims || undefined },
+    { section: "tasks", href: vaultPath(v.id, "/tasks"), label: "Tasks" },
+    { section: "changes", href: vaultPath(v.id, "/changes"), label: "Changes" },
     { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables" },
     { section: "links", href: vaultPath(v.id, "/links"), label: "Links" },
     { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings" },
   ];
-  // Settings holds Rules, so the Rules page marks Settings as current.
-  const isCurrent = (s: Section) => current.section === s || (s === "settings" && current.section === "rules");
+  // Settings holds Rules and Diagnostics, so their pages mark Settings as current.
+  const isCurrent = (s: Section) => current.section === s || (s === "settings" && (current.section === "rules" || current.section === "diagnostics"));
   const link = (s: (typeof sections)[number]) =>
     html`<a href="${s.href}"${isCurrent(s.section) ? raw(' aria-current="page"') : ""}>${s.label}${s.count ? html`<span class="count">${s.count}</span>` : ""}</a>`;
   const tree = files.length ? renderNode(root, "") : html`<p class="muted small tree-empty">No files yet.</p>`;
@@ -328,6 +327,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const canon = f.policy === "canon";
     const writable = (await writablePath(c, v, path)) && !f.erased_at;
     const watch = watchControl(ctx, id, path, await watchState(c, ctx, id, path));
+    const claim = await claimBanner(c, ctx, v, path, "view", filePath(id, path, tab === "preview" ? undefined : tab));
     const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
     const body = html`
       ${pageHeader({
@@ -345,6 +345,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
         tabs: [tab_("preview", "Preview"), tab_("source", "Source"), tab_("history", "History")],
         tabsLabel: "File view",
       })}
+      ${claim}
       ${pending.length
         ? callout(
             canon ? "warning" : "info",
@@ -453,6 +454,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
     ).rows[0];
     if (!f) return null;
     const canon = f.policy === "canon";
+    const claim = await claimBanner(c, ctx, v, path, canon ? "propose" : "write", filePath(id, path));
     // No delete here: it lives in the file page's More menu, behind a
     // confirm page, away from Save. On canon the required "Why" comes before
     // the text, so it's on screen with the header's button. expected_version
@@ -470,6 +472,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
         secondary: html`<a class="button quiet" href="${filePath(id, path)}">Cancel</a>`,
         primary: html`<button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>`,
       })}
+      ${claim}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="edit-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="path" value="${path}">
