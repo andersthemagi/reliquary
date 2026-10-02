@@ -101,3 +101,12 @@ exception when others then
   insert into t.results values (p_name, true, sqlerrm);
 end $$;
 
+-- SHA-256 hex, for hashing tokens and other values the same way the server
+-- stores them.
+create function t.sha(p text) returns text language sql as
+$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
+
+-- PKCE's S256 code challenge from a verifier (base64url, no padding).
+create function t.s256(p text) returns text language sql as
+$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
+

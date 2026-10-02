@@ -11,10 +11,6 @@ insert into t.ids select 'priv', t.run('dee', $q$select public.create_vault('Pri
 select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
 select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
 
-create function t.sha(p text) returns text language sql as
-$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
-create function t.s256(p text) returns text language sql as
-$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
 create function t.c(p text) returns text language sql as $$
   select case p
     when 'cli' then 'https://app.example/cli/oauth-client.json'

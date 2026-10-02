@@ -14,12 +14,6 @@ select t.run('ana', format($q$select public.write_file(%L, 'notes/alpha.md', 'Al
 select t.run('ana', format($q$select public.write_file(%L, 'notes/bravo.md', 'Bravo plan')$q$, t.id('side')));
 select t.run('ana', format($q$select public.set_policy(%L, 'canon/', 'canon', 1)$q$, t.id('team')));
 
-create function t.sha(p text) returns text language sql as
-$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
--- PKCE S256: base64url(sha256(verifier)), unpadded.
-create function t.s256(p text) returns text language sql as
-$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
-
 -- Constants for the fake client.
 create function t.c(p text) returns text language sql as $$
   select case p

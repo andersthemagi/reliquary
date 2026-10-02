@@ -27,10 +27,6 @@ create function t.setv(p_user text, p_vault text, p_name text, p_env text, p_tag
 $$;
 
 -- OAuth plumbing, as the web app's token endpoint does it.
-create function t.sha(p text) returns text language sql as
-$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
-create function t.s256(p text) returns text language sql as
-$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
 create function t.c(p text) returns text language sql as $$
   select case p
     when 'cli' then 'https://app.example/cli/oauth-client.json'

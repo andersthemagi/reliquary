@@ -39,10 +39,6 @@ exception when others then
   return 'ERR ' || sqlstate;
 end $$;
 
-create function t.sha(p text) returns text language sql as
-$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
-create function t.s256(p text) returns text language sql as
-$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
 create function t.tok(p_name text) returns uuid language sql as
 $$ select id from public.access_tokens where name = p_name and kind = 'pat' $$;
 create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$

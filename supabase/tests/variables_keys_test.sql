@@ -64,10 +64,6 @@ $$;
 
 -- Grants: a CLI sign-in (with push) and an MCP connection, as the token
 -- endpoint makes them.
-create function t.sha(p text) returns text language sql as
-$$ select encode(extensions.digest(p, 'sha256'), 'hex') $$;
-create function t.s256(p text) returns text language sql as
-$$ select translate(rtrim(encode(extensions.digest(p, 'sha256'), 'base64'), '='), '+/', '-_') $$;
 create table t.grants (name text primary key, id uuid);
 create function t.cli_grant(p_name text, p_user text) returns void language plpgsql as $$
 declare
