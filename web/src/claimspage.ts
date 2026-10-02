@@ -11,15 +11,17 @@
 // else to claim next, so it goes through a confirm page like every other
 // destructive action (html.ts's menu() guardrail), but needs no typed name.
 //
-//   GET  /v/:id/claims               active claims, with Break for owners/editors
+//   GET  /v/:id/claims               active claims, with Break for owners/editors (Settings, Diagnostics, Claims)
 //   GET  /v/:id/claims?break=<path>  confirm breaking the claim on path
 //   POST /v/:id/claims               action=break, path, confirm=1
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { Refusal } from "./failure.js";
-import { confirmPage, emptyState, html, pageHeader, time, type Raw } from "./html.js";
+import { confirmPage, emptyState, html, time, type Raw } from "./html.js";
+import { diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { vaultShell } from "./files.js";
+import { settingsCrumb } from "./vaultadmin.js";
 import { canWrite, filePath, message, notFound, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 
 export const claimsPath = (id: string) => vaultPath(id, "/claims");
@@ -57,15 +59,16 @@ function claimsTable(ctx: Ctx, id: string, v: Vault, rows: Claim[]): Raw {
 
 // The page, in the vault shell; or, when it can't be shown, a note for the
 // page it sends the person back to (pathowners.ts's build(), same shape).
+// The list is a tab of Diagnostics; the confirm page is not, so it has no tabs.
 type Built = { shell: Raw; title: string } | { back: string; note: string; tone: "warning" | "info" } | null;
 
-async function build(ctx: Ctx, id: string, fn: (c: pg.PoolClient, v: Vault) => Promise<{ body: Raw; title: string } | { back: string; note: string; tone: "warning" | "info" } | null>): Promise<Reply> {
+async function build(ctx: Ctx, id: string, fn: (c: pg.PoolClient, v: Vault) => Promise<{ body: Raw; title: string; tab?: true } | { back: string; note: string; tone: "warning" | "info" } | null>): Promise<Reply> {
   const out: Built = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
     const r = await fn(c, v);
     if (!r || "back" in r) return r;
-    return { shell: await vaultShell(c, ctx, v, { section: "claims" }, r.body), title: r.title };
+    return { shell: await vaultShell(c, ctx, v, { section: "diagnostics" }, r.tab ? diagnosticsFrame(id, v, "claims", r.body) : r.body), title: r.title };
   });
   if (!out) return notFound(ctx);
   if ("back" in out) {
@@ -81,13 +84,10 @@ export async function claims(ctx: Ctx, id: string): Promise<Reply> {
   return build(ctx, id, async (c, v) => {
     const rows = await loadClaims(c, id);
     const body = html`
-      ${pageHeader({
-        title: "Claims",
-        description: "Who’s working which path, and for how much longer. A claim is a courtesy signal, not an access gate: it never blocks a write.",
-      })}
+      ${diagSection("Claims", "Who’s working which path, and for how much longer. A claim is a courtesy signal, not an access gate: it never blocks a write.")}
       ${rows.length ? claimsTable(ctx, id, v, rows) : emptyState({ title: "No active claims", body: "Nobody is claiming a path right now." })}
       <p class="hint">Your agents see and take the same claims over MCP (<code>list_claims</code>, <code>claim_path</code>). <a href="/docs/concepts/claims">About claims</a></p>`;
-    return { body, title: "Claims" };
+    return { body, title: "Claims", tab: true };
   });
 }
 
@@ -103,6 +103,7 @@ async function confirmBreak(ctx: Ctx, id: string, path: string): Promise<Reply> 
     const holder = who(ctx, claim.holder, null);
     const body = confirmPage({
       title: `Break the claim on ${path}?`,
+      crumb: settingsCrumb(id, v, { label: "Diagnostics", href: vaultPath(id, "/diagnostics") }, { label: "Claims", href: back }, { label: "Break" }),
       lede: html`${holder}${claim.holder_label ? html` (${claim.holder_label})` : ""} loses this claim; they, and their agent, can claim <code>${path}</code> again once they’re ready.`,
       consequences: ["Nothing about the file itself changes: a claim is a courtesy signal, not an access gate.", "It’s logged in Activity."],
       action: claimsPath(id),

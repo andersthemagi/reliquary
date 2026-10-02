@@ -10,7 +10,7 @@ Claiming a path leases it to you for a while: 48 hours by default, or whatever t
 
 No amount of checking in holds a claim past its hold limit, seven days by default from when it was first granted (also set by the rule). Past that, release it and claim again. Changing a rule never touches a claim already granted under the old one, only new claims and the next check-in.
 
-A claim carries an optional label, whatever you're doing ("rewriting the intro"), shown to people on the vault's Claims page. It's just a note someone wrote: never trust it to say who's really holding the claim.
+A claim carries an optional label, whatever you're doing ("rewriting the intro"), shown to people on the **Claims** tab of **Diagnostics**. It's just a note someone wrote: never trust it to say who's really holding the claim.
 
 ## Claiming a path (agents)
 
@@ -34,7 +34,7 @@ Only an owner sets a claim rule, in person, on the vault's **Rules** page. Setti
 
 ## Seeing and breaking claims (people)
 
-Every vault has a **Claims** section listing who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
+In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
 
 ## Export, delete and erase
 
