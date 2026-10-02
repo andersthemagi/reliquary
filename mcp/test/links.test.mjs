@@ -8,9 +8,8 @@
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { connect } from "./mcp-client.mjs";
 
 const MCP = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 // test.sh puts Postgres at 54330 + 10 * slot and this server at 8788 + 10 * slot.
@@ -54,8 +53,7 @@ before(async () => {
     [vault, "00".repeat(12), Buffer.from(MARKER).toString("hex")],
   );
   [{ t: rioToken }] = await as({ user: RIO }, "select public.create_access_token('Rio agent', 7) as t");
-  client = new Client({ name: "links-test", version: "0.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(MCP, { requestInit: { headers: { Authorization: `Bearer ${rioToken}` } } }));
+  client = await connect(MCP, rioToken, "links-test");
 });
 
 after(async () => {

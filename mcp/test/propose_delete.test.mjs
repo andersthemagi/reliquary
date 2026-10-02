@@ -8,9 +8,8 @@
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { connect } from "./mcp-client.mjs";
 
 const MCP = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 // test.sh puts Postgres at 54330 + 10 * slot and this server at 8788 + 10 * slot.
@@ -48,8 +47,7 @@ before(async () => {
   const [{ id: first }] = await asPia("select public.propose($1, 'canon/old-rates.md', 'Old rates.', 'first') as id", [vault]);
   await asPia("select public.decide($1, 'approve')", [first]);
   const [{ t }] = await asPia("select public.create_access_token('Pia agent', 7) as t");
-  client = new Client({ name: "propose-delete", version: "0.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(MCP, { requestInit: { headers: { Authorization: `Bearer ${t}` } } }));
+  client = await connect(MCP, t, "propose-delete");
 });
 
 after(async () => {

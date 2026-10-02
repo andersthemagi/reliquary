@@ -6,23 +6,13 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { call as call_, connect } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const { EVE_ALL_RW, EVE_ALL_RO, EVE_HOME_RW } = process.env;
 const EVE = "00000000-0000-0000-0000-00000000000e";
 
-async function call(token, name, args = {}) {
-  const c = new Client({ name: "create-vault", version: "0.0.0" });
-  await c.connect(new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
-  try {
-    const r = await c.callTool({ name, arguments: args });
-    return { text: r.content.map((x) => x.text).join("\n"), isError: Boolean(r.isError) };
-  } finally {
-    await c.close();
-  }
-}
+const call = (token, name, args = {}) => call_(URL_, token, name, args);
 
 test("create_vault: an all-vaults read-write token creates a vault its person owns", async () => {
   const r = await call(EVE_ALL_RW, "create_vault", { name: "Eve agent notes" });
@@ -80,8 +70,7 @@ test("create_vault: a blank name or an unknown policy is refused with a reason",
 });
 
 test("create_vault: the agent still can't set rules or add members; there is no tool for either", async () => {
-  const c = new Client({ name: "create-vault", version: "0.0.0" });
-  await c.connect(new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${EVE_ALL_RW}` } } }));
+  const c = await connect(URL_, EVE_ALL_RW);
   const names = (await c.listTools()).tools.map((t) => t.name);
   await c.close();
   assert.ok(!names.some((n) => /polic|rule|member|approve|decide|erase/.test(n)), names.join(", "));

@@ -11,19 +11,12 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { connect as mcpConnect } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const env = process.env;
 
-async function connect(token) {
-  const client = new Client({ name: "token-load", version: "0.0.0" });
-  await client.connect(
-    new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }),
-  );
-  return client;
-}
+const connect = (token) => mcpConnect(URL_, token, "token-load");
 
 const bytes = (s) => Buffer.byteLength(s, "utf8");
 function record(name, text) {

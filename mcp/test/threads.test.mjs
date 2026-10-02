@@ -4,29 +4,12 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { call as call_, connect } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const { ANA_TOKEN, BEN_TOKEN, CAL_TOKEN, DEE_TOKEN, THREAD_PROPOSAL, THREAD_CLOSED, DEE_PROPOSAL } = process.env;
 
-async function connect(token) {
-  const client = new Client({ name: "threads", version: "0.0.0" });
-  await client.connect(
-    new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }),
-  );
-  return client;
-}
-
-async function call(token, name, args = {}) {
-  const c = await connect(token);
-  try {
-    const r = await c.callTool({ name, arguments: args });
-    return { text: r.content.map((x) => x.text).join("\n"), isError: Boolean(r.isError) };
-  } finally {
-    await c.close();
-  }
-}
+const call = (token, name, args = {}) => call_(URL_, token, name, args);
 
 const read = (token, id = THREAD_PROPOSAL) => call(token, "read_proposal", { proposal_id: id });
 const comment = (token, text, id = THREAD_PROPOSAL) => call(token, "comment_on_proposal", { proposal_id: id, comment: text });
@@ -125,7 +108,7 @@ test("limits: empty and over-long comments are refused", async () => {
 });
 
 test("snooze is not a tool: an agent can't hide proposals from its person", async () => {
-  const c = await connect(BEN_TOKEN);
+  const c = await connect(URL_, BEN_TOKEN);
   const names = (await c.listTools()).tools.map((t) => t.name);
   await c.close();
   assert.ok(!names.some((n) => /snooze/.test(n)));

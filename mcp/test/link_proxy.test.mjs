@@ -17,9 +17,8 @@ import assert from "node:assert/strict";
 import { createCipheriv, randomBytes } from "node:crypto";
 import http from "node:http";
 import { after, before, test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { connect as mcpConnect } from "./mcp-client.mjs";
 
 const MCP = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 // test.sh puts Postgres at 54330 + 10 * slot and this server at 8788 + 10 * slot.
@@ -108,11 +107,7 @@ let vault = "";
 let linkId = "";
 let ownerClient, editorClient;
 
-async function connect(token) {
-  const c = new Client({ name: "link-proxy-test", version: "0.0.0" });
-  await c.connect(new StreamableHTTPClientTransport(MCP, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
-  return c;
-}
+const connect = (token) => mcpConnect(MCP, token, "link-proxy-test");
 
 before(async () => {
   assert.ok(KEY.length === 32, "LINK_TEST_KEY must be set (mcp/test.sh)");

@@ -12,9 +12,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { after, before, test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { connect } from "./mcp-client.mjs";
 
 const MCP = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const RESOURCE = process.env.MCP_RESOURCE ?? MCP.href;
@@ -96,8 +95,7 @@ before(async () => {
   await setv(IVY, vault, "DATABASE_URL", "development");
   await setv(IVY, ivyVault, "IVY_ONLY", "development");
   [{ t: umaToken }] = await as({ user: UMA }, "select public.create_access_token('Uma agent', 7) as t");
-  client = new Client({ name: "variables-test", version: "0.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(MCP, { requestInit: { headers: { Authorization: `Bearer ${umaToken}` } } }));
+  client = await connect(MCP, umaToken, "variables-test");
 });
 
 after(async () => {

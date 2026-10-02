@@ -6,9 +6,8 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { after, before, test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { connect as mcpConnect } from "./mcp-client.mjs";
 
 const MCP = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const WEB = process.env.WEB_AS_URL ?? "http://127.0.0.1:8789";
@@ -56,8 +55,7 @@ async function pushGrant(user) {
 }
 
 async function connect(token) {
-  const c = new Client({ name: "env-imports-test", version: "0.0.0" });
-  await c.connect(new StreamableHTTPClientTransport(MCP, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+  const c = await mcpConnect(MCP, token, "env-imports-test");
   clients.push(c);
   return async (name, args = {}) => {
     const r = await c.callTool({ name, arguments: args });

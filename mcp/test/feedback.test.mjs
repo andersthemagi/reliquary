@@ -6,24 +6,14 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { call as call_ } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const { KIM_RW, KIM_RO, KIM_ONE, DEE_TOKEN, TEST_SUPER_URL } = process.env;
 const KIM = "00000000-0000-0000-0000-000000000013";
 
-async function call(token, name, args = {}) {
-  const c = new Client({ name: "feedback-test", version: "0.0.0" });
-  await c.connect(new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
-  try {
-    const r = await c.callTool({ name, arguments: args });
-    return { text: r.content.map((x) => x.text).join("\n"), isError: Boolean(r.isError) };
-  } finally {
-    await c.close();
-  }
-}
+const call = (token, name, args = {}) => call_(URL_, token, name, args);
 
 async function sql(q, params = []) {
   const db = new pg.Client({ connectionString: TEST_SUPER_URL });

@@ -5,26 +5,18 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { call as call_ } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const { GUS_RW } = process.env;
 const V = "Limits";
 
 async function call(name, args = {}) {
-  const client = new Client({ name: "hardening", version: "0.0.0" });
-  await client.connect(
-    new StreamableHTTPClientTransport(URL_, { requestInit: { headers: { Authorization: `Bearer ${GUS_RW}` } } }),
-  );
   try {
-    const r = await client.callTool({ name, arguments: args });
-    return { text: r.content.map((c) => c.text).join("\n"), isError: Boolean(r.isError) };
+    return await call_(URL_, GUS_RW, name, args);
   } catch (e) {
     // Some SDK versions reject invalid input as a protocol error instead.
     return { text: String(e?.message ?? e), isError: true };
-  } finally {
-    await client.close();
   }
 }
 

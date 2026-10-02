@@ -5,9 +5,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import pg from "pg";
+import { connect as mcpConnect } from "./mcp-client.mjs";
 
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const env = process.env;
@@ -17,14 +16,7 @@ const ANA = "00000000-0000-0000-0000-00000000000a";
 const PG_URL =
   env.PG_URL ?? `postgres://reliquary_mcp:test@127.0.0.1:${54330 + (Number(URL_.port) - 8788)}/postgres`;
 
-async function connect(token, name = "scope-test") {
-  const client = new Client({ name, version: "0.0.0" });
-  const transport = new StreamableHTTPClientTransport(URL_, {
-    requestInit: { headers: { Authorization: `Bearer ${token}` } },
-  });
-  await client.connect(transport);
-  return client;
-}
+const connect = (token, name = "scope-test") => mcpConnect(URL_, token, name);
 
 async function call(client, name, args = {}) {
   const r = await client.callTool({ name, arguments: args });
