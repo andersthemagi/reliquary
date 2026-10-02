@@ -15,6 +15,10 @@
 //                        so no tool here offers them)
 //   proposals-tools.ts   propose, list_proposals, revise_proposal,
 //                        changes_since, read_proposal, comment_on_proposal
+//   thread-tools.ts      open_thread, post_message (which also resolves
+//                        and reopens), list_threads, read_thread
+//                        (redact_message needs a person present, so no
+//                        tool here offers it)
 //   variables-tools.ts   list_variables
 //   flags-tools.ts       flags, subscriptions and feedback to Reliquary's
 //                        own operators
@@ -33,6 +37,7 @@ import { asIdentity, type Identity } from "./db.js";
 import { registerFlagsTools } from "./flags-tools.js";
 import { registerLinksTools } from "./links-tools.js";
 import { registerProposalsTools } from "./proposals-tools.js";
+import { registerThreadTools } from "./thread-tools.js";
 import { wrapRegisterTool } from "./tools-shared.js";
 import { registerVariablesTools } from "./variables-tools.js";
 import { registerVaultFileTools } from "./vaultfiles-tools.js";
@@ -57,6 +62,7 @@ export async function registerTools(
   registerClaimsTools(server, id, runAs);
   registerWorkPlanTools(server, id, runAs);
   registerProposalsTools(server, id, runAs);
+  registerThreadTools(server, id, runAs);
   registerVariablesTools(server, id, runAs);
   registerFlagsTools(server, id, runAs);
   await registerLinksTools(server, id, runAs);

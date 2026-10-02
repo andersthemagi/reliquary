@@ -11,6 +11,9 @@
 //    live token belongs to (private.rate_limit_token), so an OAuth client's
 //    hourly access tokens share one count. Only requests that call tools
 //    count, by how many they call.
+//  - Per token, thread writes (open_thread, post_message) a minute and a
+//    day, inside the same count: every member reads a thread, so it is a
+//    place to spam, and the general limit is far too loose for that.
 //  - Per address, for requests answered 401 (no token, or one that isn't
 //    live): HMAC-SHA256 of the address under the database's salt
 //    (private.rate_limit_salt()); never the address itself, in the
@@ -43,7 +46,12 @@ export const DEFAULT_LIMITS = {
   mcp_token_minute: { limit: 120, window: 60 }, // tool calls per token (grant)
   mcp_token_day: { limit: 10000, window: 86400 },
   mcp_unauth_ip: { limit: 30, window: 60 }, // 401 answers per address
+  mcp_thread_post_minute: { limit: 20, window: 60 }, // thread writes per token (grant)
+  mcp_thread_post_day: { limit: 300, window: 86400 },
 } satisfies Record<string, Limit>;
+
+// The tools whose calls also count as thread writes.
+export const THREAD_WRITES: ReadonlySet<string> = new Set(["open_thread", "post_message"]);
 
 export type LimitName = keyof typeof DEFAULT_LIMITS;
 let LIMITS: Record<LimitName, Limit> = { ...DEFAULT_LIMITS };
@@ -109,18 +117,20 @@ function getSalt(): Promise<string> {
   return salt;
 }
 
-// A token's tool calls against its grant. The hash is the token's SHA-256,
-// as the database stores it. 0, or the seconds to wait. Fails open.
-export async function limitToolCalls(tokenHash: string, calls: number): Promise<number> {
+// A token's tool calls against its grant, `threadWrites` of them counted
+// again as thread writes. The hash is the token's SHA-256, as the database
+// stores it. 0, or the seconds to wait. Fails open.
+export async function limitToolCalls(tokenHash: string, calls: number, threadWrites = 0): Promise<number> {
   if (calls < 1) return 0;
   const names: LimitName[] = ["mcp_token_minute", "mcp_token_day"];
+  if (threadWrites > 0) names.push("mcp_thread_post_minute", "mcp_thread_post_day");
   try {
     const { rows } = await pool.query("select private.rate_limit_token($1, $2, $3, $4, $5) as wait", [
       tokenHash,
       names,
       names.map((n) => LIMITS[n].window),
       names.map((n) => LIMITS[n].limit),
-      names.map(() => calls),
+      names.map((n) => (n.startsWith("mcp_thread_") ? threadWrites : calls)),
     ]);
     return Number(rows[0]?.wait ?? 0);
   } catch (err) {

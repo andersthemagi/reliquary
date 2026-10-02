@@ -107,6 +107,7 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 | OAuth revocation (`/oauth/revoke`) | 60 every 10 minutes per IP address, 600 per app |
 | Fetching an app's client metadata | 20 every 10 minutes per app host |
 | MCP tool calls | 120 a minute and 10000 a day per token or connection; a batch counts each call; listing tools and starting a session don't count |
+| Opening threads and posting in them over MCP (`open_thread`, `post_message`) | 20 a minute and 300 a day per token or connection, counted within the tool call limit above |
 | MCP requests without a valid token | 30 a minute per IP address |
 | The env API (the CLI) | 60 a minute and 5000 a day per Reliquary CLI connection |
 

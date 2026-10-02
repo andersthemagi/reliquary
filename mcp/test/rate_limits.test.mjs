@@ -1,10 +1,10 @@
 // Rate limits on the MCP endpoint (src/ratelimit.ts,
 // supabase/migrations/20260925200000_rate_limits.sql), against mcp/test.sh's
 // rate-limit server: 3 tool calls per 2-second window and 5 a day per token,
-// 3 401s a minute per address, addresses from x-real-ip. Each test makes its
-// own person's tokens (in the database, as the Tokens page does) and sends
-// from addresses of its own (documentation ranges; test.sh checks none
-// reaches the log).
+// 1 thread write per window, 3 401s a minute per address, addresses from
+// x-real-ip. Each test makes its own person's tokens (in the database, as
+// the Tokens page does) and sends from addresses of its own (documentation
+// ranges; test.sh checks none reaches the log).
 
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
@@ -106,6 +106,18 @@ test("rate limits: tool calls per token: a batch counts each call, another token
   assert.equal((await call(other)).status, 200);
   for (let i = 0; i < 5; i++) assert.equal((await rpc({ jsonrpc: "2.0", id: ++id, method: "tools/list" }, { tok })).status, 200);
   assert.equal((await call(tok)).status, 200, "the refused batch counted nothing");
+});
+
+test("rate limits: thread writes per token: the 2nd in a window is refused, and other tool calls still go through", async () => {
+  const tok = await token();
+  // Counted by the tool's name before it runs, so whether the write itself
+  // succeeds (there's no such vault here) doesn't matter.
+  const write = (name) =>
+    rpc({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name, arguments: { vault: "Nowhere", title: "Hi", message: "Hello", thread_id: "00000000-0000-4000-8000-000000000000" } } }, { tok });
+  await nextWindow();
+  assert.equal((await write("open_thread")).status, 200);
+  await limited(await write("post_message"), { max: 2, rpcId: id });
+  assert.equal((await call(tok)).status, 200, "the refused write counted nothing against the tool call limit");
 });
 
 test("rate limits: 401s per address: the 4th request without a live token from one address is a 429; other addresses still get 401", async () => {
