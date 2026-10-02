@@ -147,26 +147,26 @@ select t.run_role('reliquary_web', format($q$select private.oauth_redeem_code(%L
 select t.run_role('reliquary_web', format($q$select private.oauth_refresh(%L, %L, %L, %L, %L)$q$,
   t.sha('rlr_refresh_1'), 'https://client.example/meta.json', 'https://mcp.example/mcp', t.sha('rlo_access_2'), t.sha('rlr_refresh_2')));
 
-create function t.tok(p_hash text, p_limit int default 3) returns text language sql as $$
+create function t.rate_tok(p_hash text, p_limit int default 3) returns text language sql as $$
   select t.run_role('reliquary_mcp', format($q$select private.rate_limit_token(%L, array['tok_minute'], array[3600], array[%s], array[1])$q$,
     p_hash, p_limit))
 $$;
 
 select t.expect('tokens: a personal token''s calls count against it; the 4th of 3 is refused',
-  t.tok(t.sha((select value from t.raw where name = 'pat'))) || ',' || t.tok(t.sha((select value from t.raw where name = 'pat')))
-  || ',' || t.tok(t.sha((select value from t.raw where name = 'pat')))
-  || ',' || (t.tok(t.sha((select value from t.raw where name = 'pat'))) <> '0')::text,
+  t.rate_tok(t.sha((select value from t.raw where name = 'pat'))) || ',' || t.rate_tok(t.sha((select value from t.raw where name = 'pat')))
+  || ',' || t.rate_tok(t.sha((select value from t.raw where name = 'pat')))
+  || ',' || (t.rate_tok(t.sha((select value from t.raw where name = 'pat'))) <> '0')::text,
   '0,0,0,true');
 
 select t.expect('tokens: a grant''s access tokens share one counter, so refreshing doesn''t reset it',
-  t.tok(t.sha('rlo_access_1')) || ',' || t.tok(t.sha('rlo_access_2')) || ',' || t.tok(t.sha('rlo_access_2'))
-  || ',' || (t.tok(t.sha('rlo_access_1')) <> '0')::text,
+  t.rate_tok(t.sha('rlo_access_1')) || ',' || t.rate_tok(t.sha('rlo_access_2')) || ',' || t.rate_tok(t.sha('rlo_access_2'))
+  || ',' || (t.rate_tok(t.sha('rlo_access_1')) <> '0')::text,
   '0,0,0,true');
 
 select t.expect('tokens: an unknown, refresh or revoked token counts nothing, and the key is never the token''s hash',
-  t.tok(t.sha('rlq_nope'), 1) || ',' || t.tok(t.sha('rlq_nope'), 1)
-  || ',' || t.tok(t.sha('rlr_refresh_2'), 1) || ',' || t.tok(t.sha('rlr_refresh_2'), 1)
-  || ',' || t.tok('not-a-hash', 1)
+  t.rate_tok(t.sha('rlq_nope'), 1) || ',' || t.rate_tok(t.sha('rlq_nope'), 1)
+  || ',' || t.rate_tok(t.sha('rlr_refresh_2'), 1) || ',' || t.rate_tok(t.sha('rlr_refresh_2'), 1)
+  || ',' || t.rate_tok('not-a-hash', 1)
   || ',' || (select count(*) from private.rate_limits
               where key in (t.sha('rlq_nope'), t.sha('rlr_refresh_2'), t.sha('rlo_access_1'), t.sha((select value from t.raw where name = 'pat'))))::text,
   '0,0,0,0,0,0');
@@ -174,7 +174,7 @@ select t.expect('tokens: an unknown, refresh or revoked token counts nothing, an
 select t.run('ana', format($q$select public.revoke_access_token(%L)$q$,
   (select id from public.access_tokens where token_hash = t.sha((select value from t.raw where name = 'pat')))));
 select t.expect('tokens: a revoked personal token counts nothing',
-  t.tok(t.sha((select value from t.raw where name = 'pat')), 1000),
+  t.rate_tok(t.sha((select value from t.raw where name = 'pat')), 1000),
   '0');
 
 -- ---------------------------------------------------------------------------
