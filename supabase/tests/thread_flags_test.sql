@@ -25,13 +25,6 @@ select t.run('ben', format($q$select public.create_access_token('ben-agent', 30,
 select t.run('cal', format($q$select public.create_access_token('cal-agent', 30, array[%L]::uuid[], 'write')$q$, t.id('team')));
 select t.run('eve', format($q$select public.create_access_token('eve-agent', 30, array[%L]::uuid[], 'write')$q$, t.id('team')));
 
--- `or replace`: the same as harness.sql's once that file defines them.
-create or replace function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-create or replace function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
 -- As the person in the web app (p_tok null), or as one of their connections.
 create function t.as(p_user text, p_tok text, p_sql text) returns text language sql as $$
   select case when p_tok is null then t.run(p_user, p_sql) else t.run_tok(p_user, p_tok, p_sql) end
