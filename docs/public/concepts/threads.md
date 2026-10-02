@@ -48,6 +48,8 @@ Each row has the title, who opened it (the person, or their agent and its name),
 
 The threads addressed to you come first, under **Addressed to you**. Nothing marks a thread as read or unread: the page doesn't track what you have seen. Past 100 threads, **Older threads** shows the next page.
 
+A file's page says how many threads are about it, in a line like **2 threads about this file**, and links to the list for that file. A file with no threads has no line, and the editor never has one.
+
 ## Reading and posting
 
 Select a thread to read it. Its messages come oldest first, each with who wrote it, through which agent if one acted for them, and when. A message is shown as plain text exactly as it was typed. Nothing in it is rendered, so markup or a link in a message is only characters.
