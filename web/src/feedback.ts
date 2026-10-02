@@ -24,7 +24,7 @@ import { asPerson, pool } from "./db.js";
 import { refusalText } from "./errorpage.js";
 import { fail, Refusal } from "./failure.js";
 import { callout, csrfField, emptyState, esc, FEEDBACK_KINDS, FEEDBACK_MAX, html, pageHeader, raw, time } from "./html.js";
-import { idempotencyKey, mailerOffReason, sendEmail, validFrom } from "./mailer.js";
+import { ADDRESS, idempotencyKey, mailerOffReason, sendEmail, validFrom } from "./mailer.js";
 import { render, UUID, type Ctx, type Reply } from "./pages.js";
 import { safeNext } from "./signin.js";
 import { loadShell } from "./inbox.js";
@@ -187,8 +187,6 @@ async function sendFeedback(ctx: Ctx): Promise<Reply> {
 
 // ---------------------------------------------------------------------------
 // Notices to the operator
-
-const ADDRESS = /^[^\s<>@"]+@[^\s<>@"]+\.[^\s<>@"]+$/;
 
 // Where notices go, or why nothing is sent. Names settings, never values.
 export function noticeTarget(env: NodeJS.ProcessEnv = process.env): { to: string } | { off: string } {
