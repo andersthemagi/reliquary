@@ -470,3 +470,45 @@ start the next one.
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
 plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.
+
+## Alongside milestone 3: Threads, the audience split and the Tasks view
+
+Not a numbered milestone of its own, on the owner's call of 2026-10-02: a
+deliberate, logged exception to "work on the current milestone only", the
+same kind as path ownership and flags (2026-09-28) and compare-and-swap
+writes, claims and work plans (2026-09-30, tracking issue #52). It has no
+tracking issue of its own yet. Three parts, each its own set of small pull
+requests. Each pull request that builds a part adds its own line here.
+
+- **The audience split in the web UI.** What a person reads or acts on
+  leads the primary navigation and each page's default view. Activity,
+  Flags and Claims move one click away under a Diagnostics area, and
+  `/v/:id/activity`, `/v/:id/flags` and `/v/:id/claims` keep resolving.
+  Activity splits into a plain-language Changes feed and the full log. The
+  UI says Tasks, Threads, Changes and Diagnostics; MCP and SQL keep
+  `work_plan`, `step` and `claim`. Settled in docs/design.md ("Who each
+  surface is for") and docs/parity.md ("What the table does not say").
+- **Threads.** Conversations inside one vault between people and their
+  agents: never private, addressed threads change who is notified and
+  never who can read, messages are data under the same ceiling, delivery
+  to agents by flags only (no push, no real time), redaction by an owner in
+  person, limits, and a place in the export. Settled in docs/design.md
+  ("Threads"), with what it leaves open listed there. The database side
+  is #126; the MCP tools and the web page come after it.
+- **The Tasks view and the MCP step tools.** A page where a person sees and
+  steers the steps agents are working, shown as tasks, and MCP tools over
+  the step functions the database already has (`register_work_plan`,
+  `work_plan_status`, `claim_step`, `checkin_step`, `complete_step` and
+  `release_step`; `cancel_step` and `skip_step` stay a person's). The
+  database has no reopen, though #76's text lists one.
+
+Proposed, not yet confirmed by the owner (the owner confirmed Tasks and
+Threads on 2026-10-02, not this re-sequencing): the Tasks view and the
+step tools start ahead of CL-3.9 (#74, waiting and places in line). Issues
+#75 (CL-3.4, MCP tools) and #76 (CL-3.5, web page) list #74 as a blocker,
+and the phase 3 entry above says the same of CL-3.4, so this reverses the
+order they state, on purpose: a person needs to see and steer tasks
+before the queueing machinery matters. Anything that needs CL-3.9 is left
+out of both until it lands: `request_work`, `leave_queue`, places in line
+and who is waiting. Keep this paragraph, or strike it, when the pull
+request that carries it is reviewed.
