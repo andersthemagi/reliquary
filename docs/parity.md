@@ -42,6 +42,9 @@ and, for the agent, its token's vaults and access.
 | Read a proposal and its thread | `/v/:v/proposals/:p` | `read_proposal` | both | |
 | Revise your own proposal | `/v/:v/proposals/:p/revise` (POST) | `revise_proposal` | both | Only the proposer (the person whose agent proposed it counts as the proposer) |
 | Comment on a proposal | POST `/v/:v/proposals/:p/comment` | `comment_on_proposal` | both | |
+| Open a thread, post in one, resolve or reopen it | none yet (the vault's Threads page is next) | `open_thread`, `post_message` (its status argument resolves or reopens) | both, owners and editors; an agent needs a read-write connection | **Gap** on the web side until the Threads page ships. The database already takes the person (`20261004110000_thread_writes.sql`), and a message decides nothing on either side |
+| List a vault's threads and read one | none yet (the Threads page is next) | `list_threads`, `read_thread` | both, any member, any connection (read-only is enough) | **Gap** on the web side, the same page. Every member reads every thread; the agent's default list is the whole vault's threads and the side threads addressed to or opened by its person, and `all` adds the rest |
+| Redact a thread message | none yet (the Threads page is next) | none | person (owner) | **Ceiling**: `redact_message` is `require_human`, owners only, modelled on erasing a file (`20261004130000_thread_redaction.sql`). Also a gap until the page ships |
 | Approve, request changes, reject | POST `/v/:v/proposals/:p/decide` | none | person | **Ceiling**: approving needs the person present |
 | Edit, then approve | `/v/:v/proposals/:p/edit` (POST) | none | person | **Ceiling**: it approves. An agent revises its own proposal instead |
 | Set or remove a rule (canon/open, quorum) | `/v/:v/rules` (POST; linked from Settings) | none | person (owner) | **Ceiling**: rules are policy. An agent picks a new vault's default policy when it creates one, and nothing after |

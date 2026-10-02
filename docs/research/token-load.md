@@ -188,3 +188,30 @@ Still to do, from the token side:
 - **`tools/list` has no headroom again.** Phase 3 (work plans) will add
   several more tools once its gate opens; the budget will need raising
   again then, same as every pass so far.
+
+## Threads pass (thread tools)
+
+2026-10-02. Four new tools: `open_thread`, `post_message`, `list_threads`
+and `read_thread` (20261004100000_threads.sql onwards), and a clause more in
+`list_flags`' description for thread flags (20261005100000_thread_flags.sql).
+Resolving and reopening ride on `post_message`'s `status` instead of being
+two more tools. `tools/list` grew from 13,655 to 16,695 bytes, over its
+13,700-byte budget. Raised to 16,700, just above the actual. The first
+draft's descriptions made it 17,284; they were cut to what an agent must
+know (delivery by flags, no secrets, a message decides nothing, side
+threads) and the citation syntax, said once. No existing tool's budget
+changed.
+
+The new tools have no budget of their own yet: the Load vault has no
+threads to measure. `read_thread` defaults to 50 messages a page, and a
+message is at most 4,000 characters, so a full page of long messages is on
+the order of 200 KB; `list_threads` defaults to 20 threads, each a few
+lines and a fenced title.
+
+Still to do, from the token side:
+
+- **`tools/list` keeps growing.** Every conversation with a Reliquary
+  connection pays for every tool's schema. A client that loads tools on
+  demand would save it; nothing here does that today.
+- **A Load vault thread fixture**, so `list_threads` and `read_thread` get
+  measured budgets like the other reads.

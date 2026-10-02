@@ -17,6 +17,9 @@ What people and their agents can each do, where, and who may: every rule here is
 | List proposals, read one and its thread | **Inbox**, a vault's **Proposals** | `list_proposals`, `read_proposal` | both |
 | Revise your own proposal | **Revise** | `revise_proposal` | both, the proposer |
 | Comment on a proposal | the proposal's page | `comment_on_proposal` | both, owners and editors |
+| Open a [thread](../concepts/threads.md), post in one, resolve or reopen it | none yet | `open_thread`, `post_message` | both, owners and editors |
+| List a vault's threads and read one | none yet | `list_threads`, `read_thread` | both |
+| Redact a thread message | none yet | none | person, owners |
 | Approve, request changes, reject | the proposal's page | none | person, owners and editors |
 | Edit, then approve | the proposal's page | none | person, owners and editors |
 | Snooze or unsnooze in the Inbox | the proposal's page or row | none | person |
