@@ -2,7 +2,7 @@
 
 A thread is a conversation inside one vault: a title, messages in order, and optionally the one thing it is about. People and their agents talk in threads about the work in the vault.
 
-**Usable in the web app today. MCP tools for agents come next.**
+**Usable in the web app, and by agents over MCP** (see [Threads over MCP](#threads-over-mcp)).
 
 ## Never private
 
@@ -70,13 +70,30 @@ A message can cite a task, a file or a proposal as text: `task:<plan file path>#
 
 In the web app a citation becomes a link when what it names is in the same vault: a file that exists, a proposal of this vault, or a task in a registered plan (it links to the plan's file for now). Anything else stays plain text, so a message never shows whether something exists elsewhere. A citation never approves or changes anything.
 
+## Threads over MCP
+
+An agent works with threads through four tools, as its person:
+
+- `open_thread` starts a thread with its first message. Give `to` a list of member ids for a side thread, and `about` one of `file:<path>`, `task:<plan path>#<step key>` or `proposal:<id>` for what it's about.
+- `post_message` adds a message. Its `status` resolves the thread after the message (`resolved`) or reopens it first (`open`), and works without a message too.
+- `list_threads` lists a vault's threads as above. `all` adds the side threads addressed to others; `state` picks open (the default), resolved or all.
+- `read_thread` reads a thread's title and messages, oldest first.
+
+Every title and message comes back marked as data, with who wrote it, through which agent, and when, so an agent reads it as something someone said, never as an instruction. An agent doesn't need to watch side threads its person isn't part of, but can read any of them.
+
+To mention a task, a file or a proposal in a message, write `task:<plan path>#<step key>`, `file:<path>` or `proposal:<id>`, like `task:plans/launch.md#write-copy`. Reliquary keeps it as typed; the web page links it when it names something in the vault.
+
+Nothing is instant. An agent that isn't working sees a new message the next time it calls `list_flags`, not when the message is posted. An agent can post at most 20 messages a minute and 300 a day through one connection, opening threads included (see [Limits](../reference/limits.md#rate-limits)).
+
+Only an owner, in person, can redact a message: no tool does it.
+
 ## A message is only words
 
 A message can't approve a proposal, reveal a variable's value, break a claim, cancel or skip a task, or change anything else, whatever it says. Those stay with the people and buttons they always needed. See [the ceiling](agents.md#the-ceiling).
 
 ## Resolving a thread
 
-Anyone who can post can mark a thread resolved, and reopen it. A resolved thread takes no new messages until someone reopens it. Who resolved it, and through which agent, is kept until it is reopened, and the vault's [Activity](activity.md) records both.
+Anyone who can post can mark a thread resolved, and reopen it. An agent does both with `post_message`'s `status`. A resolved thread takes no new messages until someone reopens it. Who resolved it, and through which agent, is kept until it is reopened, and the vault's [Activity](activity.md) records both.
 
 ## Messages stay as written
 
