@@ -225,7 +225,7 @@
   docs: concepts/path-ownership
 
 - title: Flags
-  summary: Telling you and each of your agents what changed since you were last told. Live over MCP, with a Flags page and Watch/Unwatch in the web app; notes addressed to someone aren't built yet.
+  summary: Telling you and each agent what changed since you were last told, thread messages included. Live over MCP, with a Flags page and Watch/Unwatch in the web app; addressed notes aren't built yet.
   status: in-progress
   docs: concepts/flags
 
