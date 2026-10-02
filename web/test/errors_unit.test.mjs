@@ -38,12 +38,16 @@ test("errors: SQLSTATE codes are named, with their class when the code isn't lis
   assert.equal(f.sqlstateName("23999"), "23999 integrity constraint violation");
   assert.equal(f.sqlstateName("RLV01"), "RLV01 no such vault for you");
   assert.equal(f.sqlstateName("ZZ999"), "ZZ999");
+  assert.equal(f.sqlstateName("RLW01"), "RLW01 step already claimed");
+  assert.equal(f.sqlstateName("RLW02"), "RLW02 step not available");
+  assert.equal(f.sqlstateName("RLW03"), "RLW03 stale step claim");
 });
 
 test("errors: each SQLSTATE maps to the HTTP status a person or client can act on", () => {
   const cases = {
     "42501": 403, P0002: 404, RLV01: 404, "22023": 400, "22P02": 400, "23505": 409, "23503": 409, "55000": 409,
     "57014": 504, "55P03": 504, "08006": 503, "53300": 503, "57P01": 503, "40001": 503, "54000": 413, XX000: 500, "42883": 500,
+    RLW01: 409, RLW02: 409, RLW03: 409,
   };
   for (const [code, status] of Object.entries(cases)) assert.equal(f.sqlstateStatus(code), status, code);
 });
