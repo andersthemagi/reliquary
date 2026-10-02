@@ -96,7 +96,7 @@ test("viewer: reads the thread, agent words escaped and marked, and can't commen
   assert.doesNotMatch(h, /\/snooze"/);
   const token = await csrf(`/v/${SHOP_VAULT}/proposals/${TW_VIEW}`);
   const r = await post(`/v/${SHOP_VAULT}/proposals/${TW_VIEW}/comment`, { csrf: token, body: "Me too" });
-  assert.match(await follow(r), /Only editors and owners comment on proposals\./);
+  assert.match(await follow(r), /Only editors, owners and a path&#39;s named owners comment on proposals\./);
   assert.doesNotMatch(await page(`/v/${SHOP_VAULT}/proposals/${TW_VIEW}`), /Me too/);
 });
 

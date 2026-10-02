@@ -2,7 +2,7 @@
 
 A folder or file can name specific people as its owners: open for them, canon (its existing rule) for everyone else.
 
-**Partly usable.** An owner of the vault names and removes a path's owners in the web app, from **Rules**. Named owners, and their agents over MCP, write and delete the path directly, and their approval is the only kind that counts toward its quorum. The web app's file and proposal pages don't reflect path ownership yet: they still go by your role in the vault. So a named owner who is an editor or owner is still shown **Propose a change** on a canon path they own, and a named owner who is a viewer gets no **Edit** and no approve or reject buttons there. Named owners can't yet use the one-step edit-and-approve, or comment on a proposal for a path they own, unless they also have editor or owner access to the vault.
+An owner of the vault names and removes a path's owners in the web app, from **Rules**. Named owners, and their agents over MCP, write and delete the path directly; comment on, approve, reject and edit-then-approve proposals for it; and their approval is the only kind that counts toward its quorum, all of this whatever their own role in the vault, a viewer included. The file, editor and proposal pages show this: a named owner sees **Edit** instead of **Propose a change** on a path they own, and the review controls (**Approve**, **Reject**, **Edit, then approve**, commenting) even if plain viewer access alone wouldn't give them.
 
 ## What it changes
 

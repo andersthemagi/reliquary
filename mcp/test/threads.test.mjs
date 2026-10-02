@@ -93,7 +93,7 @@ test("viewer: reads the thread but can't comment", async () => {
   assert.match((await read(CAL_TOKEN)).text, /Yes, one paragraph\./);
   const r = await comment(CAL_TOKEN, "Me too");
   assert.equal(r.isError, true);
-  assert.match(r.text, /Not allowed: only editors and owners comment/);
+  assert.match(r.text, /Not allowed: only editors, owners and a path's named owners comment/);
 });
 
 test("outsider: someone else's proposal is indistinguishable from a missing one", async () => {

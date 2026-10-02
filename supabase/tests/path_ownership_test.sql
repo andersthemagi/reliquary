@@ -148,6 +148,50 @@ select t.expect('decide: on an unowned path, the proposer''s own editor approval
   t.run('ben', format($q$select public.decide(%L, 'approve')$q$, t.id('plain_p'))), 'applied');
 
 -- ---------------------------------------------------------------------------
+-- comment_on_proposal and edit_and_approve: a path's named owner, even a
+-- plain viewer, may use these too, not just plain decide() (F407-F409's
+-- own follow-up, closed 2026-10-02: both now check can_write_path, not
+-- can_write). Fay, a second viewer who owns nothing, is the real boundary:
+-- Ben, an ordinary editor, could already comment and edit-and-approve on
+-- any canon proposal before this change (can_write(vault) alone always
+-- covered him); path ownership only adds the capability for someone who
+-- doesn't already have it.
+
+insert into t.ids values ('fay', '00000000-0000-0000-0000-00000000000f');
+insert into auth.users (id, email) values (t.id('fay'), 'fay@example.test');
+select test_support.add_member(t.id('gone'), t.id('fay'), 'viewer', t.id('ana'));
+
+insert into t.ids select 'review_p', t.run('ben',
+  format($q$select public.propose(%L, 'canon/shared.md', 'Bens third', 'why')$q$, t.id('gone')))::uuid;
+select t.expect('review: Fay, a viewer but not this path''s owner, can''t comment on it',
+  t.run('fay', format($q$select public.comment_on_proposal(%L, %L)::text$q$, t.id('review_p'), 'me too')), 'ERR 42501');
+select t.expect('review: Cal, the path''s owner but a plain viewer, comments on it',
+  t.run('cal', format($q$select case when public.comment_on_proposal(%L, %L) is not null then 'ok' end$q$, t.id('review_p'), 'looks fine')), 'ok');
+select t.expect('review: only Cal''s comment landed',
+  (select count(*)::text from public.proposal_notes where proposal_id = t.id('review_p') and kind = 'comment'), '1');
+select t.expect('review: Fay, a viewer but not this path''s owner, can''t edit-and-approve it either',
+  t.run('fay', format($q$select public.edit_and_approve(%L, %L, null)::text$q$, t.id('review_p'), 'Fays edit')), 'ERR P0002');
+select t.expect('review: Ben, an ordinary editor, could already edit-and-approve any canon proposal and still can (unchanged)',
+  t.run('ben', format($q$select public.edit_and_approve(%L, %L, null)$q$, t.id('review_p'), 'Bens edit')), 'open');
+select t.expect('review: Cal edits the proposal herself and approves it in one step',
+  t.run('cal', format($q$select public.edit_and_approve(%L, %L, 'tightened the wording')$q$, t.id('review_p'), 'Cals edit')), 'applied');
+select t.expect('review: the proposal record agrees',
+  (select status from public.proposals where id = t.id('review_p')), 'applied');
+select t.expect('review: the file carries Cal''s edited text',
+  (select body from public.file_versions fv join public.files f on f.current_version_id = fv.id
+    where f.vault_id = t.id('gone') and f.path = 'canon/shared.md'),
+  'Cals edit');
+
+-- Regression: on a plain canon path with no owner, an editor still
+-- comments and edits-and-approves exactly as before this migration.
+insert into t.ids select 'plain_p2', t.run('ben',
+  format($q$select public.propose(%L, 'canon/plain.md', 'plain second', 'why')$q$, t.id('gone')))::uuid;
+select t.expect('review: on an unowned path, an editor still comments (unchanged)',
+  t.run('ana', format($q$select case when public.comment_on_proposal(%L, %L) is not null then 'ok' end$q$, t.id('plain_p2'), 'noted')), 'ok');
+select t.expect('review: and still edits-and-approves it (unchanged)',
+  t.run('ana', format($q$select public.edit_and_approve(%L, %L, null)$q$, t.id('plain_p2'), 'Anas edit')), 'applied');
+
+-- ---------------------------------------------------------------------------
 -- remove_path_owner, and the cascade off set_policy(null)
 
 select t.expect('remove: an editor cannot remove an owner',

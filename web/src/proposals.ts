@@ -17,6 +17,7 @@ import {
   UUID,
   vault,
   vaultPath,
+  writablePath,
   type Ctx,
   type Reply,
   type Vault,
@@ -230,13 +231,21 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     const flags = live
       ? risks(p, firstFromAgent ? [{ short: `First proposal from ${p.agent}`, long: `First proposal from ${p.agent} in this vault.` }] : [])
       : [];
-    const decidable = canWrite(v) && p.status === "open" && !mine;
-    const rejectable = canWrite(v) && (decidable || p.status === "changes_requested");
-    const editable = canWrite(v) && live && p.kind === "write" && p.body !== null;
+    // Vault-wide write access, or a named owner of this path (writablePath):
+    // decide(), comment_on_proposal and edit_and_approve all gate on the
+    // same can_write_path, so a path-owning viewer sees these controls too,
+    // not just vault editors and owners.
+    const writable = await writablePath(c, v, p.path);
+    const decidable = writable && p.status === "open" && !mine;
+    const rejectable = writable && (decidable || p.status === "changes_requested");
+    const editable = writable && live && p.kind === "write" && p.body !== null;
     // The proposer revises their own proposal (as their agent can over MCP):
-    // a new revision, approved by nobody.
-    const revisable = editable && p.proposed_by === ctx.userId;
-    const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: canWrite(v) });
+    // a new revision, approved by nobody. revise_proposal stays vault-role
+    // gated (canWrite), never path-owner aware: a path's named owner never
+    // proposes on it in the first place (they write directly), so they're
+    // never the proposer here regardless.
+    const revisable = canWrite(v) && live && p.kind === "write" && p.body !== null && p.proposed_by === ctx.userId;
+    const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: writable });
     const feedback = await latestFeedback(c, ctx, p);
     const snooze = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
 
@@ -354,9 +363,9 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<R
   if (!UUID.test(pid)) return notFound(ctx);
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
-    if (!v || !canWrite(v)) return null;
+    if (!v) return null;
     const p = await loadEditable(c, id, pid, null);
-    if (!p) return null;
+    if (!p || !(await writablePath(c, v, p.path))) return null;
     const body = html`
       ${pageHeader({
         crumb: proposalCrumb(v, p, "Edit, then approve"),
