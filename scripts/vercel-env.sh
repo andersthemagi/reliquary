@@ -69,12 +69,11 @@ site=${site%/}
 if [[ -n $site && ! $site =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
   echo "The site origin must be https://<host>, with no path"; exit 1
 fi
-ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
-host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
+source scripts/lib/supabase-env.sh
 web=${web%/}; mcp=${mcp%/}
 
 pw() { tr -d '[:space:]' < "supabase/.$1-db-password"; }
-enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(),safe=""))'; }
+enc() { jq -rn --arg v "$(cat)" '$v|@uri'; }
 
 # Shared by both projects (mcp/'s own calls to the web app's internal
 # link-call endpoint, linkproxy.ts): made once, the same value goes in

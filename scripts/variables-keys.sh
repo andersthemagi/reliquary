@@ -18,14 +18,13 @@
 #
 # The first time, a key from before rotation (supabase/.variables-secret,
 # the single VARIABLES_KEY, whose values carry id k1) is taken over as k1;
-# with none, a new k1 is made. KEYS_FILE and LEGACY_KEY_FILE override the
-# paths (tests).
+# with none, a new k1 is made.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
 
-file=${KEYS_FILE:-supabase/.variables-keys-secret}
-legacy=${LEGACY_KEY_FILE:-supabase/.variables-secret}
+file=supabase/.variables-keys-secret
+legacy=supabase/.variables-secret
 
 genkey() { head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n'; }
 ids() { cut -d: -f1 "$file"; }

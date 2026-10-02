@@ -133,7 +133,7 @@ services:
       GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
       GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_SENDER:?set SMTP_SENDER in .env}
       GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Reliquary}
-      GOTRUE_SMTP_MAX_FREQUENCY: ${SMTP_MAX_FREQUENCY:-60s}
+      GOTRUE_SMTP_MAX_FREQUENCY: "60s"
     depends_on:
       db-init:
         condition: service_completed_successfully

@@ -47,8 +47,7 @@
 #           latest commit on main, not the tag, so the smoke checks fail if
 #           main has moved on since the tag (live would not be the release)
 #   smoke   variables WEB_URL, MCP_URL (origins, e.g. https://app.example.com);
-#           secret KEEPALIVE_TOKEN if the MCP project has one; variable
-#           CHECK_OAUTH=1 once MCP OAuth ships
+#           secret KEEPALIVE_TOKEN if the MCP project has one
 #
 # Turn off Vercel's own production deploys from Git for both projects
 # (vercel.json: git.deploymentEnabled.main false), so code never goes live
@@ -74,10 +73,6 @@ on:
         description: Release tag to deploy (vX.Y.Z). An older tag rolls back app code only; migrations never go backwards
         required: true
         type: string
-      check_oauth:
-        description: Also check that the MCP 401 names resource_metadata
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -250,7 +245,6 @@ jobs:
           WEB_URL: ${{ vars.WEB_URL }}
           MCP_URL: ${{ vars.MCP_URL }}
           KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
-          CHECK_OAUTH: ${{ (inputs.check_oauth || vars.CHECK_OAUTH == '1') && '1' || '' }}
           EXPECT_VERSION: ${{ steps.tag.outputs.version }}
           EXPECT_COMMIT: ${{ steps.rel.outputs.sha }}
         run: ./scripts/deploy-check.sh
