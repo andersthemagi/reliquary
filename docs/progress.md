@@ -422,6 +422,58 @@ start the next one.
     doesn't. Registry: `tests/features.md` F445. Docs:
     `docs/public/concepts/claims.md`'s new "Work plans" section, which
     says plainly that nothing registers a plan from a file yet.
+  - work plan tables and functions (CL-3.2, `supabase/migrations/
+    20261002200000_work_plans.sql`): `work_plans`, `work_plan_steps`
+    (`vault_id` referencing `vaults` directly, not through
+    `vault_members` the way `path_claims`' `holder` column does, so
+    plain vault deletion already cascades with no nullable-FK gap --
+    the deadlock risk that left for path_claims is left here too, for
+    CL-3.3 to find and fix the same way), `work_plan_step_blockers` and
+    `work_plan_step_cites`. `register_work_plan` re-validates
+    duplicate keys, unknown blockers, self-dependencies and cycles from
+    scratch (Kahn's algorithm, same as spikes/claims/plan.sql), from the
+    file's current version only (a stale one refused, `RLF01`); stores
+    each step's count of unfinished blockers at registration, the same
+    design item 12f the claims spike's guard.sql validated, so
+    `claim_step` grants the claim and checks "every blocker is done" in
+    the one update statement that takes it, never a live join.
+    `complete_step` and `release_step` need the exact fence, secret,
+    connection and person the claim was granted to; `complete_step`
+    decrements every dependent's count, locked in id order first (two
+    steps finishing together that share a dependent would otherwise
+    deadlock). `checkin_step` restarts a claimed step's lease without
+    finishing it or changing its fence, the same shape `renew_claim`
+    already gives path claims, capped at the claim rule's hold limit
+    the same way; not named in CL-3.2's own issue text, but design item
+    12(a) names `agent_checkin_step` as its own agent-facing primitive,
+    a peer of `agent_complete_step`/`agent_release_step`, and CL-3.9
+    (issue #74) turned out to be scoped to the waiting queue's own
+    ticket, never a claimed step's lease -- flagged as a gap on issue
+    #70 rather than decided unilaterally, and included on that basis.
+    `cancel_step` and `skip_step` are a person's own, never
+    an agent's (design item 1's ceiling): cancelling never decrements a
+    dependent's count, so it stays blocked forever until a person acts
+    (design item 7); skipping does, without needing the holder's
+    secret, the same no-proof ceiling `break_claim` already uses --
+    skip's own meaning isn't spelled out in design.md's twelve points,
+    so this is flagged on CL-0.2 (issue #58) rather than guessed and
+    left unexplained. `work_plan_status` computes `ready`, `blocked`,
+    `blocked_by_cancelled`, `claimed`, `done` and `cancelled` per step,
+    security invoker (RLS alone keeps it honest, the same reason
+    `list_claims` needed no wrapper function). Still scoped out, matching
+    the rest of CL-3.2's own issue: no queue, no fairness, no cooldowns
+    or caps on active steps (that's `request_work`, CL-3.9, which "wraps"
+    `claim_step`); no re-registering a path's plan. Registry:
+    `tests/features.md` F446-F447. Docs: `docs/public/concepts/claims.md`'s
+    "Work plans" section now describes the step lifecycle, still plain
+    that no MCP tool or web page reaches any of it yet; `docs/public/roadmap.yml`.
+  - **Phase 3, not yet built:** every other CL-3.x issue -- MCP tools
+    (CL-3.4, blocked on this entry and CL-3.9), the web page (CL-3.5),
+    the "canon moved" signal (CL-3.6), review-gated steps (CL-3.7),
+    waiting and places in line (CL-3.9), a capacity model (CL-3.13),
+    one call for every place in line (CL-3.12), the adversary suite and
+    load test (CL-3.10/3.11), and CL-3.2's own deferred race/lock-order
+    tests (CL-3.3).
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
 plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.

@@ -77,7 +77,7 @@ export const EVENT_GROUPS: readonly [string, string][] = [
   ["variable.", "Any variable change"],
   ["link.", "Any link change"],
   ["claim.", "Any claim event"],
-  ["step.", "Any step event"],
+  ["step.", "Any work plan step event"],
 ];
 const EVENTS = EVENT_LABELS;
 const GROUPS = EVENT_GROUPS;
