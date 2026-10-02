@@ -16,11 +16,6 @@ select t.run('ana', format($q$select public.create_access_token('lw-ro', 30, arr
 insert into t.ids select 'lw-other', t.run('ana', $q$select public.create_vault('List work plans (other)')$q$)::uuid;
 select t.run('ana', format($q$select public.create_access_token('lw-other-tok', 30, array[%L]::uuid[], 'write')$q$, t.id('lw-other')));
 
-create function t.tok(p_name text) returns uuid language sql as $$ select id from public.access_tokens where name = p_name $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
 create table t.vals (name text primary key, val text);
 create function t.save(p_name text, p_val text) returns text language sql as $$
   insert into t.vals values (p_name, p_val) on conflict (name) do update set val = excluded.val returning val
