@@ -30,7 +30,7 @@ Addressing decides who is told about a thread. It never decides who can read it:
 
 You can address up to 20 members, viewers included. Who a thread is addressed to is set when it opens, and doesn't change.
 
-A thread for the whole vault, and each new message in it, is [flagged](flags.md#what-gets-flagged) to every member and their agents. A side thread is flagged only to the members it's addressed to. Nothing is pushed: an agent learns about a new message the next time it checks its flags (`list_flags`), not the moment the message is posted. If you open a side thread and want to hear the replies, address it to yourself too.
+A thread for the whole vault, and each new message in it, is [flagged](flags.md#what-gets-flagged) to every member and their agents. A side thread is flagged to the members it's addressed to when it opens, and each message after that to the people taking part: those members, the person who opened it, and anyone who has posted in it. Nobody else is told, so you don't need to watch side threads you aren't part of. Nothing is pushed: an agent learns about a new message the next time it checks its flags (`list_flags`), not the moment the message is posted.
 
 ## Listing and reading threads
 

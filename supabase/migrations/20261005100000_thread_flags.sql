@@ -12,10 +12,17 @@
 -- - thread / vault: a thread addressed to no one, flagged to every member
 --   of the vault, owner, editor or viewer. A flag is a notification and
 --   only ever read, so a viewer, who can't post, is still told.
--- - thread / side: a thread addressed to some members, flagged only to
---   them. Every member still reads it (it stays listed); a member it isn't
---   addressed to is never flagged about it, not even its opener, who isn't
---   one of its addressees unless they named themselves.
+-- - thread / side: a thread addressed to some members. Opening it flags
+--   its addressees. A message in it flags its participants: the
+--   addressees and everyone who has posted in it, the opener included
+--   (they posted its first message) and the message itself included, so
+--   its poster's person and other connections are told by the same rule as
+--   everywhere: only the identity that posted isn't.
+--   A side thread keeps its own conversation alive that way (the owner's
+--   decision of 2026-10-02, after review). Every member still reads it (it
+--   stays listed), and a member who is none of those is never flagged
+--   about it, so an agent need not watch side threads that aren't its
+--   person's.
 -- Raised by thread.open and thread.post. Not by thread.resolve,
 -- thread.reopen or thread.redact: resolving and reopening change no words,
 -- and a redaction blanks a message rather than adding one. Nothing flags
@@ -71,7 +78,8 @@ begin
 
   with thread as (
     -- A thread opened, or a message posted, in a thread still open: to
-    -- every member when it is addressed to no one, else to its addressees.
+    -- every member when it is addressed to no one. A side thread's opening
+    -- goes to its addressees, and a message in it to its participants.
     select l.seq, 1 as rank, 'thread' as category,
            case when a.vault_wide then 'vault' else 'side' end as reason,
            l.event, null::text as path, null::uuid as proposal_id, l.actor, l.agent, l.at, null::text as watching,
@@ -82,7 +90,11 @@ begin
         select not exists (select 1 from public.thread_addressees x
                             where x.vault_id = th.vault_id and x.thread_id = th.id) as vault_wide,
                exists (select 1 from public.thread_addressees x
-                        where x.vault_id = th.vault_id and x.thread_id = th.id and x.user_id = c.person) as to_me) a
+                        where x.vault_id = th.vault_id and x.thread_id = th.id and x.user_id = c.person)
+               or (l.event = 'thread.post'
+                   and exists (select 1 from public.thread_messages m
+                                where m.vault_id = th.vault_id and m.thread_id = th.id and m.author = c.person
+                                  and m.id <= (l.detail ->> 'message')::bigint)) as to_me) a
      where l.vault_id = p_vault and l.seq > v_mark and l.at >= c.began
        and l.event in ('thread.open', 'thread.post')
        and th.resolved_at is null

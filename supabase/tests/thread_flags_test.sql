@@ -5,8 +5,8 @@
 -- simulated the way private.mcp_begin sets claims (act.tok = the token id,
 -- act.name = its name).
 --
--- Team: Ana owns, Ben edits, Cal views. Dee's: Dee owns, Ana edits. Dee is
--- an outsider to Team.
+-- Team: Ana owns, Ben and Eve edit, Cal views. Dee's: Dee owns, Ana edits.
+-- Dee is an outsider to Team.
 
 -- ---------------------------------------------------------------------------
 -- Setup
@@ -15,12 +15,15 @@ insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Tea
 insert into t.ids select 'dees', t.run('dee', $q$select public.create_vault('Dee''s')$q$)::uuid;
 select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
 select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
+insert into t.ids values ('eve', '00000000-0000-0000-0000-0000000000e5');
+select test_support.add_member(t.id('team'), t.id('eve'), 'editor', t.id('ana'));
 select test_support.add_member(t.id('dees'), t.id('ana'), 'editor', t.id('dee'));
 
 select t.run('ana', format($q$select public.create_access_token('ana-agent', 30, array[%L]::uuid[], 'write')$q$, t.id('team')));
 select t.run('ana', format($q$select public.create_access_token('ana-read', 30, array[%L]::uuid[], 'read')$q$, t.id('team')));
 select t.run('ben', format($q$select public.create_access_token('ben-agent', 30, array[%L]::uuid[], 'write')$q$, t.id('team')));
 select t.run('cal', format($q$select public.create_access_token('cal-agent', 30, array[%L]::uuid[], 'write')$q$, t.id('team')));
+select t.run('eve', format($q$select public.create_access_token('eve-agent', 30, array[%L]::uuid[], 'write')$q$, t.id('team')));
 
 -- `or replace`: the same as harness.sql's once that file defines them.
 create or replace function t.tok(p_name text) returns uuid language sql as
@@ -66,6 +69,7 @@ create function t.catch_up_all() returns void language sql as $$
   select t.catch_up('ana', 'team'), t.catch_up('ana', 'team', 'ana-agent'), t.catch_up('ana', 'team', 'ana-read'),
          t.catch_up('ben', 'team'), t.catch_up('ben', 'team', 'ben-agent'),
          t.catch_up('cal', 'team'), t.catch_up('cal', 'team', 'cal-agent'),
+         t.catch_up('eve', 'team'), t.catch_up('eve', 'team', 'eve-agent'),
          t.catch_up('dee', 'dees'), t.catch_up('ana', 'dees')
 $$;
 create function t.open_sql(p_vault text, p_title text, p_body text, p_to text[] default null) returns text language sql as $$
@@ -140,10 +144,31 @@ select t.expect('thread flags: nor is its opener''s agent, when the opener didn'
 select t.catch_up_all();
 
 select t.run('ben', t.post_sql('forben', 'Paid it this morning'));
-select t.expect('thread flags: a reply in a side thread is flagged to its addressees only',
+select t.expect('thread flags: a reply in a side thread is flagged to its addressees and its opener, and to no one else',
   t.flags('ben', 'team', 'ben-agent') || ' | ' || t.flags('cal', 'team') || ' | ' || t.flags('ana', 'team')
   || ' | ' || t.flags('ana', 'team', 'ana-agent'),
-  'thread side thread.post forben | none | none | none');
+  'thread side thread.post forben | none | thread side thread.post forben | thread side thread.post forben');
+select t.catch_up_all();
+
+-- Someone who isn't addressed and didn't open a side thread joins in.
+insert into t.ids select 'budget', t.run('ana', t.open_sql('team', 'Budget', 'Ben, the numbers?', array['ben']))::uuid;
+select t.expect('thread flags: opening a side thread flags its addressees, not a member who hasn''t posted in it',
+  t.flags('ben', 'team') || ' | ' || t.flags('eve', 'team'), 'thread side thread.open budget | none');
+select t.catch_up_all();
+select t.run('eve', t.post_sql('budget', 'I have last year''s'));
+select t.expect('thread flags: the poster isn''t flagged for their own message in a side thread, but their agent is told',
+  t.flags('eve', 'team') || ' | ' || t.flags('eve', 'team', 'eve-agent'), 'none | thread side thread.post budget');
+select t.expect('thread flags: a message from someone else reaches a side thread''s opener and addressee',
+  t.flags('ana', 'team') || ' | ' || t.flags('ben', 'team'), 'thread side thread.post budget | thread side thread.post budget');
+select t.catch_up_all();
+select t.run('ben', t.post_sql('budget', 'Thanks, Eve'));
+select t.expect('thread flags: a member who has posted in a side thread is flagged about the messages after',
+  t.flags('eve', 'team') || ' | ' || t.flags('eve', 'team', 'eve-agent'),
+  'thread side thread.post budget | thread side thread.post budget');
+select t.expect('thread flags: a member who didn''t open, isn''t addressed by and hasn''t posted in a side thread still isn''t flagged',
+  t.flags('cal', 'team') || ' | ' || t.flags('cal', 'team', 'cal-agent'), 'none | none');
+select t.expect('thread flags: the poster isn''t flagged for their own reply',
+  t.flags('ben', 'team'), 'none');
 select t.catch_up_all();
 
 insert into t.ids select 'forcal', t.run('ben', t.open_sql('team', 'Read this', 'The brief changed', array['cal', 'ana']))::uuid;

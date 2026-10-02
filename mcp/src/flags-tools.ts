@@ -100,7 +100,7 @@ export function registerFlagsTools(
     {
       title: "List flags",
       description:
-        "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, a change on a path they watch, or a new message in a thread for the whole vault or addressed to them. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
+        "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, a change on a path they watch, or a new message in a thread for the whole vault or one they take part in. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
       inputSchema: {
         vault: VAULT,
         limit: z.number().int().min(1).max(200).optional().describe("Flags, default 50"),
