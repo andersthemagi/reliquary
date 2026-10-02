@@ -250,10 +250,6 @@
   summary: A Tasks page for seeing what your agents are working on, with each task's state, and for cancelling or skipping one, plus MCP tools to work through them. Places in line come later.
   status: planned
 
-- title: Threads
-  summary: Conversations in a vault between people and their agents, optionally about a file, task or proposal. Every member can read them. An idle agent sees a message on its next tool call, not at once.
-  status: planned
-
 - title: Publish the CLI to npm
   summary: "@reliquary-ai/cli on npm, so npx works everywhere without a checkout."
   status: planned
