@@ -18,23 +18,12 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { Refusal } from "./failure.js";
+import { activeClaim, activeClaims, type Claim } from "./claimlookup.js";
 import { confirmPage, emptyState, html, pageHeader, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { canWrite, filePath, message, notFound, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 
 export const claimsPath = (id: string) => vaultPath(id, "/claims");
-
-type Claim = { path: string; holder: string; holder_label: string | null; expires_at: Date };
-
-async function loadClaims(c: pg.PoolClient, id: string): Promise<Claim[]> {
-  return (
-    await c.query(
-      `select path, holder, holder_label, expires_at from public.path_claims
-        where vault_id = $1 and expires_at > now() order by path`,
-      [id],
-    )
-  ).rows;
-}
 
 // A path typed into a URL, said back only when it's plain (as rules.ts and pathowners.ts do).
 const shown = (path: string) => (/^[^\u0000-\u001f\u007f]{1,200}$/.test(path) ? path : "that path");
@@ -79,7 +68,7 @@ export async function claims(ctx: Ctx, id: string): Promise<Reply> {
   const breakPath = ctx.url.searchParams.get("break");
   if (breakPath !== null) return confirmBreak(ctx, id, breakPath);
   return build(ctx, id, async (c, v) => {
-    const rows = await loadClaims(c, id);
+    const rows = await activeClaims(c, id);
     const body = html`
       ${pageHeader({
         title: "Claims",
@@ -98,7 +87,7 @@ async function confirmBreak(ctx: Ctx, id: string, path: string): Promise<Reply> 
   return build(ctx, id, async (c, v) => {
     const back = claimsPath(id);
     if (!canWrite(v)) return { back, note: "Only an owner or editor breaks a claim.", tone: "warning" };
-    const claim = (await loadClaims(c, id)).find((r) => r.path === path);
+    const claim = await activeClaim(c, id, path);
     if (!claim) return { back, note: `There’s no active claim on ${shown(path)} to break; it may have been released or expired already.`, tone: "warning" };
     const holder = who(ctx, claim.holder, null);
     const body = confirmPage({
