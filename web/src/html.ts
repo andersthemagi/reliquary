@@ -130,7 +130,7 @@ export type PageOpts = {
 const UUID_AT = /^\/v\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?]|$)/;
 
 const agoText = (iso: string): string => relativeTime(iso);
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // One inbox item as a link: where it goes, what it is, and a line of context.
 export function inboxItem(i: ShellItem): { href: string; title: string; meta: string } {
