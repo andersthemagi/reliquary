@@ -69,8 +69,7 @@ site=${site%/}
 if [[ -n $site && ! $site =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
   echo "The site origin must be https://<host>, with no path"; exit 1
 fi
-ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
-host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
+source scripts/lib/supabase-env.sh
 web=${web%/}; mcp=${mcp%/}
 
 pw() { tr -d '[:space:]' < "supabase/.$1-db-password"; }

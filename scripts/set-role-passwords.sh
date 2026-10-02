@@ -27,8 +27,7 @@ case ${1:-} in
   *) echo "usage: scripts/set-role-passwords.sh [ops | ops-off]"; exit 2 ;;
 esac
 
-ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
-host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
+source scripts/lib/supabase-env.sh
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 [[ -s supabase/.db-password ]] || { echo "Missing supabase/.db-password."; exit 1; }
 

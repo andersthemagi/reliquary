@@ -13,8 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
-host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
+source scripts/lib/supabase-env.sh
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 dir=${RELIQUARY_BACKUP_DIR:-$HOME/reliquary-backups}
 [[ -s supabase/.db-password ]] || { echo "Missing supabase/.db-password."; exit 1; }
