@@ -26,13 +26,19 @@ dir=${DEPLOY_DIR:-/deploy}
 
 q() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 
-for _ in $(seq 120); do pg_isready -q && break; sleep 1; done
+# wait_for <tries> <check...>: runs <check> once a second until it passes, or
+# gives up after <tries> seconds (the caller decides what that means).
+wait_for() {
+  local tries=$1
+  shift
+  for _ in $(seq "$tries"); do "$@" && return 0; sleep 1; done
+  return 1
+}
+
+wait_for 120 pg_isready -q || true
 # Supabase Auth creates auth.users when it starts; the migrations read it.
-for _ in $(seq 120); do
-  [ "$(q -At -c "select to_regclass('auth.users') is not null")" = t ] && break
-  sleep 1
-done
-[ "$(q -At -c "select to_regclass('auth.users') is not null")" = t ] ||
+auth_ready() { [ "$(q -At -c "select to_regclass('auth.users') is not null")" = t ]; }
+wait_for 120 auth_ready ||
   { echo "migrate: auth.users doesn't exist after 2 minutes: is Supabase Auth (the auth service) running?" >&2; exit 1; }
 
 q <<'SQL'
