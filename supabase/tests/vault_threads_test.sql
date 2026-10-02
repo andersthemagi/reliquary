@@ -494,6 +494,61 @@ select t.expect('read thread: nor anyone, about a thread that doesn''t exist',
 select t.expect('read thread: nor anonymous',
   t.run(null, format($q$select public.read_thread(%L)::text$q$, t.id('plan'))), 'ERR 42501');
 
+-- Redaction (20261004130000_thread_redaction) --------------------------------
+
+create function t.redact_sql(p_message text) returns text language sql as $$
+  select format('select public.redact_message(%s)::text || ''ok''', p_message)
+$$;
+select t.save('secret', t.run('ben', t.post_sql('plan', 'Door code: 4417-pelican'), 'Hermes'));
+select t.save('secret row', (select format('%s %s %s %s', thread_id, author, agent, at) from public.thread_messages
+  where id = t.val('secret')::bigint));
+select t.save('log before', (select count(*)::text from public.log));
+
+select t.expect('redact: an editor can''t',
+  t.run('ben', t.redact_sql(t.val('secret'))), 'ERR 42501');
+select t.expect('redact: nor the owner''s agent',
+  t.run('ana', t.redact_sql(t.val('secret')), 'Claude'), 'ERR 42501');
+select t.expect('redact: nor the owner through a read-write connection',
+  t.run_tok('ana', 'ana-rw', t.redact_sql(t.val('secret'))), 'ERR 42501');
+select t.expect('redact: nor a viewer',
+  t.run('cal', t.redact_sql(t.val('secret'))), 'ERR 42501');
+select t.expect('redact: nor an owner of one vault, in another they''re an editor of',
+  t.run('ana', t.redact_sql(t.msg('far')::text)), 'ERR 42501');
+select t.expect('redact: an outsider learns nothing',
+  t.run('dee', t.redact_sql(t.val('secret'))), 'ERR P0002');
+select t.expect('redact: nor anyone, about a message that doesn''t exist',
+  t.run('ana', t.redact_sql('999999999')), 'ERR P0002');
+select t.expect('redact: anonymous can''t call it',
+  t.run(null, t.redact_sql(t.val('secret'))), 'ERR 42501');
+select t.expect('redact: a refused redaction changes and logs nothing',
+  (select body from public.thread_messages where id = t.val('secret')::bigint) || ' ' || (select count(*) from public.log),
+  'Door code: 4417-pelican ' || t.val('log before'));
+
+select t.expect_ok('redact: the owner, in person, redacts a message',
+  t.run('ana', t.redact_sql(t.val('secret'))));
+select t.expect('redact: its text is gone, and it says who redacted it',
+  (select (body is null)::text || ' ' || (redacted_by = t.id('ana'))::text || ' ' || (redacted_at is not null)::text
+     from public.thread_messages where id = t.val('secret')::bigint),
+  'true true true');
+select t.expect('redact: its thread, author, agent and time stay',
+  (select format('%s %s %s %s', thread_id, author, agent, at) from public.thread_messages where id = t.val('secret')::bigint),
+  t.val('secret row'));
+select t.expect('redact: the text is in no message and no log entry',
+  (select count(*) from public.thread_messages where body like '%4417-pelican%') || ' '
+  || (select count(*) from public.log where detail::text like '%4417%'),
+  '0 0');
+select t.expect('redact: logged by the owner, with the thread and the message',
+  (select (actor = t.id('ana'))::text || ' ' || coalesce(agent, '-') || ' ' || (detail ->> 'thread' = t.id('plan')::text)::text
+       || ' ' || (detail ->> 'message' = t.val('secret'))::text
+     from public.log where event = 'thread.redact' order by seq desc limit 1),
+  'true - true true');
+select t.expect('redact: once',
+  t.run('ana', t.redact_sql(t.val('secret'))), 'ERR 55000');
+select t.expect('redact: the thread still reads, the message in its place',
+  t.run('cal', format($q$select count(*) filter (where m -> 'body' = 'null'::jsonb) || ' of ' || count(*)
+    from jsonb_array_elements(public.read_thread(%L) -> 'messages') m$q$, t.id('plan'))),
+  '1 of 6');
+
 -- Membership doesn't touch the record ---------------------------------------
 
 select t.run('ana', format($q$select public.set_member(%L, %L, null)$q$, t.id('v1'), t.id('ben')));

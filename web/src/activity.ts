@@ -38,6 +38,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["thread.post", "Posted in a thread"],
   ["thread.resolve", "Resolved a thread"],
   ["thread.reopen", "Reopened a thread"],
+  ["thread.redact", "Redacted a message"],
   ["policy.set", "Changed a rule"],
   ["member.set", "Changed members"],
   ["member.leave", "Left the vault"],
