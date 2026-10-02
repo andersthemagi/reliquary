@@ -39,11 +39,11 @@ exception when others then
   return 'ERR ' || sqlstate;
 end $$;
 
-create function t.tok(p_name text) returns uuid language sql as
+create function t.pat_tok(p_name text) returns uuid language sql as
 $$ select id from public.access_tokens where name = p_name and kind = 'pat' $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
+create function t.run_pat_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
   select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
+    'act', jsonb_build_object('sub', t.pat_tok(p_tok), 'name', p_tok, 'tok', t.pat_tok(p_tok))), p_sql)
 $$;
 
 create table t.secret (name text primary key, token text);
@@ -51,7 +51,7 @@ insert into t.secret select 'ana-all', t.run('ana', $q$select public.create_acce
 insert into t.secret select 'ana-side-ro',
   t.run('ana', format($q$select public.create_access_token('ana-side-ro', 30, array[%L]::uuid[], 'read')$q$, t.id('side')));
 insert into t.secret select 'ana-revoked', t.run('ana', $q$select public.create_access_token('ana-revoked', 30, null, 'write')$q$);
-select t.run('ana', format($q$select public.revoke_access_token(%L)$q$, t.tok('ana-revoked')));
+select t.run('ana', format($q$select public.revoke_access_token(%L)$q$, t.pat_tok('ana-revoked')));
 create function t.hash(p_name text) returns text language sql as
 $$ select t.sha(token) from t.secret where name = p_name $$;
 
@@ -83,12 +83,12 @@ end $$;
 
 select t.expect('mcp begin: a personal token makes the rest of the transaction its person, through that token',
   t.begin_as(t.hash('ana-all'), null, 'select private.uid()::text || ''/'' || private.agent()'),
-  t.id('ana') || ',authenticated,' || t.tok('ana-all') || ',' || t.id('ana') || '/ana-all');
+  t.id('ana') || ',authenticated,' || t.pat_tok('ana-all') || ',' || t.id('ana') || '/ana-all');
 select t.expect('mcp begin: the token''s scope holds for the rest of the transaction',
   t.begin_as(t.hash('ana-side-ro'), null, format($q$select (select count(*) from public.files where vault_id = %L)
       || '/' || (select count(*) from public.files where vault_id = %L) || '/' || coalesce(private.role_in(%L), 'none')$q$,
     t.id('team'), t.id('side'), t.id('side'))),
-  t.id('ana') || ',authenticated,' || t.tok('ana-side-ro') || ',0/1/viewer');
+  t.id('ana') || ',authenticated,' || t.pat_tok('ana-side-ro') || ',0/1/viewer');
 select t.expect('mcp begin: an unknown, revoked or expired token sets nothing: no person, no role, no claims',
   t.begin_as(t.sha('rlq_nope')) || ';' || t.begin_as(t.hash('ana-revoked')) || ';'
   || t.begin_as(t.hash('ana-revoked'), null, 'select count(*) from public.files'),
@@ -181,7 +181,7 @@ $$;
 create function t.claims(p_user text, p_tok text default null) returns jsonb language sql as $$
   select jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated')
     || case when p_tok is null then '{}'::jsonb
-            else jsonb_build_object('act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))) end
+            else jsonb_build_object('act', jsonb_build_object('sub', t.pat_tok(p_tok), 'name', p_tok, 'tok', t.pat_tok(p_tok))) end
 $$;
 select t.expect('rls writable: the writable set equals role_in owner or editor: owner, editor, viewer, outsider in person',
   t.writable_matches(t.claims('ana')) || ',' || t.writable_matches(t.claims('ben')) || ',' ||
@@ -269,7 +269,7 @@ select t.expect('search: erased text leaves no stored words behind',
   '0,1');
 select t.expect('search: an outsider and a token scoped to another vault find nothing',
   t.run('dee', format($q$select count(*) from public.search(%L, 'workshop')$q$, t.id('find')))
-  || ',' || t.run_tok('ana', 'ana-team-rw', format($q$select count(*) from public.search(%L, 'workshop')$q$, t.id('find'))),
+  || ',' || t.run_pat_tok('ana', 'ana-team-rw', format($q$select count(*) from public.search(%L, 'workshop')$q$, t.id('find'))),
   '0,0');
 
 -- ---------------------------------------------------------------------------

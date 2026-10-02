@@ -21,13 +21,6 @@ select t.run('ana', format($q$select public.create_access_token('reach-rw', 30, 
 select t.run('ana', format($q$select public.create_access_token('reach-ro', 30, array[%L]::uuid[], 'read')$q$, t.id('reach')));
 select t.run('ana', format($q$select public.create_access_token('other-rw', 30, array[%L]::uuid[], 'write')$q$, t.id('elsewhere')));
 
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
-
 -- A fake sealed credential, the same marker convention links_test.sql uses:
 -- a "ciphertext" that is hex of 'CIPHERTEXT-MARKER-' || tag, so a test can
 -- prove exactly what comes back through begin_link_call.

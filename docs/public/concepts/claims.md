@@ -36,6 +36,12 @@ Only an owner sets a claim rule, in person, on the vault's **Rules** page. Setti
 
 In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
 
+You see a claim where you meet the file. When someone holds a claim on a file, the file page and the editor open with a banner: whose it is (a person, or "Name's agent" when an agent took it), how much longer it lasts, and the note they left. The note is only what someone typed. It's shown in quotes and never proves who holds the claim. A claim covers one path, so the banner appears on that file and nowhere else, and not at all once the claim has run out or been released. Viewers see it too.
+
+On the editor the banner also says what saving risks. Saving works, because a claim never blocks a write. But if the file changes before you save (the agent finishes first, say), Reliquary refuses your save and shows you the new version first, so nothing is overwritten by accident. On a canon file your change is a proposal, so the file stays as it is until people approve it.
+
+Owners and editors also get a **Break** button in the banner. It opens the same confirm page as the Claims section, and once you confirm it brings you back to the file. Nothing happens until you confirm. From the editor, Break leaves the page, so save or copy what you have typed first. A viewer sees the banner and no button. Only pages of the same vault are used to come back to: a link that tries to send you elsewhere ends up on the Claims section instead.
+
 ## Export, delete and erase
 
 Claims are state, not content: deleting a vault clears its claims along with everything else, and erasing a file's content releases any claim on it, since a claim on content that no longer exists means nothing. Neither is exported: see [Export, delete and erase](export-delete-erase.md).

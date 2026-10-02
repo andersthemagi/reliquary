@@ -14,29 +14,23 @@
 //   GET  /v/:id/claims               active claims, with Break for owners/editors (Settings, Diagnostics, Claims)
 //   GET  /v/:id/claims?break=<path>  confirm breaking the claim on path
 //   POST /v/:id/claims               action=break, path, confirm=1
+//
+// Both Break routes take an optional return=<page> (the file page's banner
+// sends one): where to go after, or on Cancel, in place of this page. Only
+// a page of this same vault is followed (claimbreak.ts returnTarget).
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { Refusal } from "./failure.js";
-import { confirmPage, emptyState, html, time, type Raw } from "./html.js";
 import { diagnosticsFrame, diagSection } from "./diagnostics.js";
+import { breakHref, returnTarget } from "./claimbreak.js";
+import { activeClaim, activeClaims, type Claim } from "./claimlookup.js";
+import { confirmPage, emptyState, html, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { settingsCrumb } from "./vaultadmin.js";
 import { canWrite, filePath, message, notFound, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 
 export const claimsPath = (id: string) => vaultPath(id, "/claims");
-
-type Claim = { path: string; holder: string; holder_label: string | null; expires_at: Date };
-
-async function loadClaims(c: pg.PoolClient, id: string): Promise<Claim[]> {
-  return (
-    await c.query(
-      `select path, holder, holder_label, expires_at from public.path_claims
-        where vault_id = $1 and expires_at > now() order by path`,
-      [id],
-    )
-  ).rows;
-}
 
 // A path typed into a URL, said back only when it's plain (as rules.ts and pathowners.ts do).
 const shown = (path: string) => (/^[^\u0000-\u001f\u007f]{1,200}$/.test(path) ? path : "that path");
@@ -82,7 +76,7 @@ export async function claims(ctx: Ctx, id: string): Promise<Reply> {
   const breakPath = ctx.url.searchParams.get("break");
   if (breakPath !== null) return confirmBreak(ctx, id, breakPath);
   return build(ctx, id, async (c, v) => {
-    const rows = await loadClaims(c, id);
+    const rows = await activeClaims(c, id);
     const body = html`
       ${diagSection("Claims", "Who’s working which path, and for how much longer. A claim is a courtesy signal, not an access gate: it never blocks a write.")}
       ${rows.length ? claimsTable(ctx, id, v, rows) : emptyState({ title: "No active claims", body: "Nobody is claiming a path right now." })}
@@ -97,9 +91,11 @@ export async function claims(ctx: Ctx, id: string): Promise<Reply> {
 async function confirmBreak(ctx: Ctx, id: string, path: string): Promise<Reply> {
   return build(ctx, id, async (c, v) => {
     const back = claimsPath(id);
-    if (!canWrite(v)) return { back, note: "Only an owner or editor breaks a claim.", tone: "warning" };
-    const claim = (await loadClaims(c, id)).find((r) => r.path === path);
-    if (!claim) return { back, note: `There’s no active claim on ${shown(path)} to break; it may have been released or expired already.`, tone: "warning" };
+    const ret = returnTarget(id, ctx.url.searchParams.get("return"));
+    const to = ret ?? back;
+    if (!canWrite(v)) return { back: to, note: "Only an owner or editor breaks a claim.", tone: "warning" };
+    const claim = await activeClaim(c, id, path);
+    if (!claim) return { back: to, note: `There’s no active claim on ${shown(path)} to break; it may have been released or expired already.`, tone: "warning" };
     const holder = who(ctx, claim.holder, null);
     const body = confirmPage({
       title: `Break the claim on ${path}?`,
@@ -108,9 +104,9 @@ async function confirmBreak(ctx: Ctx, id: string, path: string): Promise<Reply> 
       consequences: ["Nothing about the file itself changes: a claim is a courtesy signal, not an access gate.", "It’s logged in Activity."],
       action: claimsPath(id),
       csrf: ctx.csrf,
-      fields: { path, action: "break", confirm: "1" },
+      fields: { path, action: "break", confirm: "1", ...(ret ? { return: ret } : {}) },
       button: `Break the claim on ${path}`,
-      cancel: back,
+      cancel: to,
     });
     return { body, title: "Break a claim" };
   });
@@ -127,12 +123,14 @@ export async function claimAction(ctx: Ctx, id: string): Promise<Reply> {
   const path = ctx.form.get("path") ?? "";
   const action = ctx.form.get("action") ?? "";
   const back = claimsPath(id);
+  const ret = returnTarget(id, ctx.form.get("return"));
+  const to = ret ?? back;
   if (action !== "break") {
     ctx.setFlash(refuse("The form didn’t say what to do, so nothing changed"));
-    return { redirect: back };
+    return { redirect: to };
   }
   // Only the confirm page's form carries this: anything else is sent there.
-  if (ctx.form.get("confirm") !== "1") return { redirect: `${back}?break=${encodeURIComponent(path)}` };
+  if (ctx.form.get("confirm") !== "1") return { redirect: breakHref(id, path, ret ?? undefined) };
   try {
     const done = await asPerson(ctx.userId, async (c) => {
       if (!(await vault(c, ctx, id))) return null;
@@ -144,5 +142,5 @@ export async function claimAction(ctx: Ctx, id: string): Promise<Reply> {
   } catch (err) {
     ctx.setFlash(message(err));
   }
-  return { redirect: back };
+  return { redirect: to };
 }

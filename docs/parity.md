@@ -18,6 +18,35 @@ still be refused.
 doesn't name in its MCP column, or if the column names a tool that no longer
 exists.
 
+## What the table does not say
+
+The table answers "may they?": what a person and an agent can each do, and
+where the ceiling or a gap stops one side. It does not answer "would a
+person want it?". A capability can exist on both sides and still belong to
+one audience. Flags, claims and the full activity log are logging for
+diagnosing a problem. The web UI mirrored them because this table asks for
+every action on both surfaces, and the vault sidebar listed them right
+after Proposals (docs/design.md, "Who each surface is for").
+
+So each surface is also classed by who it is for. This changes nothing the
+table requires. It changes where the web UI puts the page.
+
+- **person**: something a person reads or acts on. It leads the primary
+  navigation and a page's default view.
+- **agent**: a mechanism for agents. A person rarely needs to see it.
+- **diagnostic**: logging a person opens to find out what went wrong. One
+  click away under Diagnostics, never deleted.
+
+| Surface | Class | Note |
+|---|---|---|
+| Tasks (a plan's steps) | person | The web UI says task. Agents work the same steps over MCP, where the names stay `work_plan` and `step` |
+| Threads | person | Conversation inside one vault, opened and posted to by people and by their agents |
+| Changes (content events) | person | The plain-language half of Activity |
+| Inbox | person | What waits on you. Person-only already, in the table below |
+| Activity (the full log) | diagnostic | `/v/:v/activity` keeps resolving |
+| Flags | agent | How an agent learns something on its next tool call. Its web page is diagnostic, and `/v/:v/flags` keeps resolving |
+| Claims | agent | An agent's own coordination signal, in the table below. Its web table, with Break, is diagnostic, and `/v/:v/claims` keeps resolving |
+
 ## The table
 
 Routes: `:v` is a vault id, `:p` a proposal id. "Both" means a person in the
