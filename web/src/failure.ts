@@ -176,6 +176,7 @@ const OWN_CODES: Record<string, string> = {
   RLW01: "step already claimed",
   RLW02: "step not available",
   RLW03: "stale step claim",
+  RLW04: "step claim past its hold limit",
 };
 
 export function sqlstateName(code: string, message = ""): string {
@@ -208,10 +209,12 @@ export function sqlstateStatus(code: string): number {
   // (connection or person cap, the hold limit) is 403.
   if (code === "RLC01" || code === "RLC02") return 409;
   if (code === "RLC03" || code === "RLC04") return 403;
-  // Work plan steps (20261002200000_work_plans.sql): the same split as path
-  // claims above -- a conflict (already claimed, not currently claimable, or
-  // a stale fence/secret/connection) is 409.
+  // Work plan steps (20261002200000_work_plans.sql, 20261002210000_
+  // work_plan_checkin.sql): the same split as path claims above -- a
+  // conflict (already claimed, not currently claimable, or a stale
+  // fence/secret/connection) is 409; the hold limit is 403.
   if (code === "RLW01" || code === "RLW02" || code === "RLW03") return 409;
+  if (code === "RLW04") return 403;
   if (code === "57014" || code === "55P03") return 504;
   if (code === "40001" || code === "40P01") return 503;
   if (code === "25006") return 503;
