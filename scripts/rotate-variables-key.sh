@@ -33,8 +33,8 @@ case $arg in
   *) echo "usage: scripts/rotate-variables-key.sh [--check]"; exit 2 ;;
 esac
 
-src=${ROTATE_ENV_FILE:-supabase/.vercel-web.env} # ROTATE_ENV_FILE: tests
-ops=${ROTATE_OPS_PASSWORD_FILE:-supabase/.ops-db-password}
+src=supabase/.vercel-web.env
+ops=supabase/.ops-db-password
 if [[ ! -s $src ]]; then
   echo "No $src: run scripts/vercel-env.sh web <web-origin> <mcp-origin> first."
   exit 2
