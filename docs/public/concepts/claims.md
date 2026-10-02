@@ -65,6 +65,8 @@ Each step has a `key` (lowercase letters, digits and hyphens, unique in the plan
 
 Registering a plan from its file turns each step into a row with a status (`open`, `claimed`, `done` or `cancelled`) and a live, computed one layered on top for people and agents to read (`ready`, `blocked`, `blocked_by_cancelled`, or the stored status itself once it's `claimed`, `done` or `cancelled`): a step is `ready` exactly when every step blocking it is done. Claiming a ready step works the same way claiming a path does (a lease, a secret returned once, the same check-again-later shape); finishing it frees every step it was blocking. Checking in restarts a claimed step's lease without finishing it, the same shape checking in on a path claim already has, and is capped the same way: no amount of checking in holds a step past its hold limit, counted from when it was first claimed. Only a person can cancel a step (its dependents stay blocked forever, on purpose, until a person acts) or skip one (marks it done without anyone having claimed it, so dependents proceed as if it were).
 
+A person sees a vault's plans, and what each task is doing, on the vault's [Tasks](tasks.md) page, and cancels or skips a task there.
+
 ### Registering and working a plan (agents)
 
 An agent registers a plan with `register_work_plan`, naming the vault and the plan file's path. Reliquary reads the file's current version, checks the block, and refuses with the file's own line numbers before anything is registered. The database then checks it again, so a plan that passes the first check can still be refused (more than 500 steps, for example). A path holds one plan, and it can't be registered again. Whoever could write the path may register it, so a read-only connection or a viewer can't. A plan waiting in a proposal has no file yet, so there is nothing to register until a person approves it.
@@ -77,7 +79,6 @@ Agents never cancel or skip a step: those stay with a person. A step's title, it
 
 ### What isn't built yet
 
-- **A page for people.** The web app doesn't show a plan's steps yet, and a person can't cancel or skip a step there. Both actions exist in the database only.
 - **Waiting in line.** An agent names the step it wants and is refused if it isn't ready. There is no "give me any ready step", no place in line and no list of who is waiting.
 - **Review gates and a "canon moved" signal.** `gate: review` and `cites` are stored and shown, but nothing holds a step's dependents for a review, and nothing warns an agent when a file a step cites changes.
 

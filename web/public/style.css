@@ -1119,6 +1119,20 @@ form.confirm .actions:first-child { margin-top: 0; }
   .table-stack tr:hover > td { background: transparent; }
 }
 
+/* Tasks (tasks.ts): every group's table has the same columns, and a badge
+   keeps its own width in a stacked row. */
+.task-table { table-layout: fixed; }
+.task-table th:nth-child(1) { width: 30%; }
+.task-table th:nth-child(2) { width: 20%; }
+.task-table td .badge, .plan-table td .badge { justify-self: start; white-space: normal; padding-block: 2px; }
+@media (max-width: 640px) { .task-table { table-layout: auto; } }
+/* Cancel and Skip stack in a narrow column beside the details. */
+@media (min-width: 641px) {
+  .task-table th:nth-child(4) { width: 6.5rem; }
+  .task-table td.row-actions .button { display: flex; justify-content: center; }
+  .task-table td.row-actions .button + .button { margin-top: var(--space-2); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
