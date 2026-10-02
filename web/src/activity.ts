@@ -178,9 +178,10 @@ export function parseFilters(p: URLSearchParams): Filters {
   return f;
 }
 
-export type Scope = { vaultId?: string; file?: string };
+// `events` narrows to those event names (the Changes feed asks for CONTENT_EVENTS).
+export type Scope = { vaultId?: string; file?: string; events?: readonly string[] };
 
-type Row = {
+export type Row = {
   seq: string;
   vault_id: string;
   vault: string;
@@ -219,6 +220,7 @@ export async function queryActivity(
   const vaultId = scope.vaultId ?? f.vault;
   if (vaultId) add("l.vault_id = $?::uuid", vaultId);
   if (scope.file) add("l.path = $?", scope.file);
+  if (scope.events) add("l.event = any($?::text[])", [...scope.events]);
   if (f.who) add("l.actor = $?::uuid", f.who);
   if (f.agent === "people") where.push("l.agent is null");
   else if (f.agent === "agents") where.push("l.agent is not null");

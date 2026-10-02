@@ -49,7 +49,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "activity" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
+export type Section = "files" | "proposals" | "activity" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // One round trip: the live files, every folder above them, each one's

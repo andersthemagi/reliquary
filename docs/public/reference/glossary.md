@@ -14,6 +14,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Ceiling.** The actions no agent can do, however its person connected it: approving, rules, path owners, members, grants, secret values, links, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
 
+**Changes.** A vault's plain-language list of what people and their agents changed: files written, deleted and erased, and proposals opened and decided. Newest first, by day. See [Changes and the log](../concepts/activity.md#changes).
+
 **Connection.** Anything that can act as you. It has a type: **Token**, **App** or **Reliquary CLI**. All are listed on the **Connections** page (the account menu), where you revoke them. See [Connections](../concepts/connections.md).
 
 **Data fencing.** Wrapping text people and agents wrote in random markers when it goes to an agent, so it reads as data and can't pose as instructions. See [MCP tools](mcp-tools.md#data-fencing).
