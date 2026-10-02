@@ -9,36 +9,18 @@
 // check the server logs, and may be in no CLI output.
 
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import os from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
+import { createHarness } from "./e2e-helpers.mjs";
 
 const WEB = process.env.WEB_URL ?? "http://127.0.0.1:8796";
 const WEB_BUILD = process.env.WEB_BUILD ?? "/work/web";
 const CARA = process.env.CARA ?? "00000000-0000-0000-0000-0000000000c1";
 const DAN = "00000000-0000-0000-0000-0000000000d1";
-const CLI = path.resolve("dist/cli.js");
-const pg = createRequire(path.join(WEB_BUILD, "package.json"))("pg");
 
-const secrets = new Set();
-function record(...xs) {
-  for (const x of xs) {
-    if (typeof x !== "string" || x.length < 8 || secrets.has(x)) continue;
-    secrets.add(x);
-    appendFileSync(process.env.SECRETS_FILE ?? "/tmp/cli-test-secrets", `${x}\n`);
-  }
-}
-const value = (label) => {
-  const v = `PUSHVAL-${label}-${randomBytes(6).toString("hex")}`;
-  record(v);
-  return v;
-};
-const tmp = (prefix) => mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+const { record, value, tmp, as, start, cli, waitFor, assertClean, csrfOf, page: pageWith, outputs } = createHarness("PUSHVAL");
 
 let vars;
 let cookie = "";
@@ -46,61 +28,8 @@ let team = "";
 let dans = "";
 let pusher = ""; // a config dir signed in with pushing allowed
 let reader = ""; // one signed in without it
-const outputs = [];
 
-async function as(user, q, params = []) {
-  const db = new pg.Client({ connectionString: process.env.PG_URL });
-  await db.connect();
-  try {
-    await db.query("begin");
-    if (user) {
-      await db.query("set local role authenticated");
-      await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: user, role: "authenticated" })]);
-    }
-    const { rows } = await db.query(q, params);
-    await db.query("commit");
-    return rows;
-  } finally {
-    await db.end();
-  }
-}
-
-function start(args, { config, cwd } = {}) {
-  const env = { ...process.env, RELIQUARY_CONFIG_DIR: config ?? tmp("cfg"), RELIQUARY_NO_BROWSER: "1", RELIQUARY_URL: WEB };
-  for (const k of ["VARIABLES_KEY", "PG_URL", "WEB_DB_URL", "DATABASE_URL"]) delete env[k];
-  const child = spawn(process.execPath, [CLI, ...args], { cwd: cwd ?? tmp("cwd"), env, stdio: ["ignore", "pipe", "pipe"] });
-  const r = { child, stdout: "", stderr: "" };
-  child.stdout.on("data", (d) => (r.stdout += d));
-  child.stderr.on("data", (d) => (r.stderr += d));
-  r.done = new Promise((resolve) =>
-    child.on("close", (code) => {
-      outputs.push(r.stdout, r.stderr);
-      resolve({ code, stdout: r.stdout, stderr: r.stderr });
-    }),
-  );
-  return r;
-}
-const cli = (args, opts) => start(args, opts).done;
-
-async function waitFor(r, stream, re, ms = 15000) {
-  const until = Date.now() + ms;
-  for (;;) {
-    const m = re.exec(r[stream]);
-    if (m) return m;
-    if (Date.now() > until) throw new Error(`timed out waiting for ${re} in ${stream}: ${r[stream]}`);
-    await new Promise((res) => setTimeout(res, 50));
-  }
-}
-
-function assertClean(...texts) {
-  for (const t of texts) {
-    assert.doesNotMatch(t, /PUSHVAL|SEKRIT|rl[ecrq]_[0-9a-f]{8}/, "a value or token in CLI output");
-    for (const s of secrets) assert.ok(!t.includes(s), "a recorded secret in CLI output");
-  }
-}
-
-const csrfOf = (h) => /name="csrf" value="([0-9a-f]+)"/.exec(h)[1];
-const page = (p) => fetch(new URL(p, WEB), { headers: { cookie }, redirect: "manual" });
+const page = (p) => pageWith(p, cookie);
 
 // `reliquary login`, with the browser's part (Cara's consent) done here.
 // `push` is the consent page's "also let it send .env files" box.
