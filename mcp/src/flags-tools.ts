@@ -153,6 +153,7 @@ export function registerFlagsTools(
             `${r.more ? " (more waiting; call again after advancing)" : ""}:`,
           summary(),
           ...lines,
+          ...(r.flags.some((f) => f.thread_id) ? ["read_thread shows a thread's messages, quoted as data."] : []),
           `through: ${r.through}`,
           "Call advance_flags(vault, through) once these are shown to your person.",
         ];

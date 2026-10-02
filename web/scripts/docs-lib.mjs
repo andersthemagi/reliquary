@@ -96,6 +96,12 @@ const ARGUMENT_WORDS = {
   from_line: "First line to return, counting from 1",
   to_line: "Last line to return",
   max_bytes: "At most this many bytes of text (default 100000)",
+  thread_id: "The thread's id, from `list_threads` or a flag",
+  title: "The thread's title, on one line",
+  message: "The text, as plain text",
+  to: "Member ids to address a side thread to; leave it out for the whole vault",
+  all: "`true` to add the side threads addressed to others",
+  before: "The `before` value the last page named, for older threads",
 };
 
 // The MCP tools reference, from mcp/test/contract.snapshot.json (what the
