@@ -25,6 +25,7 @@ import { pendingPushes } from "./variables.js";
 import { linksRoutes } from "./linkspage.js";
 import { linkGrantsRoutes } from "./linkgrants.js";
 import { claimAction, claims } from "./claimspage.js";
+import { plan, tasks } from "./tasks.js";
 import { setClaimRuleAction } from "./claimrulespage.js";
 import { flags } from "./flagspage.js";
 import { adminRoutes } from "./vaultadmin.js";
@@ -609,6 +610,8 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && rest === "/flags") return flags(ctx, id);
   if (get && rest === "/claims") return claims(ctx, id);
   if (!get && rest === "/claims") return claimAction(ctx, id);
+  if (get && rest === "/tasks") return tasks(ctx, id);
+  if (get && rest === "/tasks/plan") return plan(ctx, id);
   const lm = /^\/links\/([^/]+)\/grants$/.exec(rest);
   if (lm) return linkGrantsRoutes(ctx, id, lm[1]);
   if (rest === "/config" || rest.startsWith("/config/") || rest === "/erase") return adminRoutes(ctx, id, rest);

@@ -240,7 +240,7 @@
   docs: concepts/claims
 
 - title: Work plans
-  summary: Steps with dependencies in a plan file, so no agent is handed a step before the ones blocking it are done. The database can register, claim and complete one; no MCP tool or web page reaches it yet.
+  summary: Steps with dependencies in a plan file, so no agent gets a step before the ones blocking it are done. People see plans on the Tasks page; no MCP tool reaches them yet.
   status: in-progress
   docs: concepts/claims
 

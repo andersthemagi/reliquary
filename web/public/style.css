@@ -1119,6 +1119,14 @@ form.confirm .actions:first-child { margin-top: 0; }
   .table-stack tr:hover > td { background: transparent; }
 }
 
+/* Tasks (tasks.ts): every group's table has the same columns, and a state
+   badge keeps its own width in a stacked row. */
+.task-table { table-layout: fixed; }
+.task-table th:nth-child(1) { width: 34%; }
+.task-table th:nth-child(2) { width: 26%; }
+.task-table td .badge { justify-self: start; white-space: normal; padding-block: 2px; }
+@media (max-width: 640px) { .task-table { table-layout: auto; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
