@@ -109,8 +109,8 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   const tm = /^\/threads\/([^/]+)(?:\/([a-z]+))?$/.exec(rest);
   if (tm) {
     const thread = `thread ${short(tm[1])} in ${vault}`;
-    if (get) return say(`Opening ${thread}`);
-    const did: Record<string, string> = { post: "Posting in", resolve: "Resolving", reopen: "Reopening" };
+    if (get) return say(url.searchParams.has("redact") ? `Opening the redact page of ${thread}` : `Opening ${thread}`);
+    const did: Record<string, string> = { post: "Posting in", resolve: "Resolving", reopen: "Reopening", redact: "Redacting a message in" };
     if (tm[2] && did[tm[2]]) return say(`${did[tm[2]]} ${thread}`);
   }
   if (rest === "/activity" || rest === "/log") return say(`Opening the activity of ${vault}`);

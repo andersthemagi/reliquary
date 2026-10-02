@@ -86,6 +86,8 @@ Erasing a file doesn't touch the threads about it. If a thread holds text that m
 
 If someone pastes something into a thread that shouldn't be there, like a password, an owner of the vault can redact that message. Its text is removed for good. The message keeps its place, who wrote it and when, and says which owner redacted it and when. The vault's [Activity](activity.md) records the redaction, never the text.
 
+In the web app, an owner sees **Redact…** beside each message that still has its text. It opens a page that says what will happen and changes nothing until you select **Redact message**. Everyone then sees, in place of the text, who redacted the message and when.
+
 Only an owner redacts, in person: no agent can, not even an owner's own. Only a message's text can be redacted, not a thread's title, so keep secrets out of titles too. Redacting doesn't take back what someone already read.
 
 **Secrets belong in variables, never in a thread.** Put a password, key or token in the vault's [environment variables](variables.md) instead: the CLI delivers it to your programs, and never to a model.

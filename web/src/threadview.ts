@@ -28,7 +28,7 @@ type Message = { id: string; author: string; agent: string | null; at: Date; bod
 
 // The thread, only when it is in the vault the address names: a thread id
 // from another vault is Not found here even to someone who is in both.
-async function threadIn(c: pg.PoolClient, id: string, tid: string): Promise<ThreadRow | undefined> {
+export async function threadIn(c: pg.PoolClient, id: string, tid: string): Promise<ThreadRow | undefined> {
   if (!UUID.test(tid)) return undefined;
   const { rows } = await c.query(`select ${THREAD_COLS} from public.thread_summaries s where s.vault_id = $1 and s.id = $2`, [id, tid]);
   return rows[0];
@@ -43,9 +43,13 @@ async function messagesOf(c: pg.PoolClient, id: string, tid: string, after: stri
   return { rows: rows.slice(0, PAGE), more: rows.length > PAGE };
 }
 
-function messageItem(ctx: Ctx, m: Message, links: Map<string, string>): Raw {
+function messageItem(ctx: Ctx, id: string, tid: string, m: Message, links: Map<string, string>, owner: boolean): Raw {
+  const redact =
+    owner && m.body !== null
+      ? html` · <a href="${threadPath(id, tid, `?redact=${m.id}`)}" aria-label="Redact the message from ${who(ctx, m.author, m.agent)}">Redact…</a>`
+      : "";
   return html`<li id="message-${m.id}"${m.agent ? html` class="by-agent"` : ""}>
-    <p class="small muted">${who(ctx, m.author, m.agent)} · ${time(m.at)}</p>
+    <p class="small muted">${who(ctx, m.author, m.agent)} · ${time(m.at)}${redact}</p>
     ${m.body !== null
       ? html`<p>${citedText(m.body, links)}</p>`
       : html`<p class="muted small redacted">Redacted by ${who(ctx, m.redacted_by, null)} ${time(m.redacted_at)}. The text was removed for everyone, agents included.</p>`}
@@ -105,7 +109,7 @@ export async function threadView(ctx: Ctx, id: string, tid: string, refused?: Re
       <section class="discussion" aria-labelledby="messages">
         <h2 id="messages">Messages</h2>
         ${after ? html`<p class="small"><a href="${threadPath(id, tid)}">From the first message</a></p>` : ""}
-        <ol class="notes thread">${rows.map((m) => messageItem(ctx, m, links))}</ol>
+        <ol class="notes thread">${rows.map((m) => messageItem(ctx, id, tid, m, links, v.role === "owner"))}</ol>
         ${more
           ? html`<p class="small"><a href="${threadPath(id, tid, `?after=${rows[rows.length - 1].id}`)}">Later messages</a></p>`
           : html`<h2 id="reply">Reply</h2>${replyForm(ctx, id, t, v, refused?.body ?? "")}`}
