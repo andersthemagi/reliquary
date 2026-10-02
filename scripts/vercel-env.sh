@@ -73,7 +73,7 @@ source scripts/lib/supabase-env.sh
 web=${web%/}; mcp=${mcp%/}
 
 pw() { tr -d '[:space:]' < "supabase/.$1-db-password"; }
-enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read(),safe=""))'; }
+enc() { jq -rn --arg v "$(cat)" '$v|@uri'; }
 
 # Shared by both projects (mcp/'s own calls to the web app's internal
 # link-call endpoint, linkproxy.ts): made once, the same value goes in
