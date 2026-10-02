@@ -786,9 +786,10 @@ maintainer, via a comment on #58) rather than guessed.
 
 ## Threads
 
-Written 2026-10-02 (owner's decision). Settled shape, nothing built. A
-thread is where people and their agents talk about the work. A vault has
-no such place today: a proposal's comments exist only on that proposal,
+Written 2026-10-02 (owner's decision). Settled shape. The database side is
+written in #126 and the points below follow it; the MCP tools and the web
+page are not built. A thread is where people and their agents talk about
+the work. A vault had no such place: a proposal's comments exist only on that proposal,
 and notes addressed `to:` someone are not built
 ([Notifications](#notifications)). Ten points, each with the reason it was
 decided that way. "Task" below is a work plan's step as people see it
@@ -796,9 +797,11 @@ decided that way. "Task" below is a work plan's step as people see it
 
 ### 1. What a thread is
 
-A conversation inside one vault: a title, an optional anchor (a file
-path, a task or a proposal) and messages in order. People open threads and
-post to them, and so do their agents. Each message is attributed to the
+A conversation inside one vault: a title, an optional anchor and messages
+in order. The anchor is one thing at most: a file path (the file need not
+exist yet), a task or a proposal, the last two in this vault. A task
+anchor is the plan step's id. People open threads and post to them, and so
+do their agents. Each message is attributed to the
 person and, where one acted, the agent, the same attribution every other
 write carries. A thread never spans vaults.
 
@@ -818,26 +821,36 @@ line: read the vault, read its threads.
 
 ### 3. Side threads
 
-A thread may be addressed to specific members. Addressing controls only
+A thread may be addressed to specific members, up to 20, viewers included.
+Who it is addressed to is fixed when it opens. Addressing controls only
 who is notified, never who can read. A thread with no addressees is
 vault-wide: every member's connections are flagged about it. A thread
 addressed to some members flags only them. A side thread stays listed and
-readable, with a visible marker. The default listing for an agent is the
-vault-wide threads plus the threads addressed to the caller, and an option
-includes the rest. An agent doing active work need not watch side threads.
-When it needs one, the content is there to parse.
+readable, with a visible marker. The default listing is the vault-wide
+threads, the threads addressed to the caller's person and the threads that
+person opened, and an option adds the rest. An agent doing active work
+need not watch side threads. When it needs one, the content is there to
+parse.
 
 Why: not every conversation concerns every agent, and a flag is what
 interrupts one. Addressing narrows who is interrupted. If it also narrowed
 who can read, it would be item 2's private thread under another name.
+The addressees are fixed because a thread changes only by being resolved
+or reopened, so what the log and every flag said about who was told stays
+true. Past 20, the whole vault is the better audience. A viewer can be an
+addressee: they can read a thread and be told about it, though not post.
 
 ### 4. Who may post
 
 Owners and editors post. An agent posts as its person and needs a
-read-write connection. Viewers read, and so do read-only connections.
+read-write connection. Viewers read, and so do read-only connections. The
+same people resolve a thread and reopen it, and a resolved thread refuses
+new posts until it is reopened.
 
 Why: it is the rule for comments on proposals, so there is one split to
-learn, and a read-only connection cannot write anything anyway.
+learn, and a read-only connection cannot write anything anyway. Resolving
+and reopening are reversible and logged, so neither sits behind the
+ceiling.
 
 ### 5. Messages are data
 
@@ -876,6 +889,15 @@ Direct messages and cross-vault threads are the private and cross-vault
 channels items 1 and 2 rule out. The rest is principle 9: the smallest
 version that holds the guarantees.
 
+The log records `thread.open`, `thread.post`, `thread.resolve`,
+`thread.reopen` and `thread.redact` with the thread's id and, where there
+is one, the message's. It never carries a title, a message's text, an
+anchor's path or a proposal's id. `list_flags` flags a log row's path to
+whoever watches it and its proposal to that proposal's author, so a row
+that carried either would tell people about a side thread not addressed to
+them. The flag category for threads keys on the row's `detail.thread`
+instead.
+
 ### 7. Redaction
 
 A person can paste a secret into a thread, and append-only collides with
@@ -884,17 +906,19 @@ message: its body is blanked and a log event records it. This is how
 `erase_file` treats content. Messages are insert-only like
 `file_versions` and `proposal_notes`, except for one operation that blanks
 the text and stamps the row, and a trigger refuses any other change.
-`delete_vault` stays the one path that deletes them
-([AGENTS.md](../AGENTS.md), Guardrails: a new append-only table lets that
-path through, and nothing else). The docs warn that secrets belong in
+`delete_vault` stays the only path that deletes them. The redacted message
+keeps its place, author, agent and time, and says which owner redacted it
+and when. Only a message's body can be redacted, never a thread's title,
+so secrets stay out of titles too. The docs warn that secrets belong in
 variables, never in a thread, and that redaction cannot take back what an
 agent or an export already read.
 
 Why: the log holds no content ([Privacy, erasure and
 compliance](#privacy-erasure-and-compliance)), so a message's text lives
-in one row and blanking it removes it. A thread's log events point at
-messages and never carry their text. Redaction is a person's alone for the
-reason erasing a file is: it destroys content and cannot be undone.
+in one row and blanking it removes it. A thread's log events, `thread.redact`
+included, point at messages and never carry their text. Redaction is an
+owner's, in person, for the reason erasing a file is: it destroys content
+and cannot be undone. No agent redacts, an owner's own included.
 
 ### 8. Limits
 
@@ -906,9 +930,15 @@ rate-limit bucket of its own for thread calls (`mcp/src/ratelimit.ts`),
 next to the general per-token limit.
 
 Starting points, not measurements: a message of at most 4,000 characters,
-the same as a proposal comment (`REASON` in `mcp/src/tools-shared.ts`),
-and a title of at most 200 characters, the same as a step's. The two
-per-vault counts and the bucket's size have no number yet (see below).
+the same as a proposal comment (`REASON` in `mcp/src/tools-shared.ts`); a
+title of at most 200 characters, the same as a step's; 1,000 threads and
+10,000 messages in a vault, a redacted message counting like any other;
+and 20 addressees. The posting bucket's size has no number yet.
+
+Threads and messages are never deleted, so a vault at a limit stays at
+it. Only the operator raises the number; the refusal says so and points at
+**Ask for a bigger plan**, on **Plan and usage**. Nothing a member does
+makes room.
 
 Why: an agent calling a tool in a loop is what item 8 of [Claims and work
 plans](#claims-and-work-plans) bounds for `request_work`, and the same two
@@ -917,13 +947,20 @@ MCP server enforces. No new mechanism.
 
 ### 9. References
 
-A thread can be anchored to a task. A message can cite a task or a file in
-plain text, and the web UI turns the citation into a link. A citation is
-stored as the text typed. Nothing on the server parses it into authority.
+A thread can be anchored to a task, a path or a proposal (item 1). A
+message can cite them in plain text with three tokens:
+`task:<plan file path>#<step key>`, `file:<path>` and
+`proposal:<proposal id>`. A citation is stored as the text typed. The web
+page links a token only when its target exists in this vault; any other
+token stays text. Nothing on the server parses a citation into authority.
+Erasing a file leaves the threads about it alone, since a path anchor is
+only a path.
 
 Why: a citation that confers nothing needs no validation, and one that
 doesn't resolve is just text. It is item 5's reason again: words in a
-thread point at things, and never act on them.
+thread point at things, and never act on them. A citation names a task by
+what a person can read, the plan's path and the step's key, where the
+anchor holds the step's id.
 
 ### 10. Export and deletion
 
@@ -939,10 +976,9 @@ erasure, so nothing of a vault is left behind or kept out of its export.
 
 ### What this doesn't settle
 
-- **Limit numbers.** Threads per vault, messages per vault and the posting
-  bucket's size have none. The 4,000 and 200 above are starting points by
-  analogy. Whether message text counts toward a vault's storage is open
-  (comments and review notes don't today).
+- **Limit numbers.** Every number in item 8 is a starting point, and the
+  posting bucket's size has none. Whether message text counts toward a
+  vault's storage is open (comments and review notes don't today).
 - **The export format.** Where threads sit in the archive, and how an
   anchor to a task reads there, since tasks are not exported. Also whether
   threads reach the export in the same change as the feature. Today's
@@ -951,9 +987,8 @@ erasure, so nothing of a vault is left behind or kept out of its export.
   so adding threads means changing that function and its hostile tests,
   and may be a change of its own. Until the export carries threads, the
   docs for Threads say that it does not.
-- **Redaction mechanics.** What a redacted message shows (a marker, who
-  redacted it, when), whether an author may redact their own message, and
-  what becomes of a copy someone quoted into another message.
+- **Redaction of copies.** What becomes of a redacted message's text when
+  someone quoted it into another message.
 - **Unread markers.** Whether people get one.
 - **How a person is told.** Flags reach connections. How a person learns
   that a thread is addressed to them, or that a vault-wide one opened, is
@@ -961,11 +996,9 @@ erasure, so nothing of a vault is left behind or kept out of its export.
 - **Fit with Notifications.** A thread addressed to you reads like direct
   address, a category written for `to:` notes. Whether those notes stay,
   and how a vault-wide thread's flag fits the four categories, is open.
-- **Left to the build.** The citation syntax; whether addressees can change
-  after a thread opens; what an anchor does when its file is deleted or its
-  plan is registered again; whether a thread can be closed; and whether a
-  viewer who is the named owner of an anchored path may post, as they may
-  comment on a proposal for that path
+- **Left to the build.** What an anchor does when its plan is registered
+  again, and whether a viewer who is the named owner of an anchored path
+  may post, as they may comment on a proposal for that path
   ([path ownership](public/concepts/path-ownership.md)).
 
 ## Links
@@ -1459,7 +1492,9 @@ New in v3:
   hidden from a member it isn't addressed to (it must stay readable to
   all), or a flag about one reaching a member it isn't addressed to; a
   vault-wide thread that skips a member's connection when flagging; a
-  post past a limit going through, or a refusal that changes anything; a
+  post in a resolved thread going through; an addressee, an anchor or a
+  title changed after a thread opens; an anchor in another vault; a post
+  past a limit going through, or a refusal that changes anything; a
   vault's deletion leaving a thread or a message behind.
 
 ## Build order

@@ -478,8 +478,7 @@ deliberate, logged exception to "work on the current milestone only", the
 same kind as path ownership and flags (2026-09-28) and compare-and-swap
 writes, claims and work plans (2026-09-30, tracking issue #52). It has no
 tracking issue of its own yet. Three parts, each its own set of small pull
-requests. Nothing is built as this entry is written; each pull request
-adds its own line here.
+requests. Each pull request that builds a part adds its own line here.
 
 - **The audience split in the web UI.** What a person reads or acts on
   leads the primary navigation and each page's default view. Activity,
@@ -494,7 +493,8 @@ adds its own line here.
   never who can read, messages are data under the same ceiling, delivery
   to agents by flags only (no push, no real time), redaction by an owner in
   person, limits, and a place in the export. Settled in docs/design.md
-  ("Threads"), with what it leaves open listed there.
+  ("Threads"), with what it leaves open listed there. The database side
+  is #126; the MCP tools and the web page come after it.
 - **The Tasks view and the MCP step tools.** A page where a person sees and
   steers the steps agents are working, shown as tasks, and MCP tools over
   the step functions the database already has (`register_work_plan`,
