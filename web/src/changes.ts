@@ -13,16 +13,37 @@
 // 4 times"), so an agent saving a file in a loop doesn't bury everything
 // else. A page holds PAGE_LINES lines, not events, so a run is never cut at
 // a page's edge unless it is longer than CAP events.
+//
+// Three views, chosen with ?show=: everyone's changes, the reader's own (made
+// by them or their agents: the log's actor is the person either way), or the
+// changes on paths the reader watches (watchrule.ts; public.subscriptions
+// under its own RLS, so only their own watches count). Each is the same read
+// with one more condition, and none of them touches a flag watermark.
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { CONTENT_EVENTS, queryActivity, type Row } from "./activity.js";
-import { emptyState, html, pageHeader, time, type Raw } from "./html.js";
+import { emptyState, html, pageHeader, raw, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { filePath, notFound, proposalPath, render, vault, vaultPath, type Ctx, type Reply } from "./pages.js";
 import { personRef } from "./personref.js";
 
-export const changesPath = (id: string) => vaultPath(id, "/changes");
+export type Show = "everyone" | "mine" | "watching";
+const SHOWS: [Show, string][] = [
+  ["everyone", "Everyone"],
+  ["mine", "Mine"],
+  ["watching", "Watching"],
+];
+// Anything but the two named views is Everyone, not an error.
+const showOf = (v: string | null): Show => (v === "mine" || v === "watching" ? v : "everyone");
+
+export const changesPath = (id: string, show: Show = "everyone", before?: string) => {
+  const p = new URLSearchParams();
+  if (show !== "everyone") p.set("show", show);
+  if (before) p.set("before", before);
+  const s = p.toString();
+  return vaultPath(id, `/changes${s ? `?${s}` : ""}`);
+};
 
 export const PAGE_LINES = 30;
 const BATCH = 100;
@@ -70,13 +91,19 @@ export function collapse(rows: Row[]): Line[] {
 // One page of lines, starting just below `before` (a log seq), and where the
 // one after starts. Reads events in batches until it has a line more than
 // the page needs (so the last line is whole) or the log runs out.
-export async function readPage(c: pg.PoolClient, me: string, vaultId: string, before?: string): Promise<{ lines: Line[]; next?: string }> {
+export async function readPage(c: pg.PoolClient, me: string, vaultId: string, before?: string, show: Show = "everyone"): Promise<{ lines: Line[]; next?: string }> {
   const rows: Row[] = [];
   let cursor = before;
   let lines: Line[] = [];
   let more = false;
   for (;;) {
-    const page = await queryActivity(c, me, { vaultId, events: CONTENT_EVENTS }, cursor ? { before: cursor } : {}, BATCH);
+    const page = await queryActivity(
+      c,
+      me,
+      { vaultId, events: CONTENT_EVENTS, watching: show === "watching" },
+      { ...(cursor ? { before: cursor } : {}), ...(show === "mine" ? { who: me } : {}) },
+      BATCH,
+    );
     rows.push(...page.rows);
     lines = collapse(rows);
     more = page.next !== undefined;
@@ -163,12 +190,47 @@ function feed(ctx: Ctx, id: string, lines: Line[], live: ReadonlySet<string>): R
   )}`;
 }
 
+// Everyone, Mine, Watching: links to this page with one view chosen (no
+// script), the current one marked.
+function chips(id: string, show: Show): Raw {
+  return html`<ul class="chips" aria-label="Show changes by">${SHOWS.map(
+    ([k, label]) => html`<li><a class="chip" href="${changesPath(id, k)}"${k === show ? raw(' aria-current="true"') : ""}>${label}</a></li>`,
+  )}</ul>`;
+}
+
+// What an empty first page says, by view: nothing yet, nothing of yours, or
+// nothing on what you watch (or nothing watched at all, which is a different
+// next step).
+async function emptyFirst(c: pg.PoolClient, ctx: Ctx, id: string, show: Show): Promise<Raw> {
+  if (show === "mine") {
+    return emptyState({
+      title: "You haven’t changed anything here yet",
+      body: "Files you write or delete, and proposals you open or decide, show here, with what your agents do for you.",
+    });
+  }
+  if (show === "watching") {
+    const n = (await c.query(`select count(*)::int as n from public.subscriptions where vault_id = $1 and user_id = $2 and kind = 'path'`, [id, ctx.userId])).rows[0].n as number;
+    return n
+      ? emptyState({ title: "Nothing has changed on what you watch", body: "Changes to the folders and files you watch show here as they happen." })
+      : emptyState({
+          title: "You don’t watch anything here",
+          body: "Watch a folder or file from its page, and changes there show here.",
+          action: html`<a class="button" href="${vaultPath(id, "/config/watching")}">Watch a path</a>`,
+        });
+  }
+  return emptyState({
+    title: "Nothing has changed yet",
+    body: "Files written or deleted, and proposals and what people decide about them, show here as they happen.",
+  });
+}
+
 export async function changes(ctx: Ctx, id: string): Promise<Reply> {
   const before = /^\d{1,18}$/.test(ctx.url.searchParams.get("before") ?? "") ? ctx.url.searchParams.get("before")! : undefined;
+  const show = showOf(ctx.url.searchParams.get("show"));
   const out = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
-    const { lines, next } = await readPage(c, ctx.userId, id, before);
+    const { lines, next } = await readPage(c, ctx.userId, id, before, show);
     const paths = [...new Set(lines.filter((l) => l.event === "file.write" && l.path).map((l) => l.path!))];
     const live = new Set<string>(
       paths.length
@@ -179,21 +241,22 @@ export async function changes(ctx: Ctx, id: string): Promise<Reply> {
     );
     const body = html`
       ${pageHeader({ title: "Changes", description: "What people and their agents changed in this vault, newest first." })}
+      ${chips(id, show)}
+      ${show === "watching" && lines.length
+        ? html`<p class="hint">Changes on the folders and files you watch. <a href="${vaultPath(id, "/config/watching")}">What you watch</a></p>`
+        : ""}
       ${lines.length
         ? feed(ctx, id, lines, live)
         : before
           ? emptyState({
               title: "No older changes",
               body: "This is where the list begins.",
-              action: html`<a class="button" href="${changesPath(id)}">Back to the newest</a>`,
+              action: html`<a class="button" href="${changesPath(id, show)}">Back to the newest</a>`,
             })
-          : emptyState({
-              title: "Nothing has changed yet",
-              body: "Files written or deleted, and proposals and what people decide about them, show here as they happen.",
-            })}
+          : await emptyFirst(c, ctx, id, show)}
       ${next || (before && lines.length)
-        ? html`<nav class="pager" aria-label="Pages">${before ? html`<a href="${changesPath(id)}">Newest</a>` : ""}${
-            next ? html`<a class="older" href="${changesPath(id)}?before=${next}">Older</a>` : ""
+        ? html`<nav class="pager" aria-label="Pages">${before ? html`<a href="${changesPath(id, show)}">Newest</a>` : ""}${
+            next ? html`<a class="older" href="${changesPath(id, show, next)}">Older</a>` : ""
           }</nav>`
         : ""}
       <p class="hint">Members, rules, variables, claims and the rest of what the vault records are in the <a href="${vaultPath(id, "/activity")}">Log</a>, under Settings, Diagnostics.</p>`;
