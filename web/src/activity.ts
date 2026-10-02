@@ -63,6 +63,13 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["claim.release", "Released a claim"],
   ["claim.break", "Broke a claim"],
   ["claim_rule.set", "Changed a claim rule"],
+  ["work_plan.register", "Registered a work plan"],
+  ["step.claim", "Claimed a step"],
+  ["step.complete", "Completed a step"],
+  ["step.release", "Released a step"],
+  ["step.checkin", "Checked in on a step"],
+  ["step.cancel", "Cancelled a step"],
+  ["step.skip", "Skipped a step"],
 ];
 export const EVENT_GROUPS: readonly [string, string][] = [
   ["file.", "Any file change"],
@@ -70,6 +77,7 @@ export const EVENT_GROUPS: readonly [string, string][] = [
   ["variable.", "Any variable change"],
   ["link.", "Any link change"],
   ["claim.", "Any claim event"],
+  ["step.", "Any step event"],
 ];
 const EVENTS = EVENT_LABELS;
 const GROUPS = EVENT_GROUPS;
