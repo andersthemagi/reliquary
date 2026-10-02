@@ -49,7 +49,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "activity" | "flags" | "claims" | "rules" | "search" | "variables" | "links" | "settings";
+export type Section = "files" | "proposals" | "activity" | "flags" | "claims" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // One round trip: the live files, every folder above them, each one's
@@ -107,8 +107,8 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
     { section: "links", href: vaultPath(v.id, "/links"), label: "Links" },
     { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings" },
   ];
-  // Settings holds Rules, so the Rules page marks Settings as current.
-  const isCurrent = (s: Section) => current.section === s || (s === "settings" && current.section === "rules");
+  // Settings holds Rules and Diagnostics, so their pages mark Settings as current.
+  const isCurrent = (s: Section) => current.section === s || (s === "settings" && (current.section === "rules" || current.section === "diagnostics"));
   const link = (s: (typeof sections)[number]) =>
     html`<a href="${s.href}"${isCurrent(s.section) ? raw(' aria-current="page"') : ""}>${s.label}${s.count ? html`<span class="count">${s.count}</span>` : ""}</a>`;
   const tree = files.length ? renderNode(root, "") : html`<p class="muted small tree-empty">No files yet.</p>`;

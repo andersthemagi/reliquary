@@ -37,6 +37,10 @@ On a phone, a vault's sections (**Files**, **Proposals**, **Activity**, **Variab
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
 
+## Diagnostics
+
+**Settings**, then **Diagnostics**, is for working out why something happened. It has a tab for [Flags](flags.md) (what changed since you were last told) and one for [Claims](claims.md) (who is working on which path). Most people never need it. The **Diagnostics** page itself only lists its tabs; it changes nothing.
+
 ## Roles
 
 Every member has one role in a vault:
