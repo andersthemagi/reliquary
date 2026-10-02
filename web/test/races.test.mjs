@@ -155,6 +155,12 @@ before(async () => {
     drop trigger if exists zz_races_stop on public.variable_values;
     create trigger zz_races_stop after insert or update on public.variable_values
       for each statement execute function test_races.stop('values');
+    drop trigger if exists zz_races_stop on public.thread_messages;
+    create trigger zz_races_stop after insert on public.thread_messages
+      for each statement execute function test_races.stop('thread_messages');
+    drop trigger if exists zz_races_stop on private.vault_deletions;
+    create trigger zz_races_stop after insert on private.vault_deletions
+      for each statement execute function test_races.stop('vault_deletions');
     drop trigger if exists zz_races_stop on public.path_claims;
     create trigger zz_races_stop after insert or update or delete on public.path_claims
       for each statement execute function test_races.stop('path_claims');`);
@@ -166,6 +172,8 @@ after(async () => {
              drop trigger if exists zz_races_stop on public.log;
              drop trigger if exists zz_races_stop on public.vault_members;
              drop trigger if exists zz_races_stop on public.variable_values;
+             drop trigger if exists zz_races_stop on public.thread_messages;
+             drop trigger if exists zz_races_stop on private.vault_deletions;
              drop trigger if exists zz_races_stop on public.path_claims;
              drop schema if exists test_races cascade;`).catch(() => {});
   await Promise.all(open.map((c) => c.end().catch(() => {})));
@@ -579,6 +587,57 @@ test("races, lock order: a claim is renewed while the file at its path is erased
     outcomes.push(`${outcome(re)}/${outcome(er)}`);
   }
   log("renew vs erase", outcomes);
+  assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
+});
+
+// Threads (20261004110000_thread_writes.sql): post_message takes the
+// vault's row (for key share) before its thread's, the order delete_vault
+// takes them in (the vault's row, then through the cascade the thread's).
+// The other way round, a post holding its thread's row and then needing
+// the vault's (the log's foreign key) deadlocked against a deletion that
+// held the vault's row and then needed the thread's.
+
+test("races, lock order: deleting a vault while a message is posted in it, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const name = `Races delete thread ${round}`;
+    const v = await newVault(OWNER, name);
+    const who = people[15 + round];
+    await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, who, OWNER]);
+    const opened = await as(db, who, "select public.open_thread($1, 'Plan', 'first') as id", [v]);
+    assert.ok(opened.ok, opened.message);
+    const thread = opened.rows[0].id;
+    // The deletion holds the vault's row and stops before its cascade.
+    const [de, po] = await interleave(
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name], "vault_deletions"),
+      (c) => as(c, who, "select public.post_message($1, 'second')::text", [thread]),
+    );
+    outcomes.push(`${outcome(de)}/${outcome(po)}`);
+  }
+  log("delete_vault vs post", outcomes);
+  assert.deepEqual(outcomes, ["ok/P0002", "ok/P0002", "ok/P0002"]);
+});
+
+test("races, lock order: a message is posted while its vault is deleted, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const name = `Races post delete ${round}`;
+    const v = await newVault(OWNER, name);
+    const who = people[18 + round];
+    await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, who, OWNER]);
+    const opened = await as(db, who, "select public.open_thread($1, 'Plan', 'first') as id", [v]);
+    assert.ok(opened.ok, opened.message);
+    const thread = opened.rows[0].id;
+    // The post holds the vault's row and its thread's, and stops after
+    // writing the message, before logging it.
+    const [po, de] = await interleave(
+      (c) => as(c, who, "select public.post_message($1, 'second')::text", [thread], "thread_messages"),
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name]),
+    );
+    outcomes.push(`${outcome(po)}/${outcome(de)}`);
+    assert.equal((await sql("select count(*)::int as n from public.threads where vault_id = $1", [v]))[0].n, 0);
+  }
+  log("post vs delete_vault", outcomes);
   assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
 });
 

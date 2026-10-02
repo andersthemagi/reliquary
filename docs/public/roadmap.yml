@@ -53,7 +53,7 @@
   version: 0.1.0
 
 - title: Activity and history
-  summary: An append-only log of every change, filterable, across vaults or per file.
+  summary: A plain-language Changes feed for each vault, and an append-only log of every change, filterable, across vaults or per file.
   status: shipped
   milestone: M1
   docs: concepts/activity
@@ -229,6 +229,11 @@
   status: in-progress
   docs: concepts/flags
 
+- title: Threads
+  summary: Conversations inside a vault between its members and their agents, never private; a side thread is addressed to some members. The database holds them; no MCP tool or web page reaches them yet.
+  status: in-progress
+  docs: concepts/threads
+
 - title: Compare-and-swap writes
   summary: A write or delete against a stale version refuses instead of overwriting someone else's edit. The web editor does this automatically; agents pass expected_version.
   status: shipped
@@ -240,11 +245,15 @@
   docs: concepts/claims
 
 - title: Work plans
-  summary: Steps with dependencies in a plan file, so no agent is handed a step before the ones blocking it are done. The database can register, claim and complete one; no MCP tool or web page reaches it yet.
+  summary: Steps with dependencies in a plan file, so no agent gets a step before its blockers are done. Agents work plans over MCP, people see them on the Tasks page. Waiting in line isn't built.
   status: in-progress
   docs: concepts/claims
 
 # Planned ------------------------------------------------------------------
+
+- title: Tasks
+  summary: A Tasks page for seeing what your agents are working on, with each task's state, and for cancelling or skipping one, plus MCP tools to work through them. Places in line come later.
+  status: planned
 
 - title: Publish the CLI to npm
   summary: "@reliquary-ai/cli on npm, so npx works everywhere without a checkout."

@@ -34,6 +34,19 @@ days respectively; dropped the same day as the first decision). Usage is
 tracked informally in `docs/progress.md` as each phase ships, for the
 maintainer's own judgement, not as a formal precondition.
 
+Also (owner's decision, 2026-10-02): Threads, the audience split in the web
+UI, and the Tasks view with the MCP step tools start now too, another
+deliberate, logged exception to "work on the current milestone only." The
+audience split puts what a person reads or acts on first (Tasks, Threads,
+Changes) and moves the full log, flags and the claims table one click away
+under Diagnostics; their URLs keep resolving. The design is in
+`docs/design.md` ("Who each surface is for", "Threads"), what is built is
+in `docs/progress.md`. Proposed, not yet confirmed by the owner: the Tasks
+view and the step tools start ahead of CL-3.9 (#74, waiting and places in
+line), which issues #75 and #76 list as a blocker, and anything that needs
+CL-3.9 (`request_work`, `leave_queue`, places in line, who is waiting) is
+left out of both until it lands.
+
 All of it needs podman or docker; nothing needs Node installed on the host.
 
 `spikes/` and `pilot/` are research that informed v3 (the audience gate, session

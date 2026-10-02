@@ -4,7 +4,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Access log.** A vault's append-only record of every set, rotate, delete, read, reveal and refused attempt on its environment variables. See [Environment variables](../concepts/variables.md#the-access-log).
 
-**Activity.** A vault's append-only log of every change: who, which agent, what and where. See [Activity](../concepts/activity.md).
+**Activity.** The append-only log of every change: who, which agent, what and where. The top bar's **Activity** covers all your vaults, and a vault's **Log** (under **Settings**, **Diagnostics**) covers that vault. See [Changes and the log](../concepts/activity.md).
 
 **Agent.** An AI tool or program acting for a person through a connection. It has its person's role, minus the ceiling. See [Agents and the ceiling](../concepts/agents.md).
 
@@ -14,11 +14,15 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Ceiling.** The actions no agent can do, however its person connected it: approving, rules, path owners, members, grants, secret values, links, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
 
+**Changes.** A vault's plain-language list of what people and their agents changed: files written, deleted and erased, and proposals opened and decided. Newest first, by day. See [Changes and the log](../concepts/activity.md#changes).
+
 **Connection.** Anything that can act as you. It has a type: **Token**, **App** or **Reliquary CLI**. All are listed on the **Connections** page (the account menu), where you revoke them. See [Connections](../concepts/connections.md).
 
 **Data fencing.** Wrapping text people and agents wrote in random markers when it goes to an agent, so it reads as data and can't pose as instructions. See [MCP tools](mcp-tools.md#data-fencing).
 
 **Default policy.** What a vault's paths are, canon or open, where no rule says otherwise. Set on **Settings**.
+
+**Diagnostics.** The part of a vault's **Settings** for working out why something happened: its Flags, its Claims and the full Log. Most people never need it. See [Vaults, files and folders](../concepts/vaults-and-files.md#diagnostics).
 
 **Display name.** An optional name you set on **Account settings**, shown to people who share a vault with you next to your email. Only you set it, in the web app. See [The top bar, inbox and account](../concepts/inbox-and-account.md#display-name).
 
@@ -28,7 +32,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Erase.** Blanking every version of a file's text, while the log keeps its entries. Owners only, in person. See [Export, delete and erase](../concepts/export-delete-erase.md#erase-a-file).
 
-**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. Not shown anywhere yet. See [Flags](../concepts/flags.md).
+**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. You see yours under **Settings**, **Diagnostics**, **Flags**. See [Flags](../concepts/flags.md).
 
 **Import.** A whole `.env` brought in at once, pasted in the web app or sent from the CLI, waiting for a person to apply it. See [Imports](../concepts/imports.md).
 

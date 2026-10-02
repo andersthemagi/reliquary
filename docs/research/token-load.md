@@ -189,7 +189,44 @@ Still to do, from the token side:
   several more tools once its gate opens; the budget will need raising
   again then, same as every pass so far.
 
-## Seventh pass (the flags hint)
+## Seventh pass (work plan registration and status)
+
+2026-10-02, CL-3.4 of the same effort. Two new tools: `register_work_plan`
+and `work_plan_status` (20261002200000_work_plans.sql). `tools/list` is now
+15,018 bytes, over its 13,700-byte budget. Raised to 15,100, just above the
+actual, per this doc's own rule. No existing tool's budget
+changed. The two new tools have no budget of their own yet: their responses
+depend on the plan's size (a status line plus a fenced title per step), and
+the Load vault has no plan fixture to measure; a 500-step plan, the most the
+database allows, would be on the order of 40 KB.
+
+Still to do, from the token side:
+
+- **`tools/list` has no headroom again.** The step tools (`claim_step`,
+  `checkin_step`, `complete_step`, `release_step`) are the next four.
+- **`work_plan_status` has no cap on its answer.** It lists every step, as
+  `list_claims` lists every claim. If real plans run long, a `state` filter
+  or a page is the fix.
+
+## Eighth pass (work plan step tools)
+
+2026-10-02, CL-3.4 again. Four new tools: `claim_step`, `checkin_step`,
+`complete_step` and `release_step` (20261002200000_work_plans.sql,
+20261002210000_work_plan_checkin.sql). `tools/list` is now 18,586 bytes
+(about 4,650 tokens), over its 15,100-byte budget. Raised to 18,700, just
+above the actual. The four descriptions were trimmed once already (the
+first draft made it 18,746). No response of an existing tool changed.
+
+Still to do, from the token side:
+
+- **`tools/list` has grown by about 5 KB across the six work plan tools.**
+  Every conversation with a Reliquary connection pays for it. If an agent
+  rarely works plans, a client that loads tools on demand would save it;
+  nothing here does that today.
+- **The step tools' own responses are one or two lines**, so they have no
+  budget of their own, like `renew_claim` and `release_claim`.
+
+## Ninth pass (the flags hint)
 
 2026-10-02. A successful call that names a vault now ends with one more
 text block while flags wait for the connection there: `Reliquary: 3 flags
@@ -207,5 +244,5 @@ hint would, then measures each tool, and measures the hint once on its
 own line (budget 100). Every tool's own response is byte for byte what it
 was: `list_files` 1,609, `search` "workshop" 3,548, `list_proposals` 974,
 `read_proposal` 1,877, `changes_since` 4,520, `list_variables` 126, as in
-the passes above. `tools/list` is unchanged at 13,583: no tool's
+the passes above. `tools/list` is unchanged: no tool's
 description or schema changed.
