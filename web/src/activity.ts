@@ -137,6 +137,13 @@ export const EVENT_KIND: Record<string, EventKind> = {
   "step.checkin": "diagnostic",
   "step.cancel": "diagnostic",
   "step.skip": "diagnostic",
+  // Thread events log ids only: no path, proposal or title for a Changes
+  // line to link or say, so threads are read on their own page.
+  "thread.open": "diagnostic",
+  "thread.post": "diagnostic",
+  "thread.resolve": "diagnostic",
+  "thread.reopen": "diagnostic",
+  "thread.redact": "diagnostic",
 };
 export const CONTENT_EVENTS: readonly string[] = Object.entries(EVENT_KIND)
   .filter(([, kind]) => kind === "content")
