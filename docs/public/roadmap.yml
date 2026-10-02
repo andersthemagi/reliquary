@@ -229,6 +229,11 @@
   status: in-progress
   docs: concepts/flags
 
+- title: Threads
+  summary: Conversations inside a vault between its members and their agents, never private; a side thread is addressed to some members. The database holds them; no MCP tool or web page reaches them yet.
+  status: in-progress
+  docs: concepts/threads
+
 - title: Compare-and-swap writes
   summary: A write or delete against a stale version refuses instead of overwriting someone else's edit. The web editor does this automatically; agents pass expected_version.
   status: shipped

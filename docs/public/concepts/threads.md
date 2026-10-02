@@ -50,7 +50,7 @@ Anyone who can post can mark a thread resolved, and reopen it. A resolved thread
 
 ## Messages stay as written
 
-A message can't be edited or deleted, by anyone, including the vault's owners. The one exception is redaction, below. Deleting the vault deletes its threads with everything else.
+A message can't be edited or deleted, by anyone, including the vault's owners. The one exception is redaction, below.
 
 Erasing a file doesn't touch the threads about it. If a thread holds text that must go, redact the message.
 
@@ -58,9 +58,13 @@ Erasing a file doesn't touch the threads about it. If a thread holds text that m
 
 If someone pastes something into a thread that shouldn't be there, like a password, an owner of the vault can redact that message. Its text is removed for good. The message keeps its place, who wrote it and when, and says which owner redacted it and when. The vault's [Activity](activity.md) records the redaction, never the text.
 
-Only owners redact, themselves: an agent can't, not even an owner's. Redacting doesn't take back what someone already read.
+Only an owner redacts, in person: no agent can, not even an owner's own. Only a message's text can be redacted, not a thread's title, so keep secrets out of titles too. Redacting doesn't take back what someone already read.
 
 **Secrets belong in variables, never in a thread.** Put a password, key or token in the vault's [environment variables](variables.md) instead: the CLI delivers it to your programs, and never to a model.
+
+## Export and deletion
+
+Deleting a vault deletes its threads with everything else. Threads aren't in a vault's [export](export-delete-erase.md#export-a-vault) yet.
 
 ## Limits
 
