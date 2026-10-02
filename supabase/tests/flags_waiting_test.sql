@@ -24,8 +24,6 @@ insert into public.access_tokens (user_id, name, expires_at, all_vaults, vault_i
 values (t.id('ana'), 'ana-cli', now() + interval '1 day', true, '{}', 'read', 'cli',
         'https://app.example/cli/oauth-client.json', 'https://app.example/api/env');
 
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
 -- As the person in the web app (p_tok null), or as one of their connections.
 create function t.as(p_user text, p_tok text, p_sql text) returns text language sql as $$
   select case when p_tok is null then t.run(p_user, p_sql)
