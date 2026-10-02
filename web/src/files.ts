@@ -49,7 +49,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "activity" | "flags" | "claims" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
+export type Section = "files" | "proposals" | "activity" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // One round trip: the live files, every folder above them, each one's
@@ -65,11 +65,10 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
                  from p left join r on r.path = p.path) as files,
               (select coalesce(json_object_agg(d.path, coalesce(r.policy, 'open')), '{}')
                  from d left join r on r.path = d.path) as dirs,
-              (select count(*)::int from public.proposals where vault_id = $1 and status = 'open') as open,
-              (select count(*)::int from public.path_claims where vault_id = $1 and expires_at > now()) as claims`,
+              (select count(*)::int from public.proposals where vault_id = $1 and status = 'open') as open`,
       [v.id],
     )
-  ).rows[0] as { files: [string, string][]; dirs: Record<string, string>; open: number; claims: number };
+  ).rows[0] as { files: [string, string][]; dirs: Record<string, string>; open: number };
   const files = shell.files.map(([path, policy]) => ({ path, policy }));
   const dirPolicy = new Map<string, string>(Object.entries(shell.dirs));
   const open = shell.open;
@@ -101,8 +100,6 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
     { section: "files", href: vaultPath(v.id), label: "Files" },
     { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined },
     { section: "activity", href: vaultPath(v.id, "/activity"), label: "Activity" },
-    { section: "flags", href: vaultPath(v.id, "/flags"), label: "Flags" },
-    { section: "claims", href: vaultPath(v.id, "/claims"), label: "Claims", count: shell.claims || undefined },
     { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables" },
     { section: "links", href: vaultPath(v.id, "/links"), label: "Links" },
     { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings" },

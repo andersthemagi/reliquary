@@ -166,6 +166,17 @@ test("diagnostics: /claims is the same page inside Diagnostics, with Claims and 
   assert.ok(h.indexOf("<h1>Settings</h1>") < h.indexOf("<h2>Claims</h2>"), "Settings, then Claims");
 });
 
+test("diagnostics: Flags and Claims, and a count of active claims, are not in the vault's navigation", async () => {
+  const h = await page(noa, `/v/${V.main}`);
+  assert.deepEqual(await active(V.main), ["notes/draft.md"], "this vault has an active claim to count");
+  const navs = h.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
+  assert.equal(navs.length, 2, "the wide sidebar and the phone tabs");
+  for (const nav of navs) {
+    assert.doesNotMatch(nav, /\/flags|\/claims|Flags|Claims/);
+    assert.doesNotMatch(nav, /class="count"/, "no count badge");
+  }
+});
+
 test("diagnostics: a viewer has the Diagnostics tab and its page", async () => {
   assert.match(await page(rex, `/v/${V.main}/config`), new RegExp(`<a href="/v/${V.main}/diagnostics">Diagnostics</a>`));
   const h = await page(rex, `/v/${V.main}/diagnostics`);
