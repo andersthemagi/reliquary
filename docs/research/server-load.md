@@ -568,6 +568,51 @@ docs/public/reference/limits.md ("Rate limits").
   would pause that app's sign-ins (not its connections) for up to 10
   minutes.
 
+## The flags hint
+
+2026-10-02, `20261009100000_flags_waiting.sql` and the wrapper in
+`mcp/src/tools-shared.ts` (design.md, "Notifications"). A successful call
+that names a vault now counts the flags waiting for its connection there,
+in its own transaction after its work: one more round trip (`savepoint`,
+a 250 ms `statement_timeout`, `flags_waiting`, `rollback to savepoint`),
+on the connection it already holds. `flags_waiting` is `list_flags(vault,
+21)` counted, so the hint costs what `list_flags` costs.
+
+Measured on Postgres 17 in a container over local TCP, 200 runs each, on
+synthetic data: 200 other people with a vault of 50 writes; Ana's vault Big
+with 4,000 notes written 4 times by Ben (16,223 log rows of the 26,429),
+100 of Ben's proposals waiting on Ana, 50 of her own (each commented on, 20
+sent back) and a watched folder; her vault Small with 3 of Ben's proposals
+waiting. "Caught up" is a connection that has advanced to the vault's
+latest entry; "never advanced" one made before all of it that never has,
+so everything since counts.
+
+| The count's round trip, as the connection | Count | Median ms | p95 ms |
+|---|---:|---:|---:|
+| Small, 3 waiting | 3 | 0.94 | 0.97 |
+| Big, caught up | 0 | 7.96 | 8.75 |
+| Big, never advanced | 21 | 9.71 | 9.98 |
+
+| One `list_files` request (session, tools, call, close) | Before (main), median / p95 ms | After | Added, median |
+|---|---:|---:|---:|
+| Small, 3 waiting | 2.67 / 6.03 | 3.81 / 7.16 | +1.14 |
+| Big, caught up (`limit: 20`) | 2.94 / 5.30 | 11.41 / 13.90 | +8.46 |
+| Big, never advanced (`limit: 20`) | 2.55 / 5.02 | 12.43 / 13.27 | +9.89 |
+| `list_vaults` (no hint; the noise floor) | 2.49 / 4.98 | 2.49 / 4.89 | 0.00 |
+
+Before and after alternate call by call, so drift hits both. In a small
+vault the hint is about a millisecond. In a vault with 16,000 log entries
+and 150 open proposals it is 8 to 10 ms on every call, caught up or not:
+about four times what a cheap call costs on its own. Where it goes
+(`auto_explain`, the caught-up connection in Big, 8.1 ms in all): 5.2 ms
+is `list_flags`' review part, which finds each open proposal's latest
+event by walking every log entry of the vault through
+`log(vault_id, path, seq)` (16,221 here, all but 200 dropped by the event
+filter) and only then drops what is behind the watermark, so being caught
+up saves nothing; `flag_caller` is 0.9 ms. `list_flags` was not changed
+here (another open change rewrites it in place); the numbers are recorded
+so a fix there can be measured against them (Still to do, item 5).
+
 ## Still to do
 
 1. **Confirm the pg_cron jobs after the next `db push`** (`select jobname,
@@ -583,3 +628,11 @@ docs/public/reference/limits.md ("Rate limits").
 4. **A rare action filter on a big vault's access log** reads that vault's
    rows (9.8 ms for 50,000): add `(vault_id, action, seq)` only if the
    Access log page's timing shows it.
+5. **`list_flags` reads a vault's whole log to find what waits for
+   review**, on every MCP call that names a vault now (the flags hint,
+   above): 8 to 10 ms a call in a vault of 16,000 entries, growing with
+   the vault. Starting from the open proposals instead of from the
+   vault's paths, with an index on `log (proposal_id)` (none exists
+   today), would bound it by the proposals.
+   Change it in `list_flags` itself, where the rule lives, and measure
+   with the hint's table above.
