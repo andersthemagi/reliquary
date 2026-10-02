@@ -18,6 +18,7 @@ import { errorPage, refusalText } from "./errorpage.js";
 import { failure } from "./failure.js";
 import type { Flash, Tone } from "./flash.js";
 import { fillPeople, personRef } from "./people.js";
+import { UUID } from "./personref.js";
 import { variablesRoutes } from "./variablespage.js";
 import { pendingList } from "./imports.js";
 import { pendingPushes } from "./variables.js";
@@ -75,7 +76,7 @@ export type Ctx = {
 export type Download = { filename: string; type: string; write: (out: Writable) => Promise<void> };
 export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string; download?: Download; retryAfter?: number };
 
-export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export { UUID };
 export type Vault = { id: string; name: string; role: string };
 
 // A refusal from the database, as the reason and a reference to show on the

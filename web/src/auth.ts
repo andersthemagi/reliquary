@@ -24,6 +24,7 @@ import type http from "node:http";
 import { limit } from "./ratelimit.js";
 import { networkReason, noteUpstream } from "./failure.js";
 import { decodeFlash, encodeFlash, type Flash } from "./flash.js";
+import { UUID } from "./personref.js";
 
 export type AuthMode = "local" | "supabase";
 export type Alg = "ES256" | "RS256";
@@ -50,8 +51,6 @@ const conf = (): Config => {
   return cfg;
 };
 export const authMode = (): AuthMode => conf().mode;
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // Reads and checks the configuration once, at start. Throws an Error whose
 // message names the variable, never its value; the server prints it and exits.

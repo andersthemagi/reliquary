@@ -31,13 +31,13 @@ import { limitToken } from "./ratelimit.js";
 import { precheckImport, sealItems, type ImportRefusal } from "./variables.js";
 import { apiBody, classify, doing, fail, failure } from "./failure.js";
 import { BadRequest, readJson } from "./jsonbody.js";
+import { UUID } from "./personref.js";
 
 // An own raise's reason, for a 400 (classify: our messages are for people).
 const refusalWhy = (err: unknown) => classify(err).why.replace(/\.$/, "");
 
 const PRM_PATH = "/.well-known/oauth-protected-resource/api/env";
 const TOKEN = /^Bearer (rle_[0-9a-f]{64})$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ENVIRONMENT = /^[a-z][a-z0-9_-]{0,31}$/;
 // A push is a .env file: 1 MiB is plenty, and bounds what one request can
 // make the server seal (200 values of 64 KiB would be 12.8 MiB).
