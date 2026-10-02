@@ -29,6 +29,13 @@
 # The first release, v0.1.0, is cut by hand (runbook); until a v* tag exists
 # this workflow skips, so release-please doesn't propose a version for the
 # whole history.
+#
+# Hotfix alert (docs/ops/runbook.md, "Hotfix"). A commit pushed to main with
+# a `Hotfix: <why>` trailer opens or comments on the issue "Release ready:
+# urgent fix waiting", naming the release pull request and the reason —
+# that's the ping (GitHub's own issue-notification email), not a separate
+# deploy path. When a push instead *is* release-please's own merge
+# (release_created), that issue closes: the fix is live.
 name: release
 
 on:
@@ -101,3 +108,50 @@ jobs:
         run: |
           gh workflow run publish-cli.yml -R "$GITHUB_REPOSITORY" --ref "$TAG"
           echo "CLI publish of $TAG started: Actions > publish-cli" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Hotfix alert (a pushed commit carries a Hotfix: trailer)"
+        if: github.event_name == 'push' && steps.rp.outputs.release_created != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "no previous commit to diff from; skipping"; exit 0
+          fi
+          # Real trailers only (git parses the message's last paragraph), same
+          # as scripts/test-guard.sh does for Changes-behaviour/Test-refactor.
+          reasons=$(git log --format='%(trailers:key=Hotfix,valueonly)' "$BEFORE"..HEAD | sed '/^$/d')
+          if [ -z "$reasons" ]; then
+            echo "no Hotfix: trailer in this push"; exit 0
+          fi
+
+          title="Release ready: urgent fix waiting"
+          pr_json=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --json number,url,title \
+            -q '[.[] | select(.title | test("^Release v[0-9]"))][0]')
+          # shellcheck disable=SC2016 # literal backticks: a Markdown code block
+          body=$(printf 'A commit just pushed to main carries a `Hotfix:` trailer:\n\n```\n%s\n```\n\n' "$reasons")
+          if [ -n "$pr_json" ] && [ "$pr_json" != "null" ]; then
+            pr_url=$(jq -r .url <<< "$pr_json")
+            pr_num=$(jq -r .number <<< "$pr_json")
+            # shellcheck disable=SC2016 # literal backticks: an inline code span
+            body+=$(printf 'Release pull request: %s\n\nMerge it to deploy: `gh pr merge %s --squash` (docs/ops/runbook.md, "Hotfix").' "$pr_url" "$pr_num")
+          else
+            body+="No open release pull request yet; release-please should open or update one from this push shortly (Actions > release)."
+          fi
+
+          open_issue=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number -q '.[0].number')
+          if [ -n "$open_issue" ]; then
+            gh issue comment "$open_issue" -R "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+
+      - name: Close the hotfix alert (this push was the release)
+        if: steps.rp.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rp.outputs.tag_name }}
+        run: |
+          title="Release ready: urgent fix waiting"
+          open_issue=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number -q '.[0].number')
+          [ -z "$open_issue" ] || gh issue close "$open_issue" -R "$GITHUB_REPOSITORY" --comment "Released as $TAG."

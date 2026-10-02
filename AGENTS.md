@@ -148,8 +148,11 @@ it there.
 ## Conventions
 
 - Conventional commits (`feat(feed): ...`, `fix(rls): ...`). Trailers
-  (`Changes-behaviour:`, `Test-refactor:`, `Co-Authored-By:`) go together in
-  the last paragraph, no blank line between them.
+  (`Changes-behaviour:`, `Test-refactor:`, `Hotfix:`, `Co-Authored-By:`) go
+  together in the last paragraph, no blank line between them. `Hotfix: <why>`
+  on a commit pushed to `main` pings the repo (`docs/ops/runbook.md`,
+  "Hotfix") so whoever's free can merge the release pull request; it isn't a
+  different deploy path, just a louder one.
 - **A commit is one reviewable change.** Roughly what Google's [Small
   CLs](https://google.github.io/eng-practices/review/developer/small-cls.html)
   guide argues for: about 100 changed lines is normal, 1000 is a sign to

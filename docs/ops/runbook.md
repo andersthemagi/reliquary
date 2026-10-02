@@ -206,13 +206,25 @@ Actions > deploy > Run workflow, on `main`, with the tag (`vX.Y.Z`).
 
 ### Hotfix
 
-There are no release branches: fix forward on `main`.
+There are no release branches, and `main` is never deployed directly (see
+"By hand" below): fix forward on `main`, then merge the release pull
+request. There is no separate emergency path that skips it — that pull
+request, kept open and current by release-please, already *is* the fast
+path: it's usually one click away from live.
 
-1. Land the fix on `main` as `fix(...): ...` (with its test).
+1. Land the fix on `main` as `fix(...): ...` (with its test). If it needs to
+   go live before someone would otherwise notice, add a `Hotfix: <why>`
+   trailer (last paragraph, beside `Co-Authored-By:`). The `release`
+   workflow then opens or comments on the issue "Release ready: urgent fix
+   waiting", naming the pull request and the reason — that's what pings the
+   repo (GitHub's own issue-notification email) so whoever's free can act.
+   Ordinary `fix`/`feat` commits don't trigger it; only an explicit `Hotfix:`
+   does.
 2. The release pull request now lists it (and anything else merged since the
    last release). If something unready is also in it, revert that on `main`
    first (`revert: ...`), or roll back while you fix.
-3. Merge the release pull request: a patch release (`vX.Y.Z+1`) deploys.
+3. Merge the release pull request: a patch release (`vX.Y.Z+1`) deploys, and
+   the `release` workflow closes the "Release ready" issue if one is open.
 
 ### By hand
 
