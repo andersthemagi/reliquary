@@ -1,8 +1,9 @@
 // Helpers shared by every MCP tool domain module (vaultfiles-tools.ts,
-// proposals-tools.ts, variables-tools.ts, flags-tools.ts, links-tools.ts):
-// the response shape, the error-to-message translation, the vault-lookup
-// SQL fragment, the fenced-text nonce, the tool-name-aware register()
-// wrapper, and the input-size ceilings the database also enforces.
+// proposals-tools.ts, variables-tools.ts, flags-tools.ts, links-tools.ts,
+// claims-tools.ts): the response shape, the error-to-message translation,
+// the vault-lookup SQL fragment, the fenced-text nonce, the tool-name-aware
+// register() wrapper, and the input-size ceilings the database also
+// enforces.
 //
 // Text written by people or agents (files, reasons, notes, comments) is
 // always returned between markers, with its provenance, because it must read
@@ -36,6 +37,15 @@ export const TEXT = z.string().max(1_000_000);
 export const REASON = z.string().max(4000);
 export const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 export const VERSION = z.string().regex(/^[0-9a-fA-F-]{36}$/);
+// What a claim hands back and asks for again: a 32-byte secret in hex, and
+// the fence counter.
+export const SECRET = z.string().regex(/^[0-9a-f]{64}$/);
+export const FENCE = z.number().int().min(1);
+// A caller may ask for a shorter lease and a longer one is clamped by the
+// vault's claim rule in the database, not refused; this is only a sane
+// ceiling on the argument itself, the same spirit as every other
+// input-size check here.
+export const TTL_MINUTES = z.number().int().min(1).max(60 * 24 * 30);
 
 // Turns errors into messages the agent can act on: a first line in words
 // (our own migrations' messages, which don't echo free-form input), then the
