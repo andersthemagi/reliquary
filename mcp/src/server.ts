@@ -21,6 +21,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
 import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnauthorized, rateLimitedBody } from "./ratelimit.js";
 import { registerTools } from "./tools.js";
+import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
 import { BUILD, versionJson } from "./version.js";
 import { compact, fail, failure, withRequest, type Failure } from "./failure.js";
@@ -310,7 +311,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
     await recordClient(bearer[1], init.params.clientInfo.name);
   }
 
-  const mcp = new McpServer({ name: "reliquary", version: BUILD.version });
+  const mcp = new McpServer({ name: "reliquary", version: BUILD.version }, { instructions: INSTRUCTIONS });
   const runner = session;
   await registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
   const transport = new StreamableHTTPServerTransport({

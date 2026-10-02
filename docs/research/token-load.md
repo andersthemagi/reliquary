@@ -226,3 +226,23 @@ Still to do, from the token side:
 - **The step tools' own responses are one or two lines**, so they have no
   budget of their own, like `renew_claim` and `release_claim`.
 
+## Ninth pass (the flags hint)
+
+2026-10-02. A successful call that names a vault now ends with one more
+text block while flags wait for the connection there: `Reliquary: 3 flags
+are waiting for you in this vault. Call list_flags.` (design.md,
+"Notifications"). With a one-digit count that line is 70 bytes (about 18
+tokens), on every call until the agent calls `list_flags` and
+`advance_flags`; nothing at all once it has.
+
+Flags wait for Fay's connection in the seeded Load vault (her Loader
+agent's proposals and her comments on them), so the first run with the
+hint carried those 70 bytes on every measured call, and `propose` went to
+170 bytes, over its 150. No budget was raised. `token_load.test.mjs` now
+catches the connection up on its flags first, as an agent following the
+hint would, then measures each tool, and measures the hint once on its
+own line (budget 100). Every tool's own response is byte for byte what it
+was: `list_files` 1,609, `search` "workshop" 3,548, `list_proposals` 974,
+`read_proposal` 1,877, `changes_since` 4,520, `list_variables` 126, as in
+the passes above. `tools/list` is unchanged: no tool's
+description or schema changed.
