@@ -25,7 +25,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Environment variables](concepts/variables.md)
 - [Imports](concepts/imports.md)
 - [Members and invites](concepts/members.md)
-- [Activity](concepts/activity.md)
+- [Changes and the log](concepts/activity.md)
 - [Export, delete and erase](concepts/export-delete-erase.md)
 - [Plans and limits](concepts/plans-and-limits.md)
 - [Security model](concepts/security.md)

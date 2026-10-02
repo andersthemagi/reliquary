@@ -20,7 +20,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | Approve, request changes, reject | the proposal's page | none | person, owners and editors |
 | Edit, then approve | the proposal's page | none | person, owners and editors |
 | Snooze or unsnooze in the Inbox | the proposal's page or row | none | person |
-| Follow changes | **Activity**, a file's **History** | `changes_since` | both |
+| Follow changes | **Changes**, the **Log** (under **Diagnostics**), **Activity**, a file's **History** | `changes_since` | both |
 | Claim a path, renew or release your own [claim](../concepts/claims.md) | none | `claim_path`, `renew_claim`, `release_claim` | agent, owners and editors (whoever could write the path) |
 | See a vault's active claims | **Settings**, **Diagnostics**, **Claims** | `list_claims` | both |
 | Break someone else's claim | **Diagnostics**, **Claims**, **Break** | none | person, owners and editors |

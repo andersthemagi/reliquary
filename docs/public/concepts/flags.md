@@ -41,7 +41,7 @@ Everything you watch in a vault is on its **Settings**, **Watching** tab, each w
 
 At 100 paths in a vault, watching another is refused, and the page says so: stop watching one first.
 
-Watching starts from the moment you ask: earlier changes aren't flagged. Nobody else sees what you watch, and it isn't recorded in the vault's [Activity](activity.md).
+Watching starts from the moment you ask: earlier changes aren't flagged. Nobody else sees what you watch, and it isn't recorded in the vault's [log](activity.md).
 
 Watching a tag isn't possible yet, because files don't carry tags.
 

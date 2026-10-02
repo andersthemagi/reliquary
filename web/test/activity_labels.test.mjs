@@ -2,7 +2,8 @@
 // The events come from the database two ways: every event a migration can
 // write to public.log, read from the SQL itself, and every event already in
 // this suite's log. Either one without a label, or without a filter choice,
-// fails here. Read-only: nothing here changes the database.
+// or without a place in EVENT_KIND (content for the Changes feed, or
+// diagnostic), fails here. Read-only: nothing here changes the database.
 
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -10,6 +11,7 @@ import { join } from "node:path";
 import { before, test } from "node:test";
 import pg from "pg";
 import { activityTable, EVENT_GROUPS, EVENT_LABELS, parseFilters } from "../dist/activity.js";
+import { CONTENT_EVENTS, EVENT_KIND } from "../dist/activity.js";
 import { describe as describeEvent } from "../dist/activity.js";
 
 const BASE = process.env.WEB_URL ?? "http://127.0.0.1:8791";
@@ -113,6 +115,27 @@ test("activity labels: every event a migration can log has a plain label", () =>
   }
   const missing = [...events].filter((e) => !LABEL.has(e)).sort();
   assert.deepEqual(missing, [], "events with no label in EVENT_LABELS (web/src/activity.ts)");
+});
+
+test("activity labels: every labelled event is classified as content or diagnostic, so a new event has to be sorted", () => {
+  const labelled = EVENT_LABELS.map(([e]) => e);
+  assert.deepEqual(
+    labelled.filter((e) => !(e in EVENT_KIND)),
+    [],
+    "events with no entry in EVENT_KIND (src/activity.ts): 'content' if a person reading the vault wants it in Changes, else 'diagnostic'",
+  );
+  assert.deepEqual(Object.keys(EVENT_KIND).filter((e) => !LABEL.has(e)), [], "EVENT_KIND names an event that has no label");
+  for (const [e, kind] of Object.entries(EVENT_KIND)) assert.ok(kind === "content" || kind === "diagnostic", `${e}: ${kind}`);
+});
+
+test("activity labels: the Changes feed asks for exactly the content events, and files and proposals are among them", () => {
+  assert.deepEqual([...CONTENT_EVENTS].sort(), Object.keys(EVENT_KIND).filter((e) => EVENT_KIND[e] === "content").sort());
+  for (const e of ["file.write", "file.delete", "file.erase", "proposal.open", "proposal.approve", "proposal.comment"]) {
+    assert.ok(CONTENT_EVENTS.includes(e), `${e} is content`);
+  }
+  for (const e of ["member.set", "variable.set", "claim.grant", "policy.set", "vault.export"]) {
+    assert.ok(!CONTENT_EVENTS.includes(e), `${e} is not content`);
+  }
 });
 
 test("activity labels: every event in the log has a plain label", async () => {

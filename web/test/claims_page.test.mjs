@@ -159,7 +159,7 @@ test("claims page: lists the path (linked to the file), holder and label", async
 test("diagnostics: /claims is the same page inside Diagnostics, with Claims and Diagnostics current and the headings in order", async () => {
   const h = await page(noa, claimsUrl(V.main));
   assert.match(h, new RegExp(`<a href="/v/${V.main}/diagnostics" aria-current="page">Diagnostics</a>`), "the Settings tab");
-  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.main}/flags">Flags</a><a href="/v/${V.main}/claims" aria-current="page">Claims</a></nav>`));
+  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.main}/flags">Flags</a><a href="/v/${V.main}/claims" aria-current="page">Claims</a><a href="/v/${V.main}/activity">Log</a></nav>`));
   assert.match(h, new RegExp(`href="/v/${V.main}/config" aria-current="page">Settings`), "the sidebar's Settings");
   assert.match(h, /For working out why something happened; most people never need it\./);
   assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, "one h1");
