@@ -11,8 +11,6 @@
 #   WEB_URL, MCP_URL   origins of the two apps (required; a trailing /mcp or /
 #                      on MCP_URL is dropped)
 #   KEEPALIVE_TOKEN    sent as x-keepalive to /healthz?db=1 when set
-#   CHECK_OAUTH=1      also check that the MCP 401 names resource_metadata
-#                      (after the OAuth chunk ships)
 #   DEPLOY_WAIT        seconds to keep retrying each check (default 300)
 #   EXPECT_VERSION     the release deployed (e.g. 0.2.0): both apps' /version
 #                      must answer it (needs jq)
@@ -99,9 +97,5 @@ if [ -n "${EXPECT_VERSION:-}" ]; then
 else
   echo "SKIP  /version (set EXPECT_VERSION to the release deployed)"
 fi
-if [ "${CHECK_OAUTH:-}" = 1 ]; then
-  check "mcp 401 names resource_metadata" oauth_401
-else
-  echo "SKIP  mcp 401 names resource_metadata (set CHECK_OAUTH=1 once MCP OAuth ships)"
-fi
+check "mcp 401 names resource_metadata" oauth_401
 exit $status
