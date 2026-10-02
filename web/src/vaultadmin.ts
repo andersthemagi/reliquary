@@ -24,7 +24,7 @@ import type pg from "pg";
 import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
-import { callout, confirmPage, csrfField, html, pageHeader, policyBadge, type CrumbPart, type Raw, type Tab } from "./html.js";
+import { callout, confirmPage, csrfField, html, pageHeader, plural, policyBadge, type CrumbPart, type Raw, type Tab } from "./html.js";
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { crumbs as fileCrumbs, deletePath, vaultShell } from "./files.js";
 import { usagePanel, vaultUsages } from "./plans.js";
@@ -33,7 +33,6 @@ import { watchingRoutes } from "./watching.js";
 const q = encodeURIComponent;
 const settingsPath = (id: string, rest = "") => vaultPath(id, `/config${rest}`);
 const filePath = (id: string, path: string) => vaultPath(id, `/file?path=${q(path)}`);
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // ---------------------------------------------------------------------------
 // The Settings tabs, shared with members.ts (and for rules.ts to adopt):

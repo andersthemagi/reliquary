@@ -30,7 +30,7 @@ const RETRY_AFTER_MS = 300;
 
 type Config = { on: true; key: string; from: string; api: string } | { on: false; why: string };
 
-const ADDRESS = /^[^\s<>@"]+@[^\s<>@"]+\.[^\s<>@"]+$/;
+export const ADDRESS = /^[^\s<>@"]+@[^\s<>@"]+\.[^\s<>@"]+$/;
 const NAMED = /^([^<>"\r\n]{1,100}) <([^\s<>@"]+@[^\s<>@"]+\.[^\s<>@"]+)>$/;
 
 export function validFrom(from: string): boolean {

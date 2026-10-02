@@ -25,6 +25,7 @@ import { callUpstreamTool, UpstreamError } from "./linkcall.js";
 import { discoveryAllowsLoopback } from "./discovery.js";
 import { openLink, SecretsError, type Sealed } from "./secrets.js";
 import { apiBody, fail, failure } from "./failure.js";
+import { BadRequest, readJson } from "./jsonbody.js";
 
 const MAX_BODY = 256 * 1024;
 const PATH = "/internal/link-call";
@@ -34,15 +35,6 @@ export function configureLinkProxy(env: NodeJS.ProcessEnv = process.env): void {
   const strict = env.VERCEL ? "VERCEL" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
   SECRET = env.LINK_PROXY_SECRET ?? "";
   if (strict && !SECRET) throw new Error(`Refusing to start: ${strict} is set but LINK_PROXY_SECRET is not`);
-}
-
-class BadRequest extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-  ) {
-    super(code);
-  }
 }
 
 function send(res: http.ServerResponse, status: number, body: object): void {
@@ -55,38 +47,6 @@ function authorized(header: string | string[] | undefined): boolean {
   if (!m) return false;
   const digest = (s: string) => createHash("sha256").update(s).digest();
   return timingSafeEqual(digest(m[1]), digest(SECRET));
-}
-
-function readJson(req: http.IncomingMessage, limit: number): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    if (Number(req.headers["content-length"] ?? 0) > limit) {
-      req.resume();
-      reject(new BadRequest(413, "too_large"));
-      return;
-    }
-    let size = 0;
-    let done = false;
-    const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => {
-      if (done) return;
-      size += c.length;
-      if (size > limit) {
-        done = true;
-        chunks.length = 0;
-        reject(new BadRequest(413, "too_large"));
-      } else chunks.push(c);
-    });
-    req.on("end", () => {
-      if (done) return;
-      done = true;
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
-      } catch {
-        reject(new BadRequest(400, "invalid_request"));
-      }
-    });
-    req.on("error", reject);
-  });
 }
 
 type Body = {

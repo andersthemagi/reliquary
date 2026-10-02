@@ -21,7 +21,7 @@
 // response.
 
 import { asPerson } from "./db.js";
-import { html, page, pageHeader, type CrumbPart, type Raw, type Tab } from "./html.js";
+import { html, page, pageHeader, plural, type CrumbPart, type Raw, type Tab } from "./html.js";
 import { notFound, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
 import { pendingPushes, type Environment } from "./variables.js";
@@ -42,7 +42,7 @@ export const ENV = /^[a-z][a-z0-9_-]{0,31}$/;
 
 export const q = encodeURIComponent;
 export const base = (id: string, rest = "") => vaultPath(id, `/variables${rest}`);
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+export { plural };
 
 // Who may do what with values, as the database decides it (docs/variables.md,
 // "What holds"): owners everywhere, editors outside owners-only environments.

@@ -7,6 +7,7 @@ import { html, page, type Raw, type Shell, type Theme } from "./html.js";
 import { siteHref } from "./hosts.js";
 import { fail, ownRaise, plainText, Refusal, type Failure } from "./failure.js";
 import type { Flash } from "./flash.js";
+import { UUID } from "./personref.js";
 
 // A refusal to show on the page the person was on (a flash, or the form
 // again): the reason and the reference. Our own raised exceptions and
@@ -27,7 +28,6 @@ export function refusalText(err: unknown): string {
   throw err;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const short = (id: string) => (UUID.test(id) ? id.slice(0, 8) : "?");
 // Text the person typed (a path, a vault name), shown back to them only and
 // never logged, and only when it is plain: at most 200 characters, no

@@ -80,7 +80,6 @@ export const preAlphaNote = () =>
 export type Nav =
   | "home"
   | "inbox"
-  | "review" // the old name of the inbox: marks Inbox as current
   | "vaults"
   | "activity"
   | "connect"
@@ -130,7 +129,7 @@ export type PageOpts = {
 const UUID_AT = /^\/v\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?]|$)/;
 
 const agoText = (iso: string): string => relativeTime(iso);
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // One inbox item as a link: where it goes, what it is, and a line of context.
 export function inboxItem(i: ShellItem): { href: string; title: string; meta: string } {
@@ -209,7 +208,7 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
   const total = s?.total ?? 0;
   const inbox = s
     ? html`<details class="menu-wrap inbox">
-      <summary class="button quiet icon-button" aria-label="${total ? `Inbox, ${total} waiting` : "Inbox, nothing waiting"}"${current("inbox", "review")}>${ICON_INBOX}${total ? html`<span class="count" aria-hidden="true">${total > 99 ? "99+" : total}</span>` : ""}</summary>
+      <summary class="button quiet icon-button" aria-label="${total ? `Inbox, ${total} waiting` : "Inbox, nothing waiting"}"${current("inbox")}>${ICON_INBOX}${total ? html`<span class="count" aria-hidden="true">${total > 99 ? "99+" : total}</span>` : ""}</summary>
       <div class="menu inbox-menu">
         <p class="menu-head"><span class="menu-label">Inbox</span><a href="/inbox">View all</a></p>
         ${s.items.length

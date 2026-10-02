@@ -15,7 +15,7 @@
 
 import type pg from "pg";
 import { emptyState, html, raw, time, type Raw } from "./html.js";
-import { personRef } from "./personref.js";
+import { personRef, UUID } from "./personref.js";
 
 export const PAGE_SIZE = 50;
 
@@ -82,7 +82,6 @@ const EVENTS = EVENT_LABELS;
 const GROUPS = EVENT_GROUPS;
 const LABEL = new Map(EVENTS);
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const validDay = (s: string) => DAY.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`));
 

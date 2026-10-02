@@ -23,7 +23,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { callout, confirmPage, csrfField, emptyState, html, pageHeader, raw, time, type Raw } from "./html.js";
+import { callout, confirmPage, csrfField, emptyState, html, pageHeader, plural, raw, time, type Raw } from "./html.js";
 import { deliverInvite, INVITE_TOKEN, type Delivery, invitePageBody, inviteLink, peekInvite, ROLE_TEXT, roleName } from "./invites.js";
 import { publicSiteOrigin } from "./hosts.js";
 import { mailerOn } from "./mailer.js";
@@ -37,7 +37,6 @@ import { settingsCrumb, settingsHeader } from "./vaultadmin.js";
 
 const ROLES = ["viewer", "editor", "owner"] as const;
 const membersPath = (id: string, rest = "") => vaultPath(id, `/config/members${rest}`);
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 type Member = { user_id: string; email: string | null; role: string; added_at: Date };
 type Invite = { id: string; email: string | null; role: string; created_at: Date; expires_at: Date; max_uses: number; uses_count: number };

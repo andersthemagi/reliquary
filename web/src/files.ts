@@ -15,6 +15,7 @@ import {
   html,
   menu,
   pageHeader,
+  plural,
   policyBadge,
   raw,
   tabs,
@@ -187,7 +188,6 @@ export function crumbs(id: string, v: Vault, path: string, isDir: boolean, here?
 
 export const deletePath = (id: string, path: string) => `${filePath(id, path)}&confirm=delete`;
 const erasePath = (id: string, path: string) => vaultPath(id, `/erase?path=${q(path)}`);
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // ---------------------------------------------------------------------------
 // Folders and files

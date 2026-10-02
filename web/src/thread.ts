@@ -10,9 +10,8 @@ import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
 import { csrfField, html, menu, time, when, type Raw } from "./html.js";
 import type { Ctx, Reply } from "./pages.js";
-import { personRef } from "./personref.js";
+import { personRef, UUID } from "./personref.js";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const proposalPath = (id: string, pid: string, rest = "") => `/v/${id}/proposals/${pid}${rest}`;
 
 // Proposals this person snoozed, still in force. Appended to the Review

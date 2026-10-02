@@ -43,7 +43,7 @@
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
 import { Refusal } from "./failure.js";
-import { callout, confirmPage, csrfField, html, notice, pageHeader, signsOut, themeButtons, time } from "./html.js";
+import { callout, confirmPage, csrfField, html, notice, pageHeader, plural, signsOut, themeButtons, time } from "./html.js";
 import { EMAIL } from "./signin.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 import { shortId } from "./personref.js";
@@ -215,7 +215,6 @@ type DeletionSummary = {
   connections: number;
   invites: number;
 };
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const NO_EMAIL_PHRASE = "delete my account";
 const crumb = [{ label: "Account settings", href: "/settings" }, { label: "Delete account" }];
 

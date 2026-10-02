@@ -9,7 +9,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { html, pageHeader, type Raw } from "./html.js";
+import { html, pageHeader, plural, type Raw } from "./html.js";
 import { render, vaultPath, type Ctx, type Reply } from "./pages.js";
 import { selfHosted } from "./selfhost.js";
 import { biggerPlanHref } from "./site.js";
@@ -105,7 +105,6 @@ export const peopleLimited = (u: VaultUsage) => u.maxMembers < NO_LIMIT_COUNT;
 export const storageLimited = (u: VaultUsage) => u.maxBytes < NO_LIMIT_BYTES;
 // Storage from 80% on is worth a word before anything is refused.
 export const storageNear = (u: VaultUsage) => storageLimited(u) && !storageOver(u) && u.bytes >= u.maxBytes * 0.8;
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const filled = (u: VaultUsage) => u.members + (u.invites ?? 0);
 const PLANS_DOC = html`<a href="/docs/concepts/plans-and-limits">Plans and limits</a>`;
 // How a limit is raised: by hand, by the operator (on a self-hosted

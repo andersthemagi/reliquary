@@ -30,13 +30,14 @@ import { fromDb, open, SecretsError, variablesConfigured } from "./secrets.js";
 import { limitToken } from "./ratelimit.js";
 import { precheckImport, sealItems, type ImportRefusal } from "./variables.js";
 import { apiBody, classify, doing, fail, failure } from "./failure.js";
+import { BadRequest, readJson } from "./jsonbody.js";
+import { UUID } from "./personref.js";
 
 // An own raise's reason, for a 400 (classify: our messages are for people).
 const refusalWhy = (err: unknown) => classify(err).why.replace(/\.$/, "");
 
 const PRM_PATH = "/.well-known/oauth-protected-resource/api/env";
 const TOKEN = /^Bearer (rle_[0-9a-f]{64})$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ENVIRONMENT = /^[a-z][a-z0-9_-]{0,31}$/;
 // A push is a .env file: 1 MiB is plenty, and bounds what one request can
 // make the server seal (200 values of 64 KiB would be 12.8 MiB).
@@ -113,55 +114,6 @@ async function asGrant<T>(g: Grant, fn: (c: pg.PoolClient) => Promise<T>): Promi
 }
 
 const STATUS: Record<string, number> = { unauthorized: 401, forbidden: 403, not_found: 404, push_not_allowed: 403, rate_limited: 429 };
-
-// A refusal with a fixed code: never an echo of the request.
-class BadRequest extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    readonly why?: string, // fixed text, never the request's
-  ) {
-    super(code);
-  }
-}
-
-// The request body as JSON, at most `limit` bytes. Never logged or echoed.
-function readJson(req: http.IncomingMessage, limit: number): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    if (!/^application\/json\b/.test(req.headers["content-type"] ?? "")) {
-      req.resume();
-      reject(new BadRequest(415, "unsupported_media_type"));
-      return;
-    }
-    if (Number(req.headers["content-length"] ?? 0) > limit) {
-      req.resume();
-      reject(new BadRequest(413, "too_large"));
-      return;
-    }
-    let size = 0;
-    let done = false;
-    const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => {
-      if (done) return;
-      size += c.length;
-      if (size > limit) {
-        done = true;
-        chunks.length = 0;
-        reject(new BadRequest(413, "too_large"));
-      } else chunks.push(c);
-    });
-    req.on("end", () => {
-      if (done) return;
-      done = true;
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
-      } catch {
-        reject(new BadRequest(400, "invalid_request"));
-      }
-    });
-    req.on("error", reject);
-  });
-}
 
 // A push: {"variables": {"NAME": "value", ...}, "refused": [{"line", "name", "reason"}]}.
 // The CLI parsed its file with the same rules (dotenv.ts); names and values
@@ -357,7 +309,7 @@ async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: 
     sendError(res, 503, "not_configured");
     return "not_configured";
   }
-  const { entries, refused } = pushBody(await readJson(req, MAX_PUSH_BYTES));
+  const { entries, refused } = pushBody(await readJson(req, MAX_PUSH_BYTES, { requireJsonContentType: true }));
   let r;
   try {
     // The rate limit before sealing (up to 200 values), in the same
