@@ -33,13 +33,12 @@ cd "$(dirname "$0")/.."
 ref=${SUPABASE_PROJECT_REF:-bigonndpibguxuwtysnx}
 host=${SUPABASE_POOLER_HOST:-aws-0-eu-central-1.pooler.supabase.com}
 engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
+source scripts/lib/psql-helpers.sh
 
 usage() { sed -n '6,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
-UUID='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 NAME='^[a-z][a-z0-9_]{0,31}$'
 EMAIL='^[^[:space:][:cntrl:]@]+@[^[:space:][:cntrl:]@]+\.[^[:space:][:cntrl:]@]+$'
-need() { [[ $2 =~ $3 ]] || { echo "That isn't $1: $2" >&2; exit 2; }; }
 
 # "500mb", "2gb", "0" or a plain byte count, decimal (1 MB = 1,000,000 bytes,
 # matching private.size_text) -> a byte count, or exits naming the problem.
@@ -53,21 +52,6 @@ bytes_of() {
     mb) echo $((n * 1000000)) ;;
     gb) echo $((n * 1000000000)) ;;
   esac
-}
-
-# psql with the SQL on stdin and the arguments as psql variables.
-run() {
-  if [ -n "${PLAN_DB_CONTAINER:-}" ]; then
-    "$engine" exec -i "$PLAN_DB_CONTAINER" psql -U postgres -d "${PLAN_DB_NAME:-postgres}" \
-      -X -q -v ON_ERROR_STOP=1 -P pager=off -P footer=off "$@"
-  else
-    [[ -s supabase/.db-password ]] || { echo "Missing supabase/.db-password." >&2; exit 1; }
-    "$engine" run --rm -i --network host -v "$PWD/supabase":/s:ro,Z -e REF="$ref" -e HOST="$host" \
-      docker.io/library/postgres:17 bash -c '
-        export PGPASSWORD=$(tr -d "[:space:]" < /s/.db-password)
-        exec psql "host=$HOST port=5432 dbname=postgres user=postgres.$REF sslmode=require" \
-          -X -q -v ON_ERROR_STOP=1 -P pager=off -P footer=off "$@"' psql "$@"
-  fi
 }
 
 # One row per vault: :'kind' is all, email or vault; :'arg' the email or id.
