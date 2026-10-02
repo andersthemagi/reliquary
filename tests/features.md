@@ -74,6 +74,15 @@ git). All four: `./test.sh`.
 | F198 | An agent's delete proposal over MCP | `propose` with `delete: true` on a canon file makes an open delete proposal and leaves the file readable and listed; once a person approves, `read_file` fails, `list_files` leaves it out, the log has its `file.delete` and the proposal is applied; `propose` with neither content nor delete is refused | `mcp/test/propose_delete.test.mjs#propose delete:` | `docs/public/concepts/proposals-and-review.md` |
 | F199 | Propose deleting a canon file in the web UI | A canon file's More menu has **Propose deleting…** (the editor has no delete), whose confirm page's **Propose deleting <file>** form, with a reason, makes a delete proposal by the person (not an agent) and lands on it; the file stays until approved; approving applies it, the file page is Not found and the log has one `file.delete` | `web/test/propose_delete.test.mjs#propose-delete:` | `docs/public/concepts/proposals-and-review.md` |
 
+## Threads in a vault (`20261004100000_threads.sql` onwards; docs/public/concepts/threads.md)
+
+Conversations between a vault's members and their agents. Not the proposal threads of F17, which are comments on one proposal.
+
+| ID | Feature | Acceptance criteria | Tests | Docs |
+|---|---|---|---|---|
+| F580 | Threads are never private, and stay in their vault | Every member who can read a vault (owner, editor or viewer, their agents, a read-only connection) reads every thread, message and addressee in it, side threads addressed to someone else included; an outsider, a connection scoped to another vault and anonymous read none; a message or an addressee can't sit in a thread of another vault, nor a thread anchor to another vault's proposal or step, whoever writes the row (composite keys); a thread anchors to one thing at most | `supabase/tests/vault_threads_test.sql#read:`, `supabase/tests/vault_threads_test.sql#outsider:`, `supabase/tests/vault_threads_test.sql#cross-vault:` | `docs/public/concepts/threads.md` |
+| F581 | Thread messages are append-only | Nobody signed in writes the thread tables directly, the owner included; no role, the table owner included, rewrites, deletes or truncates a message or changes who wrote it, deletes, renames or re-anchors a thread, or changes its addressees; a message's one change is its body blanked once, saying who and when, never undone; a thread's one change is its resolved state; removing a member leaves the threads addressed to them as they were, and they read none of it; deleting the vault removes its threads, messages and addressees, and no other vault's | `supabase/tests/vault_threads_test.sql#append-only:`, `supabase/tests/vault_threads_test.sql#membership:`, `supabase/tests/vault_threads_test.sql#delete vault:` | `docs/public/concepts/threads.md` |
+
 ## Tokens and MCP
 
 | ID | Feature | Acceptance criteria | Tests | Docs |

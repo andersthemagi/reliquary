@@ -16,6 +16,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Canon, open and rules](concepts/canon-and-rules.md)
 - [Path ownership](concepts/path-ownership.md)
 - [Proposals and review](concepts/proposals-and-review.md)
+- [Threads](concepts/threads.md)
 - [The top bar, inbox and account](concepts/inbox-and-account.md)
 - [Flags](concepts/flags.md)
 - [Claims](concepts/claims.md)
