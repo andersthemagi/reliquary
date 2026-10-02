@@ -4,7 +4,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Access log.** A vault's append-only record of every set, rotate, delete, read, reveal and refused attempt on its environment variables. See [Environment variables](../concepts/variables.md#the-access-log).
 
-**Activity.** A vault's append-only log of every change: who, which agent, what and where. See [Activity](../concepts/activity.md).
+**Activity.** The append-only log of every change: who, which agent, what and where. The top bar's **Activity** covers all your vaults, and a vault's **Log** (under **Settings**, **Diagnostics**) covers that vault. See [Changes and the log](../concepts/activity.md).
 
 **Agent.** An AI tool or program acting for a person through a connection. It has its person's role, minus the ceiling. See [Agents and the ceiling](../concepts/agents.md).
 
@@ -21,6 +21,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 **Data fencing.** Wrapping text people and agents wrote in random markers when it goes to an agent, so it reads as data and can't pose as instructions. See [MCP tools](mcp-tools.md#data-fencing).
 
 **Default policy.** What a vault's paths are, canon or open, where no rule says otherwise. Set on **Settings**.
+
+**Diagnostics.** The part of a vault's **Settings** for working out why something happened: its Flags, its Claims and the full Log. Most people never need it. See [Vaults, files and folders](../concepts/vaults-and-files.md#diagnostics).
 
 **Display name.** An optional name you set on **Account settings**, shown to people who share a vault with you next to your email. Only you set it, in the web app. See [The top bar, inbox and account](../concepts/inbox-and-account.md#display-name).
 

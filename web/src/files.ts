@@ -49,7 +49,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "activity" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
+export type Section = "files" | "proposals" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // One round trip: the live files, every folder above them, each one's
@@ -99,7 +99,7 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
   const sections: { section: Section; href: string; label: string; count?: number }[] = [
     { section: "files", href: vaultPath(v.id), label: "Files" },
     { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined },
-    { section: "activity", href: vaultPath(v.id, "/activity"), label: "Activity" },
+    { section: "changes", href: vaultPath(v.id, "/changes"), label: "Changes" },
     { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables" },
     { section: "links", href: vaultPath(v.id, "/links"), label: "Links" },
     { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings" },

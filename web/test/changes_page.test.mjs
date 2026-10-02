@@ -300,3 +300,34 @@ test("changes: opening it marks no flag shown for anyone", async () => {
   for (const s of [hana, jun]) assert.equal((await get(s, changesUrl(V.main))).status, 200);
   assert.deepEqual([await waiting(HANA), await waiting(IVO)], before);
 });
+
+// ---------------------------------------------------------------------------
+// The full log is the Log tab under Diagnostics, at the address Activity had
+
+test("diagnostics: /activity and /log are the full log inside Diagnostics, as its Log tab, with the filters and every event", async () => {
+  for (const path of [`/v/${V.main}/activity`, `/v/${V.main}/log`]) {
+    const h = await page(hana, path);
+    assert.match(h, /<h1>Settings<\/h1>/, path);
+    assert.match(h, /<h2>Log<\/h2>/, path);
+    assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, `${path}: one h1`);
+    assert.match(h, new RegExp(`<a href="/v/${V.main}/diagnostics" aria-current="page">Diagnostics</a>`), `${path}: the Settings tab`);
+    assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.main}/flags">Flags</a><a href="/v/${V.main}/claims">Claims</a><a href="/v/${V.main}/activity" aria-current="page">Log</a></nav>`), path);
+    assert.match(h, new RegExp(`<form method="get" action="/v/${V.main}/activity" class="panel filters"`), `${path}: the filter form`);
+    assert.match(h, /Every change to this vault, newest first\. This log can only be added to/, path);
+    // Everything the Changes feed leaves out is here.
+    for (const label of ["Created the vault", "Changed a rule", "Made jun@example.test a viewer", "Commented on a proposal"]) {
+      assert.ok(h.includes(`>${label}</td>`) || h.includes(`>${label}</a></td>`), `${path}: ${label}`);
+    }
+  }
+});
+
+test("diagnostics: the vault's own navigation has Changes where Activity was, and no entry for the log", async () => {
+  const h = await page(hana, changesUrl(V.main));
+  const navs = h.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
+  assert.equal(navs.length, 2, "the wide sidebar and the phone tabs");
+  for (const nav of navs) {
+    assert.match(nav, new RegExp(`<a href="/v/${V.main}/changes" aria-current="page">Changes</a>`));
+    assert.doesNotMatch(nav, /Activity|\/activity|Log/);
+  }
+  assert.match(await page(hana, `/v/${V.main}/diagnostics`), /<dt><a href="[^"]+\/activity">Log<\/a><\/dt><dd>Every event the vault recorded/);
+});

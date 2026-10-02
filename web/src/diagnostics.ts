@@ -8,6 +8,7 @@
 //   GET /v/:id/diagnostics   what each tab is for; reads nothing that changes
 //   GET /v/:id/flags         the Flags tab (flagspage.ts)
 //   GET /v/:id/claims        the Claims tab (claimspage.ts)
+//   GET /v/:id/activity      the Log tab: the full log (pages.ts, activity.ts)
 //
 // The landing page is not the Flags tab on purpose: opening Flags marks the
 // person's flags shown, and finding Diagnostics in Settings shouldn't.
@@ -18,14 +19,16 @@ import { vaultShell } from "./files.js";
 import { notFound, render, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { settingsHeader } from "./vaultadmin.js";
 
-export type DiagTab = "flags" | "claims";
+export type DiagTab = "flags" | "claims" | "log";
 
 // The tabs, in order, and one line each for the landing page.
 const DIAG_TABS: { tab: DiagTab; label: string; what: string }[] = [
   { tab: "flags", label: "Flags", what: "What changed in this vault since you were last told. Opening it marks what it lists as shown for you, not for your agents." },
   { tab: "claims", label: "Claims", what: "Who is working on which path right now, and for how long. Owners and editors can break a claim." },
+  { tab: "log", label: "Log", what: "Every event the vault recorded, including members, rules, variables and claims. It can only be added to." },
 ];
-const tabHref = (id: string, tab: DiagTab) => vaultPath(id, `/${tab}`);
+// The Log keeps the address the vault's Activity page always had.
+const tabHref = (id: string, tab: DiagTab) => vaultPath(id, tab === "log" ? "/activity" : `/${tab}`);
 
 export const DIAGNOSTICS_NOTE = "For working out why something happened; most people never need it.";
 

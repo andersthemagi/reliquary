@@ -23,7 +23,7 @@ The log is append-only: no row can be updated or deleted, by anyone, including t
 ## Reading it
 
 - **Activity** in the top bar covers all your vaults.
-- A vault's **Activity** covers that vault.
+- In a vault, **Settings**, **Diagnostics**, **Log** covers that vault.
 - A file's **History** tab is the same log, for one file.
 
 Each event is named in plain words, like "Approved", "Set a variable" or "Added an environment". Member changes say whom and which role, like "Made ben@example.test an editor", "Removed ben@example.test from the vault" or "Invited someone as a viewer". An invite never shows the address it was sent to.

@@ -28,7 +28,7 @@ import { claimAction, claims } from "./claimspage.js";
 import { setClaimRuleAction } from "./claimrulespage.js";
 import { flags } from "./flagspage.js";
 import { changes } from "./changes.js";
-import { diagnostics } from "./diagnostics.js";
+import { diagnostics, diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inboxInviteRoutes, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
@@ -512,13 +512,12 @@ async function activity(ctx: Ctx, id: string): Promise<Reply> {
     const v = await vault(c, ctx, id);
     if (!v) return null;
     const body = html`
-      ${pageHeader({ title: "Activity" })}
-      <p class="lede">Every change to this vault, newest first. This log can only be added to: nothing in it is ever edited or deleted.</p>
+      ${diagSection("Log", "Every change to this vault, newest first. This log can only be added to: nothing in it is ever edited or deleted.")}
       ${await activityBody(c, { me: ctx.userId, url: ctx.url, base: vaultPath(id, "/activity"), scope: { vaultId: id } })}`;
-    return { v, shell: await vaultShell(c, ctx, v, { section: "activity" }, body) };
+    return { v, shell: await vaultShell(c, ctx, v, { section: "diagnostics" }, diagnosticsFrame(id, v, "log", body)) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, "Activity", data.shell, "vaults");
+  return render(ctx, "Log", data.shell, "vaults");
 }
 
 async function allActivity(ctx: Ctx): Promise<Reply> {
