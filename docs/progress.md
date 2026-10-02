@@ -400,8 +400,28 @@ start the next one.
   Registry: `tests/features.md` F440-F443. Docs: `docs/public/concepts/claims.md`,
   `docs/public/concepts/agents.md`'s ceiling list, `docs/public/roadmap.yml`.
 - **Phase 3: work plans** (steps with blockers, waiting without polling).
-  Not started; starts when the maintainer decides to, informed by how
-  claims hold up in real use now that phase 2 has shipped.
+  Started 2026-10-02 (owner's decision), informed by how claims held up
+  in real use after phase 2 shipped. Also that day: item 8's six
+  proposed limits (active claims per vault, steps per plan, blockers per
+  step, label length, title length, the per-person place-in-line cap),
+  open since CL-0.2, confirmed by the maintainer as given (comment on
+  #58), so CL-3.1 and onward build against real numbers, not a guess.
+  Built so far:
+  - the work plan block's grammar and parser (CL-3.1, `mcp/src/
+    workplan-format.ts`): a fenced `work_plan` block lists steps (`key`,
+    `title`, optional `blocked_by`, `cites`, `gate: review`); finding the
+    block, parsing it into steps, and refusing a malformed one with the
+    line and reason -- no block, two blocks, one never closed, a
+    duplicate key, an unknown field or blocker, a step blocked by
+    itself, a longer cycle, a bad `gate` or `cites` entry -- are all the
+    same module does; registering a parsed plan into the database (CL-3.2)
+    re-checks cycles and blockers there too, per item 12's "one way in".
+    Pure and dependency-free on purpose: no database, so its hostile
+    tests (`mcp/test/workplan_format.test.mjs`) run without
+    `mcp/test.sh`'s containers, the only test file in the repo that
+    doesn't. Registry: `tests/features.md` F445. Docs:
+    `docs/public/concepts/claims.md`'s new "Work plans" section, which
+    says plainly that nothing registers a plan from a file yet.
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
-plans", CL-0.2); phase 2 is built as of this entry, phase 3 is not.
+plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.

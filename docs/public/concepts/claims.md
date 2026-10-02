@@ -39,3 +39,22 @@ Every vault has a **Claims** section listing who's claimed what, and how much lo
 ## Export, delete and erase
 
 Claims are state, not content: deleting a vault clears its claims along with everything else, and erasing a file's content releases any claim on it, since a claim on content that no longer exists means nothing. Neither is exported: see [Export, delete and erase](export-delete-erase.md).
+
+## Work plans
+
+A work plan is steps with dependencies, so no agent is handed a step before the ones it's blocked by are done. A plan lives in its own file, as a fenced block:
+
+```work_plan
+- key: fetch-data
+  title: Fetch raw data from the api
+  cites: docs/data-source.md@3fa85f64-5717-4562-b3fc-2c963f66afa6
+- key: clean-data
+  title: Clean and normalize
+  blocked_by: fetch-data
+  cites: docs/data-source.md@3fa85f64-5717-4562-b3fc-2c963f66afa6
+  gate: review
+```
+
+Each step has a `key` (lowercase letters, digits and hyphens, unique in the plan) and a `title`. `blocked_by` names other steps' keys, comma-separated; `cites` names canon paths this step's work depends on, each as `path@version`, comma-separated; `gate: review` holds a step's dependents until a person approves it directly, or its proposal is applied. A malformed block, a blocker that doesn't exist, or a cycle of steps blocking each other is refused, naming the line and why.
+
+This is the format only. Nothing in Reliquary registers a plan from a file yet, so writing this block today doesn't create any steps to claim or wait on; that's the next piece of this effort (tracking issue [#52](https://github.com/andersthemagi/reliquary/issues/52)).

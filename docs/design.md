@@ -598,17 +598,18 @@ gets a budget of 300 `request_work` calls a minute across all its
 people and agents together, and the default gap between full
 evaluations is 15 minutes with a 10 second floor (item 3).
 
-**Open, owner: maintainer.** The other categories above (active claims
-per vault, steps per plan, blockers per step, label length, title
-length, and the per-person place-in-line cap) have no chosen number
-yet. Proposed here, by analogy with the nearest existing limits
-(`REASON`'s 4000 characters for a proposal reason or comment; a vault
-name's 100 characters; membership's 20 invites an hour): a label of 200
-characters, a title of 200 characters, 500 active claims per vault, 500
-steps per plan, 50 blockers per step, and 3 places in line per person
-across a vault. Flagged on the tracking issue (a comment on #58) for the
-maintainer to confirm or override before CL-2.x/CL-3.x build against
-them, not guessed silently, per the tracking issue's own instruction.
+**Confirmed, 2026-10-02** (owner's call, before CL-3.1 built against
+them): the other categories above (active claims per vault, steps per
+plan, blockers per step, label length, title length, and the per-person
+place-in-line cap) had no chosen number as of CL-0.2. Proposed there by
+analogy with the nearest existing limits (`REASON`'s 4000 characters for
+a proposal reason or comment; a vault name's 100 characters;
+membership's 20 invites an hour) and confirmed as starting points, not
+measurements, same spirit as the presets in item 3: a label of 200
+characters (already shipped this way in phase 2's `path_claims`), a
+title of 200 characters, 500 active claims per vault, 500 steps per
+plan, 50 blockers per step, and 3 places in line per person across a
+vault.
 
 ### 9. Events
 

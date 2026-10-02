@@ -27,12 +27,12 @@ else mid-flight.
 Also (owner's decision, 2026-09-30, tracking issue #52): compare-and-swap
 writes, path claims and work plans start now too, another deliberate,
 logged exception, in three phases — phase 1 (compare-and-swap writes) and
-phase 2 (claims) are shipped (2026-10-01). Phase 3 (work plans) starts
-whenever the maintainer decides to: no fixed day-count gate (an earlier
-version of this required 14 and 30 days respectively; dropped the same
-day, same decision). Usage is tracked informally in `docs/progress.md` as
-each phase ships, for the maintainer's own judgement, not as a formal
-precondition.
+phase 2 (claims) are shipped (2026-10-01); phase 3 (work plans) started
+2026-10-02, the maintainer's own call, informed by how claims held up in
+real use, not a calendar (an earlier version of this required 14 and 30
+days respectively; dropped the same day as the first decision). Usage is
+tracked informally in `docs/progress.md` as each phase ships, for the
+maintainer's own judgement, not as a formal precondition.
 
 All of it needs podman or docker; nothing needs Node installed on the host.
 
