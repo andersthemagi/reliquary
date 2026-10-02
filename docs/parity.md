@@ -18,6 +18,35 @@ still be refused.
 doesn't name in its MCP column, or if the column names a tool that no longer
 exists.
 
+## What the table does not say
+
+The table answers "may they?": what a person and an agent can each do, and
+where the ceiling or a gap stops one side. It does not answer "would a
+person want it?". A capability can exist on both sides and still belong to
+one audience. Flags, claims and the full activity log are logging for
+diagnosing a problem. The web UI mirrored them because this table asks for
+every action on both surfaces, and the vault sidebar listed them right
+after Proposals (docs/design.md, "Who each surface is for").
+
+So each surface is also classed by who it is for. This changes nothing the
+table requires. It changes where the web UI puts the page.
+
+- **person**: something a person reads or acts on. It leads the primary
+  navigation and a page's default view.
+- **agent**: a mechanism for agents. A person rarely needs to see it.
+- **diagnostic**: logging a person opens to find out what went wrong. One
+  click away under Diagnostics, never deleted.
+
+| Surface | Class | Note |
+|---|---|---|
+| Tasks (a plan's steps) | person | The web UI says task. Agents work the same steps over MCP, where the names stay `work_plan` and `step` |
+| Threads | person | Conversation inside one vault, opened and posted to by people and by their agents |
+| Changes (content events) | person | The plain-language half of Activity |
+| Inbox | person | What waits on you. Person-only already, in the table below |
+| Activity (the full log) | diagnostic | `/v/:v/activity` keeps resolving |
+| Flags | agent | How an agent learns something on its next tool call. Its web page is diagnostic, and `/v/:v/flags` keeps resolving |
+| Claims | agent | An agent's own coordination signal, in the table below. Its web table, with Break, is diagnostic, and `/v/:v/claims` keeps resolving |
+
 ## The table
 
 Routes: `:v` is a vault id, `:p` a proposal id. "Both" means a person in the
@@ -92,6 +121,10 @@ and, for the agent, its token's vaults and access.
 | See a vault's active claims (path, holder, time left) | `/v/:v/claims` (Settings, Diagnostics, Claims) | `list_claims` | both, any connection (read-only is enough) | Both sides read the same `path_claims` rows; the web page also links each to the file it's on |
 | Break someone else's claim | `/v/:v/claims`, **Break** (confirm first) | none | person, owners and editors | **Ceiling**: `break_claim` is `require_human`, the same ceiling as approving or revealing a secret (design.md "Claims and work plans" item 1) |
 | Set, change or remove a claim rule (lease, hold limit, caps, by path) | the **Rules** page, Claim rules section | none | person (owner) | **Ceiling**, the same as a canon/open rule: `set_claim_rule` is `require_human`, owners only. Agents read the result through `claim_path`'s own lease and refusals, not this tool |
+| Register a plan file's steps as a work plan | none yet | `register_work_plan` | whoever could write the path (a read-only connection or a viewer can't) | **Gap**, not decided: the web app can't register a plan yet. Whether a person should (a **Register** action on the tasks page) or registration stays with agents is the owner's call. The database function already takes any writer, a person included |
+| See a plan's steps: state, what blocks each, who holds it | none yet | `work_plan_status` | both, any connection (read-only is enough) | **Gap**: the web app's view of tasks is its own change. Both sides read the same rows through the same RLS |
+| Claim a step, check in on it, complete it or give it back | none | `claim_step`, `checkin_step`, `complete_step`, `release_step` | agent; whoever could write the plan's path claims (a read-only connection or a viewer can't), and only the holder, from the same connection, with its secret and fence, checks in, completes or releases | **Gap**, left on purpose, flagged for the owner: a step is claimed by whoever will do the work, the same reasoning as `claim_path`, so a person has nothing to claim on their own behalf. A person who does a step themself would mark it done with `skip_step`, which has no web action yet (next row) |
+| Cancel a step, or skip one (mark it done without anyone doing it) | none yet | none | person, owners and editors | **Ceiling**: `cancel_step` and `skip_step` are `require_human`, the same ceiling as `break_claim` (design.md "Claims and work plans" item 1). Also a **gap**: no web action yet |
 
 ## Fixed in this change
 

@@ -36,6 +36,12 @@ Only an owner sets a claim rule, in person, on the vault's **Rules** page. Setti
 
 In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
 
+You see a claim where you meet the file. When someone holds a claim on a file, the file page and the editor open with a banner: whose it is (a person, or "Name's agent" when an agent took it), how much longer it lasts, and the note they left. The note is only what someone typed. It's shown in quotes and never proves who holds the claim. A claim covers one path, so the banner appears on that file and nowhere else, and not at all once the claim has run out or been released. Viewers see it too.
+
+On the editor the banner also says what saving risks. Saving works, because a claim never blocks a write. But if the file changes before you save (the agent finishes first, say), Reliquary refuses your save and shows you the new version first, so nothing is overwritten by accident. On a canon file your change is a proposal, so the file stays as it is until people approve it.
+
+Owners and editors also get a **Break** button in the banner. It opens the same confirm page as the Claims section, and once you confirm it brings you back to the file. Nothing happens until you confirm. From the editor, Break leaves the page, so save or copy what you have typed first. A viewer sees the banner and no button. Only pages of the same vault are used to come back to: a link that tries to send you elsewhere ends up on the Claims section instead.
+
 ## Export, delete and erase
 
 Claims are state, not content: deleting a vault clears its claims along with everything else, and erasing a file's content releases any claim on it, since a claim on content that no longer exists means nothing. Neither is exported: see [Export, delete and erase](export-delete-erase.md).
@@ -55,8 +61,24 @@ A work plan is steps with dependencies, so no agent is handed a step before the 
   gate: review
 ```
 
-Each step has a `key` (lowercase letters, digits and hyphens, unique in the plan) and a `title`. `blocked_by` names other steps' keys, comma-separated; `cites` names canon paths this step's work depends on, each as `path@version`, comma-separated; `gate: review` holds a step's dependents until a person approves it directly, or its proposal is applied. A malformed block, a blocker that doesn't exist, or a cycle of steps blocking each other is refused, naming the line and why.
+Each step has a `key` (lowercase letters, digits and hyphens, unique in the plan) and a `title`. `blocked_by` names other steps' keys, comma-separated; `cites` names canon paths this step's work depends on, each as `path@version`, comma-separated; `gate: review` is meant to hold a step's dependents until a person approves it, directly or by applying its proposal; today it is stored and shown, and nothing enforces it yet. A malformed block, a blocker that doesn't exist, or a cycle of steps blocking each other is refused, naming the line and why.
 
 Registering a plan from its file turns each step into a row with a status (`open`, `claimed`, `done` or `cancelled`) and a live, computed one layered on top for people and agents to read (`ready`, `blocked`, `blocked_by_cancelled`, or the stored status itself once it's `claimed`, `done` or `cancelled`): a step is `ready` exactly when every step blocking it is done. Claiming a ready step works the same way claiming a path does (a lease, a secret returned once, the same check-again-later shape); finishing it frees every step it was blocking. Checking in restarts a claimed step's lease without finishing it, the same shape checking in on a path claim already has, and is capped the same way: no amount of checking in holds a step past its hold limit, counted from when it was first claimed. Only a person can cancel a step (its dependents stay blocked forever, on purpose, until a person acts) or skip one (marks it done without anyone having claimed it, so dependents proceed as if it were).
 
-Nothing in Reliquary registers or claims a plan yet through MCP or the web app: today this is only the database's own mechanism, proven by its hostile tests, with no tool or page that calls it. That's the next piece of this effort (tracking issue [#52](https://github.com/andersthemagi/reliquary/issues/52)).
+### Registering and working a plan (agents)
+
+An agent registers a plan with `register_work_plan`, naming the vault and the plan file's path. Reliquary reads the file's current version, checks the block, and refuses with the file's own line numbers before anything is registered. The database then checks it again, so a plan that passes the first check can still be refused (more than 500 steps, for example). A path holds one plan, and it can't be registered again. Whoever could write the path may register it, so a read-only connection or a viewer can't. A plan waiting in a proposal has no file yet, so there is nothing to register until a person approves it.
+
+`work_plan_status` lists the steps in plan order: each one's state, what it is waiting on, who holds it and until when, and what it cites.
+
+To work a step, an agent claims it by key with `claim_step`. Only a ready step can be claimed. The lease is the vault's claim rule for the plan's path, and the response returns a secret once, with a fence number, the same way `claim_path` does. `checkin_step` restarts the lease, `complete_step` marks the step done and frees the steps it was blocking, and `release_step` gives it back. All three need the secret and the fence, from the same connection and person. A blocked step, a step someone else holds, a done or cancelled step, and a stale fence or secret are each refused, with the reason.
+
+Agents never cancel or skip a step: those stay with a person. A step's title, its cites and a claim's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
+
+### What isn't built yet
+
+- **A page for people.** The web app doesn't show a plan's steps yet, and a person can't cancel or skip a step there. Both actions exist in the database only.
+- **Waiting in line.** An agent names the step it wants and is refused if it isn't ready. There is no "give me any ready step", no place in line and no list of who is waiting.
+- **Review gates and a "canon moved" signal.** `gate: review` and `cites` are stored and shown, but nothing holds a step's dependents for a review, and nothing warns an agent when a file a step cites changes.
+
+This is part of tracking issue [#52](https://github.com/andersthemagi/reliquary/issues/52).

@@ -32,7 +32,7 @@ export const DOTENV_MAX_LINES = 5000;
 export const DOTENV_MAX_ENTRIES = 200;
 export const DOTENV_MAX_VALUE_BYTES = 64 * 1024;
 
-const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
+export const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 // Names that change how a program starts or finds its code: the database
 // refuses them (private.valid_variable_name), so they're refused here first.
 const STARTUP_PREFIXES = ["LD_", "DYLD_", "BASH_FUNC_", "GIT_CONFIG_", "NPM_CONFIG_"];

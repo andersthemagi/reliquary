@@ -11,15 +11,6 @@
 insert into t.ids select 'team', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
 select t.run('ana', format($q$select public.set_policy(%L, 'canon/', 'canon', 1)$q$, t.id('team')));
 
-create function t.tok(p_name text) returns uuid language sql as
-$$ select id from public.access_tokens where name = p_name $$;
-
--- Acts through a token exactly as the MCP server (or the env API) does.
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
-  select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
-$$;
-
 -- The error message p_sql raises as p_user (NULL if it doesn't raise).
 create function t.errmsg(p_user text, p_sql text, p_agent text default null) returns text
 language plpgsql as $$

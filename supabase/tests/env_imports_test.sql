@@ -66,7 +66,7 @@ begin
 end $$;
 
 create function t.g(p_name text) returns uuid language sql as $$ select id from t.grants where name = p_name $$;
-create function t.tok(p_name text) returns uuid language sql as
+create function t.pat_tok(p_name text) returns uuid language sql as
 $$ select id from public.access_tokens where name = p_name and kind = 'pat' $$;
 
 -- Through a grant or token, as the web app (CLI) or MCP server does.
@@ -145,7 +145,7 @@ select t.expect('grant: consent records whether the CLI may push, and the defaul
   'ana-nopush=false,ana-push=true,false');
 
 select t.expect('grant: only a CLI grant can carry the push permission',
-  t.run_role('postgres', format($q$update public.access_tokens set env_push = true where id = %L returning 1$q$, t.tok('ana-pat'))),
+  t.run_role('postgres', format($q$update public.access_tokens set env_push = true where id = %L returning 1$q$, t.pat_tok('ana-pat'))),
   'ERR 23514');
 
 select t.expect('grant: an agent can''t make a CLI grant that pushes',
@@ -218,7 +218,7 @@ select t.expect('create: an outsider gets not found',
 
 select t.expect('create: an agent can''t create an import: MCP OAuth grant, personal token, act without a token (logged)',
   t.err(t.via('ana', t.g('ana-mcp'), t.create_sql('team', array['development'], array['X_KEY']), 'Chat'))
-  || ',' || t.err(t.via('ana', t.tok('ana-pat'), t.create_sql('team', array['development'], array['X_KEY']), 'ana-pat'))
+  || ',' || t.err(t.via('ana', t.pat_tok('ana-pat'), t.create_sql('team', array['development'], array['X_KEY']), 'ana-pat'))
   || ',' || t.err(t.run('ana', t.create_sql('team', array['development'], array['X_KEY']), 'Some agent'))
   || ',' || t.q($s$select count(*) from public.env_access_log where vault_id = t.id('team') and action = 'refused'
               and detail ->> 'reason' = 'an agent can''t send values'$s$),
@@ -337,7 +337,7 @@ select t.expect('apply: the CLI that pushed can''t apply it (logged), nor reject
 
 select t.expect('apply: no agent can apply: MCP OAuth grant, personal token, act without a token, reliquary_mcp',
   t.err(t.via('ana', t.g('ana-mcp'), t.apply_sql(t.id('push1')), 'Chat'))
-  || ',' || t.err(t.via('ana', t.tok('ana-pat'), t.apply_sql(t.id('push1')), 'ana-pat'))
+  || ',' || t.err(t.via('ana', t.pat_tok('ana-pat'), t.apply_sql(t.id('push1')), 'ana-pat'))
   || ',' || t.err(t.run('ana', t.apply_sql(t.id('push1')), 'Some agent'))
   || ',' || t.err(t.run_session('reliquary_mcp', jsonb_build_object('sub', t.id('ana'), 'role', 'authenticated'), t.apply_sql(t.id('push1'))))
   || ',' || t.q($s$select status from public.env_imports where id = t.id('push1')$s$),

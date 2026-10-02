@@ -79,7 +79,7 @@ create function t.run_via(p_user text, p_grant uuid, p_sql text, p_label text de
   select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
     'act', jsonb_build_object('sub', p_grant, 'name', p_label, 'tok', p_grant)), p_sql)
 $$;
-create function t.tok(p_name text) returns uuid language sql as
+create function t.pat_tok(p_name text) returns uuid language sql as
 $$ select id from public.access_tokens where name = p_name and kind = 'pat' $$;
 
 -- Runs p_sql with the session logged in as p_login (e.g. reliquary_mcp),
@@ -157,7 +157,7 @@ select t.expect('set: an outsider cannot set a value', t.setv('dee', 'team', 'DE
 select t.expect('set: anonymous cannot set a value', t.setv(null, 'team', 'ANON_KEY', 'development'), 'ERR 42501');
 select t.expect('set: the owner''s agent cannot set a value', t.setv('ana', 'team', 'AGENT_KEY', 'development', 'x', 'Claude Code'), 'ERR 42501');
 select t.expect('set: an MCP token cannot set a value',
-  t.run_via('ana', t.tok('ana-pat'), t.setv_sql('team', 'PAT_KEY', 'development'), 'ana-pat'), 'ERR 42501');
+  t.run_via('ana', t.pat_tok('ana-pat'), t.setv_sql('team', 'PAT_KEY', 'development'), 'ana-pat'), 'ERR 42501');
 select t.expect('set: an OAuth grant cannot set a value',
   t.run_via('ana', t.g('ana-mcp'), t.setv_sql('team', 'MCP_KEY', 'development'), 'Chat'), 'ERR 42501');
 select t.expect('set: a CLI grant cannot set a value',
@@ -205,11 +205,11 @@ select t.expect('names: the owner lists names and environments',
 select t.expect('names: a viewer sees the names too',
   t.run('cal', format($q$select count(*) from public.variables where vault_id = %L$q$, t.id('team'))), '2');
 select t.expect('names: an MCP agent sees names and environments (read-only token too)',
-  t.run_via('ana', t.tok('ana-pat-ro'), format($q$select count(*) from public.variable_values where vault_id = %L$q$, t.id('team')), 'ana-pat-ro'), '3');
+  t.run_via('ana', t.pat_tok('ana-pat-ro'), format($q$select count(*) from public.variable_values where vault_id = %L$q$, t.id('team')), 'ana-pat-ro'), '3');
 select t.expect('names: an outsider sees no names',
   t.run('dee', format($q$select count(*) from public.variables where vault_id = %L$q$, t.id('team'))), '0');
 select t.expect('names: a token scoped to Side sees none of Team''s names',
-  t.run_via('ana', t.tok('ana-pat-side'), format($q$select count(*) from public.variables where vault_id = %L$q$, t.id('team')), 'ana-pat-side'), '0');
+  t.run_via('ana', t.pat_tok('ana-pat-side'), format($q$select count(*) from public.variables where vault_id = %L$q$, t.id('team')), 'ana-pat-side'), '0');
 select t.expect('names: a CLI grant sees nothing through RLS',
   t.run_via('ana', t.g('ana-cli'), $q$select count(*) from public.variables$q$), '0');
 
@@ -219,7 +219,7 @@ select t.expect('names: a CLI grant sees nothing through RLS',
 select t.expect('ciphertext: the owner cannot select it',
   t.run('ana', $q$select count(*) from private.variable_secrets$q$), 'ERR 42501');
 select t.expect('ciphertext: an MCP agent cannot select it',
-  t.run_via('ana', t.tok('ana-pat'), $q$select count(*) from private.variable_secrets$q$, 'ana-pat'), 'ERR 42501');
+  t.run_via('ana', t.pat_tok('ana-pat'), $q$select count(*) from private.variable_secrets$q$, 'ana-pat'), 'ERR 42501');
 select t.expect('ciphertext: a CLI grant cannot select it',
   t.run_via('ana', t.g('ana-cli'), $q$select count(*) from private.variable_secrets$q$), 'ERR 42501');
 select t.expect('ciphertext: the MCP server''s role cannot select it',
@@ -277,7 +277,7 @@ select t.expect('reveal: anonymous is unauthorized', t.err(t.run(null, t.reveal_
 select t.expect('reveal: the owner''s agent cannot reveal',
   t.err(t.run('ana', t.reveal_sql('team', 'API_KEY', 'development'), 'Claude Code')), 'forbidden');
 select t.expect('reveal: an MCP token cannot reveal',
-  t.err(t.run_via('ana', t.tok('ana-pat'), t.reveal_sql('team', 'API_KEY', 'development'), 'ana-pat')), 'forbidden');
+  t.err(t.run_via('ana', t.pat_tok('ana-pat'), t.reveal_sql('team', 'API_KEY', 'development'), 'ana-pat')), 'forbidden');
 select t.expect('reveal: an OAuth grant cannot reveal',
   t.err(t.run_via('ana', t.g('ana-mcp'), t.reveal_sql('team', 'API_KEY', 'development'), 'Chat')), 'forbidden');
 select t.expect('reveal: a CLI grant cannot reveal (it reads whole environments, logged as read)',
@@ -329,7 +329,7 @@ select t.expect('read: a person in person reads one value at a time, not whole e
 select t.expect('read: an agent without a token cannot read',
   t.err(t.run('ana', t.read_sql('team', 'development'), 'Claude Code')), 'forbidden');
 select t.expect('read: an MCP token cannot read',
-  t.err(t.run_via('ana', t.tok('ana-pat'), t.read_sql('team', 'development'), 'ana-pat')), 'forbidden');
+  t.err(t.run_via('ana', t.pat_tok('ana-pat'), t.read_sql('team', 'development'), 'ana-pat')), 'forbidden');
 select t.expect('read: an OAuth grant cannot read',
   t.err(t.run_via('ana', t.g('ana-mcp'), t.read_sql('team', 'development'), 'Chat')), 'forbidden');
 select t.expect('read: a session logged in as the MCP role cannot read, even with a CLI grant''s claims',
@@ -401,7 +401,7 @@ select t.expect('cli grant: deletes no file',
 select t.expect('cli grant: creates no vault',
   t.run_via('ana', t.g('ana-cli'), $q$select public.create_vault('From CLI')$q$), 'ERR 42501');
 select t.expect('cli grant: revokes no token',
-  t.run_via('ana', t.g('ana-cli'), format($q$select public.revoke_access_token(%L)$q$, t.tok('ana-pat'))), 'ERR 42501');
+  t.run_via('ana', t.g('ana-cli'), format($q$select public.revoke_access_token(%L)$q$, t.pat_tok('ana-pat'))), 'ERR 42501');
 select t.expect('cli grant: mints no token',
   t.run_via('ana', t.g('ana-cli'), $q$select public.create_access_token('x', 30)$q$), 'ERR 42501');
 select t.expect('cli grant: reads no access log',
@@ -422,7 +422,7 @@ select t.expect('vaults: a viewer''s CLI lists the vault with no environments',
   t.run_via('cal', t.g('cal-cli'), $q$select string_agg(vault_name || ':' || role || ':' || cardinality(environments), ',') from public.env_vaults()$q$),
   'Team:viewer:0');
 select t.expect('vaults: an MCP token lists none',
-  t.run_via('ana', t.tok('ana-pat'), $q$select count(*) from public.env_vaults()$q$, 'ana-pat'), '0');
+  t.run_via('ana', t.pat_tok('ana-pat'), $q$select count(*) from public.env_vaults()$q$, 'ana-pat'), '0');
 select t.expect('vaults: a revoked CLI grant lists none',
   t.run_via('ana', t.g('ana-cli-revoked'), $q$select count(*) from public.env_vaults()$q$), '0');
 
@@ -453,7 +453,7 @@ select t.expect('log: a viewer does not',
 select t.expect('log: an outsider does not',
   t.run('dee', format($q$select count(*) from public.env_access_log where vault_id = %L$q$, t.id('team'))), '0');
 select t.expect('log: the owner''s read-only agent does not',
-  t.run_via('ana', t.tok('ana-pat-ro'), format($q$select count(*) from public.env_access_log where vault_id = %L$q$, t.id('team')), 'ana-pat-ro'), '0');
+  t.run_via('ana', t.pat_tok('ana-pat-ro'), format($q$select count(*) from public.env_access_log where vault_id = %L$q$, t.id('team')), 'ana-pat-ro'), '0');
 select t.expect_true('log: no row of the access log or the feed contains a value',
   not exists (select 1 from public.env_access_log l where l::text ~ 'CIPHERTEXT-MARKER|434950484552')
   and not exists (select 1 from public.log l where l::text ~ 'CIPHERTEXT-MARKER|434950484552'));

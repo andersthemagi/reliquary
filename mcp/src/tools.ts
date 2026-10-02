@@ -9,6 +9,10 @@
 //   claims-tools.ts      claim_path, renew_claim, release_claim,
 //                        list_claims (break_claim needs a person present,
 //                        so no tool here offers it)
+//   workplan-tools.ts    register_work_plan, work_plan_status, claim_step,
+//                        checkin_step, complete_step, release_step
+//                        (cancel_step and skip_step need a person present,
+//                        so no tool here offers them)
 //   proposals-tools.ts   propose, list_proposals, revise_proposal,
 //                        changes_since, read_proposal, comment_on_proposal
 //   variables-tools.ts   list_variables
@@ -32,6 +36,7 @@ import { registerProposalsTools } from "./proposals-tools.js";
 import { wrapRegisterTool } from "./tools-shared.js";
 import { registerVariablesTools } from "./variables-tools.js";
 import { registerVaultFileTools } from "./vaultfiles-tools.js";
+import { registerWorkPlanTools } from "./workplan-tools.js";
 
 // `runAs` runs one tool call's queries in a transaction as the identity:
 // the request's Session (one connection for the request, the token
@@ -50,6 +55,7 @@ export async function registerTools(
 
   registerVaultFileTools(server, id, runAs);
   registerClaimsTools(server, id, runAs);
+  registerWorkPlanTools(server, id, runAs);
   registerProposalsTools(server, id, runAs);
   registerVariablesTools(server, id, runAs);
   registerFlagsTools(server, id, runAs);
