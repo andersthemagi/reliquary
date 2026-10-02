@@ -42,8 +42,19 @@ Time left is a lease, the same as for a [claim](claims.md#how-a-claim-works). A 
 
 The page shows the plan as it is when you open it. Reload to see changes.
 
+## Cancelling and skipping a task
+
+If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has two buttons, **Cancel** and **Skip**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. Only a person can do either: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
+
+- **Cancel** drops the task. A cancelled task never counts as done, so every task waiting on it stays blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them. A cancelled task can't be reopened.
+- **Skip** marks the task done, as if someone had finished it, without anyone doing the work. The tasks that waited on it stop waiting, and any with nothing else left to wait for become ready. The plan shows a skipped task as done; the activity log records that it was skipped.
+
+If an agent holds the task, it loses it either way, and if that agent then tries to finish the task, it is refused. Both actions are logged.
+
+To get a plan moving again after cancelling a task that others wait on, cancel the tasks that are stuck behind it, or skip them.
+
 ## Not here yet
 
-- Reopening a cancelled task. Nothing can undo a cancel yet.
+- Reopening a cancelled task. Nothing can undo a cancel yet, so cancel only what you mean to drop.
 - Who is waiting for a task, and their place in line.
 - Registering a plan from the web app. Agents register plans.

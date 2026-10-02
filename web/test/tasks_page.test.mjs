@@ -101,7 +101,7 @@ const claim = async (user, vault, path, key, label) =>
 function taskRow(h, key) {
   const row = h.split("<tr>").find((r) => new RegExp(`^<td><strong>[^<]*</strong><span class="token-client"><code>${key}</code>`).test(r));
   assert.ok(row, `a row for the task ${key}`);
-  return row;
+  return row.slice(0, row.indexOf("</tr>"));
 }
 
 before(async () => {
@@ -132,6 +132,20 @@ before(async () => {
   await as(NOA, "select public.cancel_step($1, 'plans/launch.md', 'side')", [V.main]);
 
   await register(EDDA, V.main, "plans/second.md", [{ key: "only", title: "The only task" }]);
+
+  // The plan the cancel and skip tests work on. a and c are ready (b waits on
+  // a, d on c), e is held by Edda, f is done.
+  await register(EDDA, V.main, "plans/work.md", [
+    { key: "a", title: "Draft" },
+    { key: "b", title: "Review the draft", blocked_by: ["a"] },
+    { key: "c", title: "Outline" },
+    { key: "d", title: "Write the intro", blocked_by: ["c"] },
+    { key: "e", title: "Held task" },
+    { key: "f", title: "Done thing" },
+  ]);
+  const f1 = await claim(EDDA, V.main, "plans/work.md", "f", null);
+  await as(EDDA, "select public.complete_step($1, 'plans/work.md', 'f', $2, $3)", [V.main, f1.o_fence, f1.o_secret]);
+  await claim(EDDA, V.main, "plans/work.md", "e", "Edda's agent");
 
   [{ id: V.empty }] = await as(NOA, "select public.create_vault('Tasks empty', 'open') as id");
   [{ id: V.other }] = await as(REX, "select public.create_vault('Tasks rex-only', 'open') as id");
@@ -247,7 +261,11 @@ test("plan page: a ready task, a done one and a cancelled one each say what they
 });
 
 test("plan page: a lapsed claim reads as ready again, and says why", async () => {
-  await sql("update public.work_plan_steps set expires_at = now() - interval '1 minute' where status = 'claimed' and vault_id = $1", [V.main]);
+  await sql(
+    `update public.work_plan_steps s set expires_at = now() - interval '1 minute'
+       from public.work_plans p where p.id = s.plan_id and p.vault_id = $1 and p.path = 'plans/launch.md' and s.status = 'claimed'`,
+    [V.main],
+  );
   const h = await page(noa, planUrl(V.main, "plans/launch.md"));
   assert.match(taskRow(h, "clean"), /<span class="badge success">Ready<\/span>/);
   assert.match(taskRow(h, "clean"), /Its last claim ran out, so it can be taken again\./);
@@ -275,4 +293,156 @@ test("plan page: a path with no plan, or none at all, goes back to the list with
   const none = await get(noa, `/v/${V.main}/tasks/plan`);
   assert.equal(none.headers.get("location"), tasksUrl(V.main));
   assert.deepEqual(flashOf(await page(noa, tasksUrl(V.main))), ["warning", "status", "There’s no plan registered at that path."]);
+});
+
+// ---------------------------------------------------------------------------
+// Cancel and skip. The database decides (cancel_step and skip_step need a
+// person who can write the path: work_plans_test.sql), so these check the
+// wiring: who is offered the buttons, the confirm page before anything
+// changes, and what the page says afterwards.
+
+const WORK = "plans/work.md";
+const post = (s, path, fields) =>
+  fetch(s.origin + path, {
+    method: "POST",
+    redirect: "manual",
+    headers: { cookie: s.cookie, "content-type": "application/x-www-form-urlencoded", origin: s.origin },
+    body: new URLSearchParams(fields).toString(),
+  });
+const csrfOf = (h) => /name="csrf" value="([0-9a-f]+)"/.exec(h)[1];
+const landed = async (s, r) => {
+  assert.equal(r.status, 303);
+  return page(s, r.headers.get("location"));
+};
+function formFields(h, label) {
+  const forms = h.split("<form ").slice(1).map((f) => f.slice(0, f.indexOf("</form>")));
+  const form = forms.find((f) => f.includes(`>${label}</button>`));
+  assert.ok(form, `a form with a "${label}" button`);
+  const fields = {};
+  for (const m of form.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)) fields[m[1]] = m[2];
+  return { action: /action="([^"]+)"/.exec(form)[1], fields };
+}
+const confirmUrl = (v, verb, key) => `${planUrl(v, WORK)}&${verb}=${key}`;
+const stepOf = async (key) =>
+  (await sql(
+    `select s.status, s.holder, s.open_blockers from public.work_plan_steps s join public.work_plans p on p.id = s.plan_id
+      where p.vault_id = $1 and p.path = $2 and s.key = $3`,
+    [V.main, WORK, key],
+  ))[0];
+const logged = async (event) =>
+  (await sql("select path, actor, detail->>'step' as step from public.log where vault_id = $1 and path = $2 and event = $3 order by seq", [V.main, WORK, event]));
+
+test("actions: an owner is offered Skip and Cancel on every task that isn't finished, and none on a done one", async () => {
+  const h = await page(noa, planUrl(V.main, WORK));
+  for (const [key, title] of [["a", "Draft"], ["b", "Review the draft"], ["c", "Outline"], ["d", "Write the intro"], ["e", "Held task"]]) {
+    const row = taskRow(h, key);
+    assert.match(row, new RegExp(`<a class="button quiet" href="${planUrl(V.main, WORK).replace("?", "\\?")}&amp;cancel=${key}" aria-label="Cancel the task ${title}">Cancel</a>`), `Cancel on ${key}`);
+    assert.match(row, new RegExp(`&amp;skip=${key}" aria-label="Skip the task ${title}">Skip</a>`), `Skip on ${key}`);
+  }
+  assert.doesNotMatch(taskRow(h, "f"), /Skip|Cancel/, "nothing to do on a finished task");
+  assert.match(h, /<span class="sr-only">Actions<\/span>/);
+});
+
+test("actions: a viewer is offered nothing, is sent back from a confirm page, and the database refuses a crafted form", async () => {
+  const h = await page(rex, planUrl(V.main, WORK));
+  assert.doesNotMatch(h, /Skip<\/a>|Cancel<\/a>|row-actions/, "no buttons, no actions column");
+  assert.match(h, /Draft/, "the tasks are still there to read");
+  const back = await landed(rex, await get(rex, confirmUrl(V.main, "cancel", "a")));
+  assert.deepEqual(flashOf(back), ["warning", "status", "Only someone who can write this plan’s file cancels or skips its tasks."]);
+  const r = await post(rex, `/v/${V.main}/tasks/plan`, { csrf: csrfOf(back), path: WORK, key: "a", action: "cancel", confirm: "1" });
+  const [tone, , text] = flashOf(await landed(rex, r));
+  assert.equal(tone, "danger");
+  assert.match(text, /\(ref [0-9a-f]{8}\)$/);
+  assert.equal((await stepOf("a")).status, "open", "nothing cancelled");
+});
+
+test("cancel: the confirm page says what happens and what stays blocked, and opening it cancels nothing", async () => {
+  const h = await page(noa, confirmUrl(V.main, "cancel", "a"));
+  assert.match(h, /<h1>Cancel “Draft”\?<\/h1>/);
+  assert.match(h, /Cancelling <strong>Draft<\/strong> <code>a<\/code> drops it from the plan\. A cancelled task never counts as done\./);
+  assert.match(
+    h,
+    /<li>These tasks wait on it and stay blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them: Review the draft <code>b<\/code>\.<\/li>/,
+  );
+  assert.match(h, /<li>A cancelled task can’t be reopened\.<\/li>/);
+  const { action, fields } = formFields(h, "Cancel “Draft”");
+  assert.equal(action, `/v/${V.main}/tasks/plan`);
+  assert.deepEqual({ ...fields, csrf: undefined }, { csrf: undefined, path: WORK, key: "a", action: "cancel", confirm: "1" });
+  assert.equal((await stepOf("a")).status, "open", "asking cancels nothing");
+});
+
+test("cancel: a form without the confirm page's field is sent to that page and cancels nothing", async () => {
+  const token = csrfOf(await page(noa, planUrl(V.main, WORK)));
+  const r = await post(noa, `/v/${V.main}/tasks/plan`, { csrf: token, path: WORK, key: "a", action: "cancel" });
+  assert.equal(r.headers.get("location"), confirmUrl(V.main, "cancel", "a"));
+  assert.equal((await stepOf("a")).status, "open");
+});
+
+test("cancel: confirming cancels it, says so as a success, logs it, and what waited on it reads as blocked by a cancelled task", async () => {
+  const { action, fields } = formFields(await page(noa, confirmUrl(V.main, "cancel", "a")), "Cancel “Draft”");
+  const h = await landed(noa, await post(noa, action, fields));
+  assert.deepEqual(flashOf(h), ["success", "status", "“Draft” is cancelled. Tasks waiting on it stay blocked until a person cancels or skips them."]);
+  assert.equal((await stepOf("a")).status, "cancelled");
+  assert.deepEqual(await logged("step.cancel"), [{ path: WORK, actor: NOA, step: "a" }]);
+  assert.match(taskRow(h, "a"), /<span class="badge">Cancelled<\/span>/);
+  assert.match(taskRow(h, "b"), /Blocked by a cancelled task: Draft <code>a<\/code>/);
+  assert.doesNotMatch(taskRow(h, "a"), /Cancel<\/a>|Skip<\/a>/, "no more actions on it");
+});
+
+test("cancel: a task someone holds says who loses it, and confirming takes it from them", async () => {
+  const h = await page(noa, confirmUrl(V.main, "cancel", "e"));
+  assert.match(h, /<li>edda@example\.test \(“Edda&#39;s agent”\) holds it now and loses it\. If their agent tries to finish it, that is refused\.<\/li>/);
+  const { action, fields } = formFields(h, "Cancel “Held task”");
+  await landed(noa, await post(noa, action, fields));
+  assert.deepEqual({ ...(await stepOf("e")) }, { status: "cancelled", holder: null, open_blockers: 0 });
+});
+
+test("cancel: a task already finished goes back with a warning, and a crafted form is refused with a reference", async () => {
+  const back = await landed(noa, await get(noa, confirmUrl(V.main, "cancel", "f")));
+  assert.deepEqual(flashOf(back), ["warning", "status", "“Done thing” is already done, so there’s nothing to cancel."]);
+  const h = await landed(noa, await post(noa, `/v/${V.main}/tasks/plan`, { csrf: csrfOf(back), path: WORK, key: "f", action: "cancel", confirm: "1" }));
+  const [tone, , text] = flashOf(h);
+  assert.equal(tone, "danger");
+  assert.match(text, /^Step &quot;f&quot; is already done\. \(ref [0-9a-f]{8}\)$/);
+  assert.equal((await stepOf("f")).status, "done");
+  assert.equal((await logged("step.cancel")).length, 2, "only the two real cancels are logged");
+});
+
+test("skip: the confirm page says it counts as done and what becomes ready, and opening it skips nothing", async () => {
+  const h = await page(noa, confirmUrl(V.main, "skip", "c"));
+  assert.match(h, /<h1>Skip “Outline”\?<\/h1>/);
+  assert.match(h, /Skipping <strong>Outline<\/strong> <code>c<\/code> marks it done, as if someone had finished it, without anyone doing the work\./);
+  assert.match(h, /<li>These tasks stop waiting on it, and any with nothing else left to wait for become ready: Write the intro <code>d<\/code>\.<\/li>/);
+  assert.match(h, /<li>The plan shows it as done\. The activity log records that it was skipped\.<\/li>/);
+  const { fields } = formFields(h, "Skip “Outline”");
+  assert.deepEqual({ ...fields, csrf: undefined }, { csrf: undefined, path: WORK, key: "c", action: "skip", confirm: "1" });
+  assert.equal((await stepOf("c")).status, "open", "asking skips nothing");
+});
+
+test("skip: confirming marks it done, the task that waited on it is ready, and it is logged", async () => {
+  assert.equal((await stepOf("d")).open_blockers, 1);
+  const { action, fields } = formFields(await page(noa, confirmUrl(V.main, "skip", "c")), "Skip “Outline”");
+  const h = await landed(noa, await post(noa, action, fields));
+  assert.deepEqual(flashOf(h), ["success", "status", "“Outline” is skipped and counts as done. Tasks that were waiting only on it are ready now."]);
+  assert.equal((await stepOf("c")).status, "done");
+  assert.match(taskRow(h, "d"), /<span class="badge success">Ready<\/span>/);
+  assert.deepEqual(await logged("step.skip"), [{ path: WORK, actor: NOA, step: "c" }]);
+});
+
+test("skip: a task whose own blockers are not finished can be skipped, and the page says so first", async () => {
+  const h = await page(noa, confirmUrl(V.main, "skip", "b"));
+  assert.match(h, /<li>Its own blockers aren’t finished\. Skipping it lets what waits on it go ahead anyway\.<\/li>/);
+  const { action, fields } = formFields(h, "Skip “Review the draft”");
+  await landed(noa, await post(noa, action, fields));
+  assert.equal((await stepOf("b")).status, "done");
+});
+
+test("skip: an unknown task goes back with a warning, and a form naming no action is refused and changes nothing", async () => {
+  const back = await landed(noa, await get(noa, confirmUrl(V.main, "skip", "zzz")));
+  assert.deepEqual(flashOf(back), ["warning", "status", "There’s no task zzz in this plan."]);
+  const h = await landed(noa, await post(noa, `/v/${V.main}/tasks/plan`, { csrf: csrfOf(back), path: WORK, key: "d", action: "nope" }));
+  const [tone, , text] = flashOf(h);
+  assert.equal(tone, "danger");
+  assert.match(text, /^The form didn’t say what to do, so nothing changed\. \(ref [0-9a-f]{8}\)$/);
+  assert.equal((await stepOf("d")).status, "open");
 });
