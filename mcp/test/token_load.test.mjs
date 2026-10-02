@@ -37,8 +37,9 @@ async function measure(c, name, args, label = name) {
 const BUDGET = {
   // Raised for claim_path, renew_claim, release_claim and list_claims
   // (CL-2.4, F441): four more tool schemas in every tools/list response.
-  // Raised again for register_work_plan and work_plan_status (CL-3.4, F530).
-  "tools/list": 15100,
+  // Raised again for register_work_plan and work_plan_status (CL-3.4, F530),
+  // and for claim_step, checkin_step, complete_step and release_step (F531).
+  "tools/list": 18700,
   list_vaults: 200,
   list_files: 1800,
   "list_files prefix=canon/": 400,

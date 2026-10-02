@@ -207,3 +207,22 @@ Still to do, from the token side:
 - **`work_plan_status` has no cap on its answer.** It lists every step, as
   `list_claims` lists every claim. If real plans run long, a `state` filter
   or a page is the fix.
+
+## Eighth pass (work plan step tools)
+
+2026-10-02, CL-3.4 again. Four new tools: `claim_step`, `checkin_step`,
+`complete_step` and `release_step` (20261002200000_work_plans.sql,
+20261002210000_work_plan_checkin.sql). `tools/list` is now 18,586 bytes
+(about 4,650 tokens), over its 15,100-byte budget. Raised to 18,700, just
+above the actual. The four descriptions were trimmed once already (the
+first draft made it 18,746). No response of an existing tool changed.
+
+Still to do, from the token side:
+
+- **`tools/list` has grown by about 5 KB across the six work plan tools.**
+  Every conversation with a Reliquary connection pays for it. If an agent
+  rarely works plans, a client that loads tools on demand would save it;
+  nothing here does that today.
+- **The step tools' own responses are one or two lines**, so they have no
+  budget of their own, like `renew_claim` and `release_claim`.
+

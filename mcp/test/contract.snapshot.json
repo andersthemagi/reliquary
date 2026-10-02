@@ -56,6 +56,53 @@
     }
   },
   {
+    "name": "checkin_step",
+    "title": "Check in on a step",
+    "description": "Restart a claimed step's lease without finishing it, from the secret and fence claim_step returned. Needs the same connection and person; a stale secret or fence, another connection or a lapsed lease is refused. Never holds a step past its hold limit (7 days from the claim by default).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 200,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "A step's key, as in the plan file"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "secret": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "ttl_minutes": {
+          "description": "Default is the claim rule's lease, and its maximum",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 43200
+        }
+      },
+      "required": [
+        "vault",
+        "path",
+        "key",
+        "fence",
+        "secret"
+      ]
+    },
+    "annotations": null
+  },
+  {
     "name": "claim_path",
     "title": "Claim a path",
     "description": "Lease a path to say you're working on it: a courtesy and a coordination signal, not an access gate (write_file's own expected_version still guards the write). Whoever could write the path may claim it; a read-only connection can't. Default and maximum lease 48 hours; a request past that is clamped, not refused. Refused if someone already holds it, naming them and when it frees up. Returns a secret, once: keep it and the fence this returns, from this connection -- renew_claim and release_claim need both, and nothing else can prove the claim is yours.",
@@ -90,6 +137,47 @@
     "annotations": null
   },
   {
+    "name": "claim_step",
+    "title": "Claim a step",
+    "description": "Claim one named step of a registered plan, to say you're working on it. Take a step work_plan_status shows as ready. Whoever could write the plan's path may; a read-only connection can't. Refused while the step is blocked, held by someone else (naming them and when it frees up), done or cancelled. The lease is the vault's claim rule for the path (48 hours by default); a longer ttl_minutes is clamped, not refused. Returns a secret, once: keep it and the fence, from this connection. checkin_step, complete_step and release_step need both.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 200,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "A step's key, as in the plan file"
+        },
+        "label": {
+          "description": "Shown to people with the step, e.g. what you're doing. Self-reported, never trusted for identity",
+          "type": "string",
+          "maxLength": 200
+        },
+        "ttl_minutes": {
+          "description": "Default is the claim rule's lease, and its maximum",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 43200
+        }
+      },
+      "required": [
+        "vault",
+        "path",
+        "key"
+      ]
+    },
+    "annotations": null
+  },
+  {
     "name": "comment_on_proposal",
     "title": "Comment on a proposal",
     "description": "Comment on a proposal's thread as your person. Words only: a comment can't approve, reject or change it (revise_proposal changes your own).",
@@ -109,6 +197,47 @@
       "required": [
         "proposal_id",
         "comment"
+      ]
+    },
+    "annotations": null
+  },
+  {
+    "name": "complete_step",
+    "title": "Complete a step",
+    "description": "Mark a claimed step done, which frees the steps it was blocking. Needs the fence and secret claim_step returned, from the same connection and person, before the lease lapses.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 200,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "A step's key, as in the plan file"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "secret": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "vault",
+        "path",
+        "key",
+        "fence",
+        "secret"
       ]
     },
     "annotations": null
@@ -528,6 +657,47 @@
       "required": [
         "vault",
         "path",
+        "fence",
+        "secret"
+      ]
+    },
+    "annotations": null
+  },
+  {
+    "name": "release_step",
+    "title": "Release a step",
+    "description": "Give a claimed step back unfinished, so anyone may claim it again. Needs the fence and secret claim_step returned, from the same connection and person.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 200,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "A step's key, as in the plan file"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "secret": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "vault",
+        "path",
+        "key",
         "fence",
         "secret"
       ]

@@ -125,6 +125,19 @@ export function explain(err: unknown): ToolResult {
       case "RLC04":
         lead = `Past its hold limit: ${e.message}`;
         break;
+      // Work plan steps (20261002200000_work_plans.sql). No case for RLW01
+      // (already claimed) for the same reason as RLC01: its message embeds
+      // the holder's label, and claim_step catches it itself to re-fence
+      // that label. RLW02-RLW04 name a step key and a count, never a label.
+      case "RLW02":
+        lead = `Step not available: ${e.message}. Call work_plan_status to see which steps are ready.`;
+        break;
+      case "RLW03":
+        lead = `Stale step claim: ${e.message}. Call work_plan_status to see the step's current state.`;
+        break;
+      case "RLW04":
+        lead = `Refused: ${e.message}`;
+        break;
       // An hourly count (feedback, 20260926163000_feedback.sql): the
       // message says the limit and when there is room again.
       case "54000":
