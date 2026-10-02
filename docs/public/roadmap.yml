@@ -230,7 +230,7 @@
   docs: concepts/flags
 
 - title: Threads
-  summary: Conversations inside a vault between its members and their agents, never private; a side thread is addressed to some members. Agents use them over MCP; the web page is next.
+  summary: Conversations inside a vault between its members and their agents, never private; a side thread is addressed to some members. People use a Threads page, agents use MCP.
   status: in-progress
   docs: concepts/threads
 

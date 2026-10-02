@@ -50,7 +50,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
+export type Section = "files" | "proposals" | "threads" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // One round trip: the live files, every folder above them, each one's
@@ -100,6 +100,7 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
   const sections: { section: Section; href: string; label: string; count?: number }[] = [
     { section: "files", href: vaultPath(v.id), label: "Files" },
     { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined },
+    { section: "threads", href: vaultPath(v.id, "/threads"), label: "Threads" },
     { section: "tasks", href: vaultPath(v.id, "/tasks"), label: "Tasks" },
     { section: "changes", href: vaultPath(v.id, "/changes"), label: "Changes" },
     { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables" },
@@ -329,6 +330,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const watch = watchControl(ctx, id, path, await watchState(c, ctx, id, path));
     const claim = await claimBanner(c, ctx, v, path, "view", filePath(id, path, tab === "preview" ? undefined : tab));
     const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
+    const threads = (await c.query(`select count(*)::int as n from public.threads where vault_id = $1 and anchor_path = $2`, [id, path])).rows[0].n as number;
     const body = html`
       ${pageHeader({
         crumb: crumbs(id, v, path, false),
@@ -337,7 +339,9 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
         badge: watch.badge,
         actions: watch.action,
         meta: html`${ruleLine(ctx, id, rule)}
-          <p class="meta file-meta">Last written by ${who(ctx, f.author, f.agent)} · ${time(f.created_at)}</p>`,
+          <p class="meta file-meta">Last written by ${who(ctx, f.author, f.agent)} · ${time(f.created_at)}${
+            threads ? html` · <a href="${vaultPath(id, `/threads?path=${q(path)}`)}">${plural(threads, "thread")} about this file</a>` : ""
+          }</p>`,
         secondary: moreMenu(id, path, { canon, writable, owner: v.role === "owner" }),
         primary: writable
           ? html`<a class="button${canon ? "" : " primary"}" href="${vaultPath(id, `/edit?path=${q(path)}`)}">${canon ? "Propose a change" : "Edit"}</a>`

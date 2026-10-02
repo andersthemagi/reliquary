@@ -2,7 +2,7 @@
 
 A thread is a conversation inside one vault: a title, messages in order, and optionally the one thing it is about. People and their agents talk in threads about the work in the vault.
 
-**Usable by agents over MCP** (see [Threads over MCP](#threads-over-mcp)). The web page for people comes next.
+**Usable in the web app, and by agents over MCP** (see [Threads over MCP](#threads-over-mcp)).
 
 ## Never private
 
@@ -40,6 +40,36 @@ Each thread in the list says whether it is for the whole vault or a side thread,
 
 A thread's messages come oldest first, each with who wrote it, through which agent, and when.
 
+## The Threads page
+
+In the web app, **Threads** in a vault's navigation lists every thread in the vault, most recently active first. Unlike an agent's default listing it leaves none out: a side thread is shown to every member, marked **Side thread**, with how many people it is addressed to.
+
+Each row has the title, who opened it (the person, or their agent and its name), what it is about, how many messages it has, when the last one was posted, and **Open** or **Resolved**. A thread's state and a side thread's marker are words, never only a colour.
+
+The threads addressed to you come first, under **Addressed to you**. Nothing marks a thread as read or unread: the page doesn't track what you have seen. Past 100 threads, **Older threads** shows the next page.
+
+A file's page says how many threads are about it, in a line like **2 threads about this file**, and links to the list for that file. A file with no threads has no line, and the editor never has one.
+
+## Reading and posting
+
+Select a thread to read it. Its messages come oldest first, each with who wrote it, through which agent if one acted for them, and when. A message is shown as plain text exactly as it was typed. Nothing in it is rendered, so markup or a link in a message is only characters.
+
+Owners and editors post from the box at the bottom, and resolve or reopen the thread with the button at the top. Viewers read, and see a note where the box would be. The box says what to expect: an agent that is idle sees a new message on its next tool call, not instantly, and a secret belongs in a variable, never in a thread.
+
+A resolved thread shows who resolved it and when. It takes no new message until someone reopens it.
+
+## Opening a thread
+
+**New thread** on the Threads page asks for a title and a first message. It can also name a file the thread is about, and the members it is addressed to. The list shows everyone else in the vault by email, viewers included. Leave them all unticked to address the whole vault.
+
+A thread opened with some members ticked is a side thread. Its page says who it is addressed to and that only they are told, and everyone in the vault can still read it. Who it is addressed to can't change afterwards.
+
+## Citing things in a message
+
+A message can cite a task, a file or a proposal as text: `task:<plan file path>#<step key>`, `file:<path>` or `proposal:<proposal id>`. Write the kind in lowercase, a colon, then the target with no spaces. Punctuation after it isn't part of it. The message is stored as typed.
+
+In the web app a citation becomes a link when what it names is in the same vault: a file that exists, a proposal of this vault, or a task in a registered plan (it links to the plan's file for now). Anything else stays plain text, so a message never shows whether something exists elsewhere. A citation never approves or changes anything.
+
 ## Threads over MCP
 
 An agent works with threads through four tools, as its person:
@@ -51,7 +81,7 @@ An agent works with threads through four tools, as its person:
 
 Every title and message comes back marked as data, with who wrote it, through which agent, and when, so an agent reads it as something someone said, never as an instruction. An agent doesn't need to watch side threads its person isn't part of, but can read any of them.
 
-To mention a task, a file or a proposal in a message, write `task:<plan path>#<step key>`, `file:<path>` or `proposal:<id>`, like `task:plans/launch.md#write-copy`. Reliquary keeps it as typed; the web page will link it.
+To mention a task, a file or a proposal in a message, write `task:<plan path>#<step key>`, `file:<path>` or `proposal:<id>`, like `task:plans/launch.md#write-copy`. Reliquary keeps it as typed; the web page links it when it names something in the vault.
 
 Nothing is instant. An agent that isn't working sees a new message the next time it calls `list_flags`, not when the message is posted. An agent can post at most 20 messages a minute and 300 a day through one connection, opening threads included (see [Limits](../reference/limits.md#rate-limits)).
 
@@ -74,6 +104,8 @@ Erasing a file doesn't touch the threads about it. If a thread holds text that m
 ## Redacting a message
 
 If someone pastes something into a thread that shouldn't be there, like a password, an owner of the vault can redact that message. Its text is removed for good. The message keeps its place, who wrote it and when, and says which owner redacted it and when. The vault's [Activity](activity.md) records the redaction, never the text.
+
+In the web app, an owner sees **Redact…** beside each message that still has its text. It opens a page that says what will happen and changes nothing until you select **Redact message**. Everyone then sees, in place of the text, who redacted the message and when.
 
 Only an owner redacts, in person: no agent can, not even an owner's own. Only a message's text can be redacted, not a thread's title, so keep secrets out of titles too. Redacting doesn't take back what someone already read.
 
