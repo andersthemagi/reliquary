@@ -241,15 +241,16 @@ export async function asPerson<T>(userId: string, fn: (c: pg.PoolClient) => Prom
   const s = shared.getStore();
   if (s && !s.done && s.userId === userId) return inShared(s, fn);
   const client = await db.connect();
+  let broken = false;
   try {
     await begin(client, userId);
     const result = await fn(client);
     await client.query("commit");
     return result;
   } catch (err) {
-    await client.query("rollback").catch(() => {});
+    await client.query("rollback").catch(() => (broken = true));
     throw err;
   } finally {
-    client.release();
+    client.release(broken || undefined);
   }
 }
