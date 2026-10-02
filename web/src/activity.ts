@@ -16,6 +16,7 @@
 import type pg from "pg";
 import { emptyState, html, raw, time, type Raw } from "./html.js";
 import { personRef, UUID } from "./personref.js";
+import { watchCovers } from "./watchrule.js";
 
 export const PAGE_SIZE = 50;
 
@@ -178,8 +179,9 @@ export function parseFilters(p: URLSearchParams): Filters {
   return f;
 }
 
-// `events` narrows to those event names (the Changes feed asks for CONTENT_EVENTS).
-export type Scope = { vaultId?: string; file?: string; events?: readonly string[] };
+// `events` narrows to those event names (the Changes feed asks for CONTENT_EVENTS);
+// `watching` to events on paths the reader watches (watchrule.ts).
+export type Scope = { vaultId?: string; file?: string; events?: readonly string[]; watching?: boolean };
 
 export type Row = {
   seq: string;
@@ -221,6 +223,11 @@ export async function queryActivity(
   if (vaultId) add("l.vault_id = $?::uuid", vaultId);
   if (scope.file) add("l.path = $?", scope.file);
   if (scope.events) add("l.event = any($?::text[])", [...scope.events]);
+  if (scope.watching) {
+    where.push(
+      `exists (select 1 from public.subscriptions s where s.vault_id = l.vault_id and s.user_id = $1 and s.kind = 'path' and ${watchCovers("s.target", "l.path")})`,
+    );
+  }
   if (f.who) add("l.actor = $?::uuid", f.who);
   if (f.agent === "people") where.push("l.agent is null");
   else if (f.agent === "agents") where.push("l.agent is not null");

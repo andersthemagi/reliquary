@@ -10,9 +10,11 @@ Each line says who, what and where, and links to the file or the proposal. For e
 
 When one person, or one agent, writes the same file several times in a row, it is one line: "Ana wrote notes/plan.md 4 times". Another person's change in between, or the day changing, starts a new line. A write that applies an approved proposal is its own line: "Ben wrote canon/rules.md, from an approved proposal".
 
-Pages hold 30 lines. **Older** goes back, and **Newest** returns to the latest.
+Three links above the list choose what to show: **Everyone** (the default), **Mine** and **Watching**. **Mine** is what you changed, and what your agents changed for you. **Watching** is what changed on the folders and files you [watch](flags.md#watching-a-path): a folder covers everything under it and a file only itself, the same rule [flags](flags.md) use. It includes changes from before you started watching. Only your own watches count, and nobody else sees which view you chose.
 
-Changes leaves out members and invites, rules, variables, links, claims, plan steps and exports: those are in the log below. Opening Changes doesn't mark your [flags](flags.md) as shown.
+Pages hold 30 lines. **Older** goes back, and **Newest** returns to the latest, in the view you chose.
+
+Changes leaves out members and invites, rules, variables, links, claims, plan steps and exports: those are in the log below. Opening Changes, in any view, doesn't mark your [flags](flags.md) as shown, or your agents'.
 
 ## What is logged
 
