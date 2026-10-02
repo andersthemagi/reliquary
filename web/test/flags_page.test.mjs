@@ -119,7 +119,7 @@ test("flags page: a vault you're not in is 404", async () => {
 // something happened. This file's seed has flags waiting, which is what the
 // landing page must leave alone.
 
-test("diagnostics: Settings has a Diagnostics tab, and its page says what it is for and offers Flags and Claims, none of them current", async () => {
+test("diagnostics: Settings has a Diagnostics tab, and its page says what it is for and offers Flags, Claims and the Log, none of them current", async () => {
   assert.match(await page(`/v/${V.main}/config`), new RegExp(`<a href="/v/${V.main}/diagnostics">Diagnostics</a>`));
   const h = await page(`/v/${V.main}/diagnostics`);
   assert.match(h, /<h1>Settings<\/h1>/);
@@ -131,6 +131,7 @@ test("diagnostics: Settings has a Diagnostics tab, and its page says what it is 
   assert.deepEqual([...inner.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)</g)].map((m) => [m[1], m[2]]), [
     [`/v/${V.main}/flags`, "Flags"],
     [`/v/${V.main}/claims`, "Claims"],
+    [`/v/${V.main}/activity`, "Log"],
   ]);
   assert.doesNotMatch(inner, /aria-current/, "no inner tab is the current page here");
 });
@@ -151,7 +152,7 @@ test("diagnostics: /flags is the same page inside Diagnostics, with Flags and Di
   // A vault with nothing waiting, so this opens nothing of the seed's.
   const h = await page(flagsUrl(V.empty));
   assert.match(h, new RegExp(`<a href="/v/${V.empty}/diagnostics" aria-current="page">Diagnostics</a>`), "the Settings tab");
-  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.empty}/flags" aria-current="page">Flags</a><a href="/v/${V.empty}/claims">Claims</a></nav>`));
+  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.empty}/flags" aria-current="page">Flags</a><a href="/v/${V.empty}/claims">Claims</a><a href="/v/${V.empty}/activity">Log</a></nav>`));
   assert.match(h, new RegExp(`href="/v/${V.empty}/config" aria-current="page">Settings`), "the sidebar's Settings");
   assert.match(h, /For working out why something happened; most people never need it\./);
   assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, "one h1");

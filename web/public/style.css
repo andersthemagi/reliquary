@@ -1861,3 +1861,23 @@ table.env-log td[data-label="Environment"] { white-space: nowrap; }
 .welcome-actions form { margin: 0; }
 .welcome-skip { margin: var(--space-4) 0 0; text-align: center; }
 @media (max-width: 640px) { .welcome { margin: var(--space-3) 0; padding: var(--space-4); } }
+
+/* Changes (changes.ts): a heading per day, a line per change, the sentence
+   first and when it happened after it (below it on phones, as .rows does). */
+.feed-day h2 { margin: var(--space-6) 0 var(--space-3); font-size: var(--text-md); line-height: var(--lh-md); }
+.chips + .feed-day h2, .hint + .feed-day h2 { margin-top: var(--space-5); }
+.feed .change { align-items: baseline; }
+.change-what { min-width: 0; overflow-wrap: anywhere; }
+.change-agent { margin-left: var(--space-1); color: var(--fg-muted); font-size: var(--text-sm); }
+.change-when { flex: none; color: var(--fg-muted); font-size: var(--text-sm); white-space: nowrap; }
+
+/* Changes: Everyone, Mine, Watching, as links with one marked (changes.ts). */
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.chip {
+  display: inline-flex; align-items: center; min-height: var(--control-sm); padding: 0 var(--space-4);
+  border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--bg-subtle);
+  color: var(--fg); font-size: var(--text-sm); text-decoration: none;
+}
+.chip:hover { border-color: var(--border-strong); }
+.chip[aria-current="true"] { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 600; }
+.chips + .hint { margin: var(--space-3) 0 0; }

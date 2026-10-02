@@ -52,7 +52,7 @@ In the web app, the **Inbox** in the top bar now shows a count of 1.
 1. Open the proposal. The diff comes first, then the agent's stated reason, marked unverified.
 2. Choose **Approve**.
 
-The vault needs one approval (its quorum), so the file is written at once. Open **My project**: `notes/hello.md` is there, credited to your agent, and the change is in **Activity**. See [Proposals and review](../concepts/proposals-and-review.md) for requesting changes, comments and snooze.
+The vault needs one approval (its quorum), so the file is written at once. Open **My project**: `notes/hello.md` is there, credited to your agent, and the change is in **Changes**. See [Proposals and review](../concepts/proposals-and-review.md) for requesting changes, comments and snooze.
 
 ## 6. Add your first variable
 

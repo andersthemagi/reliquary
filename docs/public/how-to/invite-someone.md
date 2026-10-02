@@ -27,7 +27,7 @@ An address invite works once, for 7 days, and only for someone signed in with th
 Someone who already signs in with that address doesn't need the link. The invite waits in their **Inbox**, with **Join** and **Decline**:
 
 - **Join** makes them a member with the role you chose, the same as opening the link.
-- **Decline** ends the invite. The link stops working, the invite leaves your list on **Members**, and the vault's **Activity** shows "Declined an invite". To join later, they ask you for a new invite.
+- **Decline** ends the invite. The link stops working, the invite leaves your list on **Members**, and the vault's **Log** shows "Declined an invite". To join later, they ask you for a new invite.
 
 Only the person signed in with the invited address, in the web app, can answer from the Inbox, and only once their address is confirmed. Nobody else can join or decline with it, and neither can their agents. The invite is used once, whichever way they answer. See [The top bar, inbox and account](../concepts/inbox-and-account.md#inbox).
 
