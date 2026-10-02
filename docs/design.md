@@ -23,20 +23,21 @@ The research behind this draft is in `docs/research/`
 8. [Path ownership](#path-ownership)
 9. [Notifications](#notifications)
 10. [Claims and work plans](#claims-and-work-plans)
-11. [Links](#links)
-12. [Routines](#routines)
-13. [Environment variables](#environment-variables)
-14. [Continuity](#continuity)
-15. [Client engagements](#client-engagements)
-16. [Git mirror and export](#git-mirror-and-export)
-17. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
-18. [Architecture](#architecture)
-19. [Data model](#data-model)
-20. [Hostile tests](#hostile-tests)
-21. [Build order](#build-order)
-22. [Open decisions](#open-decisions)
-23. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
-24. [Out of scope](#out-of-scope)
+11. [Threads](#threads)
+12. [Links](#links)
+13. [Routines](#routines)
+14. [Environment variables](#environment-variables)
+15. [Continuity](#continuity)
+16. [Client engagements](#client-engagements)
+17. [Git mirror and export](#git-mirror-and-export)
+18. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
+19. [Architecture](#architecture)
+20. [Data model](#data-model)
+21. [Hostile tests](#hostile-tests)
+22. [Build order](#build-order)
+23. [Open decisions](#open-decisions)
+24. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
+25. [Out of scope](#out-of-scope)
 
 ## What changed from v2
 
@@ -783,6 +784,190 @@ agents and across 5,000 simulated vaults.
 8's remaining limit categories, marked open with an owner (the
 maintainer, via a comment on #58) rather than guessed.
 
+## Threads
+
+Written 2026-10-02 (owner's decision). Settled shape, nothing built. A
+thread is where people and their agents talk about the work. A vault has
+no such place today: a proposal's comments exist only on that proposal,
+and notes addressed `to:` someone are not built
+([Notifications](#notifications)). Ten points, each with the reason it was
+decided that way. "Task" below is a work plan's step as people see it
+([Who each surface is for](#who-each-surface-is-for)).
+
+### 1. What a thread is
+
+A conversation inside one vault: a title, an optional anchor (a file
+path, a task or a proposal) and messages in order. People open threads and
+post to them, and so do their agents. Each message is attributed to the
+person and, where one acted, the agent, the same attribution every other
+write carries. A thread never spans vaults.
+
+Why a new object: neither existing place fits. A conversation about a
+task, or about work with no proposal behind it, has nowhere to live.
+
+### 2. Never private
+
+Every member who can read the vault can read every thread. There are no
+private threads and no way to hide a thread from the vault's members.
+Someone who needs privacy takes it outside the app.
+
+Why: [Notifications](#notifications) already declines a private
+side-channel for addressed notes and says so rather than pretending to.
+This is the same stance. It also keeps the access rule for threads to one
+line: read the vault, read its threads.
+
+### 3. Side threads
+
+A thread may be addressed to specific members. Addressing controls only
+who is notified, never who can read. A thread with no addressees is
+vault-wide: every member's connections are flagged about it. A thread
+addressed to some members flags only them. A side thread stays listed and
+readable, with a visible marker. The default listing for an agent is the
+vault-wide threads plus the threads addressed to the caller, and an option
+includes the rest. An agent doing active work need not watch side threads.
+When it needs one, the content is there to parse.
+
+Why: not every conversation concerns every agent, and a flag is what
+interrupts one. Addressing narrows who is interrupted. If it also narrowed
+who can read, it would be item 2's private thread under another name.
+
+### 4. Who may post
+
+Owners and editors post. An agent posts as its person and needs a
+read-write connection. Viewers read, and so do read-only connections.
+
+Why: it is the rule for comments on proposals, so there is one split to
+learn, and a read-only connection cannot write anything anyway.
+
+### 5. Messages are data
+
+Messages are append-only. To an agent a message is data: it comes back
+quoted, with its author and time, never as an instruction. A message may
+mention a proposal or a task. It cannot decide, approve, reveal, break a
+claim or cancel anything. The ceiling ([Identity and
+permissions](#identity-and-permissions)) is untouched: approving,
+revealing a variable's value, managing members, and deleting or exporting
+a vault, plus breaking a claim and cancelling or skipping a step, which
+stay a person's in the web app. "A flag is never permission" applies to
+messages too.
+
+Why: an agent reads text other people wrote, and a thread is made of that
+text. If a message could carry authority, whoever wrote it, or injected
+text that made an agent write it, would hold every permission the
+reader's agent holds. That is the reason for the ceiling. So nothing that
+decides, reveals, breaks or cancels takes a message, or anything parsed
+from one, as input. Append-only keeps on the record what an agent acted
+on or a person agreed to. The one exception is redaction (item 7).
+
+### 6. Delivery is flags, nothing live
+
+An agent learns of a message through flags and nothing else. There is no
+push and no real time: MCP is request and response, so an idle agent sees
+a message on its next tool call, not instantly. Product copy says so
+plainly. Left out on purpose: typing indicators, read receipts, presence,
+reactions, edits, attachments, email notifications, cross-vault threads
+and direct messages.
+
+Why: the server cannot wake a sleeping agent (see
+[Notifications](#notifications) and item 11 of [Claims and work
+plans](#claims-and-work-plans)), so presence, typing and receipts would
+show what nobody can know. Edits would rewrite what was said (item 5).
+Direct messages and cross-vault threads are the private and cross-vault
+channels items 1 and 2 rule out. The rest is principle 9: the smallest
+version that holds the guarantees.
+
+### 7. Redaction
+
+A person can paste a secret into a thread, and append-only collides with
+that. The owner, a person in the web UI (`require_human`), may redact a
+message: its body is blanked and a log event records it. This is how
+`erase_file` treats content. Messages are insert-only like
+`file_versions` and `proposal_notes`, except for one operation that blanks
+the text and stamps the row, and a trigger refuses any other change.
+`delete_vault` stays the one path that deletes them
+([AGENTS.md](../AGENTS.md), Guardrails: a new append-only table lets that
+path through, and nothing else). The docs warn that secrets belong in
+variables, never in a thread, and that redaction cannot take back what an
+agent or an export already read.
+
+Why: the log holds no content ([Privacy, erasure and
+compliance](#privacy-erasure-and-compliance)), so a message's text lives
+in one row and blanking it removes it. A thread's log events point at
+messages and never carry their text. Redaction is a person's alone for the
+reason erasing a file is: it destroys content and cannot be undone.
+
+### 8. Limits
+
+A cap on a message's size, on threads per vault and on messages per vault,
+refused the way plans and limits are today: SQLSTATE `RLP01`, naming the
+vault, the limit and the usage, with nothing changed ([Plans and
+limits](public/concepts/plans-and-limits.md)). The MCP server gets a
+rate-limit bucket of its own for thread calls (`mcp/src/ratelimit.ts`),
+next to the general per-token limit.
+
+Starting points, not measurements: a message of at most 4,000 characters,
+the same as a proposal comment (`REASON` in `mcp/src/tools-shared.ts`),
+and a title of at most 200 characters, the same as a step's. The two
+per-vault counts and the bucket's size have no number yet (see below).
+
+Why: an agent calling a tool in a loop is what item 8 of [Claims and work
+plans](#claims-and-work-plans) bounds for `request_work`, and the same two
+mechanisms answer it here: a limit the database enforces and a rate the
+MCP server enforces. No new mechanism.
+
+### 9. References
+
+A thread can be anchored to a task. A message can cite a task or a file in
+plain text, and the web UI turns the citation into a link. A citation is
+stored as the text typed. Nothing on the server parses it into authority.
+
+Why: a citation that confers nothing needs no validation, and one that
+doesn't resolve is just text. It is item 5's reason again: words in a
+thread point at things, and never act on them.
+
+### 10. Export and deletion
+
+`delete_vault` clears threads and their messages with the rest of the
+vault, and the messages' table lets that one path through its append-only
+triggers. Threads belong in the markdown export. Claims and steps are
+state, not content, and are not exported (item 10 of [Claims and work
+plans](#claims-and-work-plans)). A thread is what people wrote, so
+principle 7 applies to it as it does to files.
+
+Why: principle 7 covers anything people wrote, and deleting a vault is
+erasure, so nothing of a vault is left behind or kept out of its export.
+
+### What this doesn't settle
+
+- **Limit numbers.** Threads per vault, messages per vault and the posting
+  bucket's size have none. The 4,000 and 200 above are starting points by
+  analogy. Whether message text counts toward a vault's storage is open
+  (comments and review notes don't today).
+- **The export format.** Where threads sit in the archive, and how an
+  anchor to a task reads there, since tasks are not exported. Also whether
+  threads reach the export in the same change as the feature. Today's
+  export fixes its contents in one snapshot inside `export_vault` (files
+  and a manifest, capped at 100 MiB of text, no proposals yet),
+  so adding threads means changing that function and its hostile tests,
+  and may be a change of its own. Until the export carries threads, the
+  docs for Threads say that it does not.
+- **Redaction mechanics.** What a redacted message shows (a marker, who
+  redacted it, when), whether an author may redact their own message, and
+  what becomes of a copy someone quoted into another message.
+- **Unread markers.** Whether people get one.
+- **How a person is told.** Flags reach connections. How a person learns
+  that a thread is addressed to them, or that a vault-wide one opened, is
+  open on purpose. Email is out (item 6); the rest is undecided.
+- **Fit with Notifications.** A thread addressed to you reads like direct
+  address, a category written for `to:` notes. Whether those notes stay,
+  and how a vault-wide thread's flag fits the four categories, is open.
+- **Left to the build.** The citation syntax; whether addressees can change
+  after a thread opens; what an anchor does when its file is deleted or its
+  plan is registered again; whether a thread can be closed; and whether a
+  viewer who is the named owner of an anchored path may post, as they may
+  comment on a proposal for that path
+  ([path ownership](public/concepts/path-ownership.md)).
+
 ## Links
 
 A vault can hold links to other remote MCP servers (Stripe, Linear,
@@ -1264,6 +1449,18 @@ New in v3:
 - **Plans:** a person or their agent reading or changing a plan, tier or
   counter; a write, variable, import, invite or vault past its limit; a
   downgrade deleting anything.
+- **Threads:** a session for vault A reading or posting in a thread of
+  vault B; a viewer, or a read-only connection, posting; a message
+  changed or deleted by anyone, an owner included, except by redaction;
+  a redaction by an agent, a token or anyone but an owner in person; a
+  redacted body coming back from any read, feed, flag or export; a
+  message approving, rejecting, revealing, breaking a claim or
+  cancelling or skipping a step, however it is worded; a side thread
+  hidden from a member it isn't addressed to (it must stay readable to
+  all), or a flag about one reaching a member it isn't addressed to; a
+  vault-wide thread that skips a member's connection when flagging; a
+  post past a limit going through, or a refusal that changes anything; a
+  vault's deletion leaving a thread or a message behind.
 
 ## Build order
 
@@ -1287,6 +1484,14 @@ early), not after it. Path ownership touches the same core `write_file`
 / `propose` / `decide` functions every other milestone depends on, so
 treat it with at least as much care as core schema work, not less because
 it rode in beside a smaller feature.
+
+[Threads](#threads), the audience split in the web UI ([Who each surface is
+for](#who-each-surface-is-for)) and the Tasks view with its MCP step tools
+aren't a numbered milestone either. They start now, on the owner's
+decision of 2026-10-02: a deliberate, logged exception to working on one
+milestone at a time ([AGENTS.md](../AGENTS.md#build-order),
+[progress.md](progress.md)). The design for Threads is written before any
+of it is built, as the claims section was.
 
 ## Open decisions
 
@@ -1347,3 +1552,6 @@ default more folders to open if proposals sit unreviewed.
 - Client-side (end-to-end) encrypted variables, as a later separate
   feature.
 - A Reliquary-hosted model. Every model call uses the vault's own key.
+- Chat features around Threads: typing indicators, read receipts,
+  presence, reactions, edits, attachments, email notifications,
+  cross-vault threads and direct messages ([Threads](#threads), item 6).
