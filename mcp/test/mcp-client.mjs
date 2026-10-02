@@ -10,11 +10,17 @@ export async function connect(url, token, name = "mcp-test") {
   return client;
 }
 
+// A successful call can end with the flags hint, a block of its own
+// (src/tools-shared.ts, test/flags_hint.test.mjs): `text` is the tool's own
+// answer without it, as it was before the hint existed, and `hint` the
+// hint's line when there was one.
 export async function call(url, token, name, args = {}) {
   const client = await connect(url, token);
   try {
     const r = await client.callTool({ name, arguments: args });
-    return { text: r.content.map((c) => c.text).join("\n"), isError: Boolean(r.isError) };
+    const blocks = r.content.map((c) => c.text);
+    const hint = blocks.length > 1 && blocks.at(-1).startsWith("Reliquary: ") ? blocks.pop() : undefined;
+    return { text: blocks.join("\n"), isError: Boolean(r.isError), hint };
   } finally {
     await client.close();
   }
