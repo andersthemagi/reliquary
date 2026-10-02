@@ -93,6 +93,16 @@ export const tag = (policy: string) =>
   html`<span class="badge policy ${policy}">${policy === "canon" ? "Canon" : policy === "open" ? "Open" : policy}</span>`;
 export const canWrite = (v: Vault) => v.role === "owner" || v.role === "editor";
 
+// Whether this person may write this specific path directly: vault-wide
+// write access, or a named owner of a path that narrows to them
+// (private.writable_path, which wraps can_write_path the way rule_for wraps
+// policy_for). canWrite() alone missed a path-owning viewer; only the DB
+// call does, so this stays async.
+export async function writablePath(c: pg.PoolClient, v: Vault, path: string): Promise<boolean> {
+  if (canWrite(v)) return true;
+  return (await c.query(`select private.writable_path($1, $2) as w`, [v.id, path])).rows[0].w as boolean;
+}
+
 export const q = encodeURIComponent;
 export const vaultPath = (id: string, rest = "") => `/v/${id}${rest}`;
 export const filePath = (id: string, path: string, tab?: string) =>

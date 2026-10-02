@@ -29,7 +29,6 @@ import { errorPage } from "./errorpage.js";
 import { failure } from "./failure.js";
 import { watchControl, watchState } from "./watching.js";
 import {
-  canWrite,
   filePath,
   message,
   notFound,
@@ -40,6 +39,7 @@ import {
   vault,
   vaultPath,
   who,
+  writablePath,
   type Ctx,
   type Reply,
   type Vault,
@@ -246,7 +246,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
           )
         ).rows[0] as { default_policy: string; rules: number; open: number });
     const readme = here.find((f) => /^readme\.md$/i.test(f.path.slice(dir.length)));
-    const writer = canWrite(v);
+    const writer = await writablePath(c, v, dir);
     // Any member watches a folder (watching.ts); the vault's root isn't a
     // path that can be watched.
     const watch = dir ? watchControl(ctx, id, dir, await watchState(c, ctx, id, dir)) : undefined;
@@ -326,7 +326,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
         ? await activityBody(c, { me: ctx.userId, url: ctx.url, base: vaultPath(id, "/file"), keep: { path, tab }, scope: { vaultId: id, file: path } })
         : "";
     const canon = f.policy === "canon";
-    const writable = canWrite(v) && !f.erased_at;
+    const writable = (await writablePath(c, v, path)) && !f.erased_at;
     const watch = watchControl(ctx, id, path, await watchState(c, ctx, id, path));
     const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
     const body = html`
@@ -389,7 +389,7 @@ async function deletePage(ctx: Ctx, id: string): Promise<Reply> {
   const path = ctx.url.searchParams.get("path") ?? "";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
-    if (!v || !canWrite(v)) return null;
+    if (!v || !(await writablePath(c, v, path))) return null;
     const f = (
       await c.query(
         `select (private.rule_for(f.vault_id, f.path)).policy,
@@ -442,7 +442,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
   const path = ctx.url.searchParams.get("path") ?? "";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
-    if (!v || !canWrite(v)) return null;
+    if (!v || !(await writablePath(c, v, path))) return null;
     const f = (
       await c.query(
         `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, fv.body
@@ -494,7 +494,7 @@ export async function newFile(ctx: Ctx, id: string): Promise<Reply> {
   const dir = given ? given.replace(/\/*$/, "/") : "";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
-    if (!v || !canWrite(v)) return null;
+    if (!v || !(await writablePath(c, v, dir))) return null;
     // The folder's rule decides the form: canon asks why and proposes; open
     // creates. A path typed into another folder still follows that folder's
     // rule when posted (fileAction), so the open form carries a reason too.
@@ -538,7 +538,7 @@ export async function newFile(ctx: Ctx, id: string): Promise<Reply> {
 async function conflictReply(ctx: Ctx, id: string, path: string, typed: string): Promise<Reply> {
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
-    if (!v || !canWrite(v)) return null;
+    if (!v || !(await writablePath(c, v, path))) return null;
     const cur = (
       await c.query(
         `select fv.id as version, fv.body, fv.author, fv.agent, f.updated_at

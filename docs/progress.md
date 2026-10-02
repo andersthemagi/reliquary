@@ -217,11 +217,38 @@ Naming and removing owners is in the web app (2026-09-28,
 **Owners** on Rules (`/v/:id/rules/owners?path=`), every member reading the
 list, each grant and removal behind its own confirm page, and a POST
 without that page's confirm field sent to it rather than acting. No MCP
-tool, on purpose (the ceiling). Not built: the file, editor and proposal
-pages still go by vault role and `rule_for`, not the caller-aware
-`policy_for`, so in the web app a named owner still sees the canon flow
-and a viewer owner gets no Edit or decide buttons (their agents write
-directly over MCP).
+tool, on purpose (the ceiling).
+
+### Closed 2026-10-02: F444, comment_on_proposal, edit_and_approve and the web app's own blind spot
+
+`comment_on_proposal` and `edit_and_approve` were the one piece of
+"deliberately not touched" above still left: both checked `can_write`
+(vault role) alone, so a viewer named owner of a path could already
+`decide()` on its proposals but not comment on one or use the one-step
+edit-and-approve, unless they also held ordinary editor or owner access.
+`20261002100000_path_owner_review_parity.sql` closes it the same way
+`decide()` already was: `can_write` becomes `can_write_path`, nothing else
+in either function changes. Mutation-checked: reverting the gate reproduces
+the new hostile tests failing, restored (`supabase/tests/path_ownership_test.sql#review:`).
+
+Separately, and the bigger half of this fix: the file, editor and proposal
+pages themselves still went by vault role (`canWrite()`) alone, not
+ownership, for *showing* their Edit, Approve/Reject, Edit-and-approve and
+Comment controls — so even after `decide()` was fixed, a named owner who
+was a plain viewer saw none of these in the web app, only their agent could
+act, over MCP. The same migration adds `private.writable_path()`, a
+client-callable read of `can_write_path`'s decision (mirroring how
+`rule_for` already wraps `policy_for`); `web/src/pages.ts`'s `writablePath()`
+calls it only when plain vault role doesn't already answer yes. Wired into
+the folder, file, editor and proposal pages (`web/src/files.ts`,
+`proposals.ts`), replacing `canWrite()` wherever the action is a specific
+path's, not the vault's: a named owner who is a viewer now sees **Edit**
+instead of **Propose a change**, and **Approve**, **Reject**, **Edit, then
+approve** and the comment box, exactly where the database already let them
+act. `revise_proposal` stays vault-role gated on purpose: a path's named
+owner never proposes on their own owned path (they write directly), so
+they're never its proposer, the only person revise_proposal is for.
+Web tests: `web/test/path_owner_review_page.test.mjs`.
 
 ### Fixed 2026-09-28: F425, path-owner connection scope
 

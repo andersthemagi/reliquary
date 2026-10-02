@@ -220,8 +220,8 @@
   docs: how-to/self-host
 
 - title: Path ownership
-  summary: Named owners write and approve their own path directly; everyone else still proposes. Owners name them from Rules in the web app; the file and proposal pages don't show it yet.
-  status: in-progress
+  summary: Named owners write, approve, edit-and-approve and comment on their own path directly; everyone else still proposes. Owners name them from Rules in the web app.
+  status: shipped
   docs: concepts/path-ownership
 
 - title: Flags
