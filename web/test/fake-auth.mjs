@@ -29,6 +29,9 @@
 //                                 makes the account and emails the code, then answers 500
 //                                 (the losing request); a repeat with create_user: false
 //                                 within the throttle answers 429 and sends nothing
+//   POST /_fail_otp                { status }: answer every /otp with that status, no account
+//                                 made and no email sent (0: as normal). For when Auth is down
+//                                 outright, including for sendSigninEmail's own retry.
 //   GET  /_user?email=...         { id } of that account, or null
 //   POST /_users                  { email }: makes that account if it has none; { id }
 //   POST /_fail_global_logout     { status }: answer global logouts with that status
@@ -88,6 +91,7 @@ const failGlobal = { status: 0 }; // /_fail_global_logout: answer global logouts
 const TTL = 3600;
 const signups = { on: false };
 const otpRace = { on: false }; // /_otp_race
+const failOtp = { status: 0 }; // /_fail_otp: answer every /otp with this status instead
 
 function accessToken(sub, email, sessionId) {
   const now = Math.floor(Date.now() / 1000);
@@ -131,6 +135,10 @@ http
     if (p === "/_otp_race" && req.method === "POST") {
       otpRace.on = (await readJson(req)).on === true;
       return json(res, 200, otpRace);
+    }
+    if (p === "/_fail_otp" && req.method === "POST") {
+      failOtp.status = Number((await readJson(req)).status) || 0;
+      return json(res, 200, failOtp);
     }
     if (p === "/_user") {
       const id = USERS.get(String(url.searchParams.get("email") ?? "").toLowerCase());
@@ -224,6 +232,7 @@ http
     if (p === "/auth/v1/otp") {
       stats.otp++;
       stats.lastCreateUser = body.create_user;
+      if (failOtp.status) return json(res, failOtp.status, { code: failOtp.status, error_code: "unexpected_failure", msg: "fake outage" });
       const email = String(body.email ?? "").toLowerCase();
       if (otpRace.on && body.create_user === false && lastEmail.has(email)) {
         return json(res, 429, { code: 429, error_code: "over_email_send_rate_limit", msg: "For security purposes, you can only request this after 60 seconds." });
