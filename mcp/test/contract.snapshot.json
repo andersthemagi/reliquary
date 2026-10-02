@@ -226,7 +226,7 @@
   {
     "name": "list_flags",
     "title": "List flags",
-    "description": "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, or a change on a path they watch. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
+    "description": "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, a change on a path they watch, or a new message in a thread for the whole vault or addressed to them. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
     "inputSchema": {
       "type": "object",
       "properties": {
