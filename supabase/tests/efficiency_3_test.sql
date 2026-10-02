@@ -16,11 +16,11 @@ insert into t.ids select 'dteam', t.run('dee', $q$select public.create_vault('Te
 select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
 select test_support.add_member(t.id('team'), t.id('cal'), 'viewer', t.id('ana'));
 
-create function t.tok(p_name text) returns uuid language sql as
+create function t.pat_tok(p_name text) returns uuid language sql as
 $$ select id from public.access_tokens where name = p_name and kind = 'pat' $$;
-create function t.run_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
+create function t.run_pat_tok(p_user text, p_tok text, p_sql text) returns text language sql as $$
   select t.run_claims(jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated',
-    'act', jsonb_build_object('sub', t.tok(p_tok), 'name', p_tok, 'tok', t.tok(p_tok))), p_sql)
+    'act', jsonb_build_object('sub', t.pat_tok(p_tok), 'name', p_tok, 'tok', t.pat_tok(p_tok))), p_sql)
 $$;
 select t.run('ana', format($q$select public.create_access_token('ana-side', 30, array[%L]::uuid[], 'read')$q$, t.id('side')));
 
@@ -54,9 +54,9 @@ create function t.refs_agree(p_user text, p_tok text default null) returns text 
   select string_agg(ref || '=' || (a = b)::text || ':' || (a <> 'none')::text, ',' order by ord)
     from (select r.ref, r.ord,
                  case when p_tok is null then t.run(p_user, format('select t.lookup_before(%L)', r.ref))
-                      else t.run_tok(p_user, p_tok, format('select t.lookup_before(%L)', r.ref)) end as a,
+                      else t.run_pat_tok(p_user, p_tok, format('select t.lookup_before(%L)', r.ref)) end as a,
                  case when p_tok is null then t.run(p_user, format('select t.lookup_now(%L)', r.ref))
-                      else t.run_tok(p_user, p_tok, format('select t.lookup_now(%L)', r.ref)) end as b
+                      else t.run_pat_tok(p_user, p_tok, format('select t.lookup_now(%L)', r.ref)) end as b
             from unnest(array['Team', 'Side', 'Twin', 'Private', 'team', t.id('team')::text, upper(t.id('team')::text),
                               t.id('priv')::text, '00000000-0000-0000-0000-000000000000', 'not-a-uuid-0000', ''])
                  with ordinality r(ref, ord)) x
@@ -76,9 +76,9 @@ select t.expect('vault ref: two vaults with one name are "no vault", as before (
   t.run('ana', 'select t.lookup_now(''Twin'')') || ',' || t.run('ana', format('select t.lookup_now(%L)', t.id('twin2'))),
   'none,' || t.id('twin2'));
 select t.expect('vault ref: a token scoped to Side finds Side only, by name or id',
-  t.refs_agree('ana', 'ana-side') || ' | ' || t.run_tok('ana', 'ana-side', 'select t.lookup_now(''Side'')')
-  || ',' || t.run_tok('ana', 'ana-side', 'select t.lookup_now(''Team'')')
-  || ',' || t.run_tok('ana', 'ana-side', format('select t.lookup_now(%L)', t.id('team'))),
+  t.refs_agree('ana', 'ana-side') || ' | ' || t.run_pat_tok('ana', 'ana-side', 'select t.lookup_now(''Side'')')
+  || ',' || t.run_pat_tok('ana', 'ana-side', 'select t.lookup_now(''Team'')')
+  || ',' || t.run_pat_tok('ana', 'ana-side', format('select t.lookup_now(%L)', t.id('team'))),
   t.refs_agree('ana', 'ana-side') || ' | ' || t.id('side') || ',none,none');
 select t.expect('vault ref: no vault raises RLV01; anonymous callers can''t call it',
   t.run('dee', format('select private.vault_ref(%L)', t.id('team'))) || ',' || t.run(null, 'select private.vault_ref(''Team'')'),
@@ -162,7 +162,7 @@ create table t.pairs as
                    unnest(array['notes/a.md', 'notes/deep/y.md', 'notes/deep/x.md', 'readme.md', 'notes/']) p;
 grant select on t.pairs to authenticated;
 create function t.pairs_agree(p_user text, p_tok text default null) returns text language sql as $$
-  select case when p_tok is null then t.run(p_user, q) else t.run_tok(p_user, p_tok, q) end
+  select case when p_tok is null then t.run(p_user, q) else t.run_pat_tok(p_user, p_tok, q) end
     from (select $q$select ((select coalesce(string_agg(x.vault_id || x.path || x.policy || x.quorum, ',' order by x.vault_id, x.path), '')
                     from private.rules_for_pairs((select array_agg(v) from t.pairs), (select array_agg(p) from t.pairs)) x)
              = (select coalesce(string_agg(v || p || r.policy || r.quorum, ',' order by v, p), '')
