@@ -47,7 +47,7 @@ import {
 } from "./proposals.js";
 import { rules, search, setRule } from "./rules.js";
 import { pathOwnerAction, pathOwners } from "./pathowners.js";
-import { threadsRoutes } from "./threadspage.js";
+import { threadsRoutes } from "./threadsroutes.js";
 import { accessRoutes } from "./access.js";
 
 export type Ctx = {

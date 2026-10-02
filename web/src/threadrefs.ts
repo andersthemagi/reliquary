@@ -93,5 +93,5 @@ export const byline = (ctx: Ctx, id: string | null, agent: string | null): strin
   return mine ? "you" : personRef(id);
 };
 
-export const threadsPath = (id: string, query = "") => vaultPath(id, `/threads${query}`);
+export const threadsPath = (id: string, rest = "") => vaultPath(id, `/threads${rest}`);
 export const threadPath = (id: string, tid: string, rest = "") => vaultPath(id, `/threads/${tid}${rest}`);

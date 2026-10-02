@@ -104,7 +104,15 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (rest === "/edit") return say(`Opening the editor for ${q("path") || "a file"} in ${vault}`);
   if (rest === "/new") return say(`Opening New file in ${vault}`);
   if (rest === "/proposals") return say(`Opening the proposals of ${vault}`);
-  if (rest === "/threads") return say(`Opening the threads of ${vault}`);
+  if (rest === "/threads") return say(get ? `Opening the threads of ${vault}` : `Opening a thread in ${vault}`);
+  if (rest === "/threads/new") return say(`Opening New thread in ${vault}`);
+  const tm = /^\/threads\/([^/]+)(?:\/([a-z]+))?$/.exec(rest);
+  if (tm) {
+    const thread = `thread ${short(tm[1])} in ${vault}`;
+    if (get) return say(`Opening ${thread}`);
+    const did: Record<string, string> = { post: "Posting in", resolve: "Resolving", reopen: "Reopening" };
+    if (tm[2] && did[tm[2]]) return say(`${did[tm[2]]} ${thread}`);
+  }
   if (rest === "/activity" || rest === "/log") return say(`Opening the activity of ${vault}`);
   if (rest === "/rules") return say(get ? `Opening the rules of ${vault}` : `Saving a rule for ${path || "a path"} in ${vault}`);
   if (rest === "/rules/owners") {

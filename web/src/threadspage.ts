@@ -7,6 +7,7 @@
 // people here, on purpose: nothing marks a thread as seen.
 //
 //   GET  /v/:id/threads              the list; ?path=<file> only its threads, ?before=<n> older ones
+//                                    (opening a thread and reading one: threadnew.ts, threadview.ts)
 //
 // Each handler runs as the signed-in person; the tables' row level security
 // decides what they read (supabase/migrations/20261004100000_threads.sql).
@@ -15,7 +16,7 @@ import type pg from "pg";
 import { asPerson } from "./db.js";
 import { emptyState, html, pageHeader, plural, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
-import { notFound, render, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
+import { canWrite, notFound, q, render, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { anchorLines, byline, THREAD_COLS, threadPath, threadsPath, type ThreadRow } from "./threadrefs.js";
 
 const PAGE = 100;
@@ -63,6 +64,7 @@ function body(ctx: Ctx, id: string, v: Vault, o: { rows: ThreadRow[]; more: bool
       crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Threads" }],
       title: "Threads",
       description: "Conversations between the people in this vault and their agents. Everyone in the vault can read every thread, side threads included.",
+      primary: canWrite(v) ? html`<a class="button primary" href="${threadsPath(id, `/new${o.path ? `?path=${q(o.path)}` : ""}`)}">New thread</a>` : "",
       meta: o.path ? html`<p class="meta">Showing threads about <code>${shown(o.path)}</code>. <a href="${threadsPath(id)}">Show every thread</a></p>` : undefined,
     })}
     ${o.rows.length === 0
@@ -72,7 +74,7 @@ function body(ctx: Ctx, id: string, v: Vault, o: { rows: ThreadRow[]; more: bool
         ${o.more ? html`<p class="small"><a href="${threadsPath(id, `?${o.path ? `path=${encodeURIComponent(o.path)}&` : ""}before=${o.rows[o.rows.length - 1].last_message_id}`)}">Older threads</a></p>` : ""}`}`;
 }
 
-async function list(ctx: Ctx, id: string): Promise<Reply> {
+export async function threadList(ctx: Ctx, id: string): Promise<Reply> {
   const given = ctx.url.searchParams.get("path") ?? "";
   const path = given && given.length <= 1024 ? given : null;
   const b = ctx.url.searchParams.get("before") ?? "";
@@ -86,9 +88,4 @@ async function list(ctx: Ctx, id: string): Promise<Reply> {
   });
   if (!out) return notFound(ctx);
   return render(ctx, "Threads", out, "vaults");
-}
-
-export async function threadsRoutes(ctx: Ctx, id: string, rest: string): Promise<Reply> {
-  if (ctx.method === "GET" && rest === "/threads") return list(ctx, id);
-  return notFound(ctx);
 }

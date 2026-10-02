@@ -861,6 +861,10 @@ form.comment .actions { margin-top: var(--space-4); }
 .thread-rows .thread-meta { display: block; margin-top: var(--space-2); }
 .thread-rows .thread-meta .badge { margin-right: var(--space-2); }
 .thread-rows li.is-resolved .name { color: var(--fg-muted); }
+/* One thread (threadview.ts): a message's text keeps its line breaks and breaks long words. */
+.thread li p { overflow-wrap: anywhere; }
+.page-actions .inline-form { margin: 0; }
+.redacted { font-style: italic; }
 
 /* Snooze: a quiet row of small buttons. */
 .snooze, .snoozed-note {

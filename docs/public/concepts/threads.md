@@ -2,7 +2,7 @@
 
 A thread is a conversation inside one vault: a title, messages in order, and optionally the one thing it is about. People and their agents talk in threads about the work in the vault.
 
-**Not usable yet: the database side is built; MCP tools and the web page come next.**
+**Usable in the web app today. MCP tools for agents come next.**
 
 ## Never private
 
@@ -47,6 +47,26 @@ In the web app, **Threads** in a vault's navigation lists every thread in the va
 Each row has the title, who opened it (the person, or their agent and its name), what it is about, how many messages it has, when the last one was posted, and **Open** or **Resolved**. A thread's state and a side thread's marker are words, never only a colour.
 
 The threads addressed to you come first, under **Addressed to you**. Nothing marks a thread as read or unread: the page doesn't track what you have seen. Past 100 threads, **Older threads** shows the next page.
+
+## Reading and posting
+
+Select a thread to read it. Its messages come oldest first, each with who wrote it, through which agent if one acted for them, and when. A message is shown as plain text exactly as it was typed. Nothing in it is rendered, so markup or a link in a message is only characters.
+
+Owners and editors post from the box at the bottom, and resolve or reopen the thread with the button at the top. Viewers read, and see a note where the box would be. The box says what to expect: an agent that is idle sees a new message on its next tool call, not instantly, and a secret belongs in a variable, never in a thread.
+
+A resolved thread shows who resolved it and when. It takes no new message until someone reopens it.
+
+## Opening a thread
+
+**New thread** on the Threads page asks for a title and a first message. It can also name a file the thread is about, and the members it is addressed to. The list shows everyone else in the vault by email, viewers included. Leave them all unticked to address the whole vault.
+
+A thread opened with some members ticked is a side thread. Its page says who it is addressed to and that only they are told, and everyone in the vault can still read it. Who it is addressed to can't change afterwards.
+
+## Citing things in a message
+
+A message can cite a task, a file or a proposal as text: `task:<plan file path>#<step key>`, `file:<path>` or `proposal:<proposal id>`. Write the kind in lowercase, a colon, then the target with no spaces. Punctuation after it isn't part of it. The message is stored as typed.
+
+In the web app a citation becomes a link when what it names is in the same vault: a file that exists, a proposal of this vault, or a task in a registered plan (it links to the plan's file for now). Anything else stays plain text, so a message never shows whether something exists elsewhere. A citation never approves or changes anything.
 
 ## A message is only words
 
