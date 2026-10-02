@@ -115,6 +115,11 @@ Five jobs:
 9. **Good over perfect.** Build the smallest version that holds the
    guarantees above. Note where it will need to scale, and don't build that
    yet ([Where it falls flat](#where-it-falls-flat-and-what-scales-later)).
+10. **Say who each surface is for.** What a person reads or acts on leads
+    the web UI. Logging for diagnosing a problem stays reachable under
+    Diagnostics, never deleted and never the front door. The parity rule
+    says what each side may do, not what each side should be shown
+    ([Who each surface is for](#who-each-surface-is-for)).
 
 ## Concepts
 
@@ -249,6 +254,43 @@ under 6 ms at 200k rows.
 
 No MCP tool returns a variable's value or a link's credential, on any
 scope.
+
+### Who each surface is for
+
+Settled 2026-10-02 (owner's decision); the web UI does not do it yet. On
+that date a vault's sidebar lists Activity, Flags and Claims right after
+Proposals.
+
+A vault has two audiences, and the web UI keeps them apart:
+
+- **A person** is looking for something to read or to act on: the work
+  agents are doing, the conversation about it, what changed, what waits
+  for their review. That leads the primary navigation and each page's
+  default view.
+- **Diagnosing a problem** needs logging: the full event log, the flags a
+  connection was shown, the claims table. It stays reachable, one click
+  away under a Diagnostics area, and is never deleted.
+
+This needed saying because [parity.md](parity.md) asks for every agent
+capability on both surfaces. That answers "may they?", not "would a person
+want it?". Flags, claims and activity are logging functions that were
+mirrored into the web UI because the table asked for them there.
+
+What follows from it:
+
+- **Existing URLs keep resolving.** `/v/:id/activity`, `/v/:id/flags` and
+  `/v/:id/claims` are linked from docs and bookmarks.
+- **Activity splits in two.** A plain-language Changes feed holds the
+  content events a person cares about. The full log stays under
+  Diagnostics.
+- **Flags stay as they are** ([Notifications](#notifications)). MCP has no
+  push, so an agent learns things on its next tool call. The word "flag"
+  leaves the primary UI.
+- **Two vocabularies, on purpose.** The web UI says Tasks, Threads,
+  Changes and Diagnostics. MCP tool names and SQL keep `work_plan`, `step`
+  and `claim`: the design avoided `task` on the tool side because an
+  MCP-spec extension uses it ([Claims and work plans](#claims-and-work-plans),
+  item 1). A plan's steps are shown to people as tasks.
 
 ## Context
 
