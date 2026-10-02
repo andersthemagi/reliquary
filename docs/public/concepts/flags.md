@@ -25,6 +25,20 @@ Reading flags doesn't use them up. They're marked shown only once the response c
 
 A new connection is told what is waiting on you now, but not what happened before it was made.
 
+## How an agent learns it has flags
+
+MCP has no push: Reliquary can't wake an agent or interrupt it. So when flags wait for a connection in a vault, each successful call it makes there (a call that names the vault, or a proposal in it) ends with one more line:
+
+```
+Reliquary: 3 flags are waiting for you in this vault. Call list_flags.
+```
+
+The line gives the count, up to "more than 20", and nothing else. It never holds a vault's name, a path, a proposal's text or anything else someone typed, so it can't carry instructions. The agent then calls `list_flags`, shows you what it returns, and calls `advance_flags`. The line stops until something new is flagged. Reliquary tells every agent this when it connects.
+
+The line repeats on every call until the agent calls `advance_flags`: seeing it uses nothing up. It isn't added to `list_flags` or `advance_flags` themselves, to a call that failed, or to a call that names no vault, like `list_vaults`. A read-only connection gets it too.
+
+It only reaches an agent that is making calls in that vault. An agent that is idle, or working in another vault, finds out on its next call there. Nothing wakes it.
+
 ## Seeing your flags
 
 Every vault has a **Flags** section for the person signed in to the web app: what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file.

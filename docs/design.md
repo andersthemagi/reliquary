@@ -444,6 +444,24 @@ you"). Not settled if a better word turns up before this is built.
   (22023), since no migration gives files tags yet, so a tag subscription
   could never match anything.
 
+### Delivery over MCP: a hint, not the flags (settled 2026-10-02)
+
+Flags don't ride in every MCP response; a one-line hint does. When flags
+wait for the calling connection in the vault a successful call named (or
+a named proposal's vault), the server adds one fixed line with the count:
+"Reliquary: 3 flags are waiting for you in this vault. Call list_flags."
+The server's instructions at initialize say what to do with it:
+`list_flags`, show the person, `advance_flags`.
+
+Why: `list_flags` alone reaches only an agent that thinks to call it, and
+a `flags` field on every response would cost every call bytes and carry
+text people wrote outside each tool's fences. The hint reaches any agent
+that makes a call, costs nothing when nothing waits, and holds only the
+server's words and a number, so it can't be an injection channel. It moves
+no watermark. The count is `public.flags_waiting`, which calls
+`list_flags`, so who is flagged stays defined in one place. It can't wake
+an idle agent: MCP has no push, so an agent learns on its next call.
+
 ### Open questions this doesn't resolve
 
 - Whether subscriptions are person-only to create (matching variables and
@@ -452,11 +470,6 @@ you"). Not settled if a better word turns up before this is built.
   doesn't obviously need a human in the loop the way approving or
   revealing a secret does. Built person-only for now, the safer default,
   not a final answer.
-- Whether flags ride inside every MCP tool's response (a `flags` field
-  alongside the actual answer) or need their own dedicated tool a client
-  must think to call: the former reaches an agent that never calls it
-  directly, the latter is cleaner to reason about and test. Nothing in
-  `mcp/` calls `list_flags` yet, so this is still open.
 - Working-set staleness's exact trigger: does re-reading a file that
   changed clear its own staleness flag, or does it need an explicit
   acknowledgement? Moot until staleness-from-reads exists at all: nothing

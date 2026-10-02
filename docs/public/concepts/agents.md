@@ -52,5 +52,6 @@ File text, reasons, comments and review notes reach an agent inside fences with 
 - Before writing, check a path's policy: `list_files` marks canon files `[canon]`, and `read_file` names the policy. Use `write_file` for open files and `propose` for canon ones.
 - You can't approve. After proposing, tell your person there is a proposal waiting in their Inbox.
 - Answer requests for changes with `revise_proposal`; read the notes in `changes_since` or `read_proposal`.
+- When a result ends with a line from Reliquary saying flags are waiting, call `list_flags` for that vault, show your person what it returns, then call `advance_flags` with its `through` value. See [How an agent learns it has flags](flags.md#how-an-agent-learns-it-has-flags).
 - When your person asks to report a Reliquary bug or send feedback, use `send_feedback`: summarise in your own words, add the tool and any error `ref`, and leave out secrets, tokens and variable values.
 - Never ask for or repeat a variable's value. To add a `.env` to a vault, run `npx @reliquary-ai/cli env push`; a person applies it. See [Move a .env into a vault](../how-to/move-env-into-vault.md).
