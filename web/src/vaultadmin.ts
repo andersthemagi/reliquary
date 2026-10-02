@@ -1,6 +1,7 @@
 // Vault settings at /v/:id/config (docs/parity.md), as tabs: General (rename
 // and default policy), Members (members.ts), Rules (rules.ts, /v/:id/rules),
-// Usage, Watching (watching.ts, the person's own), Export and Danger zone
+// Usage, Watching (watching.ts, the person's own), Diagnostics (diagnostics.ts,
+// /v/:id/diagnostics: Flags and Claims), Export and Danger zone
 // (leave, delete); and erasing a file, reached from the file. (Not
 // /settings: a viewer's Variables page must hold no "/set" link.) Every
 // action here is an owner's, in person, except leaving and watching, which
@@ -40,7 +41,7 @@ const filePath = (id: string, path: string) => vaultPath(id, `/file?path=${q(pat
 // breadcrumb vault / Settings / tab. Export is an owner's only, so only
 // owners see its tab; Danger zone holds Leave, which is everyone's.
 
-export type SettingsTab = "general" | "members" | "rules" | "usage" | "watching" | "export" | "danger";
+export type SettingsTab = "general" | "members" | "rules" | "usage" | "watching" | "diagnostics" | "export" | "danger";
 const TABS: [SettingsTab, string, (id: string) => string][] = [
   ["general", "General", (id) => settingsPath(id)],
   ["members", "Members", (id) => settingsPath(id, "/members")],
@@ -48,6 +49,8 @@ const TABS: [SettingsTab, string, (id: string) => string][] = [
   ["usage", "Usage", (id) => settingsPath(id, "/usage")],
   // The person's own, for every member (watching.ts).
   ["watching", "Watching", (id) => settingsPath(id, "/watching")],
+  // Flags and Claims, for working out why something happened (diagnostics.ts).
+  ["diagnostics", "Diagnostics", (id) => vaultPath(id, "/diagnostics")],
   ["export", "Export", (id) => settingsPath(id, "/export")],
   ["danger", "Danger zone", (id) => settingsPath(id, "/danger")],
 ];

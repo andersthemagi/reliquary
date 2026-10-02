@@ -10,7 +10,7 @@ Claiming a path leases it to you for a while: 48 hours by default, or whatever t
 
 No amount of checking in holds a claim past its hold limit, seven days by default from when it was first granted (also set by the rule). Past that, release it and claim again. Changing a rule never touches a claim already granted under the old one, only new claims and the next check-in.
 
-A claim carries an optional label, whatever you're doing ("rewriting the intro"), shown to people on the vault's Claims page. It's just a note someone wrote: never trust it to say who's really holding the claim.
+A claim carries an optional label, whatever you're doing ("rewriting the intro"), shown to people on the **Claims** tab of **Diagnostics**. It's just a note someone wrote: never trust it to say who's really holding the claim.
 
 ## Claiming a path (agents)
 
@@ -34,7 +34,7 @@ Only an owner sets a claim rule, in person, on the vault's **Rules** page. Setti
 
 ## Seeing and breaking claims (people)
 
-Every vault has a **Claims** section listing who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
+In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
 
 You see a claim where you meet the file. When someone holds a claim on a file, the file page and the editor open with a banner: whose it is (a person, or "Name's agent" when an agent took it), how much longer it lasts, and the note they left. The note is only what someone typed. It's shown in quotes and never proves who holds the claim. A claim covers one path, so the banner appears on that file and nowhere else, and not at all once the claim has run out or been released. Viewers see it too.
 

@@ -18,7 +18,8 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { describe } from "./activity.js";
-import { emptyState, html, pageHeader, time, type Raw } from "./html.js";
+import { emptyState, html, time, type Raw } from "./html.js";
+import { diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { vaultShell } from "./files.js";
 import { filePath, notFound, proposalPath, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
 
@@ -79,10 +80,7 @@ export async function flags(ctx: Ctx, id: string): Promise<Reply> {
     // nothing (design.md, "A separate watermark").
     await c.query(`select public.advance_flags($1, $2)`, [id, r.through]);
     const body = html`
-      ${pageHeader({
-        title: "Flags",
-        description: html`What’s changed in ${v.name} since you were last told: a proposal waiting on you, your own proposals, and paths you watch.`,
-      })}
+      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: a proposal waiting on you, your own proposals, and paths you watch.`)}
       ${r.flags.length
         ? flagsTable(ctx, id, r.flags)
         : emptyState({
@@ -91,7 +89,7 @@ export async function flags(ctx: Ctx, id: string): Promise<Reply> {
           })}
       ${r.more ? html`<p class="hint">More than ${LIMIT} flags were waiting; the oldest are shown first. Check back after these clear.</p>` : ""}
       <p class="hint">Your agents see the same flags over MCP (<code>list_flags</code>), kept separately from yours: opening this page doesn’t mark theirs shown, and their calls don’t mark yours. <a href="/docs/concepts/flags">About flags</a> · <a href="${vaultPath(id, "/config/watching")}">What you watch</a></p>`;
-    return vaultShell(c, ctx, v, { section: "flags" }, body);
+    return vaultShell(c, ctx, v, { section: "diagnostics" }, diagnosticsFrame(id, v, "flags", body));
   });
   if (!out) return notFound(ctx);
   return render(ctx, "Flags", out, "vaults");

@@ -27,7 +27,7 @@ A new connection is told what is waiting on you now, but not what happened befor
 
 ## Seeing your flags
 
-Every vault has a **Flags** section for the person signed in to the web app: what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file.
+In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
 
 Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
 

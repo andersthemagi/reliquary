@@ -33,9 +33,13 @@ The refusal says which rule the path broke. A file saved before these rules keep
 
 In the web app, a vault's page is its folder tree: each folder and file shows whether it is canon or open, the top says what files without a rule are, and a folder's `README.md` is shown under its list. **Search** finds files by their words and paths. **New file** in a folder follows that folder's rule: in a canon folder it asks why and becomes a proposal.
 
-On a phone, a vault's sections (**Files**, **Proposals**, **Activity**, **Variables**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
+On a phone, a vault's sections (**Files**, **Proposals**, **Activity**, **Variables**, **Links**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
+
+## Diagnostics
+
+**Settings**, then **Diagnostics**, is for working out why something happened. It has a tab for [Flags](flags.md) (what changed since you were last told) and one for [Claims](claims.md) (who is working on which path). Most people never need it, so neither tab is in the vault's main navigation. The **Diagnostics** page itself only lists its tabs; it changes nothing.
 
 ## Roles
 
