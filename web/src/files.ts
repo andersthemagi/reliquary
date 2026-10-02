@@ -24,6 +24,7 @@ import {
   type MenuItem,
   type Raw,
 } from "./html.js";
+import { claimBanner } from "./claimbanner.js";
 import { siteHref } from "./hosts.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage } from "./errorpage.js";
@@ -328,6 +329,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const canon = f.policy === "canon";
     const writable = (await writablePath(c, v, path)) && !f.erased_at;
     const watch = watchControl(ctx, id, path, await watchState(c, ctx, id, path));
+    const claim = await claimBanner(c, ctx, v, path, "view", filePath(id, path, tab === "preview" ? undefined : tab));
     const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
     const body = html`
       ${pageHeader({
@@ -345,6 +347,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
         tabs: [tab_("preview", "Preview"), tab_("source", "Source"), tab_("history", "History")],
         tabsLabel: "File view",
       })}
+      ${claim}
       ${pending.length
         ? callout(
             canon ? "warning" : "info",
@@ -453,6 +456,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
     ).rows[0];
     if (!f) return null;
     const canon = f.policy === "canon";
+    const claim = await claimBanner(c, ctx, v, path, canon ? "propose" : "write", filePath(id, path));
     // No delete here: it lives in the file page's More menu, behind a
     // confirm page, away from Save. On canon the required "Why" comes before
     // the text, so it's on screen with the header's button. expected_version
@@ -470,6 +474,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
         secondary: html`<a class="button quiet" href="${filePath(id, path)}">Cancel</a>`,
         primary: html`<button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>`,
       })}
+      ${claim}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="edit-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="path" value="${path}">
