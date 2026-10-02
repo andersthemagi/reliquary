@@ -239,6 +239,11 @@
   status: shipped
   docs: concepts/claims
 
+- title: Work plans
+  summary: Steps with dependencies in a plan file, so no agent is handed a step before the ones blocking it are done. The file format is settled and parsed; nothing registers or acts on a plan yet.
+  status: in-progress
+  docs: concepts/claims
+
 # Planned ------------------------------------------------------------------
 
 - title: Publish the CLI to npm
