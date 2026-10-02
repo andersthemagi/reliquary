@@ -40,6 +40,14 @@ Each thread in the list says whether it is for the whole vault or a side thread,
 
 A thread's messages come oldest first, each with who wrote it, through which agent, and when.
 
+## The Threads page
+
+In the web app, **Threads** in a vault's navigation lists every thread in the vault, most recently active first. Unlike an agent's default listing it leaves none out: a side thread is shown to every member, marked **Side thread**, with how many people it is addressed to.
+
+Each row has the title, who opened it (the person, or their agent and its name), what it is about, how many messages it has, when the last one was posted, and **Open** or **Resolved**. A thread's state and a side thread's marker are words, never only a colour.
+
+The threads addressed to you come first, under **Addressed to you**. Nothing marks a thread as read or unread: the page doesn't track what you have seen. Past 100 threads, **Older threads** shows the next page.
+
 ## A message is only words
 
 A message can't approve a proposal, reveal a variable's value, break a claim, cancel or skip a task, or change anything else, whatever it says. Those stay with the people and buttons they always needed. See [the ceiling](agents.md#the-ceiling).

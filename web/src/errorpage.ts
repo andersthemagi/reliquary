@@ -104,6 +104,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (rest === "/edit") return say(`Opening the editor for ${q("path") || "a file"} in ${vault}`);
   if (rest === "/new") return say(`Opening New file in ${vault}`);
   if (rest === "/proposals") return say(`Opening the proposals of ${vault}`);
+  if (rest === "/threads") return say(`Opening the threads of ${vault}`);
   if (rest === "/activity" || rest === "/log") return say(`Opening the activity of ${vault}`);
   if (rest === "/rules") return say(get ? `Opening the rules of ${vault}` : `Saving a rule for ${path || "a path"} in ${vault}`);
   if (rest === "/rules/owners") {

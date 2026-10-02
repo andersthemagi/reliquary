@@ -855,6 +855,13 @@ blockquote.claim {
 form.comment { margin-top: var(--space-5); }
 form.comment .actions { margin-top: var(--space-4); }
 
+/* Threads (threadspage.ts): the list reuses .rows. A resolved thread's title is
+   quieter, and its state is always a word beside it, never only the shade. */
+.thread-rows .thread-main { min-width: 0; }
+.thread-rows .thread-meta { display: block; margin-top: var(--space-2); }
+.thread-rows .thread-meta .badge { margin-right: var(--space-2); }
+.thread-rows li.is-resolved .name { color: var(--fg-muted); }
+
 /* Snooze: a quiet row of small buttons. */
 .snooze, .snoozed-note {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);

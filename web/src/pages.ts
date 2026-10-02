@@ -47,6 +47,7 @@ import {
 } from "./proposals.js";
 import { rules, search, setRule } from "./rules.js";
 import { pathOwnerAction, pathOwners } from "./pathowners.js";
+import { threadsRoutes } from "./threadspage.js";
 import { accessRoutes } from "./access.js";
 
 export type Ctx = {
@@ -597,6 +598,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && rest === "/edit") return editView(ctx, id);
   if (get && rest === "/new") return newFile(ctx, id);
   if (get && rest === "/proposals") return proposalList(ctx, id);
+  if (rest === "/threads" || rest.startsWith("/threads/")) return threadsRoutes(ctx, id, rest);
   if (get && (rest === "/activity" || rest === "/log")) return activity(ctx, id);
   if (get && rest === "/rules") return rules(ctx, id);
   if (!get && rest === "/rules") return setRule(ctx, id);

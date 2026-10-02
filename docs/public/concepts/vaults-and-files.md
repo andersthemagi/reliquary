@@ -33,7 +33,7 @@ The refusal says which rule the path broke. A file saved before these rules keep
 
 In the web app, a vault's page is its folder tree: each folder and file shows whether it is canon or open, the top says what files without a rule are, and a folder's `README.md` is shown under its list. **Search** finds files by their words and paths. **New file** in a folder follows that folder's rule: in a canon folder it asks why and becomes a proposal.
 
-On a phone, a vault's sections (**Files**, **Proposals**, **Activity**, **Variables**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
+On a phone, a vault's sections (**Files**, **Proposals**, **Threads**, **Activity**, **Variables**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
 
