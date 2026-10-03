@@ -6,6 +6,34 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.15.0](https://github.com/andersthemagi/reliquary/compare/v0.14.0...v0.15.0) (2026-10-03)
+
+Vaults get threads, conversations between members and their agents, with a Threads page and four MCP tools, and work plans get a Tasks page and MCP tools to register a plan and work its steps. Changes replaces Activity in a vault's navigation as a plain-language feed, flags and claims move under Diagnostics, a file's page shows who is working on it, and agents are told when flags are waiting.
+
+### Features
+
+* **claims:** checkin_step for work plan steps (CL-3.2 gap, [#70](https://github.com/andersthemagi/reliquary/issues/70)) ([#115](https://github.com/andersthemagi/reliquary/issues/115)) ([5568e5a](https://github.com/andersthemagi/reliquary/commit/5568e5a79f58295a95ac3793ba4d7d3e18aab23a))
+* **claims:** the work plan block's grammar and parser (CL-3.1) ([#108](https://github.com/andersthemagi/reliquary/issues/108)) ([faa09cb](https://github.com/andersthemagi/reliquary/commit/faa09cbf2a524eacb0a13878051165b5fd1f7d83))
+* **claims:** work plan tables and functions (CL-3.2) ([#109](https://github.com/andersthemagi/reliquary/issues/109)) ([c2b07b5](https://github.com/andersthemagi/reliquary/commit/c2b07b543f56c30c1b238071a52e85b203c4da21))
+* **db:** threads and messages inside a vault ([#126](https://github.com/andersthemagi/reliquary/issues/126)) ([2750846](https://github.com/andersthemagi/reliquary/commit/2750846a104ad3de7b5862af0b0b8e5456631b85))
+* **flags:** flag a vault's thread messages to the members they reach ([#127](https://github.com/andersthemagi/reliquary/issues/127)) ([c5fbdcd](https://github.com/andersthemagi/reliquary/commit/c5fbdcd873624afd4e6bc7ccb0a09ba8ba54ab50))
+* **mcp:** open, read and post to threads over MCP ([#129](https://github.com/andersthemagi/reliquary/issues/129)) ([c1afd23](https://github.com/andersthemagi/reliquary/commit/c1afd239afe3c14363d7594dcaa964b58d940fca))
+* **mcp:** register work plans and work their steps over MCP ([#124](https://github.com/andersthemagi/reliquary/issues/124)) ([0992cc1](https://github.com/andersthemagi/reliquary/commit/0992cc1af6784ed05c49640acd10f62e52ddf3e5))
+* **mcp:** tell an agent when flags are waiting ([#130](https://github.com/andersthemagi/reliquary/issues/130)) ([7e88b0a](https://github.com/andersthemagi/reliquary/commit/7e88b0a58bd87fa8314056a8abb6c24730db859e))
+* **path-ownership:** a named owner gets edit-and-approve, comments and the web app's controls ([#105](https://github.com/andersthemagi/reliquary/issues/105)) ([cddaedb](https://github.com/andersthemagi/reliquary/commit/cddaedbb5c46133ee79d825a10d0789d53620a52))
+* **web:** a plain-language Changes feed for each vault ([#123](https://github.com/andersthemagi/reliquary/issues/123)) ([2ad8a34](https://github.com/andersthemagi/reliquary/commit/2ad8a345a49989e4d326e15fb59a8666b6b7978a))
+* **web:** a Tasks page to see and steer a vault's work plans ([#122](https://github.com/andersthemagi/reliquary/issues/122)) ([c93c436](https://github.com/andersthemagi/reliquary/commit/c93c436d00552d7ddb4ce6d49b0331a4c49e6c50))
+* **web:** a Threads page where people and their agents talk about the work ([#128](https://github.com/andersthemagi/reliquary/issues/128)) ([0e308de](https://github.com/andersthemagi/reliquary/commit/0e308def11e778a25524cc4e5e2f549d80b95a1b))
+* **web:** filter Changes to what you made or watch ([#125](https://github.com/andersthemagi/reliquary/issues/125)) ([e48a2d8](https://github.com/andersthemagi/reliquary/commit/e48a2d87784bb95240df9ab1650d0fa5c7eaf807))
+* **web:** move flags and claims under a Diagnostics area ([#121](https://github.com/andersthemagi/reliquary/issues/121)) ([e406bc5](https://github.com/andersthemagi/reliquary/commit/e406bc559f47d19c547357baad8ded8894079d3f))
+* **web:** show who is working on a file, and let an owner or editor break the claim there ([#120](https://github.com/andersthemagi/reliquary/issues/120)) ([d393fe3](https://github.com/andersthemagi/reliquary/commit/d393fe3f8d17b46a5e020497034cab8520d5582b))
+
+
+### Bug fixes
+
+* **db:** asPerson treats a failed rollback as a broken client ([#107](https://github.com/andersthemagi/reliquary/issues/107)) ([6d4b2f1](https://github.com/andersthemagi/reliquary/commit/6d4b2f19c1f23d4320582d88d487802f032c94c9))
+* **web,mcp:** map work plan step SQLSTATEs to a status and a name ([#114](https://github.com/andersthemagi/reliquary/issues/114)) ([c0636de](https://github.com/andersthemagi/reliquary/commit/c0636dede93399b33cdbd6c6049b2ecc0e8df0d6))
+
 ## [0.14.0](https://github.com/andersthemagi/reliquary/compare/v0.13.0...v0.14.0) (2026-10-01)
 
 
