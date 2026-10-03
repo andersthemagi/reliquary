@@ -6,6 +6,7 @@ release-please from conventional commits that touch `cli/`.
 
 ## [0.4.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.3.3...cli-v0.4.0) (2026-10-03)
 
+No command or option changed in this release. The CLI's own code is the same apart from internal test cleanup, and the one entry below is the website's new headline, which release-please counted here.
 
 ### Features
 
