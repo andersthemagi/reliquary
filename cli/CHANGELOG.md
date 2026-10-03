@@ -4,6 +4,13 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.4.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.3.3...cli-v0.4.0) (2026-10-03)
+
+
+### Features
+
+* **web:** new hero headline, "The canon for humans and agents." ([#39](https://github.com/andersthemagi/reliquary/issues/39)) ([421f2f7](https://github.com/andersthemagi/reliquary/commit/421f2f752c2955d169719c2c0c3877a51ea8576e))
+
 ## [0.3.3](https://github.com/andersthemagi/reliquary/compare/cli-v0.3.2...cli-v0.3.3) (2026-09-29)
 
 A real client vault name had leaked into a test fixture; renamed it to a generic one ahead of this repository going public.
