@@ -6,8 +6,9 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
-## [0.15.0](https://github.com/andersthemagi/reliquary/compare/v0.14.0...v0.15.0) (2026-10-02)
+## [0.15.0](https://github.com/andersthemagi/reliquary/compare/v0.14.0...v0.15.0) (2026-10-03)
 
+Vaults get threads, conversations between members and their agents, with a Threads page and four MCP tools, and work plans get a Tasks page and MCP tools to register a plan and work its steps. Changes replaces Activity in a vault's navigation as a plain-language feed, flags and claims move under Diagnostics, a file's page shows who is working on it, and agents are told when flags are waiting.
 
 ### Features
 
