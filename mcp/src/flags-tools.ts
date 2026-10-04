@@ -171,6 +171,11 @@ export function registerFlagsTools(
         vault: VAULT,
         through: z.number().int().min(0).max(1e15).describe("The through value list_flags returned"),
       },
+      // Said outright because an unannotated tool is read as destructive and
+      // open-world (MCP's defaults), and a host that asks about those would
+      // stop the one call that clears the flags hint. It moves one
+      // watermark forward, only for this connection, and again is a no-op.
+      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ vault, through }) =>
       run(async (c) => {

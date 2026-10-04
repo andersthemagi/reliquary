@@ -286,3 +286,14 @@ for each file. `tools/list` grew by 58 bytes, 21,699 to 21,757, over its
 21,700-byte budget. Raised to 21,800, just above the actual. No tool's own
 response changed, so none of their budgets did. The clause costs about 15
 tokens in every session that connects.
+
+## Twelfth pass (advance_flags annotations)
+
+2026-10-04. `advance_flags` now says what it is in its annotations:
+`destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
+An unannotated tool is read as destructive and open-world, MCP's defaults,
+and in the Reliquary POC sprint (2026-10-03) an agent's host stopped the
+call as an external write, so the flags hint never cleared and rode on about
+25 calls. `tools/list` grew by 83 bytes, from 21,757 with the `propose` clause to
+21,840, over its 21,800-byte budget. Raised to 21,900, just above the
+actual. No tool's own response changed, so none of their budgets did.
