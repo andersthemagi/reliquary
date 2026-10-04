@@ -8,7 +8,7 @@
 // imports.ts into the Variables page's routes.
 //
 // A value exists in plaintext here only in two places: the set form's POST
-// body, handed straight to setVariable(), and the reveal response, which is a
+// body, handed straight to setVariableIn(), and the reveal response, which is a
 // page rendered from one POST (never a redirect, never a GET, so never in a
 // URL, history or referrer; every response is no-store). No flash, redirect,
 // error page or log line carries one, and a refused set re-renders its form
@@ -36,7 +36,7 @@ import {
   listVariables,
   readersSinceSet,
   revealVariable,
-  setVariable,
+  setVariableIn,
   type ReaderRow,
   type EnvImport,
   type Environment,
@@ -159,7 +159,7 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
 // ---------------------------------------------------------------------------
 // Set or rotate
 
-type SetForm = { name?: string; environment?: string; error?: string };
+type SetForm = { name?: string; environment?: string; environments?: string[]; error?: string };
 
 export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Promise<Reply> {
   const { environments, variables } = await listVariables(ctx.userId, v.id);
@@ -177,20 +177,23 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
         : "Your role in this vault can’t set variables. Ask an owner.";
     return shell(ctx, v, title, html`${pageHeader({ crumb, title, path: exists })}${callout("warning", why)}`, 403);
   }
-  // Every environment as a radio; the ones this role can't set are shown,
-  // disabled, so the rule is visible where the choice is made.
-  const chosen = allowed.some((e) => e.name === f.environment) ? f.environment : allowed[0].name;
+  // Every environment as a checkbox; the ones this role can't set are shown,
+  // disabled, so the rule is visible where the choice is made. One is ticked
+  // to start, never all: a key isn't always the same everywhere.
+  const asked = (f.environments ?? (f.environment ? [f.environment] : [])).filter((n) => allowed.some((e) => e.name === n));
+  const chosen = asked.length ? asked : [allowed[0].name];
   const locked = environments.filter((e) => !writes(v.role, e)).map((e) => e.name);
   const envChoice = exists
     ? html`<input type="hidden" name="environment" value="${f.environment}"><p class="small"><span class="muted">Environment</span> <strong>${f.environment}</strong></p>`
     : html`<fieldset class="var-envs">
-        <legend>Environment</legend>
+        <legend>Environments</legend>
         ${environments.map((e) => {
           const ok = writes(v.role, e);
-          return html`<label class="choice${ok ? "" : " is-disabled"}"><input type="radio" name="environment" value="${e.name}"${
-            ok ? raw(e.name === chosen ? " checked required" : " required") : raw(" disabled")}> ${e.name}${
+          return html`<label class="choice${ok ? "" : " is-disabled"}"><input type="checkbox" name="environment" value="${e.name}"${
+            ok ? raw(chosen.includes(e.name) ? " checked" : "") : raw(" disabled")}> ${e.name}${
             e.ownersOnly ? html` <span class="badge var-owners" title="${OWNERS_ONLY_HELP}">Owners only</span>` : ""}</label>`;
         })}
+        <p class="hint">Tick every environment this value is for. Each gets its own encrypted copy, set together or not at all.</p>
         ${locked.length ? html`<p class="hint">Only owners set values in ${locked.join(", ")}.</p>` : ""}
       </fieldset>`;
   const button = exists ? "Save new value" : "Save variable";
@@ -226,15 +229,21 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
 
 export async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
   const name = (ctx.form.get("name") ?? "").trim();
-  const environment = ctx.form.get("environment") ?? "";
+  const environments = [...new Set(ctx.form.getAll("environment"))].filter((e) => ENV.test(e));
   const value = ctx.form.get("value") ?? "";
-  // The form again, with name and environment kept and the value dropped.
-  const again = (error: string, status = 400) => setForm(ctx, v, { name, environment, error }, status);
-  if (!ENV.test(environment)) return again("Choose an environment.");
+  // The form again, with name and environments kept and the value dropped.
+  // One environment alone still reads as a rotate when the name has a value there.
+  const again = (error: string, status = 400) =>
+    setForm(ctx, v, { name, environment: environments.length === 1 ? environments[0] : undefined, environments, error }, status);
+  if (!environments.length) return again("Tick at least one environment.");
   if (!value) return again("Enter a value.");
   try {
-    const action = await setVariable(ctx.userId, v.id, name, environment, value);
-    ctx.setFlash(action === "rotate" ? `Rotated ${name} in ${environment}.` : `Set ${name} in ${environment}.`, "success");
+    const actions = await setVariableIn(ctx.userId, v.id, name, environments, value);
+    const where = (what: "set" | "rotate") => environments.filter((_, i) => actions[i] === what).join(", ");
+    ctx.setFlash(
+      [where("set") && `Set ${name} in ${where("set")}.`, where("rotate") && `Rotated ${name} in ${where("rotate")}.`].filter(Boolean).join(" "),
+      "success",
+    );
     return { redirect: base(v.id) };
   } catch (err) {
     if (err instanceof SecretsError) {

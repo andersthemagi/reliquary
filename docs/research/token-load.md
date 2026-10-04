@@ -275,6 +275,18 @@ Still to do, from the token side:
 - **A Load vault thread fixture**, so `list_threads` and `read_thread` get
   measured budgets like the other reads.
 
+## Eleventh pass (propose's description)
+
+2026-10-04. One clause added to `propose`'s description: it applies once
+enough approve, "and then can't be revised, so settle open questions
+first". In the Reliquary POC sprint (2026-10-03) an agent asked a question
+and proposed in the same turn; both proposals were approved before the
+answer came, and fixing canon took a second proposal and a second approval
+for each file. `tools/list` grew by 58 bytes, 21,699 to 21,757, over its
+21,700-byte budget. Raised to 21,800, just above the actual. No tool's own
+response changed, so none of their budgets did. The clause costs about 15
+tokens in every session that connects.
+
 ## Twelfth pass (advance_flags annotations)
 
 2026-10-04. `advance_flags` now says what it is in its annotations:
@@ -282,7 +294,6 @@ Still to do, from the token side:
 An unannotated tool is read as destructive and open-world, MCP's defaults,
 and in the Reliquary POC sprint (2026-10-03) an agent's host stopped the
 call as an external write, so the flags hint never cleared and rode on about
-25 calls. `tools/list` grew by 83 bytes, 21,699 to 21,782, over its
-21,700-byte budget. Raised to 21,900: just above the actual, and with room
-for the 58 bytes of the `propose` description change (21,840 together). No
-tool's own response changed, so none of their budgets did.
+25 calls. `tools/list` grew by 83 bytes, from 21,757 with the `propose` clause to
+21,840, over its 21,800-byte budget. Raised to 21,900, just above the
+actual. No tool's own response changed, so none of their budgets did.

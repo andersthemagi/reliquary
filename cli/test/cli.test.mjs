@@ -371,6 +371,17 @@ test("run: exits with the command's exit code", async () => {
   assert.equal(r.code, 7);
 });
 
+test("run: a failing command's exit is said to be the command's, not Reliquary's", async () => {
+  const r = await cli(["run", "--vault", "CLI Team", "--", process.execPath, "-e", "process.exit(7)"], { config: main });
+  assert.ok(r.stderr.includes(`reliquary: ${process.execPath} exited with code 7.`), r.stderr);
+  assert.match(r.stderr, /came from .*, not Reliquary\./);
+  const ok = await cli(["run", "--vault", "CLI Team", "--", process.execPath, "-e", "process.exit(0)"], { config: main });
+  assert.doesNotMatch(ok.stderr, /exited with code/);
+  const stopped = await cli(["run", "--vault", "CLI Team", "--", process.execPath, "-e", "process.exit(130)"], { config: main });
+  assert.equal(stopped.code, 130);
+  assert.doesNotMatch(stopped.stderr, /exited with code/, "a Ctrl-C the command handled isn't a failure to explain");
+});
+
 test("run: forwards SIGTERM to the command and exits 128 + 15", async () => {
   const r = start(["run", "--vault", "CLI Team", "--", process.execPath, "-e", "console.log('ready'); setInterval(() => {}, 1000)"], { config: main });
   await waitFor(r, "stdout", /ready/);
