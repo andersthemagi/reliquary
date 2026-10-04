@@ -160,6 +160,17 @@ test("templates: the canon folders really are canon, and an open folder is writt
   assert.ok(!got.files.some((f) => f.path === "decisions/2026-01-15-hosting.md"));
 });
 
+test("templates: a README with variables frames them as examples to keep or delete, and says what to do when npx is missing", () => {
+  for (const t of TEMPLATES.filter((x) => x.variables.length)) {
+    const readme = t.files.find((f) => f.path === "README.md")?.body ?? "";
+    assert.match(readme, /Examples of names this kind of project often needs, not a list to finish: keep the ones your project reads, delete the rest and add your own\./, t.name);
+  }
+  for (const t of TEMPLATES.filter((x) => x.files.length)) {
+    const readme = t.files.find((f) => f.path === "README.md")?.body ?? "";
+    assert.match(readme, /If this machine has no `npx`, ask your person to run it, or to paste the `\.env` into \*\*Import \.env\*\* on the vault's Variables page\./, t.name);
+  }
+});
+
 test("templates: every README tells agents to propose to canon, write notes, never paste secrets and use reliquary env push", () => {
   for (const t of TEMPLATES.filter((x) => x.files.length)) {
     const readme = t.files.find((f) => f.path === "README.md")?.body ?? "";
