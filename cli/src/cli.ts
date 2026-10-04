@@ -165,7 +165,13 @@ async function main(argv: string[]): Promise<number> {
       const { server, vault, environment } = await target(opts, project());
       const variables = await readEnvironment(server, vault, environment);
       say(`reliquary: ${variables.size} variable${variables.size === 1 ? "" : "s"} from ${vault.name} (${environment}) for ${rest[0]}`);
-      return runWith(rest, variables, (l) => say(`reliquary: ${l}`));
+      const code = await runWith(rest, variables, (l) => say(`reliquary: ${l}`));
+      // Whose error it was, for someone who installed this minutes ago and
+      // blames it for the command's own. 128 and up is a signal or a Ctrl-C
+      // the command handled (npm exits 130): stopping a dev server isn't a
+      // failure to explain.
+      if (code > 0 && code < 128) say(`reliquary: ${rest[0]} exited with code ${code}. Anything printed above that isn't a "reliquary:" line came from ${rest[0]}, not Reliquary.`);
+      return code;
     }
     case "env": {
       const [sub, ...more] = args;

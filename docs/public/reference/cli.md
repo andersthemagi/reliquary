@@ -39,6 +39,8 @@ Fetches one environment's variables and starts the command directly (no shell), 
 
 Exit code: the command's own; 128 plus the signal number if a signal ended it; 127 if the command wasn't found.
 
+When the command exits with a code from 1 to 127, `run` adds a line after it on stderr saying so, for example `reliquary: node exited with code 1. Anything printed above that isn't a "reliquary:" line came from node, not Reliquary.` A mistyped script name or a failing test is the command's error, and the line says whose it is. A code of 128 or more, such as a Ctrl-C the command handled, adds nothing.
+
 On Windows:
 
 - A bare command name is looked up on `PATH` with `PATHEXT`, like `cmd.exe` does, but not in the current directory; write `.\tool.exe` for one there.
