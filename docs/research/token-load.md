@@ -274,3 +274,15 @@ Still to do, from the token side:
   demand would save it; nothing here does that today.
 - **A Load vault thread fixture**, so `list_threads` and `read_thread` get
   measured budgets like the other reads.
+
+## Twelfth pass (advance_flags annotations)
+
+2026-10-04. `advance_flags` now says what it is in its annotations:
+`destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`.
+An unannotated tool is read as destructive and open-world, MCP's defaults,
+and in the Reliquary POC sprint (2026-10-03) an agent's host stopped the
+call as an external write, so the flags hint never cleared and rode on about
+25 calls. `tools/list` grew by 83 bytes, 21,699 to 21,782, over its
+21,700-byte budget. Raised to 21,900: just above the actual, and with room
+for the 58 bytes of the `propose` description change (21,840 together). No
+tool's own response changed, so none of their budgets did.

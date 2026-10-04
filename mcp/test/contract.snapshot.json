@@ -22,7 +22,11 @@
         "through"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
   },
   {
     "name": "changes_since",
