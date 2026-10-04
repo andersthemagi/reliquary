@@ -169,8 +169,8 @@ test("environments page: an owner adds one, owners-only or not; it becomes a col
   assert.equal(r.status, 303);
   // Sol, an editor, may set staging but not the owners-only audit.
   const form = await page(vp("/set"), editor);
-  assert.match(form, /<input type="radio" name="environment" value="staging" required> staging/);
-  assert.match(form, /<input type="radio" name="environment" value="audit" disabled> audit/);
+  assert.match(form, /<input type="checkbox" name="environment" value="staging"> staging/);
+  assert.match(form, /<input type="checkbox" name="environment" value="audit" disabled> audit/);
   r = await post(vp("/set"), { name: "SOL_KEY", environment: "audit", value: value("sol") }, { s: editor });
   assert.equal(r.status, 403);
 });

@@ -40,7 +40,7 @@ No MCP tool, log line, activity event, error message or email carries a value.
 
 ## Setting values
 
-On the vault's **Variables** page, **Add a variable**: a name, an environment (environments your role can't set are shown but can't be chosen) and a value. **Rotate** replaces a value, and **Delete** removes it after a confirm step. To bring in many at once, paste a `.env` with **Import .env** or send one from the CLI with `reliquary env push`: see [Imports](imports.md).
+On the vault's **Variables** page, **Add a variable**: a name, the environments it is for and a value. Tick one environment or several: each gets its own encrypted copy, set together or not at all, so a refusal in one leaves none of them set. Environments your role can't set are shown but can't be ticked. **Rotate** replaces a value, and **Delete** removes it after a confirm step. To bring in many at once, paste a `.env` with **Import .env** or send one from the CLI with `reliquary env push`: see [Imports](imports.md).
 
 - Names are shell-style: a letter or `_`, then letters, digits or `_`, up to 128 characters. Names that change how programs start, like `PATH`, `NODE_OPTIONS`, anything starting `LD_` or `NPM_CONFIG_`, Windows' `COMSPEC` and `PATHEXT`, or trust settings like `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE`, are refused. A variable that already has such a name stays readable but can't be set again.
 - A value is text up to 64 KiB, without NUL characters. A vault holds at most 1000 variables.

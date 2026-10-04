@@ -3,7 +3,7 @@
 // through asPerson() (no `act` claim), and the database decides who may do
 // what (supabase/migrations/20260925090000_variables.sql).
 //
-// Values exist in plaintext only inside setVariable (before sealing) and
+// Values exist in plaintext only inside setVariableIn (before sealing) and
 // revealVariable (after opening). Never log them, put them in a URL, a
 // flash message, an error or a redirect.
 
@@ -64,19 +64,28 @@ export async function listVariables(userId: string, vaultId: string): Promise<{
   });
 }
 
-// Sets or rotates one value. Resolves to 'set' or 'rotate'. Database refusals
-// reject with their SQLSTATE (42501 not allowed, 22023 bad name or value,
-// P0002 no such vault or environment) and a message safe to show; a value
-// over 64 KiB rejects with SecretsError.
+// Sets or rotates one value in each environment named, in one transaction:
+// a refusal in any of them (an owners-only environment, a vanished one)
+// leaves every one unset. Resolves to 'set' or 'rotate' for each, in order.
+// Each copy is sealed on its own, since its additional data names its
+// environment. Database refusals reject with their SQLSTATE (42501 not
+// allowed, 22023 bad name or value, P0002 no such vault or environment) and
+// a message safe to show; a value over 64 KiB rejects with SecretsError.
+export async function setVariableIn(userId: string, vaultId: string, name: string, environments: string[], value: string): Promise<("set" | "rotate")[]> {
+  const sealed = environments.map((environment) => ({ environment, s: seal(value, { vaultId, environment, name }) }));
+  return asPerson(userId, async (c) => {
+    const actions: ("set" | "rotate")[] = [];
+    for (const { environment, s } of sealed) {
+      actions.push(
+        (await c.query("select public.set_variable($1, $2, $3, $4, $5, $6) as action", [vaultId, name, environment, s.keyId, s.nonce, s.ciphertext])).rows[0].action,
+      );
+    }
+    return actions;
+  });
+}
+
 export async function setVariable(userId: string, vaultId: string, name: string, environment: string, value: string): Promise<"set" | "rotate"> {
-  const s = seal(value, { vaultId, environment, name });
-  return asPerson(userId, async (c) =>
-    (
-      await c.query("select public.set_variable($1, $2, $3, $4, $5, $6) as action", [
-        vaultId, name, environment, s.keyId, s.nonce, s.ciphertext,
-      ])
-    ).rows[0].action,
-  );
+  return (await setVariableIn(userId, vaultId, name, [environment], value))[0];
 }
 
 // ---------------------------------------------------------------------------
