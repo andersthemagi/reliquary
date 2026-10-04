@@ -112,12 +112,18 @@ async function as(who, q, params = []) {
 const get = (path, s = main) => fetch(s.origin + path, { headers: { cookie: s.cookie }, redirect: "manual" });
 const page = async (path, s = main) => (await get(path, s)).text();
 const csrfOf = async (s = main) => /name="csrf" value="([0-9a-f]+)"/.exec(await page("/", s))[1];
+// A field given as an array is sent once for each item, as a ticked set of checkboxes is.
+const formBody = (fields) => {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(fields)) for (const x of [].concat(v)) p.append(k, x);
+  return p.toString();
+};
 const post = async (path, fields, { s = main, csrf = true, headers = {} } = {}) =>
   fetch(s.origin + path, {
     method: "POST",
     redirect: "manual",
     headers: { cookie: s.cookie, "content-type": "application/x-www-form-urlencoded", origin: s.origin, ...headers },
-    body: new URLSearchParams({ ...(csrf ? { csrf: await csrfOf(s) } : {}), ...fields }).toString(),
+    body: formBody({ ...(csrf ? { csrf: await csrfOf(s) } : {}), ...fields }),
   });
 const vp = (vault, rest = "") => `/v/${vault}/variables${rest}`;
 const reveals = async (vault) =>
@@ -226,7 +232,7 @@ test("variables page: an editor gets controls outside production only, and a lin
   assert.match(h, /Access log<\/a>/);
   // The form offers development and preview, not production.
   const f = await page(vp(V.ed, "/set"));
-  assert.match(f, /<input type="radio" name="environment" value="development" checked required> development<\/label><label class="choice"><input type="radio" name="environment" value="preview" required> preview<\/label><label class="choice is-disabled"><input type="radio" name="environment" value="production" disabled> production/);
+  assert.match(f, /<input type="checkbox" name="environment" value="development" checked> development<\/label><label class="choice"><input type="checkbox" name="environment" value="preview"> preview<\/label><label class="choice is-disabled"><input type="checkbox" name="environment" value="production" disabled> production/);
   assert.match(f, /Only owners set values in production\./);
   const rot = await get(vp(V.ed, "/set?name=STRIPE_KEY&environment=production"));
   assert.equal(rot.status, 403);
@@ -569,16 +575,52 @@ test("variables tabs: the Imports tab says when nothing waits and how to send an
   assert.equal((await get(vp(V.priv, "/imports"))).status, 404);
 });
 
-test("variables add: the environment is a radio for each one, the one asked for (else the first) chosen, owners-only ones badged, and those a role can't set disabled", async () => {
+test("variables add: the environments are a checkbox for each one, the one asked for (else the first) ticked, owners-only ones badged, and those a role can't set disabled", async () => {
   const o = await page(vp(V.own, "/set?environment=preview"));
-  assert.match(o, /<legend>Environment<\/legend>/);
-  assert.match(o, /value="development" required> development/);
-  assert.match(o, /value="preview" checked required> preview/);
-  assert.match(o, /value="production" required> production <span class="badge var-owners"[^>]*>Owners only<\/span>/);
-  assert.doesNotMatch(o, /<select/);
+  assert.match(o, /<legend>Environments<\/legend>/);
+  assert.match(o, /type="checkbox" name="environment" value="development"> development/);
+  assert.match(o, /value="preview" checked> preview/);
+  assert.match(o, /value="production"> production <span class="badge var-owners"[^>]*>Owners only<\/span>/);
+  assert.doesNotMatch(o, /<select|type="radio" name="environment"/);
   const e = await page(vp(V.ed, "/set"));
-  assert.match(e, /value="development" checked required> development/);
-  assert.match(e, /<label class="choice is-disabled"><input type="radio" name="environment" value="production" disabled> production/);
+  assert.match(e, /value="development" checked> development/);
+  assert.match(e, /<label class="choice is-disabled"><input type="checkbox" name="environment" value="production" disabled> production/);
+});
+
+test("variables add: ticking several environments sets the one value in each, and the flash names each as set or rotated", async () => {
+  const first = value("many");
+  const r = await post(vp(V.own, "/set"), { name: "MANY_KEY", environment: ["development", "preview"], value: first });
+  assert.equal(r.status, 303);
+  assert.match(await page(vp(V.own)), /<p class="callout success flash" role="status">Set MANY_KEY in development, preview\.<\/p>/);
+  for (const env of ["development", "preview"]) assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", env)).value, first);
+  const second = value("many-again");
+  await post(vp(V.own, "/set"), { name: "MANY_KEY", environment: ["development", "production"], value: second });
+  assert.match(await page(vp(V.own)), /Set MANY_KEY in production\. Rotated MANY_KEY in development\./);
+  assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "development")).value, second);
+  assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "production")).value, second);
+  assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "preview")).value, first, "an environment left unticked keeps its value");
+});
+
+test("variables add: a tick the role can't set refuses the whole form, so none of the ticked environments is set", async () => {
+  const r = await post(vp(V.ed, "/set"), { name: "PARTIAL_KEY", environment: ["development", "production"], value: value("partial") });
+  assert.equal(r.status, 403);
+  const h = await r.text();
+  assert.match(h, /role="alert"/);
+  noValues(h);
+  assert.equal((await vars.listVariables(PIA, V.ed)).variables.some((x) => x.name === "PARTIAL_KEY"), false);
+});
+
+test("variables add: a refused set keeps the ticks, and no tick at all is told to tick one", async () => {
+  const none = await post(vp(V.own, "/set"), { name: "NONE_KEY", value: value("none") });
+  assert.equal(none.status, 400);
+  assert.match(await none.text(), /Tick at least one environment\./);
+  const noValue = await post(vp(V.own, "/set"), { name: "NOVALUE_KEY", environment: ["development", "preview"], value: "" });
+  assert.equal(noValue.status, 400);
+  const h = await noValue.text();
+  assert.match(h, /Enter a value\./);
+  assert.match(h, /value="development" checked> development/);
+  assert.match(h, /value="preview" checked> preview/);
+  assert.doesNotMatch(h, /value="production" checked/);
 });
 
 test("variables log cells: a row naming no variable shows a dash, the environment has its own column, and who is followed by the client", async () => {
