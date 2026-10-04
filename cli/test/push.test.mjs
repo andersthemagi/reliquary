@@ -32,12 +32,13 @@ let reader = ""; // one signed in without it
 const page = (p) => pageWith(p, cookie);
 
 // `reliquary login`, with the browser's part (Cara's consent) done here.
-// `push` is the consent page's "also let it send .env files" box.
+// `push` is the consent page's "also let it send .env files" box. Cara ticks
+// All my vaults, since she is in several and the page chooses nothing for her.
 async function login(config, { push }) {
   const r = start(["login", "--no-browser"], { config });
   const [, url] = await waitFor(r, "stderr", /^\s+(http:\/\/\S+\/oauth\/authorize\?\S+)$/m);
   const consent = await (await page(new URL(url).pathname + new URL(url).search)).text();
-  const fields = [...new URL(url).searchParams, ["csrf", csrfOf(consent)], ["decision", "approve"], ...(push ? [["push", "yes"]] : [])];
+  const fields = [...new URL(url).searchParams, ["csrf", csrfOf(consent)], ["decision", "approve"], ["reach", "all"], ...(push ? [["push", "yes"]] : [])];
   const answer = await fetch(`${WEB}/oauth/authorize`, {
     method: "POST",
     redirect: "manual",

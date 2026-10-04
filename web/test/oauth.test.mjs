@@ -16,12 +16,14 @@ import http from "node:http";
 import net from "node:net";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { startAs } from "./start-as.mjs";
 
 const WEB = new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791");
 // web/test.sh puts Postgres at 54332 + 10 * slot and the server at 8791 + 10 * slot.
 const PG_PORT = 54332 + (Number(WEB.port) - 8791);
 const RESOURCE = "https://mcp.reliquary.test/mcp";
 const BEN = "00000000-0000-0000-0000-00000000000b";
+const DEE = "00000000-0000-0000-0000-00000000000d"; // the seed's one person with a single vault
 const LOGIN_FILE = `/tmp/oauth-login-${process.pid}`;
 
 let base = "";
@@ -142,7 +144,7 @@ async function consent(params, choice = [], headers = {}) {
 }
 
 // Consent, then the code from the redirect. Returns everything the client knows.
-async function codeFor(over = {}, choice = [["decision", "approve"]]) {
+async function codeFor(over = {}, choice = [["decision", "approve"], ["reach", "all"]]) {
   const k = pkce();
   const params = authParams({ ...over, pkce: k });
   const r = await consent(params, choice);
@@ -249,9 +251,28 @@ test("authorize: the consent page names the client, the redirect host and the re
   assert.match(h, /<code>127\.0\.0\.1<\/code>/);
   assert.match(h, new RegExp(`<code>${RESOURCE.replace(/\./g, "\\.")}</code>`));
   assert.match(h, /name="access" value="read" checked/);
-  assert.match(h, /name="reach" value="all" checked/);
   assert.match(h, /can never approve, change rules or manage members/);
   assert.doesNotMatch(h, /loopback-warning/);
+});
+
+test("authorize: a person in several vaults has no vault choice preselected, and is told why", async () => {
+  const h = await (await authorizeGet(authParams())).text();
+  assert.ok((h.match(/name="vault"/g) ?? []).length > 1, "the seeded person is in several vaults");
+  assert.doesNotMatch(h, /name="reach" value="(all|some)" checked/);
+  assert.match(h, /You belong to \d+ vaults, so nothing is chosen for you\./);
+});
+
+test("authorize: a person in one vault keeps All my vaults chosen", async () => {
+  const dee = await startAs(DEE, { MCP_RESOURCE: RESOURCE, CIMD_ALLOW_LOOPBACK: "1" });
+  try {
+    const params = new URLSearchParams(authParams());
+    const h = await (await fetch(`${dee.url}/oauth/authorize?${params}`, { headers: { cookie: dee.cookie }, redirect: "manual" })).text();
+    assert.equal((h.match(/name="vault"/g) ?? []).length, 1, "the seeded person is in exactly one vault");
+    assert.match(h, /name="reach" value="all" checked/);
+    assert.doesNotMatch(h, /so nothing is chosen for you/);
+  } finally {
+    dee.stop();
+  }
 });
 
 test("authorize: the consent page says the app shows on Connections, where it is revoked", async () => {
@@ -390,6 +411,13 @@ test("consent: allow sends a code back, with state and iss", async () => {
   assert.match(c.code, /^rlc_[0-9a-f]{64}$/);
   assert.equal(c.loc.searchParams.get("state"), c.params.state);
   assert.equal(c.loc.searchParams.get("iss"), issuer);
+});
+
+test("consent: approving without choosing vaults is refused for a person in several vaults, and no code is sent", async () => {
+  const r = await consent(authParams(), [["decision", "approve"]]);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("location"), null);
+  assert.match(await r.text(), /Choose all your vaults, or tick the vaults it may reach\./);
 });
 
 test("consent: a vault the person isn't in can't be chosen", async () => {

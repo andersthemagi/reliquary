@@ -356,7 +356,7 @@ const cliParams = (over = {}) => {
 const get = (path, headers = {}) => fetch(base + path, { headers: { cookie, ...headers }, redirect: "manual" });
 const csrfOf = (h) => /name="csrf" value="([0-9a-f]+)"/.exec(h)[1];
 
-async function consent(params, choice = [["decision", "approve"]]) {
+async function consent(params, choice = [["decision", "approve"], ["reach", "all"]]) {
   const page = await (await get(`/oauth/authorize?${new URLSearchParams(params)}`)).text();
   return fetch(`${base}/oauth/authorize`, {
     method: "POST",
@@ -374,7 +374,7 @@ const tokenPost = (fields) =>
   });
 
 // The whole CLI login: consent (as Olive), code, tokens.
-async function cliLogin(choice = [["decision", "approve"]]) {
+async function cliLogin(choice = [["decision", "approve"], ["reach", "all"]]) {
   const k = pkce();
   const params = cliParams({ pkce: k });
   const r = await consent(params, choice);
@@ -530,7 +530,7 @@ test("env api: a sign-in scoped to one vault gets 404 for another", async () => 
 test("env api: an MCP access token is refused", async () => {
   const k = pkce();
   const params = { ...cliParams({ pkce: k }), client_id: fixtureClient, redirect_uri: REDIRECT, resource: MCP_RESOURCE };
-  const r = await consent(params, [["decision", "approve"]]);
+  const r = await consent(params, [["decision", "approve"], ["reach", "all"]]);
   const code = new URL(r.headers.get("location")).searchParams.get("code");
   const t = await (await tokenPost({ grant_type: "authorization_code", code, client_id: fixtureClient, redirect_uri: REDIRECT, code_verifier: k.verifier, resource: MCP_RESOURCE })).json();
   secrets.push(code, t.access_token, t.refresh_token);

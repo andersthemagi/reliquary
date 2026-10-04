@@ -34,6 +34,8 @@ When a client signs in, there is no secret to copy: it signs in through your bro
 
 A connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.
 
+If you belong to more than one vault, the consent page doesn't preselect either choice, and refuses an answer that names neither. If you belong to one vault, **All my vaults** is already chosen. To keep clients apart, see [Keep client work separate](../how-to/keep-client-work-separate.md).
+
 ## Revoking
 
 On the Connections page, choose **Revoke** next to it. A confirm page shows its type, vaults, access and last use; choose **Revoke** with its name to confirm. It is refused on its next request.

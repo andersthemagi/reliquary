@@ -28,7 +28,7 @@ claude mcp add --transport http --scope user reliquary https://mcp.reliquary.red
 
 Start Claude Code, run `/mcp`, choose **reliquary**, then **Authenticate**. Your browser opens Reliquary's consent page:
 
-1. Leave **All my vaults** chosen.
+1. If **All my vaults** is already chosen, which it is when you have one vault, leave it.
 2. Choose **Read and write**, so the agent can propose changes.
 3. Choose **Allow**.
 

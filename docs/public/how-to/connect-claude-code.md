@@ -16,7 +16,7 @@ Works in the Claude Code CLI and the desktop app.
 
 2. Start Claude Code and run `/mcp`. Choose **reliquary**, then **Authenticate**.
 3. Your browser opens Reliquary. Sign in if you need to, then choose:
-   - **All my vaults, including ones I join later**, or **Only the vaults I tick**;
+   - **All my vaults, including ones I join later**, or **Only the vaults I tick** (if you belong to more than one vault, nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md));
    - **Read only** (read, search and follow changes) or **Read and write** (also write open files and propose changes).
 4. Choose **Allow**. Back in Claude Code, `/mcp` shows reliquary as connected.
 

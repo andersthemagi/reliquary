@@ -31,7 +31,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type http from "node:http";
 import { CimdError, clientMetadata, isLoopbackHost, redirectAllowed, type ClientMetadata } from "./cimd.js";
 import { asPerson, pool } from "./db.js";
-import { csrfField, html, page } from "./html.js";
+import { csrfField, html, page, raw } from "./html.js";
 import { clientIp, limit, RateLimited, tooManyPage, type LimitName } from "./ratelimit.js";
 import type { Ctx, Reply } from "./pages.js";
 import { doing, fail, failure } from "./failure.js";
@@ -435,6 +435,11 @@ export async function authorize(ctx: Ctx): Promise<Reply> {
   const some = ticked.length > 0 || ctx.form.get("reach") === "some";
   const access = ctx.form.get("access") === "write" ? "write" : "read";
   if (some && ticked.length === 0) return consent(ctx, r, "Tick at least one vault, or choose all your vaults.");
+  // Nothing is preselected for a person in several vaults, so an approval that
+  // names neither choice is refused, not read as "all".
+  if (!some && ctx.form.get("reach") !== "all" && (await myVaults(ctx)).length > 1) {
+    return consent(ctx, r, "Choose all your vaults, or tick the vaults it may reach.");
+  }
   if (!ticked.every((v) => /^[0-9a-f-]{36}$/.test(v))) return consent(ctx, r, "Choose vaults from the list.");
   const host = new URL(r.client.clientId).hostname;
   const name = `${r.client.clientName}${r.client.clientName === host ? "" : ` (${host})`}`.slice(0, 100);
@@ -463,8 +468,8 @@ export async function authorize(ctx: Ctx): Promise<Reply> {
   return { redirect: backTo(r.redirectUri, { code, state: r.state, iss }) };
 }
 
-async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Reply> {
-  const vaults = (await asPerson(ctx.userId, async (c) =>
+const myVaults = async (ctx: Ctx) =>
+  (await asPerson(ctx.userId, async (c) =>
     (
       await c.query(
         `select v.id, v.name from public.vaults v
@@ -473,6 +478,14 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
         [ctx.userId],
       )
     ).rows)) as { id: string; name: string }[];
+
+async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Reply> {
+  const vaults = await myVaults(ctx);
+  // "All my vaults" used to be preselected. An agent that reaches two clients'
+  // vaults can copy text between them when something it reads tells it to, so
+  // a person in several vaults chooses on purpose; one in a single vault has
+  // nothing to confuse and keeps the shortcut.
+  const mustChoose = vaults.length > 1;
   const back = new URL(r.redirectUri);
   const local = isLoopbackHost(back.hostname);
   const clientHost = new URL(r.client.clientId).hostname;
@@ -484,7 +497,7 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
       ${hidden("resource", r.resource)}${hidden("scope", r.scope)}`;
   const vaultChoice = (what: string) => html`<fieldset>
         <legend>Vaults</legend>
-        <label class="choice"><input type="radio" name="reach" value="all" checked> All my vaults, including ones I join later</label>
+        <label class="choice"><input type="radio" name="reach" value="all"${mustChoose ? "" : raw(" checked")}> All my vaults, including ones I join later</label>
         <label class="choice"><input type="radio" name="reach" value="some"> Only the vaults I tick</label>
         ${vaults.length
           ? html`<div class="choice-list">${vaults.map(
@@ -492,6 +505,9 @@ async function consent(ctx: Ctx, r: AuthRequest, problem?: string): Promise<Repl
             )}</div>`
           : html`<p class="hint">You don’t belong to any vaults yet.</p>`}
         <p class="hint">Ticking a vault limits ${what} to the ticked vaults.</p>
+        ${mustChoose
+          ? html`<p class="hint">You belong to ${vaults.length} vaults, so nothing is chosen for you. Tick only the vaults ${what} needs: an AI can use everything it reaches, so keep each client’s work apart.</p>`
+          : ""}
       </fieldset>`;
   if (r.client.clientId === CLI_CLIENT_ID) {
     // Our own CLI: environment variables only, on this computer.
