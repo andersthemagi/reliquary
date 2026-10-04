@@ -40,8 +40,9 @@ const BUDGET = {
   // Raised again for register_work_plan and work_plan_status (CL-3.4, F530),
   // and for claim_step, checkin_step, complete_step and release_step (F531),
   // and for open_thread, post_message, list_threads and read_thread
-  // (F622-F624).
-  "tools/list": 21700,
+  // (F622-F624). Raised again for a clause in propose's description saying
+  // an approved proposal can't be revised.
+  "tools/list": 21800,
   list_vaults: 200,
   list_files: 1800,
   "list_files prefix=canon/": 400,
