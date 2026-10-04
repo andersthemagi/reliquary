@@ -274,3 +274,15 @@ Still to do, from the token side:
   demand would save it; nothing here does that today.
 - **A Load vault thread fixture**, so `list_threads` and `read_thread` get
   measured budgets like the other reads.
+
+## Eleventh pass (propose's description)
+
+2026-10-04. One clause added to `propose`'s description: it applies once
+enough approve, "and then can't be revised, so settle open questions
+first". In the Reliquary POC sprint (2026-10-03) an agent asked a question
+and proposed in the same turn; both proposals were approved before the
+answer came, and fixing canon took a second proposal and a second approval
+for each file. `tools/list` grew by 58 bytes, 21,699 to 21,757, over its
+21,700-byte budget. Raised to 21,800, just above the actual. No tool's own
+response changed, so none of their budgets did. The clause costs about 15
+tokens in every session that connects.

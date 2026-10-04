@@ -44,7 +44,7 @@ export function registerProposalsTools(
     {
       title: "Propose a change",
       description:
-        "Propose writing or deleting a file, typically a canon one. People review it; it applies once enough approve. You cannot approve. Reviewers' notes arrive in changes_since; answer with revise_proposal.",
+        "Propose writing or deleting a file, typically a canon one. People review it; it applies once enough approve, and then can't be revised, so settle open questions first. You cannot approve. Reviewers' notes arrive in changes_since; answer with revise_proposal.",
       inputSchema: {
         vault: VAULT,
         path: PATH,
