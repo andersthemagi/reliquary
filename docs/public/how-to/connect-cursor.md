@@ -6,7 +6,7 @@ Cursor connects with an access token that it reads from an environment variable,
 
 1. In Reliquary, open the **Connections** page (the account menu, then **Connections**) and choose **New token**:
    - name it after the agent and machine, like `Cursor on my laptop`;
-   - choose its vaults and **Read only** or **Read and write**;
+   - choose its vaults (if you belong to more than one vault, nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md)) and **Read only** or **Read and write**;
    - choose when it expires (90 days is the default).
 2. Copy the token. It is shown once.
 3. Set it as `RELIQUARY_TOKEN` in the environment Cursor starts from, for example in your shell profile, then start Cursor from a new shell. Paste it in your own terminal, never in a chat:

@@ -6,9 +6,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { before, test } from "node:test";
+import { startAs } from "./start-as.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://127.0.0.1:8791";
 const { TEAM_VAULT, DEE_VAULT, LOGIN_FILE } = process.env;
+const DEE = "00000000-0000-0000-0000-00000000000d"; // the seed's one person with a single vault
 let cookie = "";
 
 const get = (path) => fetch(BASE + path, { headers: { cookie }, redirect: "manual" });
@@ -43,7 +45,6 @@ before(async () => {
 
 test("form: name, my vaults to tick, read or read-write, and a required expiry", async () => {
   const h = await page("/connections/new");
-  assert.match(h, /name="scope" value="all" checked/);
   assert.match(h, new RegExp(`type="checkbox" name="vault" value="${TEAM_VAULT}"> Team`));
   assert.doesNotMatch(h, /Dee private/);
   assert.match(h, /name="access" value="read" checked/);
@@ -51,6 +52,32 @@ test("form: name, my vaults to tick, read or read-write, and a required expiry",
   assert.match(h, /<option value="90" selected>90 days<\/option>/);
   assert.match(h, /<option value="366">1 year<\/option>/);
   assert.match(h, /can’t be changed later/);
+});
+
+test("form: a person in several vaults has no vault choice preselected, and is told why", async () => {
+  const h = await page("/connections/new");
+  assert.doesNotMatch(h, /name="scope" value="(all|some)" checked/);
+  assert.match(h, /You belong to \d+ vaults, so nothing is chosen for you\./);
+});
+
+test("form: a person in one vault keeps All my vaults chosen", async () => {
+  const dee = await startAs(DEE);
+  try {
+    const h = await (await fetch(`${dee.url}/connections/new`, { headers: { cookie: dee.cookie }, redirect: "manual" })).text();
+    assert.equal((h.match(/name="vault"/g) ?? []).length, 1, "the seeded person is in exactly one vault");
+    assert.match(h, /name="scope" value="all" checked/);
+    assert.doesNotMatch(h, /so nothing is chosen for you/);
+  } finally {
+    dee.stop();
+  }
+});
+
+test("create: a form that names no vaults is refused for a person in several vaults, and no token is made", async () => {
+  const r = await create([["name", "Unchosen"], ["access", "read"], ["days", "30"]]);
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), "/connections/new");
+  assert.match(await follow(r), /Choose all your vaults, or tick the vaults it may reach\./);
+  assert.doesNotMatch(await page("/connections"), /<td>Unchosen<\/td>/);
 });
 
 test("create: a read-only token for one vault, shown once", async () => {

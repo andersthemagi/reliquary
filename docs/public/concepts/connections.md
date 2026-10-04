@@ -27,14 +27,14 @@ When a client signs in, there is no secret to copy: it signs in through your bro
 ## Make a token
 
 1. On the Connections page, choose **New token**.
-2. Name it after the agent and machine, choose its vaults, **Read only** or **Read and write**, and when it expires.
+2. Name it after the agent and machine, choose its vaults, **Read only** or **Read and write**, and when it expires. If you belong to more than one vault, nothing is chosen for you.
 3. Choose **Create token**, copy the token, then **Done**. It is shown once.
 
 ## Scope is fixed
 
 A connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.
 
-If you belong to more than one vault, the consent page doesn't preselect either choice, and refuses an answer that names neither. If you belong to one vault, **All my vaults** is already chosen. To keep clients apart, see [Keep client work separate](../how-to/keep-client-work-separate.md).
+If you belong to more than one vault, the consent page and the **New token** page don't preselect either choice, and refuse an answer that names neither. If you belong to one vault, **All my vaults** is already chosen. To keep clients apart, see [Keep client work separate](../how-to/keep-client-work-separate.md).
 
 ## Revoking
 

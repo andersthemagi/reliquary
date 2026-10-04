@@ -8,7 +8,7 @@ On Home, choose **New vault** and name it after the client. Keep that client's w
 
 ## Connect with only that client's vault
 
-When the consent page asks which vaults a connection may reach:
+When the consent page or the **New token** page asks which vaults a connection may reach:
 
 1. Choose **Only the vaults I tick**.
 2. Tick the one vault the AI needs.

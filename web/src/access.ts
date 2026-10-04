@@ -268,8 +268,8 @@ export async function connections(ctx: Ctx): Promise<Reply> {
 
 const newCrumb = [{ label: "Connections", href: "/connections" }, { label: "New token" }];
 
-export async function newToken(ctx: Ctx): Promise<Reply> {
-  const vaults = await asPerson(
+const myVaults = (ctx: Ctx) =>
+  asPerson(
     ctx.userId,
     async (c) =>
       (
@@ -281,6 +281,14 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
         )
       ).rows as { id: string; name: string }[],
   );
+
+export async function newToken(ctx: Ctx): Promise<Reply> {
+  const vaults = await myVaults(ctx);
+  // "All my vaults" used to be preselected. An agent that reaches two clients'
+  // vaults can copy text between them when something it reads tells it to, so
+  // a person in several vaults chooses on purpose (as on the consent page); one
+  // in a single vault keeps the shortcut.
+  const mustChoose = vaults.length > 1;
   return render(
     ctx,
     "New token",
@@ -298,7 +306,7 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
       <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100" autocomplete="off">
       <fieldset>
         <legend>Vaults</legend>
-        <label class="choice"><input type="radio" name="scope" value="all" checked> All my vaults, including ones I join later</label>
+        <label class="choice"><input type="radio" name="scope" value="all"${mustChoose ? "" : raw(" checked")}> All my vaults, including ones I join later</label>
         <label class="choice"><input type="radio" name="scope" value="some"> Only the vaults I tick</label>
         ${vaults.length
           ? html`<div class="choice-list">${vaults.map(
@@ -306,6 +314,9 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
             )}</div>`
           : html`<p class="hint">You don’t belong to any vaults yet. <a href="/vaults/new">Create one</a>.</p>`}
         <p class="hint">Ticking a vault limits the token to the ticked vaults.</p>
+        ${mustChoose
+          ? html`<p class="hint">You belong to ${vaults.length} vaults, so nothing is chosen for you. Tick only the vaults the token needs: an AI can use everything it reaches, so keep each client’s work apart.</p>`
+          : ""}
       </fieldset>
       <fieldset>
         <legend>Access</legend>
@@ -333,6 +344,12 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
   const days = Number.parseInt(ctx.form.get("days") ?? "90", 10);
   if (some && ticked.length === 0) {
     ctx.setFlash("Tick at least one vault, or choose all your vaults.", "danger");
+    return { redirect: "/connections/new" };
+  }
+  // Nothing is preselected for a person in several vaults, so a form that names
+  // neither choice is refused, not read as "all".
+  if (!some && ctx.form.get("scope") !== "all" && (await myVaults(ctx)).length > 1) {
+    ctx.setFlash("Choose all your vaults, or tick the vaults it may reach.", "danger");
     return { redirect: "/connections/new" };
   }
   if (!ticked.every((v) => UUID.test(v))) return notFound(ctx);
