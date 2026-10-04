@@ -18,9 +18,9 @@ What you choose under **Files without a rule are** is the vault's default policy
 ## What a template creates
 
 - **Rules** for its folders, which you can change later on the vault's **Rules** page. See [Canon, open and rules](canon-and-rules.md).
-- **A `README.md`** at the top, written for people and agents: what each folder is for, and how an agent should behave there. It tells agents to propose changes to canon folders, write working notes to `notes/` directly, never put a secret in a file, and bring a `.env` in with `reliquary env push`.
+- **A `README.md`** at the top, written for people and agents: what each folder is for, and how an agent should behave there. It tells agents to propose changes to canon folders, write working notes to `notes/` directly, never put a secret in a file, and bring a `.env` in with `reliquary env push`. If the machine has no `npx`, it says to ask a person to run the command or to paste the `.env` into **Import .env** on the Variables page.
 - **A short file in each folder**, like `brief/brief.md` or `decisions/README.md`, with headings to fill in.
-- **Suggested variable names**, as a checklist in the README. They are names only: a template never holds a value. Set values on the vault's **Variables** page. See [Environment variables](variables.md).
+- **Suggested variable names**, as a checklist in the README. They are examples to keep or delete, not a list to finish, and names only: a template never holds a value. Set values on the vault's **Variables** page. See [Environment variables](variables.md).
 
 Everything a template creates is an ordinary file, rule or setting, logged in **Activity** as yours. Edit or delete any of it.
 
