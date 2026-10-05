@@ -252,6 +252,23 @@ test("limits: a save past the storage limit answers the editor again, with the t
   assert.equal(await bytes(V.one), 300);
 });
 
+test("limits: an Edit, then approve that the storage limit refuses answers its page again, with the text and note as typed, and the proposal stays as it was", async () => {
+  await as({ user: PIA }, "select public.set_policy($1, 'canon/', 'canon', 1)", [V.one]);
+  const [{ id: pid }] = await as({ user: PIA }, "select public.propose($1, 'canon/big.md', 'x', 'a note') as id", [V.one]);
+  try {
+    const r = await post("pia", `/v/${V.one}/proposals/${pid}/edit`, { content: "c".repeat(450), note: "Made it longer" });
+    assert.equal(r.status, 400);
+    const h = await r.text();
+    assert.match(unescape(/<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(h)?.[1] ?? ""), /storage limit.*\(ref [0-9a-f]{8}\)$/);
+    assert.ok(h.includes(`>${"c".repeat(450)}</textarea>`), "the text as typed");
+    assert.match(h, /<input id="note" type="text" name="note" placeholder="Optional, for the history" value="Made it longer">/);
+    assert.deepEqual((await sql("select status, revision from public.proposals where id = $1", [pid]))[0], { status: "open", revision: 1 });
+  } finally {
+    await as({ user: PIA }, "select public.decide($1, 'reject', 'Test over.')", [pid]);
+    await as({ user: PIA }, "select public.set_policy($1, 'canon/', null, 1)", [V.one]);
+  }
+});
+
 test("limits: setting a variable past the storage limit is refused on the form with the reason, and nothing is set", async () => {
   const r = await post("pia", `/v/${V.one}/variables/set`, { name: "BIG_KEY", environment: "development", value: "v".repeat(100) });
   assert.equal(r.status, 400);

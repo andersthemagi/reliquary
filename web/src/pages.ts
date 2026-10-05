@@ -630,7 +630,7 @@ async function route(ctx: Ctx): Promise<Reply> {
     if (!get && action === "/revise") return reviseProposal(ctx, id, pid);
     if (!get && action === "/decide") return decide(ctx, id, pid);
     if (!get && action === "/repropose") return repropose(ctx, id, pid);
-    if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx));
+    if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx), (c) => proposalView(ctx, id, pid, undefined, c));
     if (!get && action === "/snooze") return snooze(ctx, id, pid, () => notFound(ctx));
     if (!get && action === "/unsnooze") return unsnooze(ctx, id, pid, () => notFound(ctx));
   }

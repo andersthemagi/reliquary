@@ -369,6 +369,29 @@ test("edit, then approve: a text that starts with a newline comes back from the 
 });
 
 // ---------------------------------------------------------------------------
+// A refused comment, or an edit with no editor left
+
+test("edit, then approve refused: on a proposal already applied there is no editor to show, so its page has the reason as a flash", async () => {
+  const r = await post("rhea", pp(P.apply, "/edit"), { content: "Late edit.", note: "Too late." });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), pp(P.apply));
+  assert.match(await page("rhea", r.headers.get("location")), /<p class="callout danger flash" role="alert">Proposal is applied\. \(ref [0-9a-f]{8}\)<\/p>/);
+});
+
+test("comment refused: the proposal page answers again (400), the reason at the top and the comment as typed in its box", async () => {
+  const pid = await propose("canon/comment-refused.md", "Text.", "For the comment tests.");
+  const r = await post("rhea", pp(pid, "/comment"), { body: "   " });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  const top = /<div class="review-top">\s*<div class="callout danger" role="alert" id="comment-error">([\s\S]*?)<\/div>/.exec(h)?.[1] ?? "";
+  assert.match(top, /<p>A comment needs some text\. \(ref [0-9a-f]{8}\)<\/p><p><a href="#discussion">Your comment is still in the box under Discussion\.<\/a><\/p>/);
+  assert.match(h, /<textarea id="comment" name="body" class="short" maxlength="4000" required>   <\/textarea>/);
+  assert.doesNotMatch(h, /class="callout [a-z]+ flash"/, "not a flash as well");
+  // Not left waiting: the Inbox tests below count what waits for Rhea.
+  await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
+});
+
+// ---------------------------------------------------------------------------
 // The Inbox
 
 test("inbox: one sentence under the title, and a count of what's waiting to review", async () => {
