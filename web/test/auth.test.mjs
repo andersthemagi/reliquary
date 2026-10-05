@@ -298,10 +298,10 @@ test("session: the form token differs per session and only works with its own", 
 test("session: a notice after a form shows once, on either instance, and can't be forged", async () => {
   const { jar } = await signInByCode(A);
   const csrf = csrfOf(await (await get(A, "/connections", jar)).text());
-  const r = await post(A, "/connections/new", { csrf, name: "x", scope: "some", access: "read", days: "7" }, jar);
+  const r = await post(A, "/connections/00000000-0000-0000-0000-000000000099/revoke", { csrf }, jar);
   assert.equal(r.status, 303);
-  assert.match(await (await get(B, "/connections", jar)).text(), /Tick at least one vault/);
-  assert.doesNotMatch(await (await get(A, "/connections", jar)).text(), /Tick at least one vault/);
+  assert.match(await (await get(B, "/connections", jar)).text(), /No such token/);
+  assert.doesNotMatch(await (await get(A, "/connections", jar)).text(), /No such token/);
   const forged = Buffer.from("Your account is locked: call +1 555 0100").toString("base64url");
   jar.c.set("__Host-rlq_flash", `${forged}.${"0".repeat(64)}`);
   assert.doesNotMatch(await (await get(A, "/connections", jar)).text(), /locked/);

@@ -87,22 +87,62 @@ test("create: an unknown access level becomes read-only, never read-write", asyn
   assert.match(row(await page("/connections"), "Odd access"), /Read only/);
 });
 
+// A refused create answers the form again, 400: the reason in it and every
+// choice made kept, so nothing is chosen twice.
+const refused = async (fields) => {
+  const r = await create(fields);
+  assert.equal(r.status, 400);
+  return r.text();
+};
+const checkedIn = (h, tag) => new RegExp(`${tag} checked`).test(h);
+
 test("create: refused without a vault, for someone else's vault, or past a year", async () => {
-  const none = await follow(await create([["name", "No vaults"], ["scope", "some"], ["access", "read"], ["days", "30"]]));
+  const none = await refused([["name", "No vaults"], ["scope", "some"], ["access", "read"], ["days", "30"]]);
   assert.match(none, /Tick at least one vault, or choose all your vaults\./);
   assert.doesNotMatch(none, /<td>No vaults<\/td>/);
 
-  const theirs = await follow(await create([["name", "Not mine"], ["scope", "some"], ["vault", DEE_VAULT], ["access", "read"], ["days", "30"]]));
+  const theirs = await refused([["name", "Not mine"], ["scope", "some"], ["vault", DEE_VAULT], ["access", "read"], ["days", "30"]]);
   assert.match(theirs, /A token can only reach vaults you belong to\./);
   assert.doesNotMatch(theirs, /<td>Not mine<\/td>/);
 
-  const long = await follow(await create([["name", "Too long"], ["scope", "all"], ["access", "read"], ["days", "5000"]]));
+  const long = await refused([["name", "Too long"], ["scope", "all"], ["access", "read"], ["days", "5000"]]);
   assert.match(long, /Tokens last 1 to 366 days\./);
-  const never = await follow(await create([["name", "Never ends"], ["scope", "all"], ["access", "read"], ["days", "never"]]));
+  const never = await refused([["name", "Never ends"], ["scope", "all"], ["access", "read"], ["days", "never"]]);
   assert.match(never, /Tokens last 1 to 366 days\./);
   assert.doesNotMatch(await page("/connections"), /<td>(Too long|Never ends)<\/td>/);
 
   assert.equal((await create([["name", "Bad id"], ["scope", "some"], ["vault", "not-a-uuid"], ["access", "read"]])).status, 404);
+});
+
+test("create: ticking no vault under 'only the vaults I tick' comes back to the form with the name, access and expiry kept, the reason and a reference, and nothing created", async () => {
+  const h = await refused([["name", "Kept <agent> & co"], ["scope", "some"], ["access", "write"], ["days", "30"]]);
+  assert.match(h, /<p class="callout danger" role="alert" id="token-error">Tick at least one vault, or choose all your vaults\. Nothing was created\. \(ref [0-9a-f]{8}\)<\/p>/);
+  assert.match(h, /id="tn" type="text" name="name"[^>]*value="Kept &lt;agent&gt; &amp; co"/);
+  assert.ok(checkedIn(h, 'type="radio" name="scope" value="some"'), "'Only the vaults I tick' stays chosen");
+  assert.ok(checkedIn(h, 'type="radio" name="access" value="write"'), "read and write stays chosen");
+  assert.ok(!checkedIn(h, 'type="radio" name="access" value="read"'));
+  assert.match(h, /<option value="30" selected>30 days<\/option>/);
+  assert.match(h, /<fieldset[^>]*aria-describedby="token-error">\s*<legend>Vaults<\/legend>/);
+  assert.doesNotMatch(await page("/connections"), /Kept &lt;agent&gt;/);
+});
+
+test("create: a refusal from the database keeps the ticked vaults too, and an expiry that is not offered falls back to the default", async () => {
+  const h = await refused([["name", "Kept ticks"], ["scope", "some"], ["vault", TEAM_VAULT], ["access", "write"], ["days", "5000"]]);
+  assert.match(h, /Tokens last 1 to 366 days\. \(ref [0-9a-f]{8}\)<\/p>/);
+  assert.match(h, new RegExp(`type="checkbox" name="vault" value="${TEAM_VAULT}" checked> Team`));
+  assert.ok(checkedIn(h, 'type="radio" name="scope" value="some"'));
+  assert.ok(checkedIn(h, 'type="radio" name="access" value="write"'));
+  assert.match(h, /<option value="90" selected>90 days<\/option>/);
+  assert.doesNotMatch(await page("/connections"), /<td>Kept ticks<\/td>/);
+});
+
+test("create: a blank name is refused in the form, saying what a name is, the field marked and the other choices kept", async () => {
+  const h = await refused([["name", "   "], ["scope", "all"], ["access", "write"], ["days", "180"]]);
+  assert.match(h, /A token needs a name, up to 100 characters: the agent and machine it is for\. Nothing was created\. \(ref [0-9a-f]{8}\)<\/p>/);
+  assert.doesNotMatch(h, /Check violation|too long/i, "not the database's words for a different problem");
+  assert.match(h, /id="tn" type="text" name="name"[^>]*aria-invalid="true" aria-describedby="token-error"/);
+  assert.ok(checkedIn(h, 'type="radio" name="access" value="write"'));
+  assert.match(h, /<option value="180" selected>180 days<\/option>/);
 });
 
 test("list: last use and the client name, escaped", async () => {

@@ -123,7 +123,7 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
           <tbody>${owners.map(
             (o) => html`<tr><td>${label(o)}${o.user_id === ctx.userId ? html` <span class="badge">You</span>` : ""}</td>
               <td class="small" data-label="Role in the vault">${roleCell(o)}</td>
-              <td class="small" data-label="Named">${o.added_by ? html`by ${who(ctx, o.added_by, null)} · ` : ""}${time(o.added_at)}</td>
+              <td class="small" data-label="Named"><div>${o.added_by ? html`by ${who(ctx, o.added_by, null)} · ` : ""}${time(o.added_at)}</div></td>
               ${owner
                 ? html`<td class="num row-actions"><a class="button quiet" href="${ownersPath(id, path)}&amp;remove=${o.user_id}" aria-label="Remove ${label(o)} as an owner of ${path}">Remove</a></td>`
                 : ""}</tr>`,
@@ -150,12 +150,12 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
 
     const body = html`
       ${pageHeader({
-        crumb: rulesCrumb(v, "Owners"),
-        title: `Owners of ${path}`,
+        crumb: rulesCrumb(v, "Named owners"),
+        title: `Named owners of ${path}`,
         path: true,
-        description: "Named owners write this path directly, with no review, and theirs are the only approvals its quorum counts. Everyone else follows the rule.",
+        description: "Named owners write this path directly, with no review, and only their approvals count toward the approvals needed. Everyone else follows the rule.",
         meta: html`<p class="rule">${policyBadge(rule.policy)} <span>The rule on <code>${path}</code>${canon ? `: changes need ${approvals(rule.quorum)}` : ""}. <a href="${vaultPath(id, "/rules")}">Rules</a></span></p>`,
-        primary: owner && candidates.length ? html`<a class="button primary" href="#add-owner">Name an owner</a>` : "",
+        primary: owner && candidates.length && owners.length ? html`<a class="button primary" href="#add-owner">Name an owner</a>` : "",
       })}
       ${canon
         ? ""
@@ -163,7 +163,7 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
       ${table}
       ${form}
       <p class="hint rules-help">A vault owner who isn’t named here proposes on this path like anyone else. <a href="/docs/concepts/path-ownership">Path ownership</a></p>`;
-    return { body, title: `Owners of ${path}` };
+    return { body, title: `Named owners of ${path}` };
   });
 }
 

@@ -296,8 +296,19 @@ const ICON_FEEDBACK = raw(
 
 // The Feedback button in the top bar: a short form in a <details> popover
 // (no script), posting to /feedback (feedback.ts) with the page it sits on.
+// The address feedback names for a page. An invite link's token is a bearer
+// secret and a sign-in code or OAuth request is as good as one, so for those
+// pages (and a search, which is the person's own words) it is the page without
+// its query: feedback is stored and emailed to the operator, and the box that
+// sends the page is ticked by default.
+const FEEDBACK_NO_QUERY = /^\/(?:invite|login|signin|oauth\/authorize|search)(?:[/?]|$)|^\/v\/[0-9a-f-]{36}\/search(?:[/?]|$)/;
+export function feedbackPath(path: string): string {
+  const here = path.startsWith("/") && !path.startsWith("//") ? path : "/";
+  return (FEEDBACK_NO_QUERY.test(here) ? here.split(/[?#]/)[0] : here).slice(0, 500);
+}
+
 function feedbackPop(csrf: string, path: string, current: boolean): Raw {
-  const here = path.startsWith("/") && !path.startsWith("//") ? path.slice(0, 500) : "/";
+  const here = feedbackPath(path);
   const shown = here.length > 48 ? `${here.slice(0, 45)}...` : here;
   return html`<details class="menu-wrap feedback-pop">
       <summary class="button quiet icon-button feedback-button"${current ? raw(' aria-current="page"') : ""}>${ICON_FEEDBACK}<span class="feedback-label">Feedback</span></summary>
@@ -582,7 +593,11 @@ export function menu(o: {
     o.icon === "more"
       ? html`<summary class="button quiet icon-button" aria-label="${o.label}" title="${o.label}">${ICON_MORE}</summary>`
       : html`<summary class="button${o.ghost ? " quiet" : ""}">${o.label}</summary>`;
-  return html`<details class="menu-wrap action-menu${o.className ? ` ${o.className}` : ""}">
+  // A ⋯ button is a table row's menu: var-menu (named for Variables, where
+  // it began) opens the list from the button, not the cell, so the table's
+  // overflow never clips it.
+  const cls = [o.icon === "more" ? "var-menu" : "", o.className ?? ""].filter(Boolean).join(" ");
+  return html`<details class="menu-wrap action-menu${cls ? ` ${cls}` : ""}">
     ${summary}
     <div class="menu action-list${o.align === "left" ? " menu-left" : ""}">
       ${o.heading ? html`<p class="menu-label">${o.heading}</p>` : ""}
@@ -625,6 +640,9 @@ export function confirmPage(o: {
   typed?: { value: string; name?: string; label?: Raw | string };
   button: string;
   cancel: string; // where Cancel goes: the page the person came from
+  // For a confirm whose danger button is itself a "Cancel …" (cancelling a
+  // task), so the two controls don't read the same and mean opposites.
+  cancelLabel?: string;
   error?: string;
 }): Raw {
   const t = o.typed;
@@ -638,6 +656,6 @@ export function confirmPage(o: {
         ? html`<label for="confirm-typed">${t.label ?? html`Type <strong>${t.value}</strong> to confirm`}</label>
           <input id="confirm-typed" type="text" name="${t.name ?? "confirm_name"}" required autocomplete="off" spellcheck="false" autocapitalize="off">`
         : ""}
-      <div class="actions"><button class="danger solid">${o.button}</button><a class="button quiet" href="${o.cancel}">Cancel</a></div>
+      <div class="actions"><button class="danger solid">${o.button}</button><a class="button quiet" href="${o.cancel}">${o.cancelLabel ?? "Cancel"}</a></div>
     </form>`;
 }

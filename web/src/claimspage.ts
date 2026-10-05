@@ -25,6 +25,7 @@ import { Refusal } from "./failure.js";
 import { diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { breakHref, returnTarget } from "./claimbreak.js";
 import { activeClaim, activeClaims, type Claim } from "./claimlookup.js";
+import { claimRulesPath } from "./claimrulespage.js";
 import { confirmPage, emptyState, html, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { settingsCrumb } from "./vaultadmin.js";
@@ -42,7 +43,7 @@ function claimsTable(ctx: Ctx, id: string, v: Vault, rows: Claim[]): Raw {
       breakable ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""
     }</tr></thead>
     <tbody>${rows.map(
-      (r) => html`<tr><td data-label="Path"><a href="${filePath(id, r.path)}">${r.path}</a></td>
+      (r) => html`<tr><td><a href="${filePath(id, r.path)}">${r.path}</a></td>
         <td class="small" data-label="Held by">${who(ctx, r.holder, null)}${r.holder_label ? html`<span class="token-client">${r.holder_label}</span>` : ""}</td>
         <td class="small" data-label="Time left">${time(r.expires_at)}</td>
         ${breakable
@@ -80,7 +81,7 @@ export async function claims(ctx: Ctx, id: string): Promise<Reply> {
     const body = html`
       ${diagSection("Claims", "Who’s working which path, and for how much longer. A claim is a courtesy signal, not an access gate: it never blocks a write.")}
       ${rows.length ? claimsTable(ctx, id, v, rows) : emptyState({ title: "No active claims", body: "Nobody is claiming a path right now." })}
-      <p class="hint">Your agents see and take the same claims over MCP (<code>list_claims</code>, <code>claim_path</code>). <a href="/docs/concepts/claims">About claims</a></p>`;
+      <p class="hint">Your agents see and take the same claims over MCP (<code>list_claims</code>, <code>claim_path</code>). How long a claim lasts is set in <a href="${claimRulesPath(id)}">Claim rules</a>. <a href="/docs/concepts/claims">About claims</a></p>`;
     return { body, title: "Claims", tab: true };
   });
 }

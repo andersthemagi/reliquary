@@ -117,7 +117,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   if (rest === "/diagnostics") return say(`Opening the diagnostics of ${vault}`);
   if (rest === "/rules") return say(get ? `Opening the rules of ${vault}` : `Saving a rule for ${path || "a path"} in ${vault}`);
   if (rest === "/rules/owners") {
-    if (get) return say(`Opening the owners of ${path || "a path"} in ${vault}`);
+    if (get) return say(`Opening the named owners of ${path || "a path"} in ${vault}`);
     const naming = form.get("action") === "add";
     return say(`${naming ? "Naming an owner of" : "Removing an owner of"} ${path || "a path"} in ${vault}`, `action=${naming ? "add" : "remove"}`);
   }
