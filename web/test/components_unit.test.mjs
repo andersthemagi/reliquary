@@ -220,11 +220,18 @@ test("menu: no script and no role=menu; keyboard use is the summary (Enter, Spac
 });
 
 test("menu: a ⋯ button has its label as its accessible name; ghost and left-aligned variants", () => {
-  const out = h.menu({ label: "Actions for DATABASE_URL", icon: "more", align: "left", className: "var-menu", items: [{ href: "/r", label: "Reveal" }] }).html;
+  const out = h.menu({ label: "Actions for DATABASE_URL", icon: "more", align: "left", items: [{ href: "/r", label: "Reveal" }] }).html;
   assert.match(out, /<details class="menu-wrap action-menu var-menu">/);
   assert.match(out, /<summary class="button quiet icon-button" aria-label="Actions for DATABASE_URL" title="Actions for DATABASE_URL"><svg class="icon"[^>]*aria-hidden="true"/);
   assert.match(out, /<div class="menu action-list menu-left">/);
   assert.match(h.menu({ label: "Snooze", ghost: true, items: [] }).html, /<summary class="button quiet">Snooze<\/summary>/);
+});
+
+test("menu: a ⋯ menu opens from its button, not its table cell, so a table or scrolling box never clips it", () => {
+  assert.match(h.menu({ label: "Actions for the rule on canon/", icon: "more", items: [] }).html, /^<details class="menu-wrap action-menu var-menu">/);
+  assert.doesNotMatch(h.menu({ label: "More", items: [] }).html, /var-menu/);
+  assert.match(CSS, /\.var-menu\.menu-wrap \{ position: static;/);
+  assert.match(CSS, /\.var-menu > \.menu \{[^}]*transform: translateX\(calc\(-100% \+ 32px\)\)/);
 });
 
 // ---------------------------------------------------------------------------
