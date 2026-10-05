@@ -26,7 +26,7 @@ import { linksRoutes } from "./linkspage.js";
 import { linkGrantsRoutes } from "./linkgrants.js";
 import { claimAction, claims } from "./claimspage.js";
 import { plan, taskAction, tasks } from "./tasks.js";
-import { setClaimRuleAction } from "./claimrulespage.js";
+import { claimRules, setClaimRuleAction } from "./claimrulespage.js";
 import { flags } from "./flagspage.js";
 import { changes } from "./changes.js";
 import { diagnostics, diagnosticsFrame, diagSection } from "./diagnostics.js";
@@ -606,6 +606,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (!get && rest === "/rules") return setRule(ctx, id);
   if (get && rest === "/rules/owners") return pathOwners(ctx, id);
   if (!get && rest === "/rules/owners") return pathOwnerAction(ctx, id);
+  if (get && rest === "/rules/claims") return claimRules(ctx, id);
   if (!get && rest === "/rules/claims") return setClaimRuleAction(ctx, id);
   if (get && rest === "/search") return search(ctx, id);
   if (rest === "/variables" || rest.startsWith("/variables/")) return variablesRoutes(ctx, id, rest);

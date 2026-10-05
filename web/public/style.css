@@ -490,18 +490,20 @@ form.panel {
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: var(--space-5) var(--space-6) var(--space-6); margin: 0 0 var(--space-6); max-width: 80ch;
 }
+/* A form straight under a table (Rules, Links) is a separate thing, not the table's last row. */
+.table-wrap + form.panel { margin-top: var(--space-6); }
 label { display: block; font-weight: 600; font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-5) 0 6px; }
 form.panel > label:first-of-type, form > label:first-child { margin-top: 0; }
 .hint { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-2) 0 0; font-weight: 400; }
-input[type="text"], input[type="search"], input[type="date"], textarea, select {
+input[type="text"], input[type="search"], input[type="date"], input[type="number"], textarea, select {
   width: 100%; min-height: var(--control-md);
   font: 400 var(--text-md)/1.4 var(--font-sans); color: var(--fg);
   background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
   padding: 6px 12px; transition: border-color 120ms ease-out;
 }
 input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: 1; }
-input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
-input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible,
+input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, input[type="number"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
+input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible, input[type="number"]:focus-visible,
 textarea:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
 textarea { min-height: 280px; resize: vertical; line-height: 1.6; padding: 10px 12px; }
 textarea.short { min-height: 96px; }
@@ -1620,6 +1622,19 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
   .rules-table td:nth-child(2), .rules-table .rule-actions { width: auto; }
   .rules-table .rule-actions { text-align: left; }
   .rules-table .rule-actions .action-list { min-width: 0; width: min(16rem, calc(100vw - 2 * var(--space-5))); left: auto; transform: none; }
+}
+
+/* Claim rules (claimrulespage.ts): two fields a row, a number beside its unit,
+   and presets as buttons that say what they set. */
+.claim-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--space-5); }
+.duration { display: flex; gap: var(--space-2); }
+.duration select { width: auto; }
+.presets { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.presets .actions { margin-top: var(--space-2); }
+.presets .button { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; height: auto; padding: var(--space-2) var(--space-4); }
+.presets .token-client { color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); font-weight: 400; }
+@media (max-width: 640px) {
+  .claim-fields { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Package H: home and new vault */
