@@ -21,6 +21,8 @@ To change an existing rule, open the **⋯** menu on its row and choose **Change
 
 If **Approvals needed** isn't a whole number from 1 to 20, the form refuses it and says why, with a reference; nothing is saved.
 
+A rule can ask for more approvals than there are people to give them. Only the vault's owners and editors can approve under a rule, or only the rule's named owners if it has any (see [Path ownership](../concepts/path-ownership.md)). Reliquary still saves the rule, since a team may be growing into it, but the message after saving is a warning that says how many people can approve now. Until more people can, or you lower the number, changes under that rule stay open.
+
 A rule's path is a path inside the vault, written the way files are. The form refuses, and says why, a path that:
 
 - starts with `/` (write `clients/`, not `/clients/`);

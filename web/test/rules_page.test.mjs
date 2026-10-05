@@ -230,9 +230,21 @@ test("rules: an open rule needs no approvals, so the number is not checked", asy
 
 test("rules: saving a canon rule says so as a success, with the approvals it needs", async () => {
   const token = csrfOf(await page(rulesOf(V.main)));
+  const h = await landed(await post(rulesOf(V.main), { csrf: token, path: "legal/", policy: "canon", quorum: "1" }));
+  assert.deepEqual(flashOf(h), ["success", "status", "legal/ is now canon: changes need 1 approval."]);
+  assert.deepEqual(await ruleRow(V.main, "legal/"), { policy: "canon", quorum: 1 });
+});
+
+test("rules: saving a canon rule that needs more approvals than people can give is saved, with a warning saying how many can approve", async () => {
+  // Jo is the only owner or editor of "Rules main".
+  const token = csrfOf(await page(rulesOf(V.main)));
   const h = await landed(await post(rulesOf(V.main), { csrf: token, path: "legal/", policy: "canon", quorum: "3" }));
-  assert.deepEqual(flashOf(h), ["success", "status", "legal/ is now canon: changes need 3 approvals."]);
-  assert.deepEqual(await ruleRow(V.main, "legal/"), { policy: "canon", quorum: 3 });
+  assert.deepEqual(flashOf(h), [
+    "warning",
+    "status",
+    "legal/ is now canon: changes need 3 approvals. Only 1 owner or editor can approve changes there, so with 3 approvals needed they would stay open until more members become editors or owners or the approvals needed are lowered.",
+  ]);
+  assert.deepEqual(await ruleRow(V.main, "legal/"), { policy: "canon", quorum: 3 }, "a rule may run ahead of the team, so it is saved");
 });
 
 test("rules: Change fills the form with the rule as it is, first on the page", async () => {
