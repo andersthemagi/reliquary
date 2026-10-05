@@ -27,6 +27,7 @@ import { breakHref, returnTarget } from "./claimbreak.js";
 import { activeClaim, activeClaims, type Claim } from "./claimlookup.js";
 import { confirmPage, emptyState, html, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
+import { liveFiles } from "./threadrefs.js";
 import { settingsCrumb } from "./vaultadmin.js";
 import { canWrite, filePath, message, notFound, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 
@@ -35,14 +36,14 @@ export const claimsPath = (id: string) => vaultPath(id, "/claims");
 // A path typed into a URL, said back only when it's plain (as rules.ts and pathowners.ts do).
 const shown = (path: string) => (/^[^\u0000-\u001f\u007f]{1,200}$/.test(path) ? path : "that path");
 
-function claimsTable(ctx: Ctx, id: string, v: Vault, rows: Claim[]): Raw {
+function claimsTable(ctx: Ctx, id: string, v: Vault, rows: Claim[], live: ReadonlySet<string>): Raw {
   const breakable = canWrite(v);
   return html`<div class="table-wrap"><table class="table-stack member-list">
     <thead><tr><th scope="col">Path</th><th scope="col">Held by</th><th scope="col">Time left</th>${
       breakable ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""
     }</tr></thead>
     <tbody>${rows.map(
-      (r) => html`<tr><td data-label="Path"><a href="${filePath(id, r.path)}">${r.path}</a></td>
+      (r) => html`<tr><td data-label="Path">${live.has(r.path) ? html`<a href="${filePath(id, r.path)}">${r.path}</a>` : html`${r.path}<span class="token-client">no file there yet</span>`}</td>
         <td class="small" data-label="Held by">${who(ctx, r.holder, null)}${r.holder_label ? html`<span class="token-client">${r.holder_label}</span>` : ""}</td>
         <td class="small" data-label="Time left">${time(r.expires_at)}</td>
         ${breakable
@@ -77,9 +78,12 @@ export async function claims(ctx: Ctx, id: string): Promise<Reply> {
   if (breakPath !== null) return confirmBreak(ctx, id, breakPath);
   return build(ctx, id, async (c, v) => {
     const rows = await activeClaims(c, id);
+    // claim_path only checks that a path is valid, so a claim can name a file
+    // nobody has written; its file page would be a 404.
+    const live = await liveFiles(c, id, rows.map((r) => r.path));
     const body = html`
       ${diagSection("Claims", "Who’s working which path, and for how much longer. A claim is a courtesy signal, not an access gate: it never blocks a write.")}
-      ${rows.length ? claimsTable(ctx, id, v, rows) : emptyState({ title: "No active claims", body: "Nobody is claiming a path right now." })}
+      ${rows.length ? claimsTable(ctx, id, v, rows, live) : emptyState({ title: "No active claims", body: "Nobody is claiming a path right now." })}
       <p class="hint">Your agents see and take the same claims over MCP (<code>list_claims</code>, <code>claim_path</code>). <a href="/docs/concepts/claims">About claims</a></p>`;
     return { body, title: "Claims", tab: true };
   });

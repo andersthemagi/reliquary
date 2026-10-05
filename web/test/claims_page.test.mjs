@@ -127,6 +127,14 @@ before(async () => {
 
   [{ id: V.empty }] = await as(NOA, "select public.create_vault('Claims empty', 'open') as id");
   [{ id: V.ola }] = await as(REX, "select public.create_vault('Claims rex-only', 'open') as id");
+
+  // A vault of its own, so V.main's single claim stays single: a claim on a
+  // file that's there and one that isn't.
+  [{ id: V.rows }] = await as(NOA, "select public.create_vault('Claims rows', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.rows, EDDA, NOA]);
+  await as(EDDA, "select public.write_file($1, 'mine.md', 'Text')", [V.rows]);
+  await as(EDDA, "select public.claim_path($1, 'planned.md')", [V.rows]);
+  await as(NOA, "select public.claim_path($1, 'mine.md')", [V.rows]);
 });
 
 after(async () => {
@@ -151,6 +159,17 @@ test("claims page: lists the path (linked to the file), holder and label", async
   assert.match(row, /edda@example\.test/);
   assert.match(row, /<span class="token-client">tidying this up<\/span>/);
   assert.match(h, /Your agents see and take the same claims over MCP/);
+});
+
+// One row of the claims table, found by its path rather than its position.
+const rowOf = (h, path) => h.split("<tr>").find((r) => r.startsWith("<td") && r.includes(path)) ?? assert.fail(`a row for ${path}`);
+
+test("claims page: a claim on a path with no file there is plain text saying so, not a link to a page that doesn't exist", async () => {
+  const h = await page(noa, claimsUrl(V.rows));
+  assert.match(rowOf(h, "mine.md"), new RegExp(`<a href="/v/${V.rows}/file\\?path=mine\\.md">mine\\.md</a>`));
+  const planned = rowOf(h, "planned.md");
+  assert.doesNotMatch(planned, /<a href="[^"]*path=planned/);
+  assert.match(planned, /planned\.md<span class="token-client">no file there yet<\/span>/);
 });
 
 // Claims is a tab of Diagnostics (src/diagnostics.ts): the page at its old
