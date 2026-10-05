@@ -238,10 +238,15 @@ test("watching tab: every member has Settings, Watching, listing only their own 
   assert.match(h, /<button class="quiet" aria-label="Unwatch notes\/">Unwatch<\/button>/);
 });
 
-test("watching tab: with nothing watched, it says how to start, and the header offers Watch a path", async () => {
+test("watching tab: with nothing watched, it says how to start, with the form under it and no header button that only scrolls to it", async () => {
   const h = await page(watching(V.empty));
   assert.match(h, /<div class="empty"><strong>You don’t watch anything here<\/strong><p>Watch a folder or file from its page, or type one below\. Changes there are flagged to your agents from then on\.<\/p><\/div>/);
   assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel watch-add"/, "the form follows the empty box, where the stylesheet spaces them");
+  assert.doesNotMatch(h, /href="#watch-path"/);
+});
+
+test("watching tab: with watches listed, the header offers Watch a path, since the form may be a scroll away", async () => {
+  const h = await page(watching(V.main));
   assert.match(h, /<div class="page-actions"><a class="button primary" href="#watch-path">Watch a path<\/a><\/div>/);
 });
 

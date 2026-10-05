@@ -136,7 +136,6 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       : emptyState({
           title: "No rules yet",
           body: html`Every path is ${policyBadge(def)}, the vault default.${owner ? " Add a rule to make a folder like clients/ canon." : ""}`,
-          ...(owner ? { action: html`<a class="button" href="#add-rule">Add rule</a>` } : {}),
         });
 
     const checker = html`<form method="get" action="${vaultPath(id, "/rules")}" class="panel rule-check">
@@ -155,14 +154,16 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       </form>`;
 
     // A refused or chosen form goes first, so its message is on the first
-    // screen; otherwise the rules, the thing people come to see, lead.
+    // screen; otherwise the rules, the thing people come to see, lead. With
+    // none, the form is already under the empty box, so a button that only
+    // scrolls to it is left out of the header.
     const formFirst = !!(form?.error || changing);
     const body = html`
       ${pageHeader({
         crumb: rulesCrumb(v),
         title: "Rules",
         description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.`,
-        primary: owner && !formFirst ? html`<a class="button primary" href="#add-rule">Add rule</a>` : "",
+        primary: owner && !formFirst && list.length ? html`<a class="button primary" href="#add-rule">Add rule</a>` : "",
       })}
       ${formFirst ? addForm : ""}
       ${table}

@@ -10,7 +10,7 @@ Open the vault, then **Settings**, **Rules**. The table lists every rule in fold
 
 ## Add or change a rule
 
-1. On **Rules**, choose **Add rule** at the top.
+1. On **Rules**, choose **Add rule** at the top. With no rules yet the form is already on the page, under the note, so go to step 2.
 2. Under **Add or change a rule**, fill in:
    - **Path or folder**: a folder ends in `/`, like `clients/`; a file is its full path, like `pricing.md`.
    - **Policy**: **Canon** or **Open**.

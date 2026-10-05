@@ -217,6 +217,7 @@ test("owners page: an open rule says named owners make a difference once it's ca
   assert.match(h, /<code>notes\/<\/code> is open, so everyone with write access already writes it directly\. Named owners make a difference once its rule is canon\./);
   assert.match(h, /<div class="empty"><strong>No named owners<\/strong><p>Everyone with write access follows the rule on <code>notes\/<\/code>\. Name someone below to let them write it directly\.<\/p><\/div>/);
   assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel owner-form"/, "the form follows the empty box, where the stylesheet spaces them");
+  assert.doesNotMatch(h, /href="#add-owner"/, "no header button that only scrolls to a form already in view");
 });
 
 test("owners page: every member sees the owners; someone who isn't an owner gets no form and no Remove", async () => {

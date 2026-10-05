@@ -94,7 +94,7 @@ async function watchingPage(ctx: Ctx, id: string): Promise<Reply> {
     const body = html`
       ${settingsHeader(id, v, "watching", {
         description: html`Folders and files you watch in ${v.name}. Changes there are flagged to your agents when they ask (<code>list_flags</code>). Only you see this list.`,
-        primary: html`<a class="button primary" href="#watch-path">Watch a path</a>`,
+        primary: list.length ? html`<a class="button primary" href="#watch-path">Watch a path</a>` : "",
       })}
       ${table}
       <form method="post" action="${here}" class="panel watch-add" id="watch-path" aria-labelledby="watch-path-title">

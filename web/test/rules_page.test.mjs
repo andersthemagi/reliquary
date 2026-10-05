@@ -305,9 +305,10 @@ test("rules: people who aren't owners see the rules without Add rule, Change or 
   assert.deepEqual(await ruleRow(V.kit, "kit/"), { policy: "canon", quorum: 1 });
 });
 
-test("rules: with no rules, the page says what every path is and offers Add rule", async () => {
+test("rules: with no rules, the page says what every path is and shows the Add form under it, with no button that only scrolls to it", async () => {
   const h = await page(rulesOf(V.blank));
-  assert.match(h, /<div class="empty"><strong>No rules yet<\/strong><p>Every path is <span class="badge policy open"[^>]*>Open<\/span>, the vault default\. Add a rule to make a folder like clients\/ canon\.<\/p><p class="empty-action"><a class="button" href="#add-rule">Add rule<\/a><\/p><\/div>/);
+  assert.match(h, /<div class="empty"><strong>No rules yet<\/strong><p>Every path is <span class="badge policy open"[^>]*>Open<\/span>, the vault default\. Add a rule to make a folder like clients\/ canon\.<\/p><\/div>/);
+  assert.doesNotMatch(h, /href="#add-rule"/);
   assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel rule-form"/, "the form follows the empty box, where the stylesheet spaces them");
 });
 

@@ -155,7 +155,7 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
         path: true,
         description: "Named owners write this path directly, with no review, and theirs are the only approvals its quorum counts. Everyone else follows the rule.",
         meta: html`<p class="rule">${policyBadge(rule.policy)} <span>The rule on <code>${path}</code>${canon ? `: changes need ${approvals(rule.quorum)}` : ""}. <a href="${vaultPath(id, "/rules")}">Rules</a></span></p>`,
-        primary: owner && candidates.length ? html`<a class="button primary" href="#add-owner">Name an owner</a>` : "",
+        primary: owner && candidates.length && owners.length ? html`<a class="button primary" href="#add-owner">Name an owner</a>` : "",
       })}
       ${canon
         ? ""
