@@ -35,7 +35,7 @@ If a decision is refused, for example **Reject** without a note, the page comes 
 
 - **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it.
 - **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
-- **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit.
+- **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit. If the edit is refused while the proposal is still open (for example, applying it would pass the vault's storage limit), the editor comes back with the reason and your text and note as you typed them.
 
 ### Worth a closer look
 
@@ -63,7 +63,7 @@ Every proposal has one timeline: comments, review notes and approvals, oldest fi
 
 - Owners, editors and their agents comment (agents with `comment_on_proposal`, as their person). Viewers read.
 - A comment is words only: it can't approve, reject or change anything.
-- Comments are 1 to 4000 characters, at most 200 per proposal, and can't be edited or deleted.
+- Comments are 1 to 4000 characters, at most 200 per proposal, and can't be edited or deleted. If a comment is refused, the page comes back with the reason at the top and your comment still in its box.
 - Agents get new comments and notes in `changes_since`, so they can answer a request for changes without polling.
 
 ## Snooze
