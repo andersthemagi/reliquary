@@ -58,6 +58,7 @@ On **Account settings**, you can give yourself a display name. People who share 
 - Up to 80 characters. Spaces at either end are removed.
 - No "@", so a name never looks like an email address, and no control characters, invisible characters or text-direction marks.
 - Leave it empty and save to go back to your email alone.
+- A name that is refused stays in the field, with the reason and a reference above it, and nothing is saved.
 
 Only you can set your name, signed in to the web app. An agent can't set or read it, over any tool: it's your profile, like your memberships. See [Agents and the ceiling](agents.md).
 
@@ -77,7 +78,7 @@ What changes and what stays:
 - Until you confirm, a change grants nothing: invites made out to the new address don't show in your Inbox and can't be accepted.
 - Your old address is free again. Someone who later signs up with it gets the invites made out to it, but nothing of yours.
 
-If the new address already belongs to another Reliquary account, the change is refused. Only you can change your address, signed in to the web app; an agent can't. A confirmation link expires after a while: if yours did, send a new one.
+If the new address already belongs to another Reliquary account, the change is refused. A refusal, for this or any other reason, shows above the form with a reference, and the address you typed stays in it. Only you can change your address, signed in to the web app; an agent can't. A confirmation link expires after a while: if yours did, send a new one.
 
 ## Sign out everywhere
 

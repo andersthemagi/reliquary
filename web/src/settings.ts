@@ -44,32 +44,39 @@ import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
 import { Refusal } from "./failure.js";
 import { callout, confirmPage, csrfField, html, notice, pageHeader, plural, signsOut, themeButtons, time } from "./html.js";
+import { loadShell } from "./inbox.js";
 import { EMAIL } from "./signin.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 import { shortId } from "./personref.js";
 
 export const DISPLAY_NAME_MAX = 80;
 
-export async function accountSettings(ctx: Ctx): Promise<Reply> {
+// A refused save, as posted and with the reason (and its reference), shown
+// in the form it came from.
+type Draft = { value: string; error: string };
+
+export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft } = {}): Promise<Reply> {
+  // A POST page isn't given the top bar's summary (pages.ts loads it for
+  // GETs), and this page reads the address and name from it.
+  if (d.name || d.email) ctx.shell ??= await asPerson(ctx.userId, loadShell);
   const me = ctx.shell?.me ?? { email: null, name: null };
   const hosted = signsOut();
   // A change of address waiting for its link, as Supabase Auth has it.
   const pending = hosted && ctx.session ? await ctx.session.pendingEmail() : null;
-  return render(
-    ctx,
-    "Account settings",
-    html`${pageHeader({ title: "Account settings", meta: html`<p class="meta">${me.email ?? `Account ${shortId(ctx.userId)}`}</p>` })}
-    <section aria-labelledby="profile">
+  const profile = html`<section aria-labelledby="profile">
       <h2 id="profile" class="form-title">Profile</h2>
       <form method="post" action="/settings/name" class="panel settings-form">
         ${csrfField(ctx.csrf)}
+        ${d.name ? html`<p class="callout danger" role="alert" id="name-error">${d.name.error}</p>` : ""}
         <label for="display-name">Display name</label>
-        <input id="display-name" type="text" name="display_name" value="${me.name ?? ""}" maxlength="${DISPLAY_NAME_MAX}" autocomplete="name" aria-describedby="display-name-hint">
+        <input id="display-name" type="text" name="display_name" value="${d.name?.value ?? me.name ?? ""}" maxlength="${DISPLAY_NAME_MAX}" autocomplete="name"${
+          d.name ? html` aria-invalid="true" aria-describedby="name-error display-name-hint"` : html` aria-describedby="display-name-hint"`
+        }>
         <p class="hint" id="display-name-hint">Shown next to your email to people who share a vault with you: in Activity, proposals, threads and members. Up to ${DISPLAY_NAME_MAX} characters, without “@”. Leave it empty to be shown by your email alone.</p>
         <div class="actions"><button class="primary">Save name</button></div>
       </form>
-    </section>
-    <section aria-labelledby="email">
+    </section>`;
+  const email = html`<section aria-labelledby="email">
       <h2 id="email">Email</h2>
       <p>${me.email ? html`<strong>${me.email}</strong>` : html`<span class="muted">No email on this account (local sign-in).</span>`}</p>
       ${hosted
@@ -84,13 +91,23 @@ export async function accountSettings(ctx: Ctx): Promise<Reply> {
               : ""}
           <form method="post" action="/settings/email" class="panel settings-form">
             ${csrfField(ctx.csrf)}
+            ${d.email ? html`<p class="callout danger" role="alert" id="email-error">${d.email.error}</p>` : ""}
             <label for="new-email">New email address</label>
-            <input id="new-email" type="text" name="new_email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required aria-describedby="new-email-hint">
+            <input id="new-email" type="text" name="new_email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${
+              d.email ? html` value="${d.email.value}" aria-invalid="true" aria-describedby="email-error new-email-hint"` : html` aria-describedby="new-email-hint"`
+            }>
             <p class="hint" id="new-email-hint">We email a link to the new address to confirm it is yours; nothing changes until you open it. Afterwards you sign in with the new address. Your vaults, roles, connections and plan stay as they are, and people who share a vault with you see the new address. Invites made out to your old address stop working: ask for a new one.</p>
             <div class="actions"><button class="primary">Send confirmation link</button></div>
           </form>`
         : html`<p class="small muted">You sign in with this address, and invites to vaults are made out to it. It can’t be changed here: to use another address, ask the operator of this Reliquary.</p>`}
-    </section>
+    </section>`;
+  // The refused form goes first, so its reason is on the first screen.
+  const reply = render(
+    ctx,
+    "Account settings",
+    html`${pageHeader({ title: "Account settings", meta: html`<p class="meta">${me.email ?? `Account ${shortId(ctx.userId)}`}</p>` })}
+    ${d.email ? email : profile}
+    ${d.email ? profile : email}
     <section aria-labelledby="appearance">
       <h2 id="appearance">Appearance</h2>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
@@ -135,6 +152,7 @@ export async function accountSettings(ctx: Ctx): Promise<Reply> {
     </section>`,
     "settings",
   );
+  return d.name || d.email ? { ...reply, status: 400 } : reply;
 }
 
 export async function saveDisplayName(ctx: Ctx): Promise<Reply> {
@@ -143,7 +161,7 @@ export async function saveDisplayName(ctx: Ctx): Promise<Reply> {
     const kept = await asPerson(ctx.userId, async (c) => (await c.query(`select public.set_display_name($1) as n`, [name])).rows[0].n as string | null);
     ctx.setFlash(kept ? `Saved. People who share a vault with you now see you as ${kept}.` : "Display name cleared. People see your email.", "success");
   } catch (err) {
-    ctx.setFlash(refusalText(err));
+    return accountSettings(ctx, { name: { value: name, error: refusalText(err) } });
   }
   return { redirect: "/settings" };
 }
@@ -183,10 +201,8 @@ export async function changeEmail(ctx: Ctx): Promise<Reply> {
     throw new Refusal({ status: 404, where, why: "Changing your email is for Supabase sign-in; the local stand-in has no email to change" });
   }
   const email = (ctx.form.get("new_email") ?? "").trim();
-  const refuse = (why: string, at = where) => {
-    ctx.setFlash(refusalText(new Refusal({ status: 400, where: at, why })));
-    return { redirect: "/settings" };
-  };
+  const refuse = (why: string, at = where) =>
+    accountSettings(ctx, { email: { value: email, error: refusalText(new Refusal({ status: 400, where: at, why })) } });
   if (!EMAIL.test(email) || email.length > 254) return refuse("Enter the new address like name@example.com. Nothing was changed");
   const current = (await asPerson(ctx.userId, async (c) => (await c.query(`select public.my_email() as e`)).rows[0].e as string | null)) ?? "";
   if (email.normalize("NFC").toLowerCase() === current.normalize("NFC").toLowerCase()) {

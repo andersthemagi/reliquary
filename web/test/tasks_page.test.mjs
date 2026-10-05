@@ -371,6 +371,13 @@ test("cancel: the confirm page says what happens and what stays blocked, and ope
   assert.equal((await stepOf("a")).status, "open", "asking cancels nothing");
 });
 
+test("cancel: the confirm page's way out says Keep the task, so its only Cancel is the irreversible button; Skip's way out stays Cancel", async () => {
+  const h = await page(noa, confirmUrl(V.main, "cancel", "a"));
+  assert.match(h, /<button class="danger solid">Cancel “Draft”<\/button><a class="button quiet" href="[^"]+">Keep the task<\/a>/);
+  assert.doesNotMatch(h, />Cancel<\/a>/);
+  assert.match(await page(noa, confirmUrl(V.main, "skip", "a")), /<a class="button quiet" href="[^"]+">Cancel<\/a>/);
+});
+
 test("cancel: a form without the confirm page's field is sent to that page and cancels nothing", async () => {
   const token = csrfOf(await page(noa, planUrl(V.main, WORK)));
   const r = await post(noa, `/v/${V.main}/tasks/plan`, { csrf: token, path: WORK, key: "a", action: "cancel" });

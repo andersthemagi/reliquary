@@ -30,6 +30,8 @@ When a client signs in, there is no secret to copy: it signs in through your bro
 2. Name it after the agent and machine, choose its vaults, **Read only** or **Read and write**, and when it expires. If you belong to more than one vault, nothing is chosen for you.
 3. Choose **Create token**, copy the token, then **Done**. It is shown once.
 
+If **Create token** is refused (no name, **Only the vaults I tick** with none ticked, an expiry past a year), the form comes back with the reason and a reference, and everything you chose is still there to correct. Nothing was created.
+
 ## Scope is fixed
 
 A connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.

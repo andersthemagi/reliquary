@@ -22,6 +22,7 @@ import {
   type Raw,
   type Tab,
 } from "./html.js";
+import { Refusal } from "./failure.js";
 import { message, notFound, q, render, UUID, type Ctx, type Reply } from "./pages.js";
 
 // The routes of these pages; pages.ts sends /connect and /connections/* here.
@@ -268,6 +269,13 @@ export async function connections(ctx: Ctx): Promise<Reply> {
 
 const newCrumb = [{ label: "Connections", href: "/connections" }, { label: "New token" }];
 
+const EXPIRIES = [7, 30, 90, 180, 366];
+
+// The form's values as posted when creating was refused: shown again with
+// the reason and its reference, so nothing is chosen twice. No `scope` means
+// the form chose neither vault option, and the form shows it that way.
+type TokenDraft = { name: string; scope?: "all" | "some"; vaults: string[]; access: "read" | "write"; days: string; error: string; field?: "name" | "vaults" };
+
 const myVaults = (ctx: Ctx) =>
   asPerson(
     ctx.userId,
@@ -282,14 +290,19 @@ const myVaults = (ctx: Ctx) =>
       ).rows as { id: string; name: string }[],
   );
 
-export async function newToken(ctx: Ctx): Promise<Reply> {
+export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
   const vaults = await myVaults(ctx);
   // "All my vaults" used to be preselected. An agent that reaches two clients'
   // vaults can copy text between them when something it reads tells it to, so
   // a person in several vaults chooses on purpose (as on the consent page); one
-  // in a single vault keeps the shortcut.
+  // in a single vault keeps the shortcut. A form shown again after a refusal
+  // keeps what was posted, which for a form that chose neither is neither.
   const mustChoose = vaults.length > 1;
-  return render(
+  const allChecked = d?.scope ? d.scope === "all" : !mustChoose;
+  // An expiry the form doesn't offer (a forged post) shows the default.
+  const posted = Number(d?.days);
+  const chosenDays = EXPIRIES.includes(posted) ? posted : 90;
+  const reply = render(
     ctx,
     "New token",
     html`${pageHeader({
@@ -302,15 +315,18 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
     <p class="hint new-token-hint">Claude Code, Claude.ai and ChatGPT don’t need one: they sign in. See <a href="/connect">Connect</a>.</p>
     <form method="post" action="/connections/new" class="panel token-form" id="new-token">
       ${csrfField(ctx.csrf)}
+      ${d ? html`<p class="callout danger" role="alert" id="token-error">${d.error}</p>` : ""}
       <label for="tn">Name it after the agent and machine</label>
-      <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100" autocomplete="off">
-      <fieldset>
+      <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100" autocomplete="off" value="${d?.name ?? ""}"${
+        d?.field === "name" ? raw(' aria-invalid="true" aria-describedby="token-error"') : ""
+      }>
+      <fieldset${d?.field === "vaults" ? raw(' aria-describedby="token-error"') : ""}>
         <legend>Vaults</legend>
-        <label class="choice"><input type="radio" name="scope" value="all"${mustChoose ? "" : raw(" checked")}> All my vaults, including ones I join later</label>
-        <label class="choice"><input type="radio" name="scope" value="some"> Only the vaults I tick</label>
+        <label class="choice"><input type="radio" name="scope" value="all"${allChecked ? raw(" checked") : ""}> All my vaults, including ones I join later</label>
+        <label class="choice"><input type="radio" name="scope" value="some"${d?.scope === "some" ? raw(" checked") : ""}> Only the vaults I tick</label>
         ${vaults.length
           ? html`<div class="choice-list">${vaults.map(
-              (v) => html`<label class="choice"><input type="checkbox" name="vault" value="${v.id}"> ${v.name}</label>`,
+              (v) => html`<label class="choice"><input type="checkbox" name="vault" value="${v.id}"${d?.vaults.includes(v.id) ? raw(" checked") : ""}> ${v.name}</label>`,
             )}</div>`
           : html`<p class="hint">You don’t belong to any vaults yet. <a href="/vaults/new">Create one</a>.</p>`}
         <p class="hint">Ticking a vault limits the token to the ticked vaults.</p>
@@ -320,19 +336,22 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
       </fieldset>
       <fieldset>
         <legend>Access</legend>
-        <label class="choice"><input type="radio" name="access" value="read" checked> Read only: read, search and follow changes</label>
-        <label class="choice"><input type="radio" name="access" value="write"> Read and write: also write open files and propose changes</label>
+        <label class="choice"><input type="radio" name="access" value="read"${d?.access === "write" ? "" : raw(" checked")}> Read only: read, search and follow changes</label>
+        <label class="choice"><input type="radio" name="access" value="write"${d?.access === "write" ? raw(" checked") : ""}> Read and write: also write open files and propose changes</label>
       </fieldset>
       <label for="te">Expires after</label>
       <select id="te" name="days" class="token-expiry">
-        ${[7, 30, 90, 180, 366].map((d) => html`<option value="${d}"${d === 90 ? raw(" selected") : ""}>${d === 366 ? "1 year" : `${d} days`}</option>`)}
+        ${EXPIRIES.map((n) => html`<option value="${n}"${n === chosenDays ? raw(" selected") : ""}>${n === 366 ? "1 year" : `${n} days`}</option>`)}
       </select>
       <p class="hint">A token’s vaults and access can’t be changed later. To change them, revoke it and create another.</p>
       <div class="actions"><button class="primary">Create token</button><a class="button quiet" href="/connections">Cancel</a></div>
     </form>`,
     "connections",
   );
+  return d ? { ...reply, status: 400 } : reply;
 }
+
+const refuse = (why: string) => message(new Refusal({ status: 400, where: "web app (New token form)", why }));
 
 export async function createToken(ctx: Ctx): Promise<Reply> {
   const name = (ctx.form.get("name") ?? "").trim();
@@ -340,17 +359,26 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
   // mismatch between the two must never produce the broader token.
   const ticked = ctx.form.getAll("vault");
   const some = ticked.length > 0 || ctx.form.get("scope") === "some";
+  // What the form chose; neither, when it names no vaults and not "all" either.
+  const scope = some ? "some" : ctx.form.get("scope") === "all" ? "all" : undefined;
   const access = ctx.form.get("access") === "write" ? "write" : "read";
-  const days = Number.parseInt(ctx.form.get("days") ?? "90", 10);
+  const typedDays = ctx.form.get("days") ?? "90";
+  const days = Number.parseInt(typedDays, 10);
+  const again = (error: string, field?: TokenDraft["field"]) =>
+    newToken(ctx, { name, scope, vaults: ticked, access, days: typedDays, error, field });
+  // The database refuses these too (a name's length is a check constraint,
+  // whose own words talk about something else); said here, the form can say
+  // which field.
+  if ([...name].length < 1 || [...name].length > 100) {
+    return again(refuse("A token needs a name, up to 100 characters: the agent and machine it is for. Nothing was created"), "name");
+  }
   if (some && ticked.length === 0) {
-    ctx.setFlash("Tick at least one vault, or choose all your vaults.", "danger");
-    return { redirect: "/connections/new" };
+    return again(refuse("Tick at least one vault, or choose all your vaults. Nothing was created"), "vaults");
   }
   // Nothing is preselected for a person in several vaults, so a form that names
   // neither choice is refused, not read as "all".
-  if (!some && ctx.form.get("scope") !== "all" && (await myVaults(ctx)).length > 1) {
-    ctx.setFlash("Choose all your vaults, or tick the vaults it may reach.", "danger");
-    return { redirect: "/connections/new" };
+  if (!scope && (await myVaults(ctx)).length > 1) {
+    return again(refuse("Choose all your vaults, or tick the vaults it may reach. Nothing was created"), "vaults");
   }
   if (!ticked.every((v) => UUID.test(v))) return notFound(ctx);
   let token: string;
@@ -368,8 +396,7 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
         ).rows[0].t as string,
     );
   } catch (err) {
-    ctx.setFlash(message(err));
-    return { redirect: "/connections/new" };
+    return again(message(err));
   }
   // The one time the token is shown: this answer only, never a redirect
   // (it would have to be stored), and no form here inviting a second one.
