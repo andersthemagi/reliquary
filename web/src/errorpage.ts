@@ -160,6 +160,7 @@ export type ErrorPageOpts = {
   title?: string; // default: "<what> failed"
   lede?: Raw | string; // default: the reason
   back?: string; // a local path
+  backLabel?: string; // what the back button says, "Back" by default
   // The signed-in frame, when there is one.
   user?: string;
   csrf?: string;
@@ -173,7 +174,7 @@ export type ErrorPageOpts = {
 // plain text to copy into a report, then links back. For a page that has
 // its own frame (the invite page, members.ts); everything else uses
 // errorPage().
-export function errorBody(f: Failure, o: Pick<ErrorPageOpts, "title" | "lede" | "back"> = {}): Raw {
+export function errorBody(f: Failure, o: Pick<ErrorPageOpts, "title" | "lede" | "back" | "backLabel"> = {}): Raw {
   const title = o.title ?? `${f.what} failed`;
   const back = o.back && o.back.startsWith("/") && !o.back.startsWith("//") ? o.back : "/";
   return html`<h1>${title}</h1>
@@ -189,7 +190,7 @@ export function errorBody(f: Failure, o: Pick<ErrorPageOpts, "title" | "lede" | 
       <p class="small muted">Copy these lines into your report. The reference finds the full record in Reliquary’s server log.</p>
       <pre class="code failure-copy">${plainText(f, { time: new Date().toISOString().slice(0, 19) + "Z" })}</pre>
     </details>
-    <p class="actions">${back !== "/" ? html`<a class="button" href="${back}">Back</a>` : ""}<a class="button" href="/">Home</a><a href="${siteHref("/docs/reference/errors")}">What these fields mean</a></p>`;
+    <p class="actions">${back !== "/" ? html`<a class="button" href="${back}">${o.backLabel ?? "Back"}</a>` : ""}<a class="button" href="/">Home</a><a href="${siteHref("/docs/reference/errors")}">What these fields mean</a></p>`;
 }
 
 // The error page: errorBody() in the site's frame, signed in or not.

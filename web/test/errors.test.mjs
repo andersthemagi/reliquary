@@ -283,6 +283,13 @@ test("errors: not found says what was looked for, the same for a vault that isn'
   assert.equal(nopage.why, "There’s no page at /no/such/page.");
 });
 
+test("errors: not found inside a vault the person belongs to offers Back to that vault, and inside one they don't offers none", async () => {
+  const mine = await (await get(`/v/${V.own}/file?path=notes%2Fnope.md`)).text();
+  assert.match(mine, new RegExp(`<a class="button" href="/v/${V.own}">Back to Errors Vault</a><a class="button" href="/">Home</a>`));
+  const hidden = await (await get(`/v/${V.hidden}/file?path=notes%2Fplan.md`)).text();
+  assert.doesNotMatch(hidden, /Back to /);
+});
+
 test("errors: the env API answers a failure with its code, what, where, why and a reference", async () => {
   // A CLI sign-in made in the database, as consent and the token endpoint would.
   const resource = `${server.origin}/api/env`;
