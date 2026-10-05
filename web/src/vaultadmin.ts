@@ -26,6 +26,7 @@ import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
 import { callout, confirmPage, csrfField, html, pageHeader, plural, policyBadge, type CrumbPart, type Raw, type Tab } from "./html.js";
+import { Refusal } from "./failure.js";
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { crumbs as fileCrumbs, deletePath, vaultShell } from "./files.js";
 import { usagePanel, vaultUsages } from "./plans.js";
@@ -105,9 +106,13 @@ const ownerCount = async (c: pg.PoolClient, id: string) =>
 // ---------------------------------------------------------------------------
 // General
 
-async function settings(ctx: Ctx, id: string): Promise<Reply> {
+// The form's values as posted when saving was refused, with the refusal.
+type GeneralForm = { name: string; policy: string; error: string };
+
+async function settings(ctx: Ctx, id: string, d?: GeneralForm): Promise<Reply> {
   return page(ctx, id, "Settings", async (_c, v) => {
     const owner = v.role === "owner";
+    const policy = d?.policy ?? v.default_policy;
     return html`
       ${settingsHeader(id, v, "general", {
         description: owner ? `The vault’s name, and what its files are when no rule covers them.` : `${v.name}’s name and default policy.`,
@@ -115,13 +120,14 @@ async function settings(ctx: Ctx, id: string): Promise<Reply> {
       ${owner
         ? html`<form method="post" action="${settingsPath(id)}" class="panel choice-form" id="general">
             ${csrfField(ctx.csrf)}
+            ${d ? html`<p class="callout danger" role="alert" id="name-error">${d.error}</p>` : ""}
             <label for="vn">Name</label>
-            <input id="vn" type="text" name="name" value="${v.name}" required maxlength="100">
+            <input id="vn" type="text" name="name" value="${d?.name ?? v.name}" required maxlength="100"${d ? html` aria-invalid="true" aria-describedby="name-error"` : ""}>
             <fieldset>
               <legend>Default policy</legend>
-              <label class="choice"><input type="radio" name="default_policy" value="open"${v.default_policy === "open" ? html` checked` : ""}>
+              <label class="choice"><input type="radio" name="default_policy" value="open"${policy === "open" ? html` checked` : ""}>
                 <span><strong>Open:</strong> members and their agents write files directly. Every change is logged.</span></label>
-              <label class="choice"><input type="radio" name="default_policy" value="canon"${v.default_policy === "canon" ? html` checked` : ""}>
+              <label class="choice"><input type="radio" name="default_policy" value="canon"${policy === "canon" ? html` checked` : ""}>
                 <span><strong>Canon:</strong> every change is a proposal that people approve before it applies.</span></label>
               <p class="hint">What a file is when no rule covers it. Rules for folders and files are on <a href="${vaultPath(id, "/rules")}">Rules</a>. You’ll confirm the change on the next page.</p>
             </fieldset>
@@ -133,7 +139,7 @@ async function settings(ctx: Ctx, id: string): Promise<Reply> {
             <div><dt>Your role</dt><dd>${v.role === "editor" ? "Editor" : "Viewer"}</dd></div>
           </dl>
           <p class="hint">Only owners rename a vault or change its default.</p>`}`;
-  });
+  }, d ? 400 : undefined);
 }
 
 // POST /config: rename and default policy. Owners get a confirmation page
@@ -154,10 +160,17 @@ async function saveSettings(ctx: Ctx, id: string): Promise<Reply> {
     return { redirect: settingsPath(id) };
   }
   if (current.role === "owner" && ctx.form.get("confirm") !== "1") {
+    // Refused here, not after Confirm: a rename the database would refuse
+    // must not be offered for confirmation, with the typed name gone.
+    const length = [...name].length;
+    if (length < 1 || length > 100) {
+      const error = message(new Refusal({ status: 400, where: "web app (Settings form)", why: "A vault name is 1 to 100 characters. Nothing was saved" }));
+      return settings(ctx, id, { name, policy, error });
+    }
     return page(ctx, id, "Confirm changes", async (_c, v) => html`
       ${pageHeader({ crumb: settingsCrumb(id, v, { label: "Confirm changes" }), title: "Confirm changes" })}
       <ul class="changes">
-        ${renamed ? html`<li>Rename <strong>${current.name}</strong> to <strong>${name || "(blank)"}</strong>. Members see the new name at once; the activity log records both.</li>` : ""}
+        ${renamed ? html`<li>Rename <strong>${current.name}</strong> to <strong>${name}</strong>. Members see the new name at once; the activity log records both.</li>` : ""}
         ${repoliced
           ? html`<li>Make the default ${policyBadge(policy)}. ${
               policy === "open"

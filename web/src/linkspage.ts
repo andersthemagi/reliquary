@@ -53,7 +53,10 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
     if (!v) return null;
     const list = await loadLinks(c, id);
     const owner = v.role === "owner";
-    const editing = edit !== null ? list.find((l) => l.id === edit) : undefined;
+    // A refused save of an edit comes back as an edit: the form's own id
+    // wins over the query, which a POST doesn't carry.
+    const editingId = form?.id ?? edit;
+    const editing = editingId ? list.find((l) => l.id === editingId) : undefined;
     const values: LinkForm | undefined = form ?? (editing ? { id: editing.id, name: editing.name, url: editing.url } : undefined);
     const described = (f: LinkForm["field"], hint: string) =>
       form?.error && form.field === f ? html` aria-invalid="true" aria-describedby="link-error ${hint}"` : html` aria-describedby="${hint}"`;
@@ -182,8 +185,12 @@ export async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
     }
   } catch (err) {
     if (err instanceof SecretsError) return again(refuse(err.message), "credential");
+    const code = (err as { code?: string }).code;
+    // (vault_id, name) is the only unique key either function can break;
+    // Postgres's own words for it are the constraint's, not a person's.
+    if (code === "23505") return again(refuse(`There is already a link named ${name} in this vault. Pick another name. Nothing was saved`), "name");
     const text = message(err);
-    if ((err as { code?: string }).code === "22023") return again(text, "name");
+    if (code === "22023") return again(text, "name");
     ctx.setFlash(text);
   }
   return { redirect: vaultPath(id, "/links") };

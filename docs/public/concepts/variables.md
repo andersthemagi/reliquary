@@ -4,7 +4,7 @@ A vault holds shared environment variables per environment, delivered to your pr
 
 ## Environments
 
-Every vault starts with three environments: `development`, `preview` and `production`. `production` is owners-only: only owners set or read its values, and its column on the Variables page says **Owners only**. Owners can add environments (up to 20 a vault, owners-only or not) on the Variables page's **Environments** tab, and rename or delete one from the **⋯** menu on its row; deleting asks you to type the name, and destroys its values.
+Every vault starts with three environments: `development`, `preview` and `production`. `production` is owners-only: only owners set or read its values, and its column on the Variables page says **Owners only**. Owners can add environments (up to 20 a vault, owners-only or not) on the Variables page's **Environments** tab, and rename or delete one from the **⋯** menu on its row; deleting asks you to type the name, and destroys its values. A name that is refused (not lowercase letters, digits, `-` and `_`, or already taken) stays in the form with the reason, so you correct it. A **Rename** or **Delete** link for an environment that is gone, renamed or deleted in another tab, takes you back to the list and says so.
 
 ## The Variables page
 

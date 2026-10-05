@@ -203,9 +203,8 @@ test("templates: Blank, chosen or left out, makes an empty vault with no rules",
 test("templates: an unknown template is refused with a reason, and nothing is created", async () => {
   const token = csrfOf(await page("/vaults/new"));
   const r = await post("/vaults/new", { csrf: token, name: "Zz template bogus", template: "bogus", default_policy: "open" });
-  assert.equal(r.status, 303);
-  assert.equal(r.headers.get("location"), "/vaults/new");
-  assert.match(await page("/vaults/new"), /Choose one of the templates on the form\./);
+  assert.equal(r.status, 400, "the form again, with its reason");
+  assert.match(await r.text(), /Choose one of the templates on the form\./);
   assert.equal(await vaultsNamed(ANA, "Zz template bogus"), 0);
 });
 
