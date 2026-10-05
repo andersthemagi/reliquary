@@ -48,7 +48,7 @@ A rule's **⋯** menu also has **Owners**: the people who write that path direct
 
 ## Change the vault default
 
-The default for paths without a rule is on **Settings**: pick open or canon and save, then confirm.
+The default for paths without a rule is on **Settings**, **General**: pick open or canon and save, then confirm. On **Rules**, owners get a **Change the default on General** link under the title.
 
 ## Examples
 

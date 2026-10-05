@@ -161,7 +161,9 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       ${pageHeader({
         crumb: rulesCrumb(v),
         title: "Rules",
-        description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.`,
+        description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.${
+          owner ? html` <a href="${vaultPath(id, "/config")}">Change the default on General</a>` : ""
+        }`,
         primary: owner && !formFirst ? html`<a class="button primary" href="#add-rule">Add rule</a>` : "",
       })}
       ${formFirst ? addForm : ""}
