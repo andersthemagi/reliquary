@@ -165,6 +165,12 @@ test("flags page: a vault with nothing waiting says so", async () => {
   assert.match(h, /<strong>Nothing new<\/strong>/);
 });
 
+test("flags page: with nothing new it says so and points to Proposals for what is still waiting, not that nothing waits", async () => {
+  const h = await page(flagsUrl(V.empty));
+  assert.doesNotMatch(h, /Nothing is waiting on you/);
+  assert.match(h, new RegExp(`Nothing has changed since you last looked\\. Proposals still waiting on you are in <a href="/v/${V.empty}/proposals">Proposals</a>\\.`));
+});
+
 test("flags page: shows what waits on Fran, oldest first, none of it Fran's own actions", async () => {
   const h = await page(flagsUrl(V.main));
   const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
@@ -199,4 +205,18 @@ test("flags page: viewing it marks these shown; a second visit has nothing new u
   const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)];
   assert.equal(rows.length, 1);
   assert.match(rows[0][1], new RegExp(`<a href="/v/${V.main}/proposals/${P.own}">Commented on a proposal</a>`));
+});
+
+test("flags page: past 200 flags it says to reload for the next batch, and the reload shows it", async () => {
+  [{ id: V.many }] = await as(FRAN, "select public.create_vault('Flags many', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.many, GIL, FRAN]);
+  await as(FRAN, "select public.create_subscription($1, 'path', 'bulk/')", [V.many]);
+  await as(GIL, "select public.write_file($1, 'bulk/' || g || '.md', 'Text') from generate_series(1, 201) g", [V.many]);
+  const first = await page(flagsUrl(V.many));
+  assert.equal((first.match(/<tr class="ev">/g) ?? []).length, 200);
+  assert.match(first, /More than 200 flags were waiting; the oldest are shown first\. Reload for the next batch\./);
+  assert.doesNotMatch(first, /Check back/);
+  const second = await page(flagsUrl(V.many));
+  assert.equal((second.match(/<tr class="ev">/g) ?? []).length, 1);
+  assert.doesNotMatch(second, /More than 200 flags/);
 });

@@ -228,12 +228,12 @@ test("file: the meta says who wrote it last and when, relative, with the exact t
   assert.match(h, /<p class="meta file-meta">Last written by you · <time datetime="[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/p>/);
 });
 
-test("file: an owner's More menu on an open file has Delete file and Erase content, each with what it does, before the primary Edit", async () => {
+test("file: an owner's More menu on an open file has Delete file and Erase file, each with what it does, before the primary Edit", async () => {
   const h = await page(file(V.main, "notes/a.md"));
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>\s*<\/div>/.exec(h)[1];
   assert.match(actions, /<details class="menu-wrap action-menu file-more">\s*<summary class="button">More<\/summary>/);
   assert.match(actions, new RegExp(`<a class="menu-item danger" href="${re(file(V.main, "notes/a.md", "&amp;confirm=delete"))}"><span class="menu-item-title">Delete file…</span><span class="menu-item-meta">Removes the file; its history stays</span></a>`));
-  assert.match(actions, new RegExp(`<a class="menu-item danger" href="/v/${V.main}/erase\\?path=notes%2Fa\\.md"><span class="menu-item-title">Erase content…</span><span class="menu-item-meta">Blanks every version; for personal data</span></a>`));
+  assert.match(actions, new RegExp(`<a class="menu-item danger" href="/v/${V.main}/erase\\?path=notes%2Fa\\.md"><span class="menu-item-title">Erase file…</span><span class="menu-item-meta">Blanks every version, then removes the file; for personal data</span></a>`));
   assert.ok(actions.indexOf("file-more") < actions.indexOf(">Edit</a>"), "More before the primary action");
   assert.match(actions, /<a class="button primary" href="[^"]+">Edit<\/a>$/m);
 });
@@ -243,7 +243,7 @@ test("file: on a canon file the menu proposes deleting; an editor has no Erase; 
   assert.match(canon, new RegExp(`<a class="menu-item" href="${re(file(V.main, "canon/terms.md", "&amp;confirm=delete"))}"><span class="menu-item-title">Propose deleting…</span>`));
   const editor = await page(file(V.cal, "cal.md"));
   assert.match(editor, /Delete file…/);
-  assert.doesNotMatch(editor, /Erase content|\/erase\?/);
+  assert.doesNotMatch(editor, /Erase file|\/erase\?/);
   const viewer = await page(file(V.dora, "dora.md"));
   assert.doesNotMatch(viewer, /file-more|confirm=delete|\/erase\?/);
 });

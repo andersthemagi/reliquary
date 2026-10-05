@@ -4,7 +4,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { claimRulesSection, loadClaimRules } from "./claimrulespage.js";
+import { claimRulesSummary, loadClaimRules } from "./claimrulespage.js";
 import { confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge, time, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
@@ -133,7 +133,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
                     icon: "more",
                     items: [
                       { href: `${vaultPath(id, "/rules")}?change=${q(r.path)}#add-rule`, label: "Change", description: "Policy or approvals needed" },
-                      { href: ownersPath(id, r.path), label: "Owners", description: r.owners ? namedOwners(r.owners) : "Name people who write it directly" },
+                      { href: ownersPath(id, r.path), label: "Named owners", description: r.owners ? namedOwners(r.owners) : "Name people who write it directly" },
                       { href: `${vaultPath(id, "/rules")}?remove=${q(r.path)}`, label: "Remove", description: "Asks you to confirm first", danger: true },
                     ],
                   })}</td>`
@@ -169,7 +169,9 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       ${pageHeader({
         crumb: rulesCrumb(v),
         title: "Rules",
-        description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.`,
+        description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.${
+          owner ? html` <a href="${vaultPath(id, "/config")}">Change the default on General</a>` : ""
+        }`,
         primary: owner && !formFirst && list.length ? html`<a class="button primary" href="#add-rule">Add rule</a>` : "",
       })}
       ${formFirst ? addForm : ""}
@@ -177,7 +179,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       ${formFirst ? "" : addForm}
       ${checker}
       <p class="hint rules-help">Canon changes need approval from people; agents can only propose them.${owner ? "" : " Only owners change rules."} <a href="/docs/how-to/set-rules">How rules work</a></p>
-      ${claimRulesSection(ctx, id, owner, claimRules)}`;
+      ${claimRulesSummary(id, claimRules)}`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "rules" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -232,7 +234,7 @@ async function removePage(ctx: Ctx, id: string, path: string): Promise<Reply> {
         : []),
       // Named owners hang off the rule (path_owners cascades from path_policies).
       ...(rule.owners
-        ? [html`Its ${namedOwners(rule.owners)} ${rule.owners === 1 ? "is" : "are"} removed with it. Adding the rule again doesn’t bring them back: name them again from <strong>Owners</strong>.`]
+        ? [html`Its ${namedOwners(rule.owners)} ${rule.owners === 1 ? "is" : "are"} removed with it. Adding the rule again doesn’t bring them back: name them again from <strong>Named owners</strong>.`]
         : []),
       html`The removal is logged in Activity. You can add the rule again at any time.`,
     ];

@@ -23,7 +23,7 @@
 import { asPerson, pool } from "./db.js";
 import { refusalText } from "./errorpage.js";
 import { fail, Refusal } from "./failure.js";
-import { callout, csrfField, emptyState, esc, FEEDBACK_KINDS, FEEDBACK_MAX, html, pageHeader, raw, time } from "./html.js";
+import { callout, csrfField, emptyState, esc, FEEDBACK_KINDS, FEEDBACK_MAX, feedbackPath, html, pageHeader, raw, time } from "./html.js";
 import { ADDRESS, idempotencyKey, mailerOffReason, sendEmail, validFrom } from "./mailer.js";
 import { render, UUID, type Ctx, type Reply } from "./pages.js";
 import { safeNext } from "./signin.js";
@@ -65,7 +65,7 @@ type Sent = {
 function pageOf(v: string | null): string | null {
   const p = (v ?? "").trim();
   if (!p || safeNext(p) !== p) return null;
-  return p.slice(0, 500);
+  return feedbackPath(p);
 }
 
 export async function feedbackRoutes(ctx: Ctx): Promise<Reply> {

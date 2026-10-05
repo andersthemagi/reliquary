@@ -168,10 +168,16 @@ test("rules: the header has the crumb and Add rule; the rules table comes first,
   const h = await page(rulesOf(V.main));
   assert.match(h, new RegExp(`<nav class="crumb" aria-label="Breadcrumb"><ol><li><a href="/v/${V.main}">Rules main</a></li><li><a href="/v/${V.main}/config">Settings</a></li><li aria-current="page">Rules</li></ol></nav>`));
   assert.match(h, /<div class="page-actions"><a class="button primary" href="#add-rule">Add rule<\/a><\/div>/);
-  assert.match(h, /<p class="page-desc">Everything is <span class="badge policy open"[^>]*>Open<\/span> unless a rule says otherwise; the most specific rule wins\.<\/p>/);
+  assert.match(h, new RegExp(`<p class="page-desc">Everything is <span class="badge policy open"[^>]*>Open</span> unless a rule says otherwise; the most specific rule wins\\. <a href="/v/${V.main}/config">Change the default on General</a></p>`));
   assert.ok(at(h, '<div class="page-actions">') < at(h, '<table class="table-stack rules-table">'));
   assert.ok(at(h, '<table class="table-stack rules-table">') < at(h, 'id="add-rule"'));
   assert.ok(at(h, 'id="add-rule"') < at(h, "What applies to a path?"));
+});
+
+test("rules: the header's Change the default link is for owners; someone who isn't an owner isn't offered it", async () => {
+  const h = await page(rulesOf(V.kit));
+  assert.match(h, /<p class="page-desc">Everything is [\s\S]*the most specific rule wins\.<\/p>/);
+  assert.doesNotMatch(h, /Change the default on General/);
 });
 
 test("rules: every row labels its cells for phones", async () => {
@@ -228,6 +234,15 @@ test("rules: approvals outside 1 to 20 are refused in the form, with a ref in th
     assert.doesNotMatch(h, /page-actions/, "no Add rule while the form is first");
   }
   assert.equal(await ruleRow(V.main, "q/"), undefined);
+});
+
+test("rules: the page that answers a refused save keeps the top bar's vault switcher and inbox", async () => {
+  const token = csrfOf(await page(rulesOf(V.main)));
+  const r = await post(rulesOf(V.main), { csrf: token, path: "q/", policy: "canon", quorum: "21" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<details class="menu-wrap vault-switch">/);
+  assert.match(h, /<details class="menu-wrap inbox">/);
 });
 
 test("rules: an open rule needs no approvals, so the number is not checked", async () => {

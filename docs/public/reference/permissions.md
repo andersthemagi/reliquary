@@ -38,7 +38,7 @@ What people and their agents can each do, where, and who may: every rule here is
 |---|---|---|---|
 | Set or remove a rule | **Settings**, **Rules** | none | person, owners |
 | Set, change or remove a [claim rule](../concepts/claims.md#claim-rules) | **Rules**, **Claim rules** | none | person, owners |
-| Name or remove a path's [owners](../concepts/path-ownership.md) | **Rules**, a rule's **⋯**, **Owners** | none | person, owners |
+| Name or remove a path's [owners](../concepts/path-ownership.md) | **Rules**, a rule's **⋯**, **Named owners** | none | person, owners |
 | Watch or unwatch a folder or file for [flags](../concepts/flags.md) | its page's **Watch**; **Settings**, **Watching** | none (`list_subscriptions` lists them) | person, any member, their own only |
 | Rename a vault or change its default policy | **Settings**, **General** | none | person, owners |
 | See members (by email) | **Settings**, **Members** | none | person, any member |
@@ -50,7 +50,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | Set your display name | **Account settings** | none | person, for themself only |
 | Change your email address, sign out everywhere or delete your account | **Account settings** | none | person, for themself only |
 | Allow an OAuth client or the CLI | the consent page | none | person |
-| Erase a file | the file's **More**, **Erase content** | none | person, owners |
+| Erase a file | the file's **More**, **Erase file** | none | person, owners |
 | Export a vault | **Settings**, **Export** | none | person, owners |
 | Delete a vault | **Settings**, **Danger zone** | none | person, owners |
 

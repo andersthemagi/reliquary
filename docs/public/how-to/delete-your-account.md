@@ -6,7 +6,7 @@ Deleting your account is immediate and can't be undone. You leave every vault, y
 
 - **Vaults you own alone.** A vault always keeps an owner, so you can't delete your account while you're the only owner of a vault. For each one, either make someone else an owner (the vault's **Settings**, **Members**) or delete the vault (**Settings**, **Danger zone**). The delete page lists these vaults with a link to each.
 - **A copy.** To keep a vault's files, export it first: **Settings**, **Export**. See [Export, delete and erase](../concepts/export-delete-erase.md).
-- **What you wrote.** Files, proposals, comments and the activity log belong to each vault and its owners, so they stay. To remove something you wrote, erase it (owners only, **More**, **Erase content**) or ask an owner to, before you delete your account.
+- **What you wrote.** Files, proposals, comments and the activity log belong to each vault and its owners, so they stay. To remove something you wrote, erase it (owners only, **More**, **Erase file**) or ask an owner to, before you delete your account.
 
 ## Delete it
 
