@@ -1,5 +1,5 @@
 // The Values tab of the Variables page (docs/variables.md, "Web: the
-// Variables page"): the grid of names by environment, and set/rotate,
+// Variables page"): the grid of names by environment, and set/change,
 // delete and reveal for people whose role allows it. Every call goes
 // through src/variables.ts as the signed-in person, and the database
 // decides: this file only chooses what to offer. Split out of
@@ -71,7 +71,7 @@ const label = (e: Environment) => (e.ownersOnly ? `${e.name} (owners only)` : e.
 // One cell: "Set 6 min ago" ("by you" is read out, and shown on a phone;
 // who, the exact time and the version are in its title and at the top of
 // its menu), a "Read since set" mark when someone has, and one ⋯ menu with
-// Reveal, Rotate and Delete; or "Not set" with a Set link.
+// Reveal, Change value and Delete; or "Not set" with a Set link.
 function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByCell: Readers | null, keyed: boolean): Raw {
   const value = variable.values.find((x) => x.environment === e.name);
   const may = keyed && writes(v.role, e);
@@ -86,7 +86,7 @@ function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByC
   const seen = readers.who.join("; ");
   const items: MenuItem[] = [
     { action: base(v.id, "/reveal"), csrf: ctx.csrf, fields: { name: variable.name, environment: e.name }, label: "Reveal", description: "Show it once; the reveal is logged" },
-    { href: `${base(v.id, "/set")}${slotQuery(variable.name, e.name)}`, label: "Rotate", description: "Replace it with a new value" },
+    { href: `${base(v.id, "/set")}${slotQuery(variable.name, e.name)}`, label: "Change value", description: "Replace it with a new value" },
     ...(readers.read ? [{ href: "/connections", label: "Manage connections", description: "Revoke the Reliquary CLI that read it" }] : []),
     { href: `${base(v.id, "/delete")}${slotQuery(variable.name, e.name)}`, label: "Delete", description: `Remove it from ${e.name}`, danger: true },
   ];
@@ -130,7 +130,7 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
     ${v.role === "viewer"
       ? html`<p class="muted small">As a viewer you see names only. Owners and editors set and use values.</p>`
       : v.role === "editor" && ownersOnly.length
-        ? html`<p class="muted small">Only owners set, rotate, delete or reveal values in ${ownersOnly.join(", ")}.</p>`
+        ? html`<p class="muted small">Only owners set, change, delete or reveal values in ${ownersOnly.join(", ")}.</p>`
         : ""}
     ${variables.length
       ? html`<div class="var-values"><div class="var-grid-wrap"><table class="var-grid">
@@ -157,7 +157,7 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
 }
 
 // ---------------------------------------------------------------------------
-// Set or rotate
+// Set or change
 
 type SetForm = { name?: string; environment?: string; environments?: string[]; error?: string };
 
@@ -165,7 +165,7 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
   const { environments, variables } = await listVariables(ctx.userId, v.id);
   const allowed = environments.filter((e) => writes(v.role, e));
   const exists = !!f.name && !!f.environment && variables.some((x) => x.name === f.name && x.values.some((y) => y.environment === f.environment));
-  const title = exists ? `Rotate ${f.name}` : "Add a variable";
+  const title = exists ? `Change ${f.name} in ${f.environment}` : "Add a variable";
   const crumb = crumbs(v, { label: title });
   const keyed = variablesConfigured();
   const lockedEnv = exists && !allowed.some((e) => e.name === f.environment);
@@ -232,7 +232,7 @@ export async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
   const environments = [...new Set(ctx.form.getAll("environment"))].filter((e) => ENV.test(e));
   const value = ctx.form.get("value") ?? "";
   // The form again, with name and environments kept and the value dropped.
-  // One environment alone still reads as a rotate when the name has a value there.
+  // One environment alone still reads as a change when the name has a value there.
   const again = (error: string, status = 400) =>
     setForm(ctx, v, { name, environment: environments.length === 1 ? environments[0] : undefined, environments, error }, status);
   if (!environments.length) return again("Tick at least one environment.");
@@ -241,7 +241,7 @@ export async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
     const actions = await setVariableIn(ctx.userId, v.id, name, environments, value);
     const where = (what: "set" | "rotate") => environments.filter((_, i) => actions[i] === what).join(", ");
     ctx.setFlash(
-      [where("set") && `Set ${name} in ${where("set")}.`, where("rotate") && `Rotated ${name} in ${where("rotate")}.`].filter(Boolean).join(" "),
+      [where("set") && `Set ${name} in ${where("set")}.`, where("rotate") && `Changed ${name} in ${where("rotate")}.`].filter(Boolean).join(" "),
       "success",
     );
     return { redirect: base(v.id) };
