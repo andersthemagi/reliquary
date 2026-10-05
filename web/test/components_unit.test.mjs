@@ -220,11 +220,23 @@ test("menu: no script and no role=menu; keyboard use is the summary (Enter, Spac
 });
 
 test("menu: a ⋯ button has its label as its accessible name; ghost and left-aligned variants", () => {
-  const out = h.menu({ label: "Actions for DATABASE_URL", icon: "more", align: "left", className: "var-menu", items: [{ href: "/r", label: "Reveal" }] }).html;
+  const out = h.menu({ label: "Actions for DATABASE_URL", icon: "more", align: "left", items: [{ href: "/r", label: "Reveal" }] }).html;
   assert.match(out, /<details class="menu-wrap action-menu var-menu">/);
   assert.match(out, /<summary class="button quiet icon-button" aria-label="Actions for DATABASE_URL" title="Actions for DATABASE_URL"><svg class="icon"[^>]*aria-hidden="true"/);
   assert.match(out, /<div class="menu action-list menu-left">/);
   assert.match(h.menu({ label: "Snooze", ghost: true, items: [] }).html, /<summary class="button quiet">Snooze<\/summary>/);
+});
+
+test("menu: a ⋯ menu opens from its button, not its table cell, so a table or scrolling box never clips it", () => {
+  assert.match(h.menu({ label: "Actions for the rule on canon/", icon: "more", items: [] }).html, /^<details class="menu-wrap action-menu var-menu">/);
+  assert.doesNotMatch(h.menu({ label: "More", items: [] }).html, /var-menu/);
+  assert.match(CSS, /\.var-menu\.menu-wrap \{ position: static;/);
+  assert.match(CSS, /\.var-menu > \.menu \{[^}]*transform: translateX\(calc\(-100% \+ 32px\)\)/);
+});
+
+test("stylesheet: a list box doesn't clip a row's open menu (the inbox's Snooze), though it clips rows to its corners otherwise", () => {
+  assert.match(CSS, /\.rows \{[^}]*overflow: hidden;/);
+  assert.match(CSS, /\.rows:has\(\.menu-wrap\[open\]\) \{ overflow: visible; \}/);
 });
 
 // ---------------------------------------------------------------------------
@@ -288,6 +300,16 @@ test("stylesheet: stacked tables on phones label each cell from data-label", () 
   assert.match(phone, /@media \(max-width: 640px\) \{/);
   assert.match(phone, /\.table-stack td::before, \.table-stack tbody th::before \{ content: attr\(data-label\);/);
   assert.match(phone, /table\.table-stack \{ min-width: 0; \}/);
+});
+
+test("stylesheet: a form panel right under a table has space above it", () => {
+  assert.match(CSS, /\.table-wrap \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
+});
+
+test("stylesheet: number fields look like the other fields: border, height, hover and focus", () => {
+  assert.match(CSS, /input\[type="date"\], input\[type="number"\], textarea, select \{\s*width: 100%;/);
+  assert.match(CSS, /input\[type="number"\]:hover/);
+  assert.match(CSS, /input\[type="number"\]:focus-visible/);
 });
 
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {

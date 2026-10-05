@@ -261,7 +261,7 @@ async function invitePage(ctx: Ctx, id: string, d: InviteDraft = {}): Promise<Re
           <input id="ie" type="text" name="email" value="${d.email ?? ""}" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="254" aria-describedby="ie-hint">
           <p class="hint" id="ie-hint">One person, at this address (a new account is made if they have none). Leave it blank to make a link anyone can open instead.</p>
           <label for="iu">Uses (a link with no address only)</label>
-          <input id="iu" type="number" name="max_uses" value="${d.maxUses ?? "1"}" min="1" max="${MAX_USES_CAP}" inputmode="numeric" aria-describedby="iu-hint">
+          <input id="iu" class="narrow" type="number" name="max_uses" value="${d.maxUses ?? "1"}" min="1" max="${MAX_USES_CAP}" inputmode="numeric" aria-describedby="iu-hint">
           <p class="hint" id="iu-hint">How many different people may join with it. Ignored, and always 1, for an invite to one address.</p>
           <fieldset>
             <legend>Role</legend>

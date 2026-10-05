@@ -4,7 +4,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { claimRulesSection, loadClaimRules } from "./claimrulespage.js";
+import { claimRulesSummary, loadClaimRules } from "./claimrulespage.js";
 import { confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge, time, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
@@ -171,7 +171,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       ${formFirst ? "" : addForm}
       ${checker}
       <p class="hint rules-help">Canon changes need approval from people; agents can only propose them.${owner ? "" : " Only owners change rules."} <a href="/docs/how-to/set-rules">How rules work</a></p>
-      ${claimRulesSection(ctx, id, owner, claimRules)}`;
+      ${claimRulesSummary(id, claimRules)}`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "rules" }, body) };
   });
   if (!data) return notFound(ctx);

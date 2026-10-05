@@ -227,6 +227,15 @@ test("rules: approvals outside 1 to 20 are refused in the form, with a ref in th
   assert.equal(await ruleRow(V.main, "q/"), undefined);
 });
 
+test("rules: the page that answers a refused save keeps the top bar's vault switcher and inbox", async () => {
+  const token = csrfOf(await page(rulesOf(V.main)));
+  const r = await post(rulesOf(V.main), { csrf: token, path: "q/", policy: "canon", quorum: "21" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<details class="menu-wrap vault-switch">/);
+  assert.match(h, /<details class="menu-wrap inbox">/);
+});
+
 test("rules: an open rule needs no approvals, so the number is not checked", async () => {
   const token = csrfOf(await page(rulesOf(V.main)));
   const h = await landed(await post(rulesOf(V.main), { csrf: token, path: "scratch/", policy: "open", quorum: "99" }));
