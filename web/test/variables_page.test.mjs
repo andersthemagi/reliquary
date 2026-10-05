@@ -278,7 +278,7 @@ test("variables page: setting a value redirects with a flash naming it and its e
   assert.equal((await vars.revealVariable(PIA, V.own, "NEW_KEY", "preview")).value, v);
   // Again: a rotation.
   const w = value("new-rotated");
-  const r2 = await post(vp(V.own, "/set"), { name: "NEW_KEY", environment: "preview", value: w });
+  const r2 = await post(vp(V.own, "/set"), { name: "NEW_KEY", environment: "preview", replace: "preview", value: w });
   assert.equal(r2.headers.get("location"), vp(V.own));
   assert.match(await page(vp(V.own)), /Rotated NEW_KEY in preview\./);
   assert.equal((await vars.revealVariable(PIA, V.own, "NEW_KEY", "preview")).value, w);
@@ -438,7 +438,7 @@ test("variables log: next to a value, who read or revealed it since it was set, 
   assert.match(dev, /Since then: .*read by you \(CLI\).*revealed by you|Since then: .*revealed by you.*read by you \(CLI\)/);
   assert.match(dev, /href="\/connections"><span class="menu-item-title">Manage connections<\/span>/);
   // Setting it again starts over.
-  await post(vp(V.own, "/set"), { name: "API_KEY", environment: "development", value: value("own-dev-2") });
+  await post(vp(V.own, "/set"), { name: "API_KEY", environment: "development", replace: "development", value: value("own-dev-2") });
   const after = /<td data-label="development">[\s\S]*?<\/td>/.exec((await page(vp(V.own))).split("<code>API_KEY</code>")[1])[0];
   assert.doesNotMatch(after, /Since then/);
   assert.match(after, /title="Set by you, [^"]+ \(version 2\)"/);
@@ -594,7 +594,7 @@ test("variables add: ticking several environments sets the one value in each, an
   assert.match(await page(vp(V.own)), /<p class="callout success flash" role="status">Set MANY_KEY in development, preview\.<\/p>/);
   for (const env of ["development", "preview"]) assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", env)).value, first);
   const second = value("many-again");
-  await post(vp(V.own, "/set"), { name: "MANY_KEY", environment: ["development", "production"], value: second });
+  await post(vp(V.own, "/set"), { name: "MANY_KEY", environment: ["development", "production"], replace: "development", value: second });
   assert.match(await page(vp(V.own)), /Set MANY_KEY in production\. Rotated MANY_KEY in development\./);
   assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "development")).value, second);
   assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "production")).value, second);
@@ -621,6 +621,46 @@ test("variables add: a refused set keeps the ticks, and no tick at all is told t
   assert.match(h, /value="development" checked> development/);
   assert.match(h, /value="preview" checked> preview/);
   assert.doesNotMatch(h, /value="production" checked/);
+});
+
+test("variables add: a name that already has a value in a ticked environment asks before replacing it, and sets nothing", async () => {
+  const old = value("ask-old");
+  await vars.setVariable(PIA, V.own, "ASK_KEY", "development", old);
+  const r = await post(vp(V.own, "/set"), { name: "ASK_KEY", environment: ["development", "preview"], value: value("ask-new") });
+  assert.equal(r.status, 409);
+  const h = await r.text();
+  assert.match(h, /<code>ASK_KEY<\/code> already has a value in development\./);
+  assert.match(h, /<input type="checkbox" name="replace" value="development"> Replace the existing value in development/);
+  assert.doesNotMatch(h, /name="replace" value="preview"/);
+  assert.match(h, /name="name" value="ASK_KEY"/);
+  assert.match(h, /value="development" checked> development/);
+  assert.match(h, /value="preview" checked> preview/);
+  noValues(h);
+  assert.equal((await vars.revealVariable(PIA, V.own, "ASK_KEY", "development")).value, old);
+  assert.equal((await vars.revealVariable(PIA, V.own, "ASK_KEY", "preview")).error, "not_found", "the environment with no value wasn't set either");
+});
+
+test("variables add: ticking replace for each existing value saves, and one left unticked keeps its value", async () => {
+  const old = value("ask2-old");
+  await vars.setVariable(PIA, V.own, "ASK2_KEY", "development", old);
+  await vars.setVariable(PIA, V.own, "ASK2_KEY", "preview", old);
+  const next = value("ask2-new");
+  const r = await post(vp(V.own, "/set"), { name: "ASK2_KEY", environment: ["development", "production"], replace: ["development", "preview"], value: next });
+  assert.equal(r.status, 303);
+  assert.match(await page(vp(V.own)), /Set ASK2_KEY in production\. Rotated ASK2_KEY in development\./);
+  for (const env of ["development", "production"]) assert.equal((await vars.revealVariable(PIA, V.own, "ASK2_KEY", env)).value, next);
+  assert.equal((await vars.revealVariable(PIA, V.own, "ASK2_KEY", "preview")).value, old, "ticking replace for an environment that isn't ticked changes nothing");
+});
+
+test("variables add: the form opened for an existing value carries its own confirmation, so saving it doesn't ask again", async () => {
+  await vars.setVariable(PIA, V.own, "ASK3_KEY", "development", value("ask3-old"));
+  const form = await page(vp(V.own, "/set?name=ASK3_KEY&environment=development"));
+  const fixed = Object.fromEntries([...form.matchAll(/<input type="hidden" name="(\w+)" value="([^"]*)">/g)].map((m) => [m[1], m[2]]).filter(([k]) => k !== "csrf"));
+  const next = value("ask3-new");
+  const r = await post(vp(V.own, "/set"), { ...fixed, value: next });
+  assert.equal(r.status, 303);
+  assert.match(await page(vp(V.own)), /Rotated ASK3_KEY in development\./);
+  assert.equal((await vars.revealVariable(PIA, V.own, "ASK3_KEY", "development")).value, next);
 });
 
 test("variables add: a multi-line value is stored with LF line endings, though a browser sends CRLF", async () => {

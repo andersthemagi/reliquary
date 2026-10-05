@@ -44,6 +44,7 @@ On the vault's **Variables** page, **Add a variable**: a name, the environments 
 
 - Names are shell-style: a letter or `_`, then letters, digits or `_`, up to 128 characters. Names that change how programs start, like `PATH`, `NODE_OPTIONS`, anything starting `LD_` or `NPM_CONFIG_`, Windows' `COMSPEC` and `PATHEXT`, or trust settings like `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE`, are refused. A variable that already has such a name stays readable but can't be set again.
 - A value is text up to 64 KiB, without NUL characters. A vault holds at most 1000 variables.
+- If the name already has a value in a ticked environment, **Add a variable** doesn't save yet: it lists those environments and offers a **Replace the existing value in** box for each. Tick them, enter the value again and save; untick an environment to keep its value. The form opened from a value's **⋯** menu says it replaces that value, so it saves at once.
 - A multi-line value, such as a PEM key, is stored with `\n` line breaks, even though browsers send `\r\n` from a text box.
 
 ## The access log
