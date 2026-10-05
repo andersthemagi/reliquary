@@ -28,6 +28,7 @@ import { claimBanner } from "./claimbanner.js";
 import { siteHref } from "./hosts.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage } from "./errorpage.js";
+import { loadShell } from "./inbox.js";
 import { failure } from "./failure.js";
 import { watchControl, watchState } from "./watching.js";
 import {
@@ -53,6 +54,11 @@ type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: stri
 export type Section = "files" | "proposals" | "threads" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
+  // A GET has the top bar's summary already. A POST that answers with a page
+  // (a refused save is the form again) doesn't, and without it the bar loses
+  // its vault switcher and inbox count; one that redirects never gets here,
+  // so it still pays nothing for it.
+  ctx.shell ??= await loadShell(c);
   // One round trip: the live files, every folder above them, each one's
   // rule in one set-based call (one membership check, not rule_for() per
   // row), and the open proposals' count.
