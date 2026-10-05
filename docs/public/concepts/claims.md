@@ -34,7 +34,7 @@ Only an owner sets a claim rule, in person, on the vault's **Rules** page. Setti
 
 ## Seeing and breaking claims (people)
 
-In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. A path is a link to its file; a claim can name a file nobody has written yet, and that one is plain text marked "no file there yet". An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
+In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. A path is a link to its file; a claim can name a file nobody has written yet, and that one is plain text marked "no file there yet". A claim an agent took says which one, like "you via Hermes". An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
 
 You see a claim where you meet the file. When someone holds a claim on a file, the file page and the editor open with a banner: whose it is (a person, or "Name's agent" when an agent took it), how much longer it lasts, and the note they left. The note is only what someone typed. It's shown in quotes and never proves who holds the claim. A claim covers one path, so the banner appears on that file and nowhere else, and not at all once the claim has run out or been released. Viewers see it too.
 
