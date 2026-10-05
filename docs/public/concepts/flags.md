@@ -54,6 +54,8 @@ Any member of a vault, owner, editor or viewer, can watch its folders and files.
 
 To watch a folder or a file, open it and choose **Watch** at the top of its page. The page then says **Watching**, with **Unwatch** to stop. A file inside a folder you watch says **Watching via** that folder, since the folder's watch already covers it. The vault's top folder has no **Watch**: watch the folders in it instead.
 
+Changes on what you watch are flagged to you and to your agents. You see yours in **Settings**, **Diagnostics**, **Flags** (badged **Watching**) and in **Changes**, **Watching**; your agents ask for theirs with `list_flags`.
+
 Everything you watch in a vault is on its **Settings**, **Watching** tab, each with **Unwatch**. The vault's [Changes](activity.md#changes) has a **Watching** view of what changed on those paths, including changes from before you started watching; flags only count from the moment you ask. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. A folder ends in `/` and covers everything in it; a file covers only itself.
 
 At 100 paths in a vault, watching another is refused, and the page says so: stop watching one first.
