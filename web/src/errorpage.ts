@@ -33,7 +33,7 @@ const short = (id: string) => (UUID.test(id) ? id.slice(0, 8) : "?");
 // never logged, and only when it is plain: at most 200 characters, no
 // control characters, no "." or ".." segment. Anything else isn't echoed
 // (web/test/hardening.test.mjs), and the description says "a file".
-const typed = (s: string | null | undefined) => {
+export const typed = (s: string | null | undefined) => {
   const t = (s ?? "").trim();
   if (!t || t.length > 200 || /[\u0000-\u001f\u007f-\u009f]/.test(t) || /(^|\/)\.\.?(\/|$)/.test(t)) return "";
   return t;

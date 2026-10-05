@@ -233,11 +233,23 @@ test("limits: a save that fits is counted; one past the storage limit is refused
   assert.equal((await post("pia", `/v/${V.one}/file`, { action: "create", path: "notes/a.md", content: "a".repeat(300) })).status, 303);
   assert.equal(await bytes(V.one), 300);
   const r = await post("pia", `/v/${V.one}/file`, { action: "create", path: "notes/b.md", content: "b".repeat(200) });
-  assert.match(await flashAfter("pia", r),
+  assert.equal(r.status, 400);
+  assert.match(unescape(/<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(await r.text())?.[1] ?? ""),
     /^Plans One has 300 bytes of its 400 bytes storage limit on the Web small plan, and this needs 200 bytes more\. Erase files you no longer need \(deleting a file keeps its history\) or delete variables, then try again\. \(ref [0-9a-f]{8}\)$/);
   const [{ n }] = await sql("select count(*)::int as n from public.files where vault_id = $1 and path = 'notes/b.md'", [V.one]);
   assert.equal(n, 0);
   assert.match(await page("pia", `/v/${V.one}/config/usage`), /<th scope="row">Storage<\/th><td>300 bytes of 400 bytes \(75%\)<meter /);
+});
+
+test("limits: a save past the storage limit answers the editor again, with the text as typed and the version it loaded", async () => {
+  const h0 = await page("pia", `/v/${V.one}/edit?path=notes%2Fa.md`);
+  const version = /name="expected_version" value="([0-9a-f-]{36})"/.exec(h0)[1];
+  const r = await post("pia", `/v/${V.one}/file`, { action: "write", path: "notes/a.md", content: "c".repeat(450), expected_version: version });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.ok(h.includes(`<input type="hidden" name="expected_version" value="${version}">`), "the version it loaded, so a save from it is still checked");
+  assert.ok(h.includes(`>${"c".repeat(450)}</textarea>`), "the text as typed");
+  assert.equal(await bytes(V.one), 300);
 });
 
 test("limits: setting a variable past the storage limit is refused on the form with the reason, and nothing is set", async () => {

@@ -228,8 +228,8 @@ test("errors: the lines to copy are folded away under Details to send if you rep
 
 test("errors: a unique violation's row values never reach the page or the log", async () => {
   const r = await write("errors-test/unique.md");
-  assert.equal(r.status, 303);
-  const flash = flashOf(await (await get(r.headers.get("location"))).text());
+  assert.equal(r.status, 400);
+  const flash = /<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(await r.text())?.[1] ?? "";
   assert.match(flash, /^23505 unique violation: duplicate key value violates unique constraint &quot;uniq_v_key&quot;\. \(ref [0-9a-f]{8}\)$/);
   const ref = REF.exec(flash)[1];
   refs.push(ref);
