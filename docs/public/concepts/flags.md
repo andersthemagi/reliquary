@@ -44,7 +44,7 @@ It only reaches an agent that is making calls in that vault. An agent that is id
 
 ## Seeing your flags
 
-In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
+In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from threads, events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its thread, proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
 
 Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
 
