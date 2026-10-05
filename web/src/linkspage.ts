@@ -1,7 +1,7 @@
 // A vault's Links page (docs/design.md, "Links"): a credential to an
 // upstream MCP server, named and reachable by an agent as `<link>.<tool>`
-// once the MCP proxy exists (mcp/, not built yet -- see the note this page
-// shows on an empty vault). Add, edit and delete are owners' only, in
+// through the MCP proxy (mcp/, linkcall.ts) for any tool an owner has
+// granted. Add, edit and delete are owners' only, in
 // person; the database enforces this (20260928120000_links.sql) and this
 // page only chooses what to offer. Credentials are sealed here with the
 // same VARIABLES_KEYS as environment variables (secrets.ts, sealLink/
@@ -53,7 +53,10 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
     if (!v) return null;
     const list = await loadLinks(c, id);
     const owner = v.role === "owner";
-    const editing = edit !== null ? list.find((l) => l.id === edit) : undefined;
+    // A refused save of an edit comes back as an edit: the form's own id
+    // wins over the query, which a POST doesn't carry.
+    const editingId = form?.id ?? edit;
+    const editing = editingId ? list.find((l) => l.id === editingId) : undefined;
     const values: LinkForm | undefined = form ?? (editing ? { id: editing.id, name: editing.name, url: editing.url } : undefined);
     const described = (f: LinkForm["field"], hint: string) =>
       form?.error && form.field === f ? html` aria-invalid="true" aria-describedby="link-error ${hint}"` : html` aria-describedby="${hint}"`;
@@ -71,15 +74,15 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
             : ""}
           <div class="fields">
             <div><label for="ln">Name</label><input id="ln" type="text" name="name" placeholder="linear" required maxlength="64" pattern="[A-Za-z_][A-Za-z0-9_]*" value="${values?.name ?? ""}"${described("name", "ln-hint")}></div>
-            <div><label for="lu">URL</label><input id="lu" type="text" name="url" placeholder="https://api.linear.app" required maxlength="2048" value="${values?.url ?? ""}"${described("url", "lu-hint")}></div>
+            <div><label for="lu">URL</label><input id="lu" type="text" name="url" placeholder="https://mcp.example.com/mcp" required maxlength="2048" value="${values?.url ?? ""}"${described("url", "lu-hint")}></div>
             ${editing
               ? ""
               : html`<div><label for="lc">Credential</label><input id="lc" type="password" name="credential" autocomplete="new-password" required maxlength="65536"${described("credential", "lc-hint")}></div>`}
           </div>
-          <p class="hint" id="ln-hint">Letters, digits and underscores, not starting with a digit: an agent calls this link’s tools as <code>&lt;name&gt;.&lt;tool&gt;</code> once that’s built.</p>
+          <p class="hint" id="ln-hint">Letters, digits and underscores, not starting with a digit: an agent calls this link’s granted tools as <code>&lt;name&gt;.&lt;tool&gt;</code>.</p>
           <p class="hint" id="lu-hint">The upstream MCP server’s URL. Must be https.</p>
           ${editing
-            ? ""
+            ? html`<p class="hint" id="lc-hint">The credential isn’t shown or changed here. To replace it, delete this link and add it again; its grants are deleted too. Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered.</p>`
             : html`<p class="hint" id="lc-hint">An API key or token for the upstream server. Stored encrypted, the same way environment variable values are; never shown again once saved.</p>`}
           <div class="actions"><button class="primary"${!editing && !configured ? " disabled" : ""}>${editing ? "Save changes" : "Add link"}</button>${editing ? html`<a class="button quiet" href="${vaultPath(id, "/links")}">Cancel</a>` : ""}</div>
         </form>`
@@ -91,8 +94,8 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
           <tbody>${list.map(
             (l) => html`<tr>
               <td data-label="Name"><code>${l.name}</code></td>
-              <td data-label="URL" class="small">${l.url}</td>
-              <td data-label="Added by" class="small muted">${who(ctx, l.created_by, null)} · ${time(l.created_at)}</td>
+              <td data-label="URL" class="small link-url">${l.url}</td>
+              <td data-label="Added by" class="small muted"><div>${who(ctx, l.created_by, null)} · ${time(l.created_at)}</div></td>
               ${owner
                 ? html`<td class="num rule-actions">${menu({
                     label: `Actions for ${l.name}`,
@@ -111,21 +114,22 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
           body: owner
             ? "A link holds a shared credential to an upstream MCP server, like Linear or Stripe, so a member’s agent can use it without ever seeing the key."
             : "Only owners add links. Ask an owner of this vault.",
-          ...(owner ? { action: html`<a class="button" href="#add-link">Add link</a>` } : {}),
         });
 
+    // With no links the form is already under the empty box, so a button
+    // that only scrolls to it is left out of the header.
     const formFirst = !!(form?.error || editing);
     const body = html`
       ${pageHeader({
         crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Links" }],
         title: "Links",
         description: "A vault’s credentials to upstream MCP servers, shared by everyone with access, seen by no one.",
-        primary: owner && !formFirst ? html`<a class="button primary" href="#add-link">Add link</a>` : "",
+        primary: owner && !formFirst && list.length ? html`<a class="button primary" href="#add-link">Add link</a>` : "",
       })}
       ${formFirst ? addForm : ""}
       ${table}
       ${formFirst ? "" : addForm}
-      <p class="hint">An agent can already list a vault’s links over MCP, and adding one discovers its tools. An owner grants a tool per role from its Grants page; calling one isn’t built yet. <a href="/docs/concepts/links">How links work</a></p>`;
+      <p class="hint">Adding a link discovers its tools. An owner grants a tool per role from its Grants page, and an agent with a granted role can then call it over MCP as <code>&lt;link&gt;.&lt;tool&gt;</code>. An agent can list a vault’s links, never their credentials, with <code>list_links</code>. <a href="/docs/concepts/links">How links work</a></p>`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "links" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -181,18 +185,20 @@ export async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
     }
   } catch (err) {
     if (err instanceof SecretsError) return again(refuse(err.message), "credential");
+    const code = (err as { code?: string }).code;
+    // (vault_id, name) is the only unique key either function can break;
+    // Postgres's own words for it are the constraint's, not a person's.
+    if (code === "23505") return again(refuse(`There is already a link named ${name} in this vault. Pick another name. Nothing was saved`), "name");
     const text = message(err);
-    if ((err as { code?: string }).code === "22023") return again(text, "name");
+    if (code === "22023") return again(text, "name");
     ctx.setFlash(text);
   }
   return { redirect: vaultPath(id, "/links") };
 }
 
 // The confirm step before a link is deleted: an agent that could call its
-// tools loses that ability at once (moot today: nothing calls a link's
-// tools yet, but this page is written for when that changes, not just for
-// today). Owners only; anyone else, or a link that doesn't exist, is sent
-// back with a note.
+// tools loses that ability at once. Owners only; anyone else, or a link
+// that doesn't exist, is sent back with a note.
 async function deletePage(ctx: Ctx, id: string, linkId: string): Promise<Reply> {
   const data = await asPerson(ctx.userId, async (c): Promise<{ gone: string } | { shell: Raw } | null> => {
     const v = await vault(c, ctx, id);

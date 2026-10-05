@@ -490,19 +490,23 @@ form.panel {
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: var(--space-5) var(--space-6) var(--space-6); margin: 0 0 var(--space-6); max-width: 80ch;
 }
+/* A form straight under a table (Rules, Links) is a separate thing, not the table's last row. */
+.table-wrap + form.panel { margin-top: var(--space-6); }
 label { display: block; font-weight: 600; font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-5) 0 6px; }
 form.panel > label:first-of-type, form > label:first-child { margin-top: 0; }
 .hint { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-2) 0 0; font-weight: 400; }
-input[type="text"], input[type="search"], input[type="date"], textarea, select {
+input[type="text"], input[type="search"], input[type="date"], input[type="number"], textarea, select {
   width: 100%; min-height: var(--control-md);
   font: 400 var(--text-md)/1.4 var(--font-sans); color: var(--fg);
   background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
   padding: 6px 12px; transition: border-color 120ms ease-out;
 }
 input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: 1; }
-input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
-input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible,
+input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, input[type="number"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
+input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible, input[type="number"]:focus-visible,
 textarea:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
+/* A locked field (the Rules form's path while changing a rule) must not look editable. */
+input[readonly] { background: var(--bg-subtle); }
 textarea { min-height: 280px; resize: vertical; line-height: 1.6; padding: 10px 12px; }
 textarea.short { min-height: 96px; }
 textarea.note-field { min-height: 0; }
@@ -590,6 +594,9 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5);
   padding: var(--space-4) var(--space-5); min-height: 56px; border-top: 1px solid var(--border);
 }
+/* The box clips its rows to its rounded corners; while a row's menu is open
+   it must not, or the menu is cut to a sliver under the last row. */
+.rows:has(.menu-wrap[open]) { overflow: visible; }
 .rows li:first-child { border-top: 0; }
 .rows li:hover { background: var(--bg-subtle); }
 .rows .name { font-weight: 500; color: var(--fg); text-decoration: none; overflow-wrap: anywhere; }
@@ -636,6 +643,7 @@ a.dir { font-weight: 600; }
 .empty strong { display: block; color: var(--fg); font-size: var(--text-md); margin-bottom: var(--space-2); }
 .empty p { max-width: var(--measure); margin: 0 auto var(--space-4); }
 .empty p:last-child { margin-bottom: 0; }
+.empty + form.panel { margin-top: var(--space-6); }
 
 /* Tabs ----------------------------------------------------------------------- */
 
@@ -1608,6 +1616,10 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
 .rules-table .rule-owners { display: inline-block; margin-top: var(--space-1); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .owner-form, .watch-add { scroll-margin-top: var(--space-10); }
 .rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }
+/* Links reuses this table, but its second column is a URL of up to 2048
+   characters: it must wrap, or the table scrolls sideways and pushes the
+   actions out of sight. Same specificity as the rule above, so it follows it. */
+.rules-table td.link-url { width: auto; white-space: normal; overflow-wrap: anywhere; }
 .rules-table .rule-actions .action-list { min-width: 240px; }
 .rule-form { scroll-margin-top: var(--space-10); }
 .rule-form .hint + .hint { margin-top: var(--space-1); }
@@ -1616,7 +1628,20 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
 @media (max-width: 640px) {
   .rules-table td:nth-child(2), .rules-table .rule-actions { width: auto; }
   .rules-table .rule-actions { text-align: left; }
-  .rules-table .rule-actions .action-list { min-width: 0; width: min(16rem, calc(100vw - 2 * var(--space-5))); left: 0; right: auto; }
+  .rules-table .rule-actions .action-list { min-width: 0; width: min(16rem, calc(100vw - 2 * var(--space-5))); left: auto; transform: none; }
+}
+
+/* Claim rules (claimrulespage.ts): two fields a row, a number beside its unit,
+   and presets as buttons that say what they set. */
+.claim-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--space-5); }
+.duration { display: flex; gap: var(--space-2); }
+.duration select { width: auto; }
+.presets { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.presets .actions { margin-top: var(--space-2); }
+.presets .button { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; height: auto; padding: var(--space-2) var(--space-4); }
+.presets .token-client { color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); font-weight: 400; }
+@media (max-width: 640px) {
+  .claim-fields { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Package H: home and new vault */
@@ -1767,6 +1792,8 @@ table.var-grid { border: 0; border-radius: 0; overflow: visible; }
 .var-grid th[scope="row"] { font-weight: 500; color: var(--fg); }
 .var-grid th[scope="row"] code { white-space: nowrap; font-size: var(--text-sm); color: var(--fg); }
 .var-env { color: var(--fg); }
+/* The footnote under the Environments table would otherwise touch its border. */
+.table-wrap:has(> .var-envtable) + p { margin-top: var(--space-4); }
 .var-owners { margin-left: var(--space-1); }
 .var-owners::before {
   /* A small padlock: shackle and body, drawn in CSS. */
@@ -1788,9 +1815,12 @@ table.var-grid { border: 0; border-radius: 0; overflow: visible; }
 .var-readers::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--info); flex: none; }
 td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
 
-/* A ⋯ menu inside a table: positioned from where it would sit (under its
-   button, aligned to its right edge) rather than from the cell, so a table
-   or a scrolling box never clips it. */
+/* A ⋯ menu inside a table (every menu() with icon "more"): positioned from
+   where it would sit (under its button, aligned to its right edge) rather
+   than from the cell, so a table or a scrolling box never clips it. A
+   table's own overflow (the wrapper's scroll, the table's rounded corners)
+   cuts off anything positioned from inside it, which showed as an empty
+   sliver on a table with one or two rows. */
 .var-menu.menu-wrap { position: static; flex: none; }
 .var-menu > summary.icon-button { width: 32px; min-height: var(--control-sm); padding: 0; }
 .var-menu > .menu { top: auto; right: auto; left: auto; margin-top: 4px; transform: translateX(calc(-100% + 32px)); }
@@ -1800,10 +1830,12 @@ td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
    centres its content). */
 .var-menu .menu-item { justify-content: start; }
 
-/* "Set" in an empty cell shows on hover or focus where there is a pointer
-   to hover with; always on touch screens and phones. */
+/* "Set" in an empty cell is quiet until hover or focus where there is a
+   pointer to hover with, but never invisible: hidden, "Not set" offered
+   nothing to click. Always full on touch screens and phones. 0.7 keeps it
+   above 3:1 (contrast.test.mjs). */
 @media (hover: hover) and (min-width: 641px) {
-  .var-grid .var-add { opacity: 0; transition: opacity 120ms ease-out; }
+  .var-grid .var-add { opacity: 0.7; transition: opacity 120ms ease-out; }
   .var-grid tr:hover .var-add, .var-grid .var-add:focus-visible { opacity: 1; }
 }
 

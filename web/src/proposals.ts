@@ -6,7 +6,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { diffMode, diffSection } from "./diffview.js";
-import { callout, csrfField, emptyState, html, pageHeader, time, type CrumbPart, type Raw, type Tone } from "./html.js";
+import { callout, csrfField, emptyState, html, pageHeader, textareaText, time, type CrumbPart, type Raw, type Tone } from "./html.js";
 import { vaultShell } from "./files.js";
 import {
   canWrite,
@@ -22,7 +22,7 @@ import {
   type Reply,
   type Vault,
 } from "./pages.js";
-import { byWhom, latestFeedback, person, rowSnooze, snoozeControl, threadSection } from "./thread.js";
+import { byWhom, latestFeedback, person, rowSnooze, snoozeControl, threadSection, type Commented } from "./thread.js";
 import { risks } from "./risk.js";
 
 export { risks } from "./risk.js";
@@ -200,9 +200,11 @@ function proposalCrumb(v: Vault, p: Basis & { id: string; kind: string; path: st
 
 // A refused decision, shown again on the proposal page (answered 400): the
 // database's reason inside the decision box, and the note as it was typed.
+// A refused comment is the same page with its reason at the top, where the
+// page starts, and the comment kept in its box (thread.ts).
 type Refused = { error: string; decision: string; note: string };
 
-export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: Refused): Promise<Reply> {
+export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: Refused, comment?: Commented): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
@@ -259,7 +261,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     // proposes on it in the first place (they write directly), so they're
     // never the proposer here regardless.
     const revisable = canWrite(v) && live && p.kind === "write" && p.body !== null && p.proposed_by === ctx.userId;
-    const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: writable });
+    const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: writable, comment });
     const feedback = await latestFeedback(c, ctx, p);
     const snooze = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
 
@@ -278,7 +280,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
           <p class="hint" id="note-hint">Required to request changes or reject. The proposer sees it.</p>
           <textarea id="note" name="note" class="note-field" rows="2" aria-describedby="${noteMissing ? "decide-error note-hint" : "note-hint"}"${
             noteMissing ? html` aria-invalid="true"` : ""
-          }>${refused?.note ?? ""}</textarea>
+          }>${textareaText(refused?.note)}</textarea>
           <div class="actions">
             ${decidable && !moved
               ? html`<button class="primary" name="decision" value="approve">Approve</button>
@@ -325,6 +327,13 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
         }`,
       })}
       <div class="review-top">
+        ${comment
+          ? callout(
+              "danger",
+              html`<p>${comment.error}</p>${live && writable ? html`<p><a href="#discussion">Your comment is still in the box under Discussion.</a></p>` : ""}`,
+              { id: "comment-error" },
+            )
+          : ""}
         ${p.proposed_by === ctx.userId && p.agent
           ? html`<p class="callout info">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
           : ""}
@@ -369,7 +378,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
   });
   if (!data) return notFound(ctx);
   const reply = render(ctx, `Proposal: ${data.p.path}`, data.shell, "vaults");
-  return refused ? { ...reply, status: 400 } : reply;
+  return refused || comment ? { ...reply, status: 400 } : reply;
 }
 
 // Edit, then approve, and Revise: the proposed text in an editor, with the
@@ -380,7 +389,13 @@ function currentFile(current: string | null): Raw {
     : html`<details class="current-file"><summary>The file as it is now</summary><pre class="current-text">${current}</pre></details>`;
 }
 
-export async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<Reply> {
+// A refused Edit, then approve, shown again on its own page (answered 400)
+// with the reason and the text and note as typed: a redirect would lose
+// them. It happens when approving applies the edit and the database refuses
+// that (the vault's storage limit), leaving the proposal live.
+type Retyped = { error: string; content: string; note: string };
+
+export async function proposalEdit(ctx: Ctx, id: string, pid: string, refused?: Retyped): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
@@ -395,21 +410,22 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<R
         secondary: html`<a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a>`,
         primary: html`<button class="primary" form="edit-approve">Save edit and approve</button>`,
       })}
+      ${refused ? callout("danger", refused.error) : ""}
       <p class="lede">Change the proposed text of <code>${p.path}</code>. Saving records your edit as a new revision and approves it. If this path needs more than one approval, the others approve your edited version.</p>
       ${currentFile(p.current_body)}
       <form method="post" action="${proposalPath(id, pid, "/edit")}" class="panel" id="edit-approve">
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
-        <textarea id="content" name="content">${p.body}</textarea>
+        <textarea id="content" name="content">${textareaText(refused?.content ?? p.body)}</textarea>
         <label for="note">What you changed</label>
-        <input id="note" type="text" name="note" placeholder="Optional, for the history">
+        <input id="note" type="text" name="note" placeholder="Optional, for the history" value="${refused?.note ?? ""}">
         <div class="actions"><button class="primary">Save edit and approve</button>
           <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a></div>
       </form>`;
     return { v, p, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, `Edit, then approve ${fileName(data.p.path)}`, data.shell, "vaults");
+  return { ...render(ctx, `Edit, then approve ${fileName(data.p.path)}`, data.shell, "vaults"), ...(refused ? { status: 400 } : {}) };
 }
 
 // A live write proposal in the vault with its text and the file's current
@@ -451,7 +467,7 @@ export async function proposalRevise(ctx: Ctx, id: string, pid: string): Promise
       <form method="post" action="${proposalPath(id, pid, "/revise")}" class="panel" id="revise-proposal">
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
-        <textarea id="content" name="content">${p.body}</textarea>
+        <textarea id="content" name="content">${textareaText(p.body)}</textarea>
         <label for="reason">New reason (replaces the old one; leave empty to keep it)</label>
         <p class="hint" id="reason-hint">Reviewers read this as why the proposal exists, so say why, not only what changed. It is also added to the discussion.</p>
         <input id="reason" type="text" name="reason" aria-describedby="reason-hint">
@@ -521,21 +537,21 @@ export async function decide(ctx: Ctx, id: string, pid: string): Promise<Reply> 
 
 export async function editAndApprove(ctx: Ctx, id: string, pid: string): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
+  const content = (ctx.form.get("content") ?? "").replaceAll("\r\n", "\n");
+  const note = ctx.form.get("note") ?? "";
   try {
     const result = await asPerson(
       ctx.userId,
-      async (c) =>
-        (
-          await c.query(`select public.edit_and_approve($1, $2, $3) as r`, [
-            pid,
-            (ctx.form.get("content") ?? "").replaceAll("\r\n", "\n"),
-            ctx.form.get("note") || null,
-          ])
-        ).rows[0].r as string,
+      async (c) => (await c.query(`select public.edit_and_approve($1, $2, $3) as r`, [pid, content, note || null])).rows[0].r as string,
     );
     decidedFlash(ctx, result);
   } catch (err) {
-    ctx.setFlash(message(err));
+    const error = message(err);
+    // Not the page again once the proposal is no longer live (it was
+    // decided): its own page says so, and there is no editor left to show.
+    const again = await proposalEdit(ctx, id, pid, { error, content, note });
+    if (again.status === 400) return again;
+    ctx.setFlash(error);
   }
   return { redirect: proposalPath(id, pid) };
 }

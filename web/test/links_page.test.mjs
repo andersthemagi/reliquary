@@ -171,10 +171,22 @@ after(async () => {
   for (const c of servers) c.kill();
 });
 
-test("links page: an empty vault says so, and offers Add link to an owner", async () => {
+test("links page: an empty vault says so, and shows an owner the Add form under it, with no button that only scrolls to it", async () => {
   const h = await page(lp(V.empty));
   assert.match(h, /No links yet/);
-  assert.match(h, /Add link/);
+  assert.match(h, /Add a link/);
+  assert.doesNotMatch(h, /href="#add-link"/);
+  assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel rule-form"/, "the form follows the empty box, where the stylesheet spaces them");
+});
+
+test("links page: says a granted tool can be called over MCP, not that calling isn’t built", async () => {
+  const h = await page(lp(V.own));
+  assert.doesNotMatch(h, /isn.t built|once that.s built/);
+  assert.match(h, /an agent with a granted role can then call it over MCP as <code>&lt;link&gt;\.&lt;tool&gt;<\/code>/);
+});
+
+test("links page: the URL example is an MCP endpoint, not a product’s API host", async () => {
+  assert.match(await page(lp(V.own)), /name="url" placeholder="https:\/\/mcp\.example\.com\/mcp"/);
 });
 
 test("links page: owner adds a link; the credential never appears on any page", async () => {
@@ -192,6 +204,9 @@ test("links page: owner adds a link; the credential never appears on any page", 
   assert.match(flash?.[2] ?? "", /^Added linear, but its tools couldn’t be discovered\. This link’s address isn’t public\. \(ref [0-9a-f]{8}\)$/);
   assert.match(h2, /linear/);
   assert.match(h2, /https:\/\/127\.0\.0\.1\/mcp/);
+  assert.match(h2, /<div class="page-actions"><a class="button primary" href="#add-link">Add link<\/a><\/div>/, "with links listed, the form may be a scroll away, so the header offers it");
+  assert.match(h2, /<td data-label="URL" class="small link-url">https:\/\/127\.0\.0\.1\/mcp<\/td>/, "its own class, so the URL can wrap");
+  assert.match(h2, /<td data-label="Added by" class="small muted"><div>you · <time [^>]+>[^<]+<\/time><\/div><\/td>/, "who and when stay in one block on a phone");
   noCredentials(h2);
 
   const row = await linkRow(V.own, "linear");
@@ -267,6 +282,14 @@ test("links page: owner edits a link's name and url; the credential is untouched
   assert.ok(sealedRow, "the credential row survives an edit");
 });
 
+test("links page: the Edit form says the credential isn’t shown or changed there, and how to replace it", async () => {
+  const row = await linkRow(V.own, "linear2");
+  const edit = await page(lp(V.own, `?edit=${row.id}`));
+  assert.match(edit, /The credential isn’t shown or changed here\. To replace it, delete this link and add it again; its grants are deleted too\./);
+  assert.match(edit, /Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered\./);
+  assert.doesNotMatch(await page(lp(V.own)), /isn’t shown or changed here/);
+});
+
 test("links page: deleting goes through a confirm page, not a bare button", async () => {
   const row = await linkRow(V.own, "linear2");
   const h1 = await page(lp(V.own, `?delete=${row.id}`));
@@ -286,9 +309,73 @@ test("links page: without VARIABLES_KEY, links still list but Add is disabled", 
   assert.match(h, /<button class="primary" disabled>Add link<\/button>/);
 });
 
+// A refused save answers the form again (400), with the reason and its
+// reference, what was typed kept and the refused field marked.
+const refusedForm = (h) => /<p class="callout danger" role="alert" id="link-error">([\s\S]*?)<\/p>/.exec(h)?.[1];
+const countLinks = async (v) => (await sql("select count(*)::int as n from public.links where vault_id = $1", [v]))[0].n;
+const addStored = async (v, name, url = "https://api.example.com") => {
+  const [{ id }] = await as(
+    LU,
+    `select public.create_link($1, $2, $3, 'k1', decode($4,'hex'), decode($5,'hex')) as id`,
+    [v, name, url, randomBytes(12).toString("hex"), randomBytes(32).toString("hex")],
+  );
+  return id;
+};
+
+test("links page: a refused edit is still an edit: its title, Save changes, no credential field, the link's id and what was typed", async () => {
+  const [{ id: v }] = await as(LU, "select public.create_vault('Links Refused Edit') as id");
+  const id = await addStored(v, "keep_me");
+  const h1 = await page(lp(v, `?edit=${id}`));
+  const r = await post(lp(v), { op: "save", link_id: id, name: "not valid!", url: "https://typed.example.com" }, { csrf: csrfOf(h1) });
+  assert.equal(r.status, 400);
+  const h2 = await r.text();
+  assert.match(refusedForm(h2) ?? "", /^A link’s name is letters, digits and underscores.* Nothing was saved\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(h2, /<h2 id="add-link-title" class="form-title">Edit <code>keep_me<\/code><\/h2>/);
+  assert.match(h2, new RegExp(`<input type="hidden" name="link_id" value="${id}">`));
+  assert.match(h2, /<button class="primary">Save changes<\/button>/);
+  assert.doesNotMatch(h2, /name="credential"/);
+  assert.match(h2, /name="name"[^>]*value="not valid!" aria-invalid="true"/);
+  assert.match(h2, /name="url"[^>]*value="https:\/\/typed\.example\.com"/);
+
+  const r2 = await post(lp(v), { op: "save", link_id: /name="link_id" value="([^"]+)"/.exec(h2)[1], name: "kept_renamed", url: "https://typed.example.com" }, { csrf: csrfOf(h2) });
+  assert.equal(r2.status, 303);
+  assert.deepEqual(await sql("select id, name from public.links where vault_id = $1", [v]), [{ id, name: "kept_renamed" }], "the same link was renamed; no second one");
+});
+
+test("links page: a name already used in the vault is refused in the form, in plain words, with what was typed kept and no database text", async () => {
+  const [{ id: v }] = await as(LU, "select public.create_vault('Links Refused Duplicate') as id");
+  await addStored(v, "taken");
+  const cred = credential("dup");
+  const r = await post(lp(v), { op: "save", name: "taken", url: "https://typed.example.com", credential: cred }, { csrf: csrfOf(await page(lp(v))) });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  const m = /^There is already a link named taken in this vault\. Pick another name\. Nothing was saved\. \(ref ([0-9a-f]{8})\)$/.exec(refusedForm(h) ?? "");
+  assert.ok(m, refusedForm(h));
+  assert.match(log, new RegExp(`failure ref=${m[1]} `), "the ref is in the server log");
+  assert.doesNotMatch(h, /violates unique constraint|duplicate key/i);
+  assert.match(h, /<h2 id="add-link-title" class="form-title">Add a link<\/h2>/);
+  assert.match(h, /name="name"[^>]*value="taken" aria-invalid="true"/);
+  assert.match(h, /name="url"[^>]*value="https:\/\/typed\.example\.com"/);
+  noCredentials(h);
+  assert.equal(await countLinks(v), 1);
+});
+
+test("links page: renaming a link to a name another link has is refused in its edit form, and nothing changes", async () => {
+  const [{ id: v }] = await as(LU, "select public.create_vault('Links Refused Rename') as id");
+  await addStored(v, "first");
+  const second = await addStored(v, "second", "https://second.example.com");
+  const r = await post(lp(v), { op: "save", link_id: second, name: "first", url: "https://second.example.com" }, { csrf: csrfOf(await page(lp(v, `?edit=${second}`))) });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(refusedForm(h) ?? "", /^There is already a link named first in this vault\. Pick another name\. Nothing was saved\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(h, /<h2 id="add-link-title" class="form-title">Edit <code>second<\/code><\/h2>/);
+  assert.match(h, /name="name"[^>]*value="first" aria-invalid="true"/);
+  assert.deepEqual(await sql("select name from public.links where vault_id = $1 order by name", [v]), [{ name: "first" }, { name: "second" }]);
+});
+
 // ---------------------------------------------------------------------------
 // The Grants page (linkgrants.ts): which of a link's discovered tools each
-// role may call, once the MCP proxy exists. set_link_grant's own hostile
+// role may call through the MCP proxy. set_link_grant's own hostile
 // tests (supabase/tests/links_test.sql) cover the database side; this
 // proves the web UI on top of it.
 
@@ -383,6 +470,12 @@ test("grants page: unchecking a cell disables it without deleting the grant row"
   assert.match(flashOf(h2)?.[2] ?? "", /Saved 1 grant change for gh\./);
   const row = await sql(`select enabled from public.link_grants where link_id = $1 and role = 'owner' and tool_name = 'list_issues'`, [grantsLink]);
   assert.deepEqual(row, [{ enabled: false }]);
+});
+
+test("grants page: says a granted tool is callable over MCP, not that calling isn’t built", async () => {
+  const h = await page(gp(V.own, grantsLink));
+  assert.doesNotMatch(h, /isn.t built|nothing acts on a grant/);
+  assert.match(h, /A granted tool is callable over MCP as <code>gh\.&lt;tool&gt;<\/code>/);
 });
 
 test("grants page: an editor sees a read-only view, no checkboxes or Save button", async () => {

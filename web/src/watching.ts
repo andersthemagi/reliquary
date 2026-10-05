@@ -13,7 +13,9 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { changesPath } from "./changes.js";
 import { csrfField, emptyState, html, time, type Raw } from "./html.js";
+import { flagsPath } from "./flagspage.js";
 import { Refusal } from "./failure.js";
 import { vaultShell } from "./files.js";
 import { filePath, message, notFound, render, treePath, UUID, vault, vaultPath, type Ctx, type Reply } from "./pages.js";
@@ -47,7 +49,7 @@ export function watchControl(ctx: Ctx, id: string, path: string, w: WatchState):
   const back = html`<input type="hidden" name="back" value="${ctx.url.pathname + ctx.url.search}">`;
   if (w.direct) {
     return {
-      badge: html`<span class="badge info" title="Changes here are flagged to your agents. Only you see this.">Watching</span>`,
+      badge: html`<span class="badge info" title="Changes here are flagged to you and your agents. Only you see this.">Watching</span>`,
       action: html`<form method="post" action="${watchingPath(id)}" class="watch-form">${csrfField(ctx.csrf)}<input type="hidden" name="action" value="unwatch"><input type="hidden" name="subscription" value="${w.direct.id}">${back}<button aria-label="Unwatch ${path}">Unwatch</button></form>`,
     };
   }
@@ -58,14 +60,18 @@ export function watchControl(ctx: Ctx, id: string, path: string, w: WatchState):
     };
   }
   return {
-    action: html`<form method="post" action="${watchingPath(id)}" class="watch-form">${csrfField(ctx.csrf)}<input type="hidden" name="action" value="watch"><input type="hidden" name="path" value="${path}">${back}<button title="Flag changes here to your agents">Watch</button></form>`,
+    action: html`<form method="post" action="${watchingPath(id)}" class="watch-form">${csrfField(ctx.csrf)}<input type="hidden" name="action" value="watch"><input type="hidden" name="path" value="${path}">${back}<button title="Flag changes here to you and your agents">Watch</button></form>`,
   };
 }
 
 // ---------------------------------------------------------------------------
 // The Watching tab
 
-async function watchingPage(ctx: Ctx, id: string): Promise<Reply> {
+// The Watch form's values when saving was refused: the path as typed and
+// the refusal with its reference, shown in the form.
+type WatchForm = { path: string; error: string };
+
+async function watchingPage(ctx: Ctx, id: string, form?: WatchForm): Promise<Reply> {
   const out = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
@@ -89,26 +95,32 @@ async function watchingPage(ctx: Ctx, id: string): Promise<Reply> {
           })}</tbody></table></div>`
       : emptyState({
           title: "You don’t watch anything here",
-          body: "Watch a folder or file from its page, or type one below. Changes there are flagged to your agents from then on.",
+          body: "Watch a folder or file from its page, or type one below. Changes there are flagged to you and your agents from then on.",
         });
-    const body = html`
-      ${settingsHeader(id, v, "watching", {
-        description: html`Folders and files you watch in ${v.name}. Changes there are flagged to your agents when they ask (<code>list_flags</code>). Only you see this list.`,
-        primary: html`<a class="button primary" href="#watch-path">Watch a path</a>`,
-      })}
-      ${table}
-      <form method="post" action="${here}" class="panel watch-add" id="watch-path" aria-labelledby="watch-path-title">
+    const addForm = html`<form method="post" action="${here}" class="panel watch-add" id="watch-path" aria-labelledby="watch-path-title">
         <h2 id="watch-path-title" class="form-title">Watch a folder or file</h2>
         ${csrfField(ctx.csrf)}<input type="hidden" name="action" value="watch"><input type="hidden" name="back" value="${here}">
+        ${form ? html`<p class="callout danger" role="alert" id="watch-error">${form.error}</p>` : ""}
         <label for="wp">Path</label>
-        <div class="inline-field"><input id="wp" type="text" name="path" placeholder="clients/" required maxlength="1024" autocomplete="off" spellcheck="false" aria-describedby="wp-hint"><button>Watch</button></div>
+        <div class="inline-field"><input id="wp" type="text" name="path" placeholder="clients/" required maxlength="1024" autocomplete="off" spellcheck="false" value="${form?.path ?? ""}"${
+          form ? html` aria-invalid="true" aria-describedby="watch-error wp-hint"` : html` aria-describedby="wp-hint"`
+        }><button>Watch</button></div>
         <p class="hint" id="wp-hint">A folder ends in <code>/</code>, like <code>clients/</code>, and covers everything in it; a file is its full path, like <code>notes/plan.md</code>. It needn’t exist yet. Changes are flagged from when you start watching, not before.</p>
-      </form>
+      </form>`;
+    // A refused form goes first, so its reason is on the first screen.
+    const body = html`
+      ${settingsHeader(id, v, "watching", {
+        description: html`Folders and files you watch in ${v.name}. Changes there are flagged to you and to your agents. You see them in <a href="${flagsPath(id)}">Flags</a> (under Diagnostics) and in <a href="${changesPath(id, "watching")}">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>. Only you see this list.`,
+        primary: form || !list.length ? "" : html`<a class="button primary" href="#watch-path">Watch a path</a>`,
+      })}
+      ${form ? addForm : ""}
+      ${table}
+      ${form ? "" : addForm}
       <p class="hint">Any member can watch, a viewer too. Your agents can list what you watch, but only you start or stop it, here. <a href="/docs/concepts/flags#watching-a-path">Watching a path</a></p>`;
     return vaultShell(c, ctx, v, { section: "settings" }, body);
   });
   if (!out) return notFound(ctx);
-  return render(ctx, "Watching", out, "vaults");
+  return { ...render(ctx, "Watching", out, "vaults"), ...(form ? { status: 400 } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -140,11 +152,15 @@ async function watchAction(ctx: Ctx, id: string): Promise<Reply> {
       });
       if (!r) return notFound(ctx);
       if (r.had) ctx.setFlash(`You already watch ${path}.`, "info");
-      else ctx.setFlash(`Watching ${path}. From now on, changes there are flagged to your agents.`, "success");
+      else ctx.setFlash(`Watching ${path}. From now on, changes there are flagged to you and your agents.`, "success");
     } catch (err) {
       // Refused by the database: a path it won't take, or the most paths
       // one person can watch in a vault. Its own words, with a reference.
-      ctx.setFlash(message(err));
+      // The Watching tab's own form keeps the path typed there; the button
+      // on a file or folder page has nothing typed, so it flashes.
+      const text = message(err);
+      if (back === watchingPath(id)) return watchingPage(ctx, id, { path, error: text });
+      ctx.setFlash(text);
     }
     return { redirect: back };
   }

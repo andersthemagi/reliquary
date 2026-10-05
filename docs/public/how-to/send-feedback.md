@@ -9,7 +9,7 @@ Feedback goes to the operator of the Reliquary you use: on Reliquary's hosted se
 1. Choose **Feedback** in the top bar, on any page (on a narrow screen, the speech-bubble button next to the inbox). On a phone, open the account menu and choose **Send feedback**: the Feedback page opens with the page you were on.
 2. Pick what it is: **Bug**, **Idea**, **Question** or **Other**.
 3. Write what happened, or what would help. For a bug: what you did, what you expected, what happened, and the reference (`ref`) an error showed. See [Errors and reference IDs](../reference/errors.md).
-4. Leave **Include this page** ticked to send the address of the page you're on (and, in a vault, which vault). Untick it to send the message alone.
+4. Leave **Include this page** ticked to send the address of the page you're on (and, in a vault, which vault). Untick it to send the message alone. On an invite, sign-in or search page only the page's name is sent, never the invite link, code or search words.
 5. Choose **Send**.
 
 You land on the **Feedback** page with "Sent", and the message is listed under **What you've sent**. The full page, at **Feedback**, **Your feedback**, has the same form with an optional vault to pick.

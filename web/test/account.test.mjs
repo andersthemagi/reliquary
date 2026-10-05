@@ -238,6 +238,11 @@ const flashAfter = async (r, jar) => {
   assert.equal(r.headers.get("location"), "/settings");
   return flashOf(await (await get("/settings", jar)).text());
 };
+// A refused change of address answers Account settings itself (400): the reason in the form, with a reference.
+const refusedEmail = async (r) => {
+  assert.equal(r.status, 400);
+  return /<p class="callout danger" role="alert" id="email-error">([^<]*)<\/p>/.exec(await r.text())?.[1] ?? "";
+};
 const confirmLink = async (tokenHash, jar) => {
   remember(tokenHash);
   const page = await (await get(`/auth/confirm?token_hash=${tokenHash}&type=email_change`, jar)).text();
@@ -294,13 +299,24 @@ test("change email: a malformed address, my own or another account's is refused 
   const jar = await signIn("acct-vera.new@example.test");
   const n = (await stats()).userUpdate;
   const csrf = await settingsCsrf(jar);
-  assert.match(await flashAfter(await post("/settings/email", { csrf, new_email: "not an address" }, jar), jar), /^Enter the new address like name@example\.com\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
-  assert.match(await flashAfter(await post("/settings/email", { csrf, new_email: "ACCT-VERA.NEW@example.test" }, jar), jar), /^That is already your address\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(await refusedEmail(await post("/settings/email", { csrf, new_email: "not an address" }, jar)), /^Enter the new address like name@example\.com\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(await refusedEmail(await post("/settings/email", { csrf, new_email: "ACCT-VERA.NEW@example.test" }, jar)), /^That is already your address\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
   assert.equal((await stats()).userUpdate, n, "neither reached Supabase Auth");
-  assert.match(await flashAfter(await post("/settings/email", { csrf, new_email: "acct-uma@example.test" }, jar), jar), /^That address already belongs to another Reliquary account, so it can’t be yours too\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(await refusedEmail(await post("/settings/email", { csrf, new_email: "acct-uma@example.test" }, jar)), /^That address already belongs to another Reliquary account, so it can’t be yours too\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
   const h = await (await get("/settings", jar)).text();
   assert.doesNotMatch(h, /Waiting for confirmation/);
   assert.match(h, /<p><strong>acct-vera\.new@example\.test<\/strong><\/p>/);
+});
+
+test("change email: a refused address stays in its field, marked, the form first on the page, and the address in use is still shown", async () => {
+  const jar = await signIn("acct-vera.new@example.test");
+  const r = await post("/settings/email", { csrf: await settingsCsrf(jar), new_email: "not an address" }, jar);
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<input id="new-email" type="text" name="new_email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required value="not an address" aria-invalid="true" aria-describedby="email-error new-email-hint">/);
+  assert.match(h, /<p><strong>acct-vera\.new@example\.test<\/strong><\/p>/, "not 'no email on this account'");
+  assert.ok(h.indexOf('aria-labelledby="email"') < h.indexOf('aria-labelledby="profile"'), "the refused section is on the first screen");
+  assert.match(h, /<form method="post" action="\/signout">/, "the rest of the page is there");
 });
 
 test("change email: if Supabase Auth can't be reached or limits emails, the page says where, why and a reference", async () => {
@@ -315,7 +331,7 @@ test("change email: if Supabase Auth can't be reached or limits emails, the page
     assert.match(h, /Reliquary couldn’t reach its sign-in service, so no confirmation link was sent and your address is unchanged/);
     await fake("/_fail_user_update", { method: "POST", body: JSON.stringify({ status: 429, body: { code: 429, error_code: "over_email_send_rate_limit", msg: "email rate limit exceeded" } }) });
     const limited = await post("/settings/email", { csrf: await settingsCsrf(jar), new_email: "acct-vera.third@example.test" }, jar);
-    assert.match(await flashAfter(limited, jar), /^The sign-in service has sent as many emails as it allows for now, so no link was sent\. Wait an hour, then ask again\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
+    assert.match(await refusedEmail(limited), /^The sign-in service has sent as many emails as it allows for now, so no link was sent\. Wait an hour, then ask again\. Nothing was changed\. \(ref [0-9a-f]{8}\)$/);
   } finally {
     await fake("/_fail_user_update", { method: "POST", body: JSON.stringify({ status: 0 }) });
   }

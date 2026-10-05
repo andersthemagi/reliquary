@@ -228,8 +228,8 @@ test("errors: the lines to copy are folded away under Details to send if you rep
 
 test("errors: a unique violation's row values never reach the page or the log", async () => {
   const r = await write("errors-test/unique.md");
-  assert.equal(r.status, 303);
-  const flash = flashOf(await (await get(r.headers.get("location"))).text());
+  assert.equal(r.status, 400);
+  const flash = /<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(await r.text())?.[1] ?? "";
   assert.match(flash, /^23505 unique violation: duplicate key value violates unique constraint &quot;uniq_v_key&quot;\. \(ref [0-9a-f]{8}\)$/);
   const ref = REF.exec(flash)[1];
   refs.push(ref);
@@ -281,6 +281,13 @@ test("errors: not found says what was looked for, the same for a vault that isn'
   // A page that doesn't exist names its path.
   const nopage = fields(await (await get("/no/such/page")).text());
   assert.equal(nopage.why, "There’s no page at /no/such/page.");
+});
+
+test("errors: not found inside a vault the person belongs to offers Back to that vault, and inside one they don't offers none", async () => {
+  const mine = await (await get(`/v/${V.own}/file?path=notes%2Fnope.md`)).text();
+  assert.match(mine, new RegExp(`<a class="button" href="/v/${V.own}">Back to Errors Vault</a><a class="button" href="/">Home</a>`));
+  const hidden = await (await get(`/v/${V.hidden}/file?path=notes%2Fplan.md`)).text();
+  assert.doesNotMatch(hidden, /Back to /);
 });
 
 test("errors: the env API answers a failure with its code, what, where, why and a reference", async () => {
