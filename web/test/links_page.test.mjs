@@ -319,6 +319,37 @@ test("links page: a refused edit is still an edit: its title, Save changes, no c
   assert.deepEqual(await sql("select id, name from public.links where vault_id = $1", [v]), [{ id, name: "kept_renamed" }], "the same link was renamed; no second one");
 });
 
+test("links page: a name already used in the vault is refused in the form, in plain words, with what was typed kept and no database text", async () => {
+  const [{ id: v }] = await as(LU, "select public.create_vault('Links Refused Duplicate') as id");
+  await addStored(v, "taken");
+  const cred = credential("dup");
+  const r = await post(lp(v), { op: "save", name: "taken", url: "https://typed.example.com", credential: cred }, { csrf: csrfOf(await page(lp(v))) });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  const m = /^There is already a link named taken in this vault\. Pick another name\. Nothing was saved\. \(ref ([0-9a-f]{8})\)$/.exec(refusedForm(h) ?? "");
+  assert.ok(m, refusedForm(h));
+  assert.match(log, new RegExp(`failure ref=${m[1]} `), "the ref is in the server log");
+  assert.doesNotMatch(h, /violates unique constraint|duplicate key/i);
+  assert.match(h, /<h2 id="add-link-title" class="form-title">Add a link<\/h2>/);
+  assert.match(h, /name="name"[^>]*value="taken" aria-invalid="true"/);
+  assert.match(h, /name="url"[^>]*value="https:\/\/typed\.example\.com"/);
+  noCredentials(h);
+  assert.equal(await countLinks(v), 1);
+});
+
+test("links page: renaming a link to a name another link has is refused in its edit form, and nothing changes", async () => {
+  const [{ id: v }] = await as(LU, "select public.create_vault('Links Refused Rename') as id");
+  await addStored(v, "first");
+  const second = await addStored(v, "second", "https://second.example.com");
+  const r = await post(lp(v), { op: "save", link_id: second, name: "first", url: "https://second.example.com" }, { csrf: csrfOf(await page(lp(v, `?edit=${second}`))) });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(refusedForm(h) ?? "", /^There is already a link named first in this vault\. Pick another name\. Nothing was saved\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(h, /<h2 id="add-link-title" class="form-title">Edit <code>second<\/code><\/h2>/);
+  assert.match(h, /name="name"[^>]*value="first" aria-invalid="true"/);
+  assert.deepEqual(await sql("select name from public.links where vault_id = $1 order by name", [v]), [{ name: "first" }, { name: "second" }]);
+});
+
 // ---------------------------------------------------------------------------
 // The Grants page (linkgrants.ts): which of a link's discovered tools each
 // role may call, once the MCP proxy exists. set_link_grant's own hostile
