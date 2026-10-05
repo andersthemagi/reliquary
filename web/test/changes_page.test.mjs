@@ -321,6 +321,16 @@ test("diagnostics: /activity and /log are the full log inside Diagnostics, as it
   }
 });
 
+test("diagnostics: the Log links a write to its file only while the file is there, never to a deleted one's 404", async () => {
+  const h = await page(hana, `/v/${V.main}/activity`);
+  const pathCells = [...h.matchAll(/<td class="path-cell">([\s\S]*?)<\/td>/g)].map((m) => m[1]);
+  assert.ok(pathCells.includes(`<a href="/v/${V.main}/file?path=${q("notes/plan.md")}">notes/plan.md</a>`), "a file that's there is linked");
+  for (const gone of ["tmp/scratch.md", "archive/2026.md"]) {
+    assert.ok(pathCells.includes(gone), `${gone}: written once, no file now, so plain text`);
+    assert.ok(!h.includes(q(gone)), `${gone}: no link to it anywhere on the page`);
+  }
+});
+
 test("diagnostics: the vault's own navigation has Changes where Activity was, and no entry for the log", async () => {
   const h = await page(hana, changesUrl(V.main));
   const navs = h.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);

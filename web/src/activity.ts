@@ -433,10 +433,25 @@ function link(o: ActivityOpts, f: Filters): string {
   return s ? `${o.base}?${s}` : o.base;
 }
 
+// A write is linked to its file only while the file is there: a deleted file's
+// page is a 404.
+const liveKey = (r: Pick<Row, "vault_id" | "path">) => `${r.vault_id}/${r.path}`;
+async function liveWrites(c: pg.PoolClient, rows: Row[]): Promise<Set<string>> {
+  const writes = rows.filter((r) => r.event === "file.write" && r.path);
+  if (!writes.length) return new Set();
+  const { rows: found } = await c.query(
+    `select f.vault_id, f.path from public.files f
+       join unnest($1::uuid[], $2::text[]) as w(vault_id, path) using (vault_id, path)
+      where f.deleted_at is null`,
+    [writes.map((r) => r.vault_id), writes.map((r) => r.path)],
+  );
+  return new Set(found.map(liveKey));
+}
+
 // The events: a table on wide screens; below 640px each row is two lines,
 // what and when, then who, vault and path (style.css). Each row's id is its
 // place in the log ("ev-123"), for linking.
-export function activityTable(o: ActivityOpts, rows: Row[]): Raw {
+export function activityTable(o: ActivityOpts, rows: Row[], live: ReadonlySet<string>): Raw {
   const fileLink = (r: Row) => `/v/${r.vault_id}/file?path=${q(r.path ?? "")}`;
   return html`<div class="table-wrap activity-wrap"><table class="activity">
     <thead><tr><th>When</th><th>What</th>${o.showVault ? html`<th>Vault</th>` : ""}${o.scope.file ? "" : html`<th>Path</th>`}<th>By</th></tr></thead>
@@ -445,7 +460,7 @@ export function activityTable(o: ActivityOpts, rows: Row[]): Raw {
       return html`<tr class="ev" id="ev-${r.seq}"><td class="small nowrap ev-when">${time(r.at)}</td>
         <td class="small ev-what">${r.proposal_id ? html`<a href="/v/${r.vault_id}/proposals/${r.proposal_id}">${what}</a>` : what}</td>
         ${o.showVault ? html`<td class="small ev-vault"><a href="/v/${r.vault_id}/activity">${r.vault}</a></td>` : ""}
-        ${o.scope.file ? "" : html`<td class="path-cell">${r.path && r.event === "file.write" ? html`<a href="${fileLink(r)}">${r.path}</a>` : r.path ?? ""}</td>`}
+        ${o.scope.file ? "" : html`<td class="path-cell">${r.path && r.event === "file.write" && live.has(liveKey(r)) ? html`<a href="${fileLink(r)}">${r.path}</a>` : r.path ?? ""}</td>`}
         <td class="small">${who(o.me, r.actor, r.agent)}</td></tr>`;
     })}</tbody></table></div>`;
 }
@@ -481,10 +496,11 @@ export async function activityBody(c: pg.PoolClient, o: ActivityOpts): Promise<R
   if (o.scope.file) delete f.path;
   const opt = await options(c, o.me, o.scope.vaultId);
   const { rows, next } = await queryActivity(c, o.me, o.scope, f);
+  const live = await liveWrites(c, rows);
   const { before: _before, ...current } = f;
   const filtered = Object.keys(current).length > 0;
   return html`${filterBar(o, f, opt, filtered && !rows.length)}
-    ${rows.length ? activityTable(o, rows) : empty(o, f, filtered)}
+    ${rows.length ? activityTable(o, rows, live) : empty(o, f, filtered)}
     ${next || (f.before && rows.length)
       ? html`<nav class="pager" aria-label="Pages">${f.before ? html`<a href="${link(o, current)}">Newest</a>` : ""}${
           next ? html`<a class="older" href="${link(o, { ...current, before: next })}">Older</a>` : ""

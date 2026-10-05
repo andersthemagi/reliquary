@@ -46,6 +46,38 @@ const parentRule = (list: Rule[], path: string) =>
 export const approvals = (n: number) => `${n} approval${n === 1 ? "" : "s"}`;
 const namedOwners = (n: number) => `${n} named owner${n === 1 ? "" : "s"}`;
 
+// Who can approve under a rule, counted as decide() does
+// (supabase/migrations/20260928130000_path_ownership.sql): its named owners
+// if it has any, otherwise the vault's owners and editors, with no fallback
+// from one to the other. A rule asking for more approvals than that holds
+// every change under it open. That is allowed, since a rule may run ahead of
+// the team, so it is said rather than refused. `named` is how many current
+// members the rule's owners come to.
+type Approvers = { n: number; named: boolean };
+export async function approvers(c: pg.PoolClient, id: string, named: number): Promise<Approvers> {
+  if (named > 0) return { n: named, named: true };
+  const n = (await c.query(`select count(*)::int as n from public.vault_members where vault_id = $1 and role in ('owner', 'editor')`, [id])).rows[0].n as number;
+  return { n, named: false };
+}
+
+export const shortfall = (quorum: number, a: Approvers): string | null =>
+  a.n >= quorum
+    ? null
+    : `Only ${a.named ? namedOwners(a.n) : `${a.n} ${a.n === 1 ? "owner or editor" : "owners and editors"}`} can approve changes there, so with ${approvals(quorum)} needed they would stay open until ${
+        a.named ? "more owners are named" : "more members become editors or owners"
+      } or the approvals needed are lowered.`;
+
+// How many of a rule's named owners are still members: one who left stays on
+// the list but can no longer approve.
+const currentOwners = async (c: pg.PoolClient, id: string, path: string): Promise<number> =>
+  (
+    await c.query(
+      `select count(*)::int as n from public.path_owners po join public.vault_members m on m.vault_id = po.vault_id and m.user_id = po.user_id
+        where po.vault_id = $1 and po.path = $2`,
+      [id, path],
+    )
+  ).rows[0].n;
+
 // A rule's named owners (pathowners.ts), reached from its row.
 export const ownersPath = (id: string, path: string) => vaultPath(id, `/rules/owners?path=${q(path)}`);
 
@@ -286,11 +318,13 @@ export async function setRule(ctx: Ctx, id: string): Promise<Reply> {
     }
   }
   try {
+    let short = null as string | null;
     const after = await asPerson(ctx.userId, async (c) => {
       await c.query(`select public.set_policy($1, $2, $3, $4)`, [id, path, policy, quorum]);
+      if (policy === "canon") short = shortfall(quorum, await approvers(c, id, await currentOwners(c, id, path)));
       return policy ? null : await ruleFor(c, id, path);
     });
-    if (policy === "canon") ctx.setFlash(`${path} is now canon: changes need ${approvals(quorum)}.`, "success");
+    if (policy === "canon") ctx.setFlash(`${path} is now canon: changes need ${approvals(quorum)}.${short ? ` ${short}` : ""}`, short ? "warning" : "success");
     else if (policy === "open") ctx.setFlash(`${path} is now open: members and agents write there directly.`, "success");
     else {
       const now = after?.rule ? `the rule on ${after.rule.path} (${after.rule.policy})` : `the vault default (${after?.def})`;

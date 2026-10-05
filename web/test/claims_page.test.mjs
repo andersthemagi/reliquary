@@ -65,6 +65,26 @@ async function as(user, q, params = []) {
   }
 }
 
+// `q` through a new connection of `user`'s named `name`: the token's `act`
+// claims are what make the log record an agent.
+async function asAgent(user, vault, name, q, params = []) {
+  await as(user, "select public.create_access_token($1, 30, array[$2]::uuid[], 'write')", [name, vault]);
+  const [{ id }] = await sql("select id from public.access_tokens where name = $1 and user_id = $2 order by created_at desc limit 1", [name, user]);
+  const claims = { sub: user, role: "authenticated", act: { sub: id, name, tok: id } };
+  const db = new pg.Client({ connectionString: SUPER });
+  await db.connect();
+  try {
+    await db.query("begin");
+    await db.query("set local role authenticated");
+    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
+    const { rows } = await db.query(q, params);
+    await db.query("commit");
+    return rows;
+  } finally {
+    await db.end();
+  }
+}
+
 // A server from dist/, signed in as `user`.
 async function start(user, name) {
   const port = await freePort();
@@ -127,6 +147,17 @@ before(async () => {
 
   [{ id: V.empty }] = await as(NOA, "select public.create_vault('Claims empty', 'open') as id");
   [{ id: V.ola }] = await as(REX, "select public.create_vault('Claims rex-only', 'open') as id");
+
+  // A vault of its own, so V.main's single claim stays single: one claim for
+  // each way to hold one (a connection holds at most one per vault), on files
+  // that are there and, for Edda in person, one that isn't.
+  [{ id: V.rows }] = await as(NOA, "select public.create_vault('Claims rows', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.rows, EDDA, NOA]);
+  for (const f of ["brief.md", "plan.md", "mine.md"]) await as(EDDA, "select public.write_file($1, $2, 'Text')", [V.rows, f]);
+  await as(EDDA, "select public.claim_path($1, 'planned.md')", [V.rows]);
+  await as(NOA, "select public.claim_path($1, 'mine.md')", [V.rows]);
+  await asAgent(NOA, V.rows, "Hermes", "select public.claim_path($1, 'brief.md', 'Rewriting the brief')", [V.rows]);
+  await asAgent(EDDA, V.rows, "Atlas", "select public.claim_path($1, 'plan.md')", [V.rows]);
 });
 
 after(async () => {
@@ -151,6 +182,24 @@ test("claims page: lists the path (linked to the file), holder and label", async
   assert.match(row, /edda@example\.test/);
   assert.match(row, /<span class="token-client">tidying this up<\/span>/);
   assert.match(h, /Your agents see and take the same claims over MCP/);
+});
+
+// One row of the claims table, found by its path rather than its position.
+const rowOf = (h, path) => h.split("<tr>").find((r) => r.startsWith("<td") && r.includes(path)) ?? assert.fail(`a row for ${path}`);
+
+test("claims page: a claim on a path with no file there is plain text saying so, not a link to a page that doesn't exist", async () => {
+  const h = await page(noa, claimsUrl(V.rows));
+  assert.match(rowOf(h, "mine.md"), new RegExp(`<a href="/v/${V.rows}/file\\?path=mine\\.md">mine\\.md</a>`));
+  const planned = rowOf(h, "planned.md");
+  assert.doesNotMatch(planned, /<a href="[^"]*path=planned/);
+  assert.match(planned, /planned\.md<span class="token-client">no file there yet<\/span>/);
+});
+
+test("claims page: a claim an agent took says which agent, for you and for someone else", async () => {
+  const h = await page(noa, claimsUrl(V.rows));
+  assert.match(rowOf(h, "brief.md"), /data-label="Held by">you via Hermes<span class="token-client">Rewriting the brief<\/span>/);
+  assert.match(rowOf(h, "plan.md"), /data-label="Held by">edda@example\.test via Atlas<\/td>/);
+  assert.match(rowOf(h, "mine.md"), /data-label="Held by">you<\/td>/, "taken in person, so no agent");
 });
 
 // The member-list stylesheet makes a table's first cell a plain block on a
@@ -212,6 +261,16 @@ test("break: the confirm page says what happens, and opening it breaks nothing",
   const { fields } = formFields(h, "Break the claim on notes/draft.md");
   assert.deepEqual({ ...fields, csrf: undefined }, { csrf: undefined, path: "notes/draft.md", action: "break", confirm: "1" });
   assert.deepEqual(await active(V.main), ["notes/draft.md"], "asking breaks nothing");
+});
+
+test("break: the confirm page words your own claim as yours, and a claim an agent took as that agent's", async () => {
+  const confirm = (path) => page(noa, `${claimsUrl(V.rows)}?break=${encodeURIComponent(path)}`);
+  assert.match(
+    await confirm("brief.md"),
+    /This claim is yours, taken by your agent Hermes \(Rewriting the brief\)\. Breaking it frees <code>brief\.md<\/code>: you, or your agent, can claim it again once you’re ready\./,
+  );
+  assert.match(await confirm("mine.md"), /This claim is yours\. Breaking it frees <code>mine\.md<\/code>: you, or your agent, can claim it again once you’re ready\./);
+  assert.match(await confirm("plan.md"), /edda@example\.test via Atlas loses this claim; they, and their agent, can claim <code>plan\.md<\/code> again once they’re ready\./);
 });
 
 test("break: a form without the confirm page's field is sent to that page and breaks nothing", async () => {

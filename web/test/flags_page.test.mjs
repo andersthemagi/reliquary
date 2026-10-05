@@ -26,6 +26,7 @@ let child;
 const s = { origin: "", cookie: "" };
 const V = {};
 const P = {};
+const T = {};
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -98,6 +99,12 @@ before(async () => {
 
   [{ id: V.empty }] = await as(FRAN, "select public.create_vault('Flags empty', 'open') as id");
   [{ id: V.ola }] = await as(GIL, "select public.create_vault('Flags gil-only', 'open') as id");
+
+  // Its own vault, so the five flags V.main's tests count stay five.
+  [{ id: V.thread }] = await as(FRAN, "select public.create_vault('Flags threads', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.thread, GIL, FRAN]);
+  [{ id: T.open }] = await as(GIL, "select public.open_thread($1, 'Who owns the brief?', 'Asking the room.') as id", [V.thread]);
+  await as(GIL, "select public.post_message($1, 'Still asking.')", [T.open]);
 
   // Gil's actions: what Fran's Flags page should show, oldest first.
   [{ id: P.review }] = await as(GIL, "select public.propose($1, 'notes/a.md', 'Text v2', '') as id", [V.main]); // responsibility/review
@@ -205,6 +212,18 @@ test("flags page: viewing it marks these shown; a second visit has nothing new u
   const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)];
   assert.equal(rows.length, 1);
   assert.match(rows[0][1], new RegExp(`<a href="/v/${V.main}/proposals/${P.own}">Commented on a proposal</a>`));
+});
+
+test("flags page: a thread flag is badged Thread and links to its thread, not left as a bare Watching row", async () => {
+  const h = await page(flagsUrl(V.thread));
+  const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 2, h);
+  for (const r of rows) {
+    assert.match(r, /<span class="badge info">Thread<\/span>/);
+    assert.doesNotMatch(r, /Watching/);
+  }
+  assert.match(rows[0], new RegExp(`<a href="/v/${V.thread}/threads/${T.open}(#message-\\d+)?">Opened a thread</a>`));
+  assert.match(rows[1], new RegExp(`<a href="/v/${V.thread}/threads/${T.open}#message-\\d+">Posted in a thread</a>`));
 });
 
 test("flags page: past 200 flags it says to reload for the next batch, and the reload shows it", async () => {
