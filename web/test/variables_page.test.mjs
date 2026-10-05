@@ -432,6 +432,38 @@ test("variables reveal: a missing value says so, and a value that won't decrypt 
   await vars.deleteVariable(PIA, V.own, "SWAP_B", "development");
 });
 
+test("variables reveal: a refused reveal and a missing value say why with a reference whose log line says where it broke", async () => {
+  const cases = [
+    ["a role that can't reveal", () => post(vp(V.ed, "/reveal"), { name: "STRIPE_KEY", environment: "production" }), 403, "database (function public.reveal_variable)"],
+    ["a value that isn't there", () => post(vp(V.own, "/reveal"), { name: "API_KEY", environment: "preview" }), 404, "database (function public.reveal_variable)"],
+    ["a server with no key", () => post(vp(V.own, "/reveal"), { name: "API_KEY", environment: "production" }, { s: bare }), 503, "encryption"],
+  ];
+  for (const [what, send, status, where] of cases) {
+    const r = await send();
+    assert.equal(r.status, status, what);
+    const line = await failureLine(await r.text(), where);
+    assert.match(line, new RegExp(`"status":${status}`), what);
+  }
+});
+
+test("variables reveal: a value that won't decrypt says to set it again with a reference whose log line says why", async () => {
+  await vars.setVariable(PIA, V.own, "BADCT_KEY", "development", value("badct"));
+  await sql(
+    `update private.variable_secrets s set ciphertext = s.ciphertext || '\\x00'::bytea
+       from public.variables v
+      where v.id = s.variable_id and v.vault_id = $1 and v.name = 'BADCT_KEY' and s.environment = 'development'`,
+    [V.own],
+  );
+  const r = await post(vp(V.own, "/reveal"), { name: "BADCT_KEY", environment: "development" });
+  assert.equal(r.status, 500);
+  const h = await r.text();
+  assert.match(h, /<code>BADCT_KEY<\/code> in development can’t be decrypted\. Set it again to replace it\. \(ref [0-9a-f]{8}\)/);
+  const line = await failureLine(h, "encryption");
+  assert.match(line, /"status":500/);
+  assert.match(line, /was altered, belongs to another name or environment, or was sealed under a key this server doesn’t hold/);
+  await vars.deleteVariable(PIA, V.own, "BADCT_KEY", "development");
+});
+
 // ---------------------------------------------------------------------------
 // Access log and rotation help
 
@@ -533,6 +565,15 @@ async function failureLine(text, where) {
   noValues(line);
   return line;
 }
+
+test("variables add: without VARIABLES_KEY a set says so with a reference whose log line says where it broke", async () => {
+  const r = await post(vp(V.own, "/set"), { name: "NOKEY_SET", environment: "development", value: value("nokey-set") }, { s: bare });
+  assert.equal(r.status, 403);
+  const h = await r.text();
+  assert.match(h, /This server has no encryption key, so values can’t be set here\. \(ref [0-9a-f]{8}\)/);
+  noValues(h);
+  await failureLine(h, "encryption");
+});
 
 test("variables import: without VARIABLES_KEY a pasted import is refused with a reference whose log line says where it broke", async () => {
   const r = await post(vp(V.own, "/import"), { dotenv: `NOKEY_IMPORT=${value("nokey-import")}`, environment: "development" }, { s: bare });
