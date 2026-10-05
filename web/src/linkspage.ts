@@ -91,7 +91,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
           <tbody>${list.map(
             (l) => html`<tr>
               <td data-label="Name"><code>${l.name}</code></td>
-              <td data-label="URL" class="small">${l.url}</td>
+              <td data-label="URL" class="small link-url">${l.url}</td>
               <td data-label="Added by" class="small muted"><div>${who(ctx, l.created_by, null)} · ${time(l.created_at)}</div></td>
               ${owner
                 ? html`<td class="num rule-actions">${menu({

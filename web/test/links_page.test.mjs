@@ -192,6 +192,7 @@ test("links page: owner adds a link; the credential never appears on any page", 
   assert.match(flash?.[2] ?? "", /^Added linear, but its tools couldn’t be discovered\. This link’s address isn’t public\. \(ref [0-9a-f]{8}\)$/);
   assert.match(h2, /linear/);
   assert.match(h2, /https:\/\/127\.0\.0\.1\/mcp/);
+  assert.match(h2, /<td data-label="URL" class="small link-url">https:\/\/127\.0\.0\.1\/mcp<\/td>/, "its own class, so the URL can wrap");
   assert.match(h2, /<td data-label="Added by" class="small muted"><div>you · <time [^>]+>[^<]+<\/time><\/div><\/td>/, "who and when stay in one block on a phone");
   noCredentials(h2);
 

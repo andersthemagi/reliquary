@@ -284,6 +284,13 @@ test("stylesheet: stacked tables on phones label each cell from data-label", () 
   assert.match(phone, /table\.table-stack \{ min-width: 0; \}/);
 });
 
+test("stylesheet: a link's URL wraps instead of widening the Links table, which shares the Rules table's nowrap second column", () => {
+  const nowrap = CSS.indexOf(".rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }");
+  const url = /\n\.rules-table td\.link-url \{ width: auto; white-space: normal; overflow-wrap: anywhere; \}/.exec(CSS);
+  assert.ok(nowrap >= 0 && url, "both rules exist");
+  assert.ok(url.index > nowrap, "the URL rule follows the rule it overrides: same specificity, so order decides");
+});
+
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {
   for (const sel of [/\n\.secondary \{/, /\n\.ghost \{/, /\n\.ghost:hover \{/, /\n\.danger \{/, /\n\.danger\.solid \{/, /\n\.primary, a\.button\.primary \{/]) assert.match(CSS, sel);
 });

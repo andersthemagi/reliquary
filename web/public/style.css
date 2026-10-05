@@ -1608,6 +1608,10 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
 .rules-table .rule-owners { display: inline-block; margin-top: var(--space-1); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .owner-form, .watch-add { scroll-margin-top: var(--space-10); }
 .rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }
+/* Links reuses this table, but its second column is a URL of up to 2048
+   characters: it must wrap, or the table scrolls sideways and pushes the
+   actions out of sight. Same specificity as the rule above, so it follows it. */
+.rules-table td.link-url { width: auto; white-space: normal; overflow-wrap: anywhere; }
 .rules-table .rule-actions .action-list { min-width: 240px; }
 .rule-form { scroll-margin-top: var(--space-10); }
 .rule-form .hint + .hint { margin-top: var(--space-1); }
