@@ -176,23 +176,32 @@ test("rules: the header has the crumb and Add rule; the rules table comes first,
 
 test("rules: every row labels its cells for phones", async () => {
   const h = await page(rulesOf(V.main));
-  const row = /<tr>\s*<td data-label="Path"><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)?.[0];
+  const row = /<tr>\s*<td data-label="Path"><div><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)?.[0];
   assert.ok(row);
   for (const label of ["Path", "Policy", "Approvals needed", "Set by"]) assert.match(row, new RegExp(`data-label="${label}"`));
   assert.match(row, /<td data-label="Approvals needed" class="num">2<\/td>/);
-  const open = /<tr>\s*<td data-label="Path"><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  const open = /<tr>\s*<td data-label="Path"><div><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(open, /<td data-label="Approvals needed" class="num"><span class="muted">Not needed<\/span><\/td>/);
 });
 
 test("rules: each rule says who set it and when, relative with the exact time on hover", async () => {
   const h = await page(rulesOf(V.main));
-  const row = /<tr>\s*<td data-label="Path"><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
-  assert.match(row, /<td data-label="Set by" class="small muted">you · <time datetime="\d{4}-\d\d-\d\dT[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/td>/);
+  const row = /<tr>\s*<td data-label="Path"><div><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  assert.match(row, /<td data-label="Set by" class="small muted"><div>you · <time datetime="\d{4}-\d\d-\d\dT[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/div><\/td>/);
+});
+
+// A phone's stacked row makes each child of a cell its own grid item, which
+// put "Folder" under the label column and "you ·" apart from its time.
+test("rules: a cell of several parts keeps them in one block, so a phone's stacked row doesn't split them", async () => {
+  const h = await page(rulesOf(V.main));
+  const row = /<tr>\s*<td data-label="Path">[\s\S]*?<\/tr>/.exec(h)[0];
+  assert.match(row, /<td data-label="Path"><div><code class="rule-path">[^<]+<\/code><span class="rule-scope">[\s\S]*?<\/span><\/div><\/td>/);
+  assert.match(row, /<td data-label="Set by" class="small muted"><div>[\s\S]*?<\/div><\/td>/);
 });
 
 test("rules: owners get Change and Remove for each rule in one menu", async () => {
   const h = await page(rulesOf(V.main));
-  const row = /<tr>\s*<td data-label="Path"><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  const row = /<tr>\s*<td data-label="Path"><div><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(row, /<summary class="button quiet icon-button" aria-label="Actions for the rule on clients\/"/);
   assert.match(row, new RegExp(`<a class="menu-item" href="/v/${V.main}/rules\\?change=clients%2F#add-rule"><span class="menu-item-title">Change</span>`));
   assert.match(row, new RegExp(`<a class="menu-item danger" href="/v/${V.main}/rules\\?remove=clients%2F"><span class="menu-item-title">Remove</span>`));

@@ -163,11 +163,12 @@ after(async () => {
 
 test("owners page: an owner's Rules page has Owners in each rule's menu, and every member sees how many named owners a rule has", async () => {
   const h = await page(pat, `/v/${V.main}/rules`);
-  const legal = /<tr>\s*<td data-label="Path"><code class="rule-path">legal\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  const legal = /<tr>\s*<td data-label="Path"><div><code class="rule-path">legal\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(legal, new RegExp(`<a class="rule-owners" href="${re(owners(V.main, "legal/"))}">2 named owners</a>`));
+  assert.match(legal, /<\/span><a class="rule-owners"[^>]*>[^<]+<\/a><\/div><\/td>/, "the count stays in the path's block, so a phone doesn't split it from the path");
   assert.match(legal, new RegExp(`<a class="menu-item" href="${re(owners(V.main, "legal/"))}"><span class="menu-item-title">Owners</span><span class="menu-item-meta">2 named owners</span></a>`));
   assert.ok(legal.indexOf(">Change<") < legal.indexOf(">Owners<") && legal.indexOf(">Owners<") < legal.indexOf(">Remove<"), "between Change and Remove");
-  const notes = /<tr>\s*<td data-label="Path"><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  const notes = /<tr>\s*<td data-label="Path"><div><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.doesNotMatch(notes, /rule-owners/, "no count where nobody is named");
   assert.match(notes, /<span class="menu-item-title">Owners<\/span><span class="menu-item-meta">Name people who write it directly<\/span>/);
   const e = await page(edda, `/v/${V.main}/rules`);
@@ -193,7 +194,7 @@ test("owners page: lists a path's named owners with their role in the vault, a v
   const row = /<tr><td>vio@example\.test[\s\S]*?<\/tr>/.exec(h)?.[0];
   assert.ok(row, "Vio's row, by email");
   assert.match(row, /<td class="small" data-label="Role in the vault">Viewer<span class="token-client">Writes and approves this path only; reads the rest<\/span><\/td>/);
-  assert.match(row, /<td class="small" data-label="Named">by you · <time /);
+  assert.match(row, /<td class="small" data-label="Named"><div>by you · <time [^>]+>[^<]+<\/time><\/div><\/td>/, "who and when stay in one block on a phone");
   assert.match(row, new RegExp(`<a class="button quiet" href="${re(owners(V.main, "hr/"))}&amp;remove=${VIO}" aria-label="Remove vio@example\\.test as an owner of hr/">Remove</a>`));
   const legal = await page(pat, owners(V.main, "legal/"));
   assert.match(legal, /<td class="small" data-label="Role in the vault">Editor<\/td>/, "an editor is just an editor");

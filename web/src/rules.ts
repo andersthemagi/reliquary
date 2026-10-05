@@ -114,12 +114,12 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
           <tbody>${list.map((r) => {
             const parent = parentRule(list, r.path);
             return html`<tr>
-              <td data-label="Path"><code class="rule-path">${r.path}</code><span class="rule-scope">${r.path.endsWith("/") ? "Folder" : "File"}${
+              <td data-label="Path"><div><code class="rule-path">${r.path}</code><span class="rule-scope">${r.path.endsWith("/") ? "Folder" : "File"}${
                 parent ? html` · overrides <code>${parent.path}</code>` : ""
-              }</span>${r.owners ? html`<a class="rule-owners" href="${ownersPath(id, r.path)}">${namedOwners(r.owners)}</a>` : ""}</td>
+              }</span>${r.owners ? html`<a class="rule-owners" href="${ownersPath(id, r.path)}">${namedOwners(r.owners)}</a>` : ""}</div></td>
               <td data-label="Policy">${policyBadge(r.policy)}</td>
               <td data-label="Approvals needed" class="num">${r.policy === "canon" ? r.quorum : html`<span class="muted">Not needed</span>`}</td>
-              <td data-label="Set by" class="small muted">${r.set_at ? html`${who(ctx, r.set_by, null)} · ${time(r.set_at)}` : ""}</td>
+              <td data-label="Set by" class="small muted">${r.set_at ? html`<div>${who(ctx, r.set_by, null)} · ${time(r.set_at)}</div>` : ""}</td>
               ${owner
                 ? html`<td class="num rule-actions">${menu({
                     label: `Actions for the rule on ${r.path}`,

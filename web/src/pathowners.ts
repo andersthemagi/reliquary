@@ -123,7 +123,7 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
           <tbody>${owners.map(
             (o) => html`<tr><td>${label(o)}${o.user_id === ctx.userId ? html` <span class="badge">You</span>` : ""}</td>
               <td class="small" data-label="Role in the vault">${roleCell(o)}</td>
-              <td class="small" data-label="Named">${o.added_by ? html`by ${who(ctx, o.added_by, null)} · ` : ""}${time(o.added_at)}</td>
+              <td class="small" data-label="Named"><div>${o.added_by ? html`by ${who(ctx, o.added_by, null)} · ` : ""}${time(o.added_at)}</div></td>
               ${owner
                 ? html`<td class="num row-actions"><a class="button quiet" href="${ownersPath(id, path)}&amp;remove=${o.user_id}" aria-label="Remove ${label(o)} as an owner of ${path}">Remove</a></td>`
                 : ""}</tr>`,
