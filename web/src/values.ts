@@ -29,6 +29,7 @@ import {
   type MenuItem,
   type Raw,
 } from "./html.js";
+import { failure } from "./failure.js";
 import { message, notFound, who, type Ctx, type Reply, type Vault } from "./pages.js";
 import { SecretsError, variablesConfigured } from "./secrets.js";
 import {
@@ -42,7 +43,7 @@ import {
   type Environment,
   type Variable,
 } from "./variables.js";
-import { base, client, crumbs, ENV, NAME, OWNERS_ONLY_HELP, plural, q, readsLog, refusal, sectionHeader, shell, theVault, waitingIn, writes } from "./variablespage.js";
+import { base, client, crumbs, ENV, NAME, OWNERS_ONLY_HELP, plural, q, readsLog, refusal, sectionHeader, shell, theVault, waitingIn, withRef, writes } from "./variablespage.js";
 import { importPath } from "./imports.js";
 
 const slotQuery = (name: string, environment: string) => `?name=${q(name)}&environment=${q(environment)}`;
@@ -161,7 +162,9 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
 // ---------------------------------------------------------------------------
 // Set or change
 
-type SetForm = { name?: string; environment?: string; environments?: string[]; error?: string };
+// `replaces`: the ticked environments that already hold a value, which the
+// person has to confirm one by one before the save replaces them.
+type SetForm = { name?: string; environment?: string; environments?: string[]; error?: string; replaces?: string[] };
 
 export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Promise<Reply> {
   const { environments, variables } = await listVariables(ctx.userId, v.id);
@@ -177,7 +180,9 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
       : lockedEnv
         ? `Only owners set values in ${f.environment}.`
         : "Your role in this vault can’t set variables. Ask an owner.";
-    return shell(ctx, v, title, html`${pageHeader({ crumb, title, path: exists })}${callout("warning", why)}`, 403);
+    // A POST that lands here was refused, so it gets a reference; a GET only explains.
+    const shown = ctx.method === "POST" ? withRef(403, !keyed ? "encryption" : "web app (the set form)", why) : why;
+    return shell(ctx, v, title, html`${pageHeader({ crumb, title, path: exists })}${callout("warning", shown)}`, 403);
   }
   // Every environment as a checkbox; the ones this role can't set are shown,
   // disabled, so the rule is visible where the choice is made. One is ticked
@@ -186,7 +191,7 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
   const chosen = asked.length ? asked : [allowed[0].name];
   const locked = environments.filter((e) => !writes(v.role, e)).map((e) => e.name);
   const envChoice = exists
-    ? html`<input type="hidden" name="environment" value="${f.environment}"><p class="small"><span class="muted">Environment</span> <strong>${f.environment}</strong></p>`
+    ? html`<input type="hidden" name="environment" value="${f.environment}"><input type="hidden" name="replace" value="${f.environment}"><p class="small"><span class="muted">Environment</span> <strong>${f.environment}</strong></p>`
     : html`<fieldset class="var-envs">
         <legend>Environments</legend>
         ${environments.map((e) => {
@@ -208,6 +213,9 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
       primary: html`<button class="primary" form="set-variable">${button}</button>`,
     })}
     ${f.error ? refusal(f.error) : ""}
+    ${f.replaces?.length
+      ? callout("warning", html`<p><strong><code>${f.name}</code> already has a value in ${f.replaces.join(", ")}.</strong> Saving replaces it, and the old value is gone. To go ahead, tick the replace box for each one below, enter the value again and save. To keep one, untick its environment.</p>`)
+      : ""}
     <p class="lede">${exists
       ? html`The new value replaces the old one in <strong>${f.environment}</strong>. Anyone who already read the old value still has it: rotate it at its provider too.`
       : "Programs run with the CLI get it as an environment variable. The value is encrypted before it’s stored, and isn’t shown here again unless an owner or editor reveals it."}</p>
@@ -220,6 +228,11 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
             pattern="[A-Za-z_][A-Za-z0-9_]*" autocomplete="off" autocapitalize="off" spellcheck="false">
           <p class="hint">Letters, digits and underscores, not starting with a digit. Names that change how programs start, like <code>PATH</code> or <code>NODE_OPTIONS</code>, are refused.</p>`}
       ${envChoice}
+      ${f.replaces?.length
+        ? html`<fieldset class="var-replace"><legend>Existing values</legend>${f.replaces.map(
+            (e) => html`<label class="choice"><input type="checkbox" name="replace" value="${e}"> Replace the existing value in ${e}</label>`,
+          )}</fieldset>`
+        : ""}
       <label for="vv">Value</label>
       <textarea id="vv" name="value" class="short secret-input" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
       <p class="hint">Up to 64 KiB of text. It isn’t shown back after you save.</p>
@@ -232,13 +245,23 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
 export async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
   const name = (ctx.form.get("name") ?? "").trim();
   const environments = [...new Set(ctx.form.getAll("environment"))].filter((e) => ENV.test(e));
-  const value = ctx.form.get("value") ?? "";
+  // A browser sends a textarea's line breaks as CRLF, and a multi-line secret
+  // (a PEM key) has to reach a program as it was written.
+  const value = (ctx.form.get("value") ?? "").replaceAll("\r\n", "\n");
   // The form again, with name and environments kept and the value dropped.
   // One environment alone still reads as a change when the name has a value there.
   const again = (error: string, status = 400) =>
     setForm(ctx, v, { name, environment: environments.length === 1 ? environments[0] : undefined, environments, error }, status);
   if (!environments.length) return again("Tick at least one environment.");
   if (!value) return again("Enter a value.");
+  // Adding a name that already has a value in a ticked environment would
+  // replace it, the old value gone, and only then say so. The form opened from
+  // a value's menu says it replaces (its title), so it carries the tick itself.
+  const confirmed = ctx.form.getAll("replace");
+  const { environments: known, variables } = await listVariables(ctx.userId, v.id);
+  const held = variables.find((x) => x.name === name)?.values.map((y) => y.environment) ?? [];
+  const replaces = environments.filter((e) => held.includes(e) && !confirmed.includes(e) && known.some((k) => k.name === e && writes(v.role, k)));
+  if (replaces.length) return setForm(ctx, v, { name, environments, replaces }, 409);
   try {
     const actions = await setVariableIn(ctx.userId, v.id, name, environments, value);
     const where = (what: "set" | "rotate") => environments.filter((_, i) => actions[i] === what).join(", ");
@@ -249,13 +272,9 @@ export async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
     return { redirect: base(v.id) };
   } catch (err) {
     if (err instanceof SecretsError) {
-      return again(
-        !variablesConfigured()
-          ? "This server has no encryption key, so values can’t be set here."
-          : value.includes("\u0000")
-            ? "A value can’t contain a NUL character."
-            : "A value is at most 64 KiB.",
-      );
+      // No key: the form explains it, with a reference (setForm).
+      if (!variablesConfigured()) return again("This server has no encryption key, so values can’t be set here.", 403);
+      return again(withRef(400, "encryption", value.includes("\u0000") ? "A value can’t contain a NUL character." : "A value is at most 64 KiB."));
     }
     const code = (err as { code?: string }).code;
     return again(message(err), code === "42501" ? 403 : code === "P0002" ? 404 : 400);
@@ -270,7 +289,12 @@ export async function confirmDelete(ctx: Ctx, v: Vault): Promise<Reply> {
   const environment = ctx.url.searchParams.get("environment") ?? "";
   if (!NAME.test(name) || !ENV.test(environment)) return notFound(ctx);
   const { variables } = await listVariables(ctx.userId, v.id);
-  if (!variables.some((x) => x.name === name && x.values.some((y) => y.environment === environment))) return notFound(ctx);
+  // A Delete link outlives its value (deleted in another tab, or by someone
+  // else): the vault exists, so say what changed and go back.
+  if (!variables.some((x) => x.name === name && x.values.some((y) => y.environment === environment))) {
+    ctx.setFlash(`${name} no longer has a value in ${environment}.`, "warning");
+    return { redirect: base(v.id) };
+  }
   const title = `Delete ${name}`;
   const body = html`<div class="var-confirm">${confirmPage({
     title,
@@ -305,24 +329,35 @@ export async function reveal(ctx: Ctx, v: Vault): Promise<Reply> {
   const name = ctx.form.get("name") ?? "";
   const environment = ctx.form.get("environment") ?? "";
   const back = base(v.id);
-  const fail = (status: number, text: Raw | string) =>
-    shell(ctx, v, `Reveal ${name}`, html`${pageHeader({ crumb: crumbs(v, { label: `Reveal ${name}` }), title: `Reveal ${name}`, path: true, primary: html`<a class="button" href="${back}">Back to variables</a>` })}
-      ${refusal(text)}`, status, back);
-  if (!NAME.test(name) || !ENV.test(environment)) return fail(404, "There’s no such variable.");
+  // Each refusal is logged under a reference, which the page shows with the
+  // reason. `shown` is the reason with markup, where `why` is the same in
+  // plain words for the log.
+  const fail = (status: number, where: string, why: string, shown?: Raw) => {
+    const f = failure({ status, where, why });
+    return shell(ctx, v, `Reveal ${name}`, html`${pageHeader({ crumb: crumbs(v, { label: `Reveal ${name}` }), title: `Reveal ${name}`, path: true, primary: html`<a class="button" href="${back}">Back to variables</a>` })}
+      ${refusal(html`${shown ?? f.why} (ref ${f.ref})`)}`, status, back);
+  };
+  const db = "database (function public.reveal_variable)";
+  if (!NAME.test(name) || !ENV.test(environment)) return fail(404, "web app (the reveal form)", "There’s no such variable.");
   // Without the key nothing could be opened: don't let the database log a
   // reveal that shows nothing.
-  if (!variablesConfigured()) return fail(503, "This server has no encryption key, so values can’t be revealed here.");
+  if (!variablesConfigured()) return fail(503, "encryption", "This server has no encryption key, so values can’t be revealed here.");
   const r = await revealVariable(ctx.userId, v.id, name, environment);
   if (!r.ok) {
     switch (r.error) {
       case "forbidden":
-        return fail(403, `Your role can’t reveal values in ${environment}. The attempt is in the access log.`);
+        return fail(403, db, `Your role can’t reveal values in ${environment}. The attempt is in the access log.`);
       case "decrypt_failed":
-        return fail(500, html`<code>${name}</code> in ${environment} can’t be decrypted. Set it again to replace it.`);
+        return fail(
+          500,
+          "encryption",
+          `The value of ${name} in ${environment} can’t be decrypted: it was altered, belongs to another name or environment, or was sealed under a key this server doesn’t hold. Set it again to replace it.`,
+          html`<code>${name}</code> in ${environment} can’t be decrypted. Set it again to replace it.`,
+        );
       case "unauthorized":
-        return fail(401, "Your session ended. Sign in and try again.");
+        return fail(401, db, "Your session ended. Sign in and try again.");
       default:
-        return fail(404, html`<code>${name}</code> has no value in ${environment}.`);
+        return fail(404, db, `${name} has no value in ${environment}.`, html`<code>${name}</code> has no value in ${environment}.`);
     }
   }
   const title = `${name} in ${environment}`;
