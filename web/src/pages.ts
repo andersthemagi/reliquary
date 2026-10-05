@@ -147,10 +147,15 @@ export const notFound = (ctx: Ctx): Reply => {
     where: inVault ? "database (only what’s shared with you is visible)" : "web app",
     why: inVault ? "There’s no such vault, file or proposal, or it isn’t shared with you." : `There’s no page at ${ctx.url.pathname}.`,
   });
+  // The way back is offered only to a member, from the top bar's own list of
+  // their vaults: someone else's vault must look exactly like one that
+  // doesn't exist.
+  const mine = inVault ? ctx.shell?.vaults.find((v) => v.id === ctx.url.pathname.split("/")[2]) : undefined;
   return {
     status: 404,
     html: errorPage(f, {
       title: "Not found",
+      ...(mine ? { back: vaultPath(mine.id), backLabel: `Back to ${mine.name}` } : {}),
       // The flash too: a refused write of a new path lands here, and its
       // message must not be dropped.
       user: ctx.userId, flash: ctx.flash, theme: ctx.theme, csrf: ctx.csrf, path: "/", shell: ctx.shell,
@@ -639,7 +644,7 @@ async function route(ctx: Ctx): Promise<Reply> {
     if (!get && action === "/revise") return reviseProposal(ctx, id, pid);
     if (!get && action === "/decide") return decide(ctx, id, pid);
     if (!get && action === "/repropose") return repropose(ctx, id, pid);
-    if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx));
+    if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx), (c) => proposalView(ctx, id, pid, undefined, c));
     if (!get && action === "/snooze") return snooze(ctx, id, pid, () => notFound(ctx));
     if (!get && action === "/unsnooze") return unsnooze(ctx, id, pid, () => notFound(ctx));
   }

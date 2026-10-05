@@ -386,6 +386,11 @@ export function when(d: Date | null | undefined): string {
 // Hidden field carrying the CSRF token for every form.
 export const csrfField = (token: string) => html`<input type="hidden" name="csrf" value="${token}">`;
 
+// A text to put inside <textarea>…</textarea>. Browsers drop one newline
+// right after the opening tag, so a text that starts with a newline would
+// lose it on every save unless there is one more in front.
+export const textareaText = (text: string | null | undefined): Raw => html`${/^[\r\n]/.test(text ?? "") ? "\n" : ""}${text ?? ""}`;
+
 // ---------------------------------------------------------------------------
 // Components. The shared parts every page builds from; the inventory, with
 // when to use each, is in docs/research/ui-design-system.md ("Components as

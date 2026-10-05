@@ -8,7 +8,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
-import { csrfField, html, menu, time, when, type Raw } from "./html.js";
+import { csrfField, html, menu, textareaText, time, when, type Raw } from "./html.js";
 import type { Ctx, Reply } from "./pages.js";
 import { personRef, UUID } from "./personref.js";
 
@@ -130,10 +130,14 @@ export const rowSnooze = (ctx: Ctx, vaultId: string, pid: string, label: string)
 // ---------------------------------------------------------------------------
 // The proposal page's discussion, at the end of the page.
 
+// A comment the database refused, shown again with the proposal's page
+// (answered 400): its reason, and the comment as typed.
+export type Commented = { error: string; body: string };
+
 export async function threadSection(
   c: pg.PoolClient,
   ctx: Ctx,
-  o: { vaultId: string; p: { id: string; status: string }; canWrite: boolean },
+  o: { vaultId: string; p: { id: string; status: string }; canWrite: boolean; comment?: Commented },
 ): Promise<Raw> {
   const { vaultId: id, p } = o;
   const entries = (
@@ -164,7 +168,7 @@ export async function threadSection(
       ? html`<form method="post" action="${proposalPath(id, p.id, "/comment")}" class="panel comment">
           ${csrfField(ctx.csrf)}
           <label for="comment">Add to the discussion</label>
-          <textarea id="comment" name="body" class="short" maxlength="4000" required></textarea>
+          <textarea id="comment" name="body" class="short" maxlength="4000" required>${textareaText(o.comment?.body)}</textarea>
           <p class="hint">Everyone in this vault can read it, and so can their agents, as quoted text. A comment doesn’t approve or change the proposal.</p>
           <div class="actions"><button>Comment</button></div>
         </form>`
@@ -183,17 +187,28 @@ async function inVault(c: pg.PoolClient, id: string, pid: string): Promise<boole
   return (await c.query(`select 1 from public.proposals where id = $1 and vault_id = $2`, [pid, id])).rowCount === 1;
 }
 
-export async function postComment(ctx: Ctx, id: string, pid: string, notFound: () => Reply): Promise<Reply> {
+// `again` shows the proposal's page with a refused comment kept in its box.
+export async function postComment(
+  ctx: Ctx,
+  id: string,
+  pid: string,
+  notFound: () => Reply,
+  again: (refused: Commented) => Promise<Reply>,
+): Promise<Reply> {
+  const body = (ctx.form.get("body") ?? "").replaceAll("\r\n", "\n");
   try {
     const found = await asPerson(ctx.userId, async (c) => {
       if (!(await inVault(c, id, pid))) return false;
-      await c.query(`select public.comment_on_proposal($1, $2)`, [pid, (ctx.form.get("body") ?? "").replaceAll("\r\n", "\n")]);
+      await c.query(`select public.comment_on_proposal($1, $2)`, [pid, body]);
       return true;
     });
     if (!found) return notFound();
     ctx.setFlash("Comment added.", "success");
   } catch (err) {
-    ctx.setFlash(message(err));
+    const error = message(err);
+    const shown = await again({ error, body });
+    if (shown.status === 400) return shown;
+    ctx.setFlash(error);
   }
   return { redirect: `${proposalPath(id, pid)}#discussion` };
 }

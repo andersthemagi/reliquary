@@ -53,7 +53,7 @@ Reliquary never shows a variable's value, a token, a key, a password, a file's t
 
 ## What each surface shows
 
-The web app shows an error page with the right HTTP status (400, 403, 404, 409, 413, 429, 500, 502, 503 or 504), the four fields, and **Details to send if you report this**: open it for the same fields as plain text to paste into a report. A refusal on a form you just sent (you aren't allowed, a name is taken) shows in red under the title of the page you were on, ending with its reference, and screen readers announce it at once. When a form works, the message saying what was done shows in the same place.
+The web app shows an error page with the right HTTP status (400, 403, 404, 409, 413, 429, 500, 502, 503 or 504), the four fields, and **Details to send if you report this**: open it for the same fields as plain text to paste into a report. A refusal on a form you just sent (you aren't allowed, a name is taken) shows in red under the title of the page you were on, ending with its reference, and screen readers announce it at once. When a form works, the message saying what was done shows in the same place. A Not found page inside a vault you belong to has a button back to that vault, named for it; for a vault you don't belong to it has only **Home**, the same as for a vault that doesn't exist.
 
 An MCP tool error has two lines: the first says what failed and why, the second gives what, where and the reference:
 
