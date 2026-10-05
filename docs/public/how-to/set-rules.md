@@ -44,7 +44,7 @@ A rule saved before paths were checked, on a path like `../x`, never applied to 
 
 ## Name a path's owners
 
-A rule's **⋯** menu also has **Owners**: the people who write that path directly while it stays canon for everyone else. See [Path ownership](../concepts/path-ownership.md#name-an-owner).
+A rule's **⋯** menu also has **Named owners**: the people who write that path directly while it stays canon for everyone else. See [Path ownership](../concepts/path-ownership.md#name-an-owner).
 
 ## Change the vault default
 
