@@ -234,6 +234,11 @@ test("menu: a ⋯ menu opens from its button, not its table cell, so a table or 
   assert.match(CSS, /\.var-menu > \.menu \{[^}]*transform: translateX\(calc\(-100% \+ 32px\)\)/);
 });
 
+test("stylesheet: a list box doesn't clip a row's open menu (the inbox's Snooze), though it clips rows to its corners otherwise", () => {
+  assert.match(CSS, /\.rows \{[^}]*overflow: hidden;/);
+  assert.match(CSS, /\.rows:has\(\.menu-wrap\[open\]\) \{ overflow: visible; \}/);
+});
+
 // ---------------------------------------------------------------------------
 // Confirm pages
 

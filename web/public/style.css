@@ -590,6 +590,9 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5);
   padding: var(--space-4) var(--space-5); min-height: 56px; border-top: 1px solid var(--border);
 }
+/* The box clips its rows to its rounded corners; while a row's menu is open
+   it must not, or the menu is cut to a sliver under the last row. */
+.rows:has(.menu-wrap[open]) { overflow: visible; }
 .rows li:first-child { border-top: 0; }
 .rows li:hover { background: var(--bg-subtle); }
 .rows .name { font-weight: 500; color: var(--fg); text-decoration: none; overflow-wrap: anywhere; }
