@@ -242,3 +242,43 @@ test("environments page: the access log shows each change, and no value reached 
   noValues(await page(vp("/environments")));
   noValues(log);
 });
+
+// A refused add or rename answers the same form (400) with what was typed
+// still in it: the person has to correct it, not retype it.
+test("environments page: a refused environment name stays in the Add form to correct, with the box kept", async () => {
+  for (const name of ["Bad Name", "production"]) {
+    const r = await post(vp("/environments"), { name, owners_only: "1" });
+    assert.equal(r.status, 400, name);
+    const h = await r.text();
+    assert.match(h, new RegExp(`<input id="en" type="text" name="name" value="${name}"`), name);
+    assert.match(h, /<input type="checkbox" name="owners_only" value="1" checked>/, "the box is kept");
+  }
+});
+
+test("environments page: a refused rename target stays in the New name field to correct", async () => {
+  await post(vp("/environments"), { name: "wip" });
+  try {
+    for (const to of ["Bad Name", "production"]) {
+      const r = await post(vp("/environments/rename"), { from: "wip", to });
+      assert.equal(r.status, 400, to);
+      assert.match(await r.text(), new RegExp(`<input id="et" type="text" name="to" value="${to}"`), to);
+    }
+  } finally {
+    await post(vp("/environments/delete"), { name: "wip", confirm_name: "wip" });
+  }
+  assert.doesNotMatch(await envs(), /wip/);
+});
+
+test("environments page: a Rename or Delete link for an environment that is gone goes back to the list, saying so, not to a page that says nothing exists", async () => {
+  const warned = async (r) => {
+    assert.equal(r.status, 303, "back to Environments");
+    assert.equal(r.headers.get("location"), vp("/environments"));
+    const h = await page(r.headers.get("location"));
+    assert.match(h, /<p class="callout warning flash" role="status">There’s no environment named gone in this vault; it may have been renamed or deleted already\.<\/p>/);
+    assert.doesNotMatch(h, /no such vault, file or proposal/);
+  };
+  await warned(await get(vp("/environments/rename?name=gone")));
+  await warned(await get(vp("/environments/delete?name=gone")));
+  await warned(await post(vp("/environments/rename"), { from: "gone", to: "elsewhere" }));
+  await warned(await post(vp("/environments/delete"), { name: "gone", confirm_name: "gone" }));
+});

@@ -20,6 +20,14 @@ async function ownersOnlyPage(ctx: Ctx, v: Vault, title: string): Promise<Reply>
     ${callout("warning", "Only owners manage a vault’s environments.")}`, 403);
 }
 
+// A Rename or Delete link outlives its environment (renamed or deleted in
+// another tab): the vault is there, so the list is the place to land, not a
+// page that says nothing exists.
+function gone(ctx: Ctx, v: Vault, name: string): Reply {
+  ctx.setFlash(`There’s no environment named ${name} in this vault; it may have been renamed or deleted already.`, "warning");
+  return { redirect: envBase(v.id) };
+}
+
 export async function environmentsPage(ctx: Ctx, v: Vault, f: { name?: string; ownersOnly?: boolean; error?: string } = {}, status = 200): Promise<Reply> {
   const title = "Environments";
   if (v.role !== "owner") return ownersOnlyPage(ctx, v, title);
@@ -73,7 +81,7 @@ export async function createEnvironmentPost(ctx: Ctx, v: Vault): Promise<Reply> 
     return { redirect: envBase(v.id) };
   } catch (err) {
     const code = (err as { code?: string }).code;
-    return environmentsPage(ctx, v, { name: ENV.test(name) ? name : "", ownersOnly, error: message(err) }, code === "42501" ? 403 : code === "P0002" ? 404 : 400);
+    return environmentsPage(ctx, v, { name, ownersOnly, error: message(err) }, code === "42501" ? 403 : code === "P0002" ? 404 : 400);
   }
 }
 
@@ -81,7 +89,7 @@ export async function renamePage(ctx: Ctx, v: Vault, from: string, f: { to?: str
   const title = `Rename ${from}`;
   if (v.role !== "owner") return ownersOnlyPage(ctx, v, title);
   const { environments, variables } = await listVariables(ctx.userId, v.id);
-  if (!environments.some((e) => e.name === from)) return notFound(ctx);
+  if (!environments.some((e) => e.name === from)) return gone(ctx, v, from);
   const n = variables.filter((x) => x.values.some((y) => y.environment === from)).length;
   const body = html`
     ${pageHeader({
@@ -118,7 +126,7 @@ export async function renamePost(ctx: Ctx, v: Vault): Promise<Reply> {
         : "This server has no encryption key, and renaming seals each value again for the new name. Nothing was renamed." }, 409);
     }
     const code = (err as { code?: string }).code;
-    return renamePage(ctx, v, from, { to: ENV.test(to) ? to : "", error: message(err) }, code === "42501" ? 403 : code === "P0002" ? 404 : 400);
+    return renamePage(ctx, v, from, { to, error: message(err) }, code === "42501" ? 403 : code === "P0002" ? 404 : 400);
   }
 }
 
@@ -126,7 +134,7 @@ export async function deleteEnvPage(ctx: Ctx, v: Vault, name: string, error?: st
   const title = `Delete ${name}`;
   if (v.role !== "owner") return ownersOnlyPage(ctx, v, title);
   const { environments, variables } = await listVariables(ctx.userId, v.id);
-  if (!environments.some((e) => e.name === name)) return notFound(ctx);
+  if (!environments.some((e) => e.name === name)) return gone(ctx, v, name);
   const names = variables.filter((x) => x.values.some((y) => y.environment === name)).map((x) => x.name);
   const body = html`<div class="var-confirm">${confirmPage({
     title,
