@@ -51,6 +51,8 @@ On the vault's **Variables** page, **Add a variable**: a name, the environments 
 
 The **Access log** tab on the Variables page lists every set, rotate, delete, read, reveal and refused attempt: when, who and from which client (the web app, the CLI, or an agent), what, which variables and which environment. Owners and editors can read it; viewers can't. Nobody can edit or delete a row, including the owner and Reliquary's operator. It is kept as long as the vault exists.
 
+The row for a value that an applied [import](imports.md) set says where it came from, **from a pasted import** or **from a CLI import sent by** whoever sent it, so it doesn't look like one typed by hand.
+
 A value that someone has read or revealed since it was last set is marked **Read since set** (or **Revealed since set**) in the Values table. Its **⋯** menu names who, and after a CLI read offers **Manage connections** to revoke the Reliquary CLI that read it. When you rotate a leaked value, that tells you whose copies are old.
 
 ## Encryption

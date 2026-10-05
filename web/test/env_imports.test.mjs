@@ -468,6 +468,18 @@ test("env push: a person applies it in the web UI; the CLI sees it applied, and 
   assert.doesNotMatch(await page(vp(V.push)), /waiting to be applied/);
 });
 
+test("env import log: the access log says an applied import set a value, and who sent it when it came from the CLI", async () => {
+  const pasted = await page(vp(V.own, "/log?name=API_KEY"));
+  assert.match(pasted, /data-label="What"><div>Rotated <span class="muted">from a pasted import<\/span><\/div>/);
+  assert.match(pasted, /data-label="What"><div>Set <span class="muted">from a pasted import<\/span><\/div>/);
+  const cli = await page(vp(V.push, "/log"));
+  assert.match(cli, /data-label="What"><div>Set <span class="muted">from a CLI import sent by you<\/span><\/div>/);
+  assert.match(cli, /data-label="What"><div>Rotated <span class="muted">from a CLI import sent by you<\/span><\/div>/);
+  assert.match(cli, /data-label="What"><div>Set<\/div>/, "a value typed by hand says nothing about a source");
+  noValues(pasted);
+  noValues(cli);
+});
+
 test("env push: refused without the push permission, for an editor's production, for a vault outside the sign-in, and for bad input", async () => {
   const nopush = await cliToken(RUTH, ruth.origin, false);
   const r1 = await pushTo(V.push, "development", nopush, { variables: { A: value("a") } });
