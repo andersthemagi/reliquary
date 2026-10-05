@@ -209,7 +209,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     if (!v) return null;
     const p = (
       await c.query(
-        `select p.*, cur.body as current_body, base.body as base_body, (private.rule_for(p.vault_id, p.path)).quorum
+        `select p.*, cur.body as current_body, f.current_version_id, base.body as base_body, (private.rule_for(p.vault_id, p.path)).quorum
            from public.proposals p
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
@@ -236,6 +236,10 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
       : false;
     const verb = verbOf(p);
     const live = p.status === "open" || p.status === "changes_requested";
+    // decide() applies a proposal only while the file is at the version it
+    // was proposed against, and neither Revise nor Edit, then approve moves
+    // that base, so a proposal whose file has moved on can only go stale.
+    const moved = p.status === "open" && (p.base_version_id ?? null) !== (p.current_version_id ?? null);
     const approvers = approvals.filter((a) => a.decision === "approve");
     const mine = approvals.some((a) => a.user_id === ctx.userId);
     const flags = live
@@ -276,7 +280,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
             noteMissing ? html` aria-invalid="true"` : ""
           }>${refused?.note ?? ""}</textarea>
           <div class="actions">
-            ${decidable
+            ${decidable && !moved
               ? html`<button class="primary" name="decision" value="approve">Approve</button>
                 <button name="decision" value="request_changes">Request changes</button>`
               : ""}
@@ -301,7 +305,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
           ? html`<p class="callout ${p.status === "applied" ? "success" : "neutral"} outcome-line">${ended}.</p>`
           : p.status === "changes_requested"
             ? html`<p class="callout neutral">Waiting for the proposer to revise.${rejectable ? " You can still edit it yourself, or reject it." : ""}</p>`
-            : p.status === "open" && mine
+            : p.status === "open" && mine && !moved
               ? html`<p class="callout neutral">You’ve decided on this revision. It needs more approvals before it applies.</p>`
               : "";
 
@@ -330,6 +334,12 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
           ? html`<ul class="risks" aria-label="Worth a closer look">${flags.map(
               (f) => html`<li><span class="badge attention">${f.short}</span> <span class="risk-long">${f.long}</span></li>`,
             )}</ul>`
+          : ""}
+        ${moved
+          ? callout(
+              "warning",
+              "The file changed after this was proposed. Approving it would mark it stale instead of applying it, and revising or editing it doesn’t change that. The diff below compares with the file as it is now. To go ahead, reject it and propose the same text again against the current version.",
+            )
           : ""}
         ${status}${controls ?? refusal}
       </div>
