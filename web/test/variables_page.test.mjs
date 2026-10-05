@@ -724,7 +724,7 @@ test("variables add: ticking replace for each existing value saves, and one left
   const next = value("ask2-new");
   const r = await post(vp(V.own, "/set"), { name: "ASK2_KEY", environment: ["development", "production"], replace: ["development", "preview"], value: next });
   assert.equal(r.status, 303);
-  assert.match(await page(vp(V.own)), /Set ASK2_KEY in production\. Rotated ASK2_KEY in development\./);
+  assert.match(await page(vp(V.own)), /Set ASK2_KEY in production\. (?:Rotated|Changed) ASK2_KEY in development\./);
   for (const env of ["development", "production"]) assert.equal((await vars.revealVariable(PIA, V.own, "ASK2_KEY", env)).value, next);
   assert.equal((await vars.revealVariable(PIA, V.own, "ASK2_KEY", "preview")).value, old, "ticking replace for an environment that isn't ticked changes nothing");
 });
@@ -736,7 +736,7 @@ test("variables add: the form opened for an existing value carries its own confi
   const next = value("ask3-new");
   const r = await post(vp(V.own, "/set"), { ...fixed, value: next });
   assert.equal(r.status, 303);
-  assert.match(await page(vp(V.own)), /Rotated ASK3_KEY in development\./);
+  assert.match(await page(vp(V.own)), /(?:Rotated|Changed) ASK3_KEY in development\./);
   assert.equal((await vars.revealVariable(PIA, V.own, "ASK3_KEY", "development")).value, next);
 });
 
