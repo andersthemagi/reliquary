@@ -102,3 +102,11 @@ test("decided diff: a stale proposal still compares with the file as it is now, 
   assert.deepEqual(lines(h, "del"), ["Moved by hand."]);
   assert.deepEqual(lines(h, "add"), ["After it moved, proposed."]);
 });
+
+test("decided diff: the split and rendered views call the earlier side Before, not Current", async () => {
+  const split = await page(ines, `${pp(P.change)}?diff=split`);
+  assert.match(split, /<span>Before<\/span><span><\/span><span>Proposed<\/span>/);
+  assert.doesNotMatch(split, /<span>Current<\/span>/);
+  const rendered = await page(ines, `${pp(P.create)}?diff=rendered`);
+  assert.match(rendered, /<section class="current" aria-label="Before">[\s\S]*There was no earlier version: this created the file\./);
+});

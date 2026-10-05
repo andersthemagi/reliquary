@@ -338,6 +338,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
         ? html`<div class="empty">This proposal’s content was erased.</div>`
         : diffSection({
             before: beforeOf(p),
+            earlier: againstBase(p),
             after: p.kind === "delete" ? null : p.body,
             mode: diffMode(ctx.url.searchParams),
             href: (m) => proposalPath(id, pid, `?diff=${m}`),
