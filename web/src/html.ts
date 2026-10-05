@@ -577,7 +577,11 @@ export function menu(o: {
     o.icon === "more"
       ? html`<summary class="button quiet icon-button" aria-label="${o.label}" title="${o.label}">${ICON_MORE}</summary>`
       : html`<summary class="button${o.ghost ? " quiet" : ""}">${o.label}</summary>`;
-  return html`<details class="menu-wrap action-menu${o.className ? ` ${o.className}` : ""}">
+  // A ⋯ button is a table row's menu: var-menu (named for Variables, where
+  // it began) opens the list from the button, not the cell, so the table's
+  // overflow never clips it.
+  const cls = [o.icon === "more" ? "var-menu" : "", o.className ?? ""].filter(Boolean).join(" ");
+  return html`<details class="menu-wrap action-menu${cls ? ` ${cls}` : ""}">
     ${summary}
     <div class="menu action-list${o.align === "left" ? " menu-left" : ""}">
       ${o.heading ? html`<p class="menu-label">${o.heading}</p>` : ""}

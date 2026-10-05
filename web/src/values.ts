@@ -93,7 +93,7 @@ function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByC
   return html`<td data-label="${label(e)}"><div class="var-cell">
     <span class="var-state" title="Set by ${setBy}, ${utc(value.updatedAt)} (version ${value.version})"><span class="var-set">Set</span> <span class="var-meta"><time datetime="${value.updatedAt.toISOString()}">${relativeTime(value.updatedAt)}</time><span class="var-by"> by ${setBy}</span></span>${
       seen ? html`<span class="var-readers" title="Since it was set: ${seen}">${readers.read ? "Read since set" : "Revealed since set"}</span>` : ""}</span>
-    ${may ? menu({ label: `Actions for ${where}`, icon: "more", items, heading: `Set by ${setBy}, ${utc(value.updatedAt)}.${seen ? ` Since then: ${seen}.` : ""}`, className: "var-menu" }) : ""}
+    ${may ? menu({ label: `Actions for ${where}`, icon: "more", items, heading: `Set by ${setBy}, ${utc(value.updatedAt)}.${seen ? ` Since then: ${seen}.` : ""}` }) : ""}
   </div></td>`;
 }
 
