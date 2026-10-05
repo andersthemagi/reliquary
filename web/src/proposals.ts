@@ -442,8 +442,9 @@ export async function proposalRevise(ctx: Ctx, id: string, pid: string): Promise
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
         <textarea id="content" name="content">${p.body}</textarea>
-        <label for="reason">What changed</label>
-        <input id="reason" type="text" name="reason" placeholder="Optional, for the reviewers">
+        <label for="reason">New reason (replaces the old one; leave empty to keep it)</label>
+        <p class="hint" id="reason-hint">Reviewers read this as why the proposal exists, so say why, not only what changed. It is also added to the discussion.</p>
+        <input id="reason" type="text" name="reason" aria-describedby="reason-hint">
         <div class="actions"><button class="primary">Save revision</button>
           <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a></div>
       </form>`;

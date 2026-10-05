@@ -55,7 +55,7 @@ Only people approve, request changes or reject, in the web app. An agent can't, 
 
 ## Revising
 
-Only the proposer revises: in the web app with **Revise**, or over MCP with `revise_proposal` (the person whose agent proposed counts as the proposer). A revision replaces the text, and approvals of earlier revisions stop counting.
+Only the proposer revises: in the web app with **Revise**, or over MCP with `revise_proposal` (the person whose agent proposed counts as the proposer). A revision replaces the text, and approvals of earlier revisions stop counting. The **New reason** field (`reason` over MCP) replaces the proposal's reason, the one reviewers read as why it was proposed, and is also added to the discussion. Leave it empty to keep the old reason.
 
 ## Threads
 
