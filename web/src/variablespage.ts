@@ -22,6 +22,7 @@
 
 import { asPerson } from "./db.js";
 import { NAME } from "./dotenv.js";
+import { failure } from "./failure.js";
 import { html, page, pageHeader, plural, type CrumbPart, type Raw, type Tab } from "./html.js";
 import { notFound, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
@@ -104,6 +105,15 @@ function sectionTabs(v: Vault, current: Section, waiting: number): Tab[] {
 // A refused form's reason, above the form: the danger callout as one
 // paragraph, read out at once.
 export const refusal = (why: Raw | string) => html`<p class="callout danger" role="alert">${why}</p>`;
+
+// A refusal a person reads in a flash or above a form: the reason written
+// for them, then the reference under which the server log holds what, where
+// and why (failure.ts). The reason is shown and logged as written, so it
+// never names a value.
+export function withRef(status: number, where: string, why: string): string {
+  const f = failure({ status, where, why });
+  return `${f.why} (ref ${f.ref})`;
+}
 
 // The imports from the CLI waiting in this vault, for the Imports tab's
 // count (owners and editors see them; others get none).

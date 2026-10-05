@@ -177,7 +177,7 @@ test("claims page: a vault with nothing claimed says so", async () => {
 
 test("claims page: lists the path (linked to the file), holder and label", async () => {
   const h = await page(noa, claimsUrl(V.main));
-  const row = /<tr><td data-label="Path">[\s\S]*?<\/tr>/.exec(h)[0];
+  const row = /<tr><td><a href="[^"]+">[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(row, new RegExp(`<a href="/v/${V.main}/file\\?path=notes%2Fdraft\\.md">notes/draft\\.md</a>`));
   assert.match(row, /edda@example\.test/);
   assert.match(row, /<span class="token-client">tidying this up<\/span>/);
@@ -200,6 +200,13 @@ test("claims page: a claim an agent took says which agent, for you and for someo
   assert.match(rowOf(h, "brief.md"), /data-label="Held by">you via Hermes<span class="token-client">Rewriting the brief<\/span>/);
   assert.match(rowOf(h, "plan.md"), /data-label="Held by">edda@example\.test via Atlas<\/td>/);
   assert.match(rowOf(h, "mine.md"), /data-label="Held by">you<\/td>/, "taken in person, so no agent");
+});
+
+// The member-list stylesheet makes a table's first cell a plain block on a
+// phone, where a label ran into the path: "Pathnotes/draft.md".
+test("claims page: the path cell has no phone label, like the first cell of every member-list table", async () => {
+  const h = await page(noa, claimsUrl(V.main));
+  assert.doesNotMatch(h, /<td data-label="Path"/);
 });
 
 // Claims is a tab of Diagnostics (src/diagnostics.ts): the page at its old

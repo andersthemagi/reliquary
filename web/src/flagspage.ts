@@ -93,9 +93,12 @@ export async function flags(ctx: Ctx, id: string): Promise<Reply> {
         ? flagsTable(ctx, id, r.flags)
         : emptyState({
             title: "Nothing new",
-            body: "Nothing is waiting on you, none of your proposals have changed, and nothing you watch has either.",
+            // Opening this page marks what it shows as seen, so an empty list
+            // means nothing new, not nothing waiting: a proposal can still be
+            // waiting on the person, and Proposals is where it is counted.
+            body: html`Nothing has changed since you last looked. Proposals still waiting on you are in <a href="${vaultPath(id, "/proposals")}">Proposals</a>.`,
           })}
-      ${r.more ? html`<p class="hint">More than ${LIMIT} flags were waiting; the oldest are shown first. Check back after these clear.</p>` : ""}
+      ${r.more ? html`<p class="hint">More than ${LIMIT} flags were waiting; the oldest are shown first. Reload for the next batch.</p>` : ""}
       <p class="hint">Your agents see the same flags over MCP (<code>list_flags</code>), kept separately from yours: opening this page doesn’t mark theirs shown, and their calls don’t mark yours. <a href="/docs/concepts/flags">About flags</a> · <a href="${vaultPath(id, "/config/watching")}">What you watch</a></p>`;
     return vaultShell(c, ctx, v, { section: "diagnostics" }, diagnosticsFrame(id, v, "flags", body));
   });

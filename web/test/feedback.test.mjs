@@ -220,6 +220,26 @@ test("feedback page: the account menu's Send feedback opens the page with the pa
   assert.deepEqual({ message: row.message, context: row.context, vault: row.vault_id }, { message: "From the account menu.", context: "/activity?person=me", vault: null });
 });
 
+test("feedback page: a page whose address carries a secret or the person's words is named without its query, in the form and when sent", async () => {
+  const token = `rli_${"ab".repeat(32)}`;
+  const popOf = (h) => h.slice(h.indexOf('<details class="menu-wrap feedback-pop">'), h.indexOf('<details class="menu-wrap inbox">'));
+  const invite = popOf(await page(S.mail, `/invite?token=${token}`));
+  assert.match(invite, /name="page" value="\/invite">/);
+  assert.doesNotMatch(invite, /rli_/);
+  const search = popOf(await page(S.mail, `/search?q=my+private+words`));
+  assert.match(search, /name="page" value="\/search">/);
+  assert.doesNotMatch(search, /private/);
+  const inVault = popOf(await page(S.mail, `/v/${vault}/search?q=salary`));
+  assert.match(inVault, new RegExp(`name="page" value="/v/${vault}/search">`));
+  // A hand-made form is held to the same: the operator never receives the token.
+  const h = await page(S.nobody, "/feedback");
+  const r = await post(S.nobody, "/feedback", { csrf: csrfOf(h), page: `/invite?token=${token}`, include_page: "1", kind: "bug", message: "Sent from an invite page." });
+  assert.equal(r.status, 303);
+  const row = (await mine()).at(-1);
+  assert.equal(row.message, "Sent from an invite page.");
+  assert.equal(row.context, "/invite");
+});
+
 test("feedback page: a refusal comes back with the reason and a reference, the message kept, and nothing stored", async () => {
   const before = (await mine()).length;
   const cases = [

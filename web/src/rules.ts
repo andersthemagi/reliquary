@@ -4,7 +4,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { claimRulesSection, loadClaimRules } from "./claimrulespage.js";
+import { claimRulesSummary, loadClaimRules } from "./claimrulespage.js";
 import { confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge, time, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
@@ -19,7 +19,9 @@ type Rule = { path: string; policy: string; quorum: number; set_by: string | nul
 // The Add form's values: as sent, when saving was refused (the refusal is
 // shown in the form with its reference, the typed values kept and the
 // refused field marked), or a rule's own, when "Change" was chosen.
-type RuleForm = { path: string; policy: string; quorum: string; error?: string; field?: "path" | "quorum" };
+// `changing` says the refused form was the Change form, so its path stays
+// locked: a refusal must not turn it back into a way to add a second rule.
+type RuleForm = { path: string; policy: string; quorum: string; changing?: boolean; error?: string; field?: "path" | "quorum" };
 
 // Rules in tree order: a folder's rule, then the rules inside it, before
 // the next folder ("clients/", "clients/acme/", "clients/acme/brief.md",
@@ -117,7 +119,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
     const claimRules = await loadClaimRules(c, id);
     const owner = v.role === "owner";
     // "Change" fills the form with the rule as it is.
-    const changing = change !== null ? list.find((r) => r.path === change) : undefined;
+    const changing = change !== null ? list.find((r) => r.path === change) : form?.changing ? list.find((r) => r.path === form.path) : undefined;
     const values: RuleForm | undefined =
       form ?? (changing ? { path: changing.path, policy: changing.policy, quorum: String(changing.quorum) } : undefined);
     // The refused field is marked invalid and described by the refusal first.
@@ -128,13 +130,18 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       ? html`<form method="post" action="${vaultPath(id, "/rules")}" class="panel rule-form" id="add-rule" aria-labelledby="add-rule-title">
           <h2 id="add-rule-title" class="form-title">${changing ? html`Change the rule on <code>${changing.path}</code>` : "Add or change a rule"}</h2>
           ${csrfField(ctx.csrf)}
+          ${changing ? html`<input type="hidden" name="changing" value="1">` : ""}
           ${form?.error ? html`<p class="callout danger" role="alert" id="rule-error">${form.error}</p>` : ""}
           <div class="fields">
-            <div><label for="pp">Path or folder</label><input id="pp" type="text" name="path" placeholder="clients/" required value="${values?.path ?? ""}"${described("path", "pp-hint")}></div>
+            <div><label for="pp">Path or folder</label><input id="pp" type="text" name="path" placeholder="clients/" required value="${values?.path ?? ""}"${changing ? " readonly" : ""}${described("path", "pp-hint")}></div>
             <div><label for="pol">Policy</label><select id="pol" name="policy"><option value="canon">Canon</option><option value="open"${values?.policy === "open" ? " selected" : ""}>Open</option></select></div>
             <div><label for="qq">Approvals needed</label><input id="qq" class="narrow" type="number" name="quorum" min="1" max="20" step="1" required value="${values?.quorum ?? "1"}"${described("quorum", "qq-hint")}></div>
           </div>
-          <p class="hint" id="pp-hint">A folder ends in <code>/</code>, like <code>clients/</code>, and covers everything inside it; a file is its full path, like <code>pricing.md</code>. Saving a path that has a rule replaces it.</p>
+          <p class="hint" id="pp-hint">${
+            changing
+              ? "A rule’s path can’t be changed here, since saving a new path would add a second rule. To move it, add a rule on the new path, then remove this one."
+              : html`A folder ends in <code>/</code>, like <code>clients/</code>, and covers everything inside it; a file is its full path, like <code>pricing.md</code>. Saving a path that has a rule replaces it.`
+          }</p>
           <p class="hint" id="qq-hint">For canon: how many different people must approve a change, 1 to 20. Open paths are written directly.</p>
           <div class="actions"><button class="primary">Save rule</button>${changing ? html`<a class="button quiet" href="${vaultPath(id, "/rules")}">Cancel</a>` : ""}</div>
         </form>`
@@ -146,19 +153,19 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
           <tbody>${list.map((r) => {
             const parent = parentRule(list, r.path);
             return html`<tr>
-              <td data-label="Path"><code class="rule-path">${r.path}</code><span class="rule-scope">${r.path.endsWith("/") ? "Folder" : "File"}${
+              <td data-label="Path"><div><code class="rule-path">${r.path}</code><span class="rule-scope">${r.path.endsWith("/") ? "Folder" : "File"}${
                 parent ? html` · overrides <code>${parent.path}</code>` : ""
-              }</span>${r.owners ? html`<a class="rule-owners" href="${ownersPath(id, r.path)}">${namedOwners(r.owners)}</a>` : ""}</td>
+              }</span>${r.owners ? html`<a class="rule-owners" href="${ownersPath(id, r.path)}">${namedOwners(r.owners)}</a>` : ""}</div></td>
               <td data-label="Policy">${policyBadge(r.policy)}</td>
               <td data-label="Approvals needed" class="num">${r.policy === "canon" ? r.quorum : html`<span class="muted">Not needed</span>`}</td>
-              <td data-label="Set by" class="small muted">${r.set_at ? html`${who(ctx, r.set_by, null)} · ${time(r.set_at)}` : ""}</td>
+              <td data-label="Set by" class="small muted">${r.set_at ? html`<div>${who(ctx, r.set_by, null)} · ${time(r.set_at)}</div>` : ""}</td>
               ${owner
                 ? html`<td class="num rule-actions">${menu({
                     label: `Actions for the rule on ${r.path}`,
                     icon: "more",
                     items: [
                       { href: `${vaultPath(id, "/rules")}?change=${q(r.path)}#add-rule`, label: "Change", description: "Policy or approvals needed" },
-                      { href: ownersPath(id, r.path), label: "Owners", description: r.owners ? namedOwners(r.owners) : "Name people who write it directly" },
+                      { href: ownersPath(id, r.path), label: "Named owners", description: r.owners ? namedOwners(r.owners) : "Name people who write it directly" },
                       { href: `${vaultPath(id, "/rules")}?remove=${q(r.path)}`, label: "Remove", description: "Asks you to confirm first", danger: true },
                     ],
                   })}</td>`
@@ -168,7 +175,6 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       : emptyState({
           title: "No rules yet",
           body: html`Every path is ${policyBadge(def)}, the vault default.${owner ? " Add a rule to make a folder like clients/ canon." : ""}`,
-          ...(owner ? { action: html`<a class="button" href="#add-rule">Add rule</a>` } : {}),
         });
 
     const checker = html`<form method="get" action="${vaultPath(id, "/rules")}" class="panel rule-check">
@@ -187,21 +193,25 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
       </form>`;
 
     // A refused or chosen form goes first, so its message is on the first
-    // screen; otherwise the rules, the thing people come to see, lead.
+    // screen; otherwise the rules, the thing people come to see, lead. With
+    // none, the form is already under the empty box, so a button that only
+    // scrolls to it is left out of the header.
     const formFirst = !!(form?.error || changing);
     const body = html`
       ${pageHeader({
         crumb: rulesCrumb(v),
         title: "Rules",
-        description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.`,
-        primary: owner && !formFirst ? html`<a class="button primary" href="#add-rule">Add rule</a>` : "",
+        description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.${
+          owner ? html` <a href="${vaultPath(id, "/config")}">Change the default on General</a>` : ""
+        }`,
+        primary: owner && !formFirst && list.length ? html`<a class="button primary" href="#add-rule">Add rule</a>` : "",
       })}
       ${formFirst ? addForm : ""}
       ${table}
       ${formFirst ? "" : addForm}
       ${checker}
       <p class="hint rules-help">Canon changes need approval from people; agents can only propose them.${owner ? "" : " Only owners change rules."} <a href="/docs/how-to/set-rules">How rules work</a></p>
-      ${claimRulesSection(ctx, id, owner, claimRules)}`;
+      ${claimRulesSummary(id, claimRules)}`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "rules" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -256,7 +266,7 @@ async function removePage(ctx: Ctx, id: string, path: string): Promise<Reply> {
         : []),
       // Named owners hang off the rule (path_owners cascades from path_policies).
       ...(rule.owners
-        ? [html`Its ${namedOwners(rule.owners)} ${rule.owners === 1 ? "is" : "are"} removed with it. Adding the rule again doesn’t bring them back: name them again from <strong>Owners</strong>.`]
+        ? [html`Its ${namedOwners(rule.owners)} ${rule.owners === 1 ? "is" : "are"} removed with it. Adding the rule again doesn’t bring them back: name them again from <strong>Named owners</strong>.`]
         : []),
       html`The removal is logged in Activity. You can add the rule again at any time.`,
     ];
@@ -290,8 +300,9 @@ export async function setRule(ctx: Ctx, id: string): Promise<Reply> {
   const path = (ctx.form.get("path") ?? "").trim();
   const policy = ctx.form.get("policy") || null;
   const typed = (ctx.form.get("quorum") ?? "1").trim();
+  const changing = ctx.form.get("changing") === "1";
   const again = (error: string, field: RuleForm["field"]) =>
-    rules(ctx, id, { path, policy: policy ?? "", quorum: typed, error, field });
+    rules(ctx, id, { path, policy: policy ?? "", quorum: typed, changing, error, field });
   if (policy !== null && policy !== "canon" && policy !== "open") {
     return again(refuse("A rule’s policy is Canon or Open; choose one and save again. Nothing was saved"), undefined);
   }

@@ -288,11 +288,28 @@ test("settings: a display name is saved trimmed, shown in my account menu, and t
   assert.doesNotMatch(await page("gus", "/activity"), /Dora Díaz/);
 });
 
+// A refused name answers the Account settings page itself (400): the reason in the form.
+const refusedName = async (display_name) => {
+  const r = await post("dora", "/settings/name", { display_name });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  return { h, reason: (/<p class="callout danger" role="alert" id="name-error">([^<]*)<\/p>/.exec(h)?.[1] ?? "").replace(/ \(ref [0-9a-f]{8}\)$/, "") };
+};
+
 test("settings: a name with \"@\", control characters or over 80 characters is refused with the reason, and the old name stays", async () => {
-  assert.match(await flashAfter("dora", await post("dora", "/settings/name", { display_name: "dora@evil.test" })), /can&#39;t contain &quot;@&quot;/);
-  assert.match(await flashAfter("dora", await post("dora", "/settings/name", { display_name: `Dora${String.fromCodePoint(0x202e)}evil` })), /control characters, invisible characters or text-direction marks/);
+  assert.match((await refusedName("dora@evil.test")).reason, /can&#39;t contain &quot;@&quot;/);
+  assert.match((await refusedName(`Dora${String.fromCodePoint(0x202e)}evil`)).reason, /control characters, invisible characters or text-direction marks/);
   assert.equal(await flashAfter("dora", await post("dora", "/settings/name", { display_name: "d".repeat(81) })), "A display name is at most 80 characters. Nothing was saved.");
   assert.match(await page("dora", "/settings"), /name="display_name" value="Dora Díaz"/);
+});
+
+test("settings: a refused name stays in its field, marked, with a reference, and the rest of the page and the top bar are still there", async () => {
+  const { h } = await refusedName("dora@evil.test");
+  assert.match(h, /<p class="callout danger" role="alert" id="name-error">[^<]*\(ref [0-9a-f]{8}\)<\/p>/);
+  assert.match(h, /<input id="display-name" type="text" name="display_name" value="dora@evil\.test" maxlength="80" autocomplete="name" aria-invalid="true" aria-describedby="name-error display-name-hint">/);
+  assert.match(h, /<strong>dora@example\.test<\/strong>/, "the address is still shown, not 'no email on this account'");
+  assert.match(accountMenu(h), /Signed in as <strong>Dora Díaz<\/strong>/);
+  assert.match(h, /<form method="post" action="\/theme" class="theme" aria-label="Theme">/);
 });
 
 test("settings: saving a name needs the form token and this site's origin", async () => {

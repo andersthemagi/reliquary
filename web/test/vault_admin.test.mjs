@@ -275,6 +275,20 @@ test("vault settings: a blank name is refused with the database's reason", async
   assert.equal((await vaultRow(V.own)).name, "Admin Renamed");
 });
 
+test("vault settings: a blank or over-long name is refused before the confirm step, in the form, with the choices kept and the name field marked", async () => {
+  for (const name of ["   ", "x".repeat(101)]) {
+    const r = await post(`/v/${V.own}/config`, { name, default_policy: "canon" });
+    assert.equal(r.status, 400, "the form again, not a confirm page for a rename that can't be made");
+    const h = await r.text();
+    assert.doesNotMatch(h, /<h1>Confirm changes<\/h1>/);
+    assert.match(h, /<p class="callout danger" role="alert" id="name-error">A vault name is 1 to 100 characters\. Nothing was saved\. \(ref [0-9a-f]{8}\)<\/p>/);
+    assert.match(h, new RegExp(`<input id="vn" type="text" name="name" value="${name.trim()}" required maxlength="100" aria-invalid="true" aria-describedby="name-error">`));
+    assert.match(h, /name="default_policy" value="canon" checked/, "the policy chosen alongside is kept");
+  }
+  assert.deepEqual(await vaultRow(V.own), { name: "Admin Renamed", default_policy: "open" });
+  assert.equal(await events(V.own, "vault.rename"), 1, "only the earlier, confirmed rename is logged");
+});
+
 test("vault settings: an editor's forged rename is refused by the database", async () => {
   const flash = await flashAfter(await post(`/v/${V.walt}/config`, { name: "Vera's now", default_policy: "canon", confirm: "1" }));
   assert.equal(flash, "Only owners rename a vault.");
@@ -385,8 +399,8 @@ test("export: an editor gets no download; the database refuses a forged post", a
 test("erase: an owner's file page has a More menu with Erase; an editor's has none", async () => {
   const h = await page(`/v/${V.erase}/file?path=people/pat.md`);
   assert.match(h, /<details class="menu-wrap action-menu file-more">\s*<summary class="button">More<\/summary>/);
-  assert.match(h, new RegExp(`<a class="menu-item danger" href="/v/${V.erase}/erase\\?path=people%2Fpat\\.md"><span class="menu-item-title">Erase content…</span>`));
-  assert.doesNotMatch(await page(`/v/${V.walt}/file?path=walt.md`), /\/erase\?|Erase content/);
+  assert.match(h, new RegExp(`<a class="menu-item danger" href="/v/${V.erase}/erase\\?path=people%2Fpat\\.md"><span class="menu-item-title">Erase file…</span>`));
+  assert.doesNotMatch(await page(`/v/${V.walt}/file?path=walt.md`), /\/erase\?|Erase file/);
 });
 
 test("erase: the confirm page explains that every version is blanked and the log keeps its sequence, and asks for the path", async () => {

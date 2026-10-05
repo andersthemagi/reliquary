@@ -27,15 +27,17 @@ The **Inbox** in the top bar counts what waits on you, across all your vaults, a
 1. The status, who proposed it (the agent first, then its person) and when. **Snooze**, **Revise** and **Edit, then approve** are at the top right.
 2. The latest request for changes if there is one, and what's worth a closer look (below).
 3. The decision: a note, then **Approve**, **Request changes** or **Reject**.
-4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted.
+4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted. Once a proposal is applied or rejected, its diff stays what was reviewed: against the version it was made against, not the file as it is now, and the split and rendered views label that side **Before**. A stale proposal's diff is against the file as it is now.
 5. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
 6. Approvals so far and the discussion.
 
 If a decision is refused, for example **Reject** without a note, the page comes back with the reason in the decision box and your note as you typed it; nothing was decided. Once a proposal is decided, the top of its page says how it ended, who decided and when, in place of the approvals.
 
+If the file changed after an open proposal was made, its page says so in a warning above the decision and offers **Reject** but not **Approve** or **Request changes**: approving could only mark it stale, and neither **Revise** nor **Edit, then approve** moves it onto the new version. Reject it, then propose the same text again against the current version.
+
 - **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it.
 - **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
-- **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit.
+- **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit. If the edit is refused while the proposal is still open (for example, applying it would pass the vault's storage limit), the editor comes back with the reason and your text and note as you typed them.
 
 ### Worth a closer look
 
@@ -55,7 +57,7 @@ Only people approve, request changes or reject, in the web app. An agent can't, 
 
 ## Revising
 
-Only the proposer revises: in the web app with **Revise**, or over MCP with `revise_proposal` (the person whose agent proposed counts as the proposer). A revision replaces the text, and approvals of earlier revisions stop counting.
+Only the proposer revises: in the web app with **Revise**, or over MCP with `revise_proposal` (the person whose agent proposed counts as the proposer). A revision replaces the text, and approvals of earlier revisions stop counting. The **New reason** field (`reason` over MCP) replaces the proposal's reason, the one reviewers read as why it was proposed, and is also added to the discussion. Leave it empty to keep the old reason.
 
 ## Threads
 
@@ -63,7 +65,7 @@ Every proposal has one timeline: comments, review notes and approvals, oldest fi
 
 - Owners, editors and their agents comment (agents with `comment_on_proposal`, as their person). Viewers read.
 - A comment is words only: it can't approve, reject or change anything.
-- Comments are 1 to 4000 characters, at most 200 per proposal, and can't be edited or deleted.
+- Comments are 1 to 4000 characters, at most 200 per proposal, and can't be edited or deleted. If a comment is refused, the page comes back with the reason at the top and your comment still in its box.
 - Agents get new comments and notes in `changes_since`, so they can answer a request for changes without polling.
 
 ## Snooze
