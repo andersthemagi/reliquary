@@ -296,6 +296,12 @@ test("stylesheet: an empty-state box has clear space above the form under it, an
   assert.match(CSS, /\n\.table-wrap:has\(> \.var-envtable\) \+ p \{ margin-top: var\(--space-4\); \}/);
 });
 
+test("stylesheet: a read-only input is shaded, so a locked field doesn't look editable", () => {
+  const field = CSS.indexOf('input[type="text"], input[type="search"]');
+  const locked = CSS.indexOf("\ninput[readonly] { background: var(--bg-subtle); }");
+  assert.ok(field >= 0 && locked > field, "after the field rule it overrides, which has the same specificity");
+});
+
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {
   for (const sel of [/\n\.secondary \{/, /\n\.ghost \{/, /\n\.ghost:hover \{/, /\n\.danger \{/, /\n\.danger\.solid \{/, /\n\.primary, a\.button\.primary \{/]) assert.match(CSS, sel);
 });

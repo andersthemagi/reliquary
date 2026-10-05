@@ -503,6 +503,8 @@ input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: 1; 
 input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
 input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible,
 textarea:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
+/* A locked field (the Rules form's path while changing a rule) must not look editable. */
+input[readonly] { background: var(--bg-subtle); }
 textarea { min-height: 280px; resize: vertical; line-height: 1.6; padding: 10px 12px; }
 textarea.short { min-height: 96px; }
 textarea.note-field { min-height: 0; }

@@ -17,7 +17,7 @@ Open the vault, then **Settings**, **Rules**. The table lists every rule in fold
    - **Approvals needed**: for canon, how many different people must approve a change, a whole number from 1 to 20. Open rules don't use it.
 3. Choose **Save rule**.
 
-To change an existing rule, open the **⋯** menu on its row and choose **Change**: the form opens with the rule filled in. Saving a rule for a path that already has one replaces it. The change is logged.
+To change an existing rule, open the **⋯** menu on its row and choose **Change**: the form opens with the rule filled in and its path locked. To move a rule to another path, add a rule there, then remove the old one. Saving a rule for a path that already has one replaces it. The change is logged.
 
 If **Approvals needed** isn't a whole number from 1 to 20, the form refuses it and says why, with a reference; nothing is saved.
 

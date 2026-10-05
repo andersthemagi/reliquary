@@ -254,6 +254,23 @@ test("rules: Change fills the form with the rule as it is, first on the page", a
   assert.ok(at(h, 'id="add-rule"') < at(h, '<table class="table-stack rules-table">'));
 });
 
+// A path edited in the Change form was saved as a second rule, leaving the
+// one being changed in place. readonly (not disabled) so the path still posts.
+test("rules: Change locks the path, in the form and after a refusal, and says why; Add keeps it editable", async () => {
+  const h = await page(`${rulesOf(V.main)}?change=clients%2F`);
+  assert.match(h, /name="path" placeholder="clients\/" required value="clients\/" readonly aria-describedby="pp-hint">/);
+  assert.match(h, /<p class="hint" id="pp-hint">A rule’s path can’t be changed here, since saving a new path would add a second rule\. To move it, add a rule on the new path, then remove this one\.<\/p>/);
+  assert.match(h, /<input type="hidden" name="changing" value="1">/);
+  const refused = await post(rulesOf(V.main), { csrf: csrfOf(h), path: "clients/", policy: "canon", quorum: "0", changing: "1" });
+  assert.equal(refused.status, 400);
+  const again = await refused.text();
+  assert.match(again, /Change the rule on <code>clients\/<\/code>/);
+  assert.match(again, /name="path" placeholder="clients\/" required value="clients\/" readonly aria-describedby="pp-hint">/, "a refusal doesn't unlock it");
+  const add = await page(rulesOf(V.main));
+  assert.doesNotMatch(add, /readonly|name="changing"/);
+  assert.match(add, /Saving a path that has a rule replaces it\./);
+});
+
 test("rules: Remove asks first, naming what the path follows next, the files that change, the rules inside and the proposals waiting", async () => {
   const r = await get(`${rulesOf(V.main)}?remove=clients%2F`);
   assert.equal(r.status, 200);
