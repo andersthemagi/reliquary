@@ -53,7 +53,10 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
     if (!v) return null;
     const list = await loadLinks(c, id);
     const owner = v.role === "owner";
-    const editing = edit !== null ? list.find((l) => l.id === edit) : undefined;
+    // A refused save of an edit comes back as an edit: the form's own id
+    // wins over the query, which a POST doesn't carry.
+    const editingId = form?.id ?? edit;
+    const editing = editingId ? list.find((l) => l.id === editingId) : undefined;
     const values: LinkForm | undefined = form ?? (editing ? { id: editing.id, name: editing.name, url: editing.url } : undefined);
     const described = (f: LinkForm["field"], hint: string) =>
       form?.error && form.field === f ? html` aria-invalid="true" aria-describedby="link-error ${hint}"` : html` aria-describedby="${hint}"`;

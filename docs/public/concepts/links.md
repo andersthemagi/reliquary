@@ -6,7 +6,7 @@ A vault's owner adds, edits and deletes links from its **Links** page in the web
 
 ## What a link holds
 
-- **A name and a url.** The url must be `https://`; letters, digits and underscores for the name, unique in the vault.
+- **A name and a url.** The url must be `https://`; letters, digits and underscores for the name, unique in the vault. A save that is refused shows its reason in the form, with a reference, and keeps what you typed, so you correct it and save again. A refused edit stays an edit.
 - **A credential**, encrypted the same way as an environment variable: nobody, including an agent, ever reads it back. It is attached to a call at the last moment, server-side, and re-checked for safety (see below) on every call, not just when the link was added.
 - **Discovered tools.** Adding a link calls the upstream server's own tool list and stores each tool's name, description, arguments and whether it writes (from the tool's own `readOnlyHint`; anything but an explicit yes is treated as a write tool). A slow or unreachable server doesn't stop the link from being added: it's flashed as a warning, and the link's tools stay empty until it's deleted and re-added (there's no rediscovery yet).
 - **Grants per role.** An owner decides which of a link's tools each role may use, from the link's **Grants** page. Read tools default on for editors and owners; write tools stay off until an owner turns them on there.

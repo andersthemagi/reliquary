@@ -286,6 +286,39 @@ test("links page: without VARIABLES_KEY, links still list but Add is disabled", 
   assert.match(h, /<button class="primary" disabled>Add link<\/button>/);
 });
 
+// A refused save answers the form again (400), with the reason and its
+// reference, what was typed kept and the refused field marked.
+const refusedForm = (h) => /<p class="callout danger" role="alert" id="link-error">([\s\S]*?)<\/p>/.exec(h)?.[1];
+const countLinks = async (v) => (await sql("select count(*)::int as n from public.links where vault_id = $1", [v]))[0].n;
+const addStored = async (v, name, url = "https://api.example.com") => {
+  const [{ id }] = await as(
+    LU,
+    `select public.create_link($1, $2, $3, 'k1', decode($4,'hex'), decode($5,'hex')) as id`,
+    [v, name, url, randomBytes(12).toString("hex"), randomBytes(32).toString("hex")],
+  );
+  return id;
+};
+
+test("links page: a refused edit is still an edit: its title, Save changes, no credential field, the link's id and what was typed", async () => {
+  const [{ id: v }] = await as(LU, "select public.create_vault('Links Refused Edit') as id");
+  const id = await addStored(v, "keep_me");
+  const h1 = await page(lp(v, `?edit=${id}`));
+  const r = await post(lp(v), { op: "save", link_id: id, name: "not valid!", url: "https://typed.example.com" }, { csrf: csrfOf(h1) });
+  assert.equal(r.status, 400);
+  const h2 = await r.text();
+  assert.match(refusedForm(h2) ?? "", /^A link’s name is letters, digits and underscores.* Nothing was saved\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(h2, /<h2 id="add-link-title" class="form-title">Edit <code>keep_me<\/code><\/h2>/);
+  assert.match(h2, new RegExp(`<input type="hidden" name="link_id" value="${id}">`));
+  assert.match(h2, /<button class="primary">Save changes<\/button>/);
+  assert.doesNotMatch(h2, /name="credential"/);
+  assert.match(h2, /name="name"[^>]*value="not valid!" aria-invalid="true"/);
+  assert.match(h2, /name="url"[^>]*value="https:\/\/typed\.example\.com"/);
+
+  const r2 = await post(lp(v), { op: "save", link_id: /name="link_id" value="([^"]+)"/.exec(h2)[1], name: "kept_renamed", url: "https://typed.example.com" }, { csrf: csrfOf(h2) });
+  assert.equal(r2.status, 303);
+  assert.deepEqual(await sql("select id, name from public.links where vault_id = $1", [v]), [{ id, name: "kept_renamed" }], "the same link was renamed; no second one");
+});
+
 // ---------------------------------------------------------------------------
 // The Grants page (linkgrants.ts): which of a link's discovered tools each
 // role may call, once the MCP proxy exists. set_link_grant's own hostile
