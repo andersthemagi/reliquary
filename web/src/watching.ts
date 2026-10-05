@@ -96,7 +96,7 @@ async function watchingPage(ctx: Ctx, id: string): Promise<Reply> {
     const body = html`
       ${settingsHeader(id, v, "watching", {
         description: html`Folders and files you watch in ${v.name}. Changes there are flagged to you and to your agents. You see them in <a href="${flagsPath(id)}">Flags</a> (under Diagnostics) and in <a href="${changesPath(id, "watching")}">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>. Only you see this list.`,
-        primary: html`<a class="button primary" href="#watch-path">Watch a path</a>`,
+        primary: list.length ? html`<a class="button primary" href="#watch-path">Watch a path</a>` : "",
       })}
       ${table}
       <form method="post" action="${here}" class="panel watch-add" id="watch-path" aria-labelledby="watch-path-title">

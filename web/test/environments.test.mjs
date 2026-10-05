@@ -153,6 +153,7 @@ test("environments page: owners get Environments on the Variables page; editors 
   assert.match(h, /<strong>development<\/strong> <span class="badge">Default<\/span><\/th>\s*<td data-label="Values">1 value<\/td>/);
   assert.match(h, /<strong>production<\/strong> <span class="badge">Default<\/span><\/th>[\s\S]*?<td data-label="Who can set"><span class="badge var-owners" title="Only owners set, reveal or read values here">Owners only<\/span><\/td>/);
   assert.doesNotMatch(h, /environments\/rename\?name=development/);
+  assert.match(h, /<\/table><\/div>\s*<p class="small muted">The defaults keep their names/, "the footnote follows the table, where the stylesheet gives it space");
 });
 
 test("environments page: an owner adds one, owners-only or not; it becomes a column on Variables where values can be set", async () => {

@@ -302,6 +302,24 @@ test("stylesheet: stacked tables on phones label each cell from data-label", () 
   assert.match(phone, /table\.table-stack \{ min-width: 0; \}/);
 });
 
+test("stylesheet: a link's URL wraps instead of widening the Links table, which shares the Rules table's nowrap second column", () => {
+  const nowrap = CSS.indexOf(".rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }");
+  const url = /\n\.rules-table td\.link-url \{ width: auto; white-space: normal; overflow-wrap: anywhere; \}/.exec(CSS);
+  assert.ok(nowrap >= 0 && url, "both rules exist");
+  assert.ok(url.index > nowrap, "the URL rule follows the rule it overrides: same specificity, so order decides");
+});
+
+test("stylesheet: an empty-state box has clear space above the form under it, and the Environments footnote below its table", () => {
+  assert.match(CSS, /\n\.empty \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
+  assert.match(CSS, /\n\.table-wrap:has\(> \.var-envtable\) \+ p \{ margin-top: var\(--space-4\); \}/);
+});
+
+test("stylesheet: a read-only input is shaded, so a locked field doesn't look editable", () => {
+  const field = CSS.indexOf('input[type="text"], input[type="search"]');
+  const locked = CSS.indexOf("\ninput[readonly] { background: var(--bg-subtle); }");
+  assert.ok(field >= 0 && locked > field, "after the field rule it overrides, which has the same specificity");
+});
+
 test("stylesheet: a form panel right under a table has space above it", () => {
   assert.match(CSS, /\.table-wrap \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
 });

@@ -171,10 +171,12 @@ after(async () => {
   for (const c of servers) c.kill();
 });
 
-test("links page: an empty vault says so, and offers Add link to an owner", async () => {
+test("links page: an empty vault says so, and shows an owner the Add form under it, with no button that only scrolls to it", async () => {
   const h = await page(lp(V.empty));
   assert.match(h, /No links yet/);
-  assert.match(h, /Add link/);
+  assert.match(h, /Add a link/);
+  assert.doesNotMatch(h, /href="#add-link"/);
+  assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel rule-form"/, "the form follows the empty box, where the stylesheet spaces them");
 });
 
 test("links page: says a granted tool can be called over MCP, not that calling isn’t built", async () => {
@@ -202,6 +204,9 @@ test("links page: owner adds a link; the credential never appears on any page", 
   assert.match(flash?.[2] ?? "", /^Added linear, but its tools couldn’t be discovered\. This link’s address isn’t public\. \(ref [0-9a-f]{8}\)$/);
   assert.match(h2, /linear/);
   assert.match(h2, /https:\/\/127\.0\.0\.1\/mcp/);
+  assert.match(h2, /<div class="page-actions"><a class="button primary" href="#add-link">Add link<\/a><\/div>/, "with links listed, the form may be a scroll away, so the header offers it");
+  assert.match(h2, /<td data-label="URL" class="small link-url">https:\/\/127\.0\.0\.1\/mcp<\/td>/, "its own class, so the URL can wrap");
+  assert.match(h2, /<td data-label="Added by" class="small muted"><div>you · <time [^>]+>[^<]+<\/time><\/div><\/td>/, "who and when stay in one block on a phone");
   noCredentials(h2);
 
   const row = await linkRow(V.own, "linear");

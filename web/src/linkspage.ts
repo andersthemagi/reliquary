@@ -91,8 +91,8 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
           <tbody>${list.map(
             (l) => html`<tr>
               <td data-label="Name"><code>${l.name}</code></td>
-              <td data-label="URL" class="small">${l.url}</td>
-              <td data-label="Added by" class="small muted">${who(ctx, l.created_by, null)} · ${time(l.created_at)}</td>
+              <td data-label="URL" class="small link-url">${l.url}</td>
+              <td data-label="Added by" class="small muted"><div>${who(ctx, l.created_by, null)} · ${time(l.created_at)}</div></td>
               ${owner
                 ? html`<td class="num rule-actions">${menu({
                     label: `Actions for ${l.name}`,
@@ -111,16 +111,17 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
           body: owner
             ? "A link holds a shared credential to an upstream MCP server, like Linear or Stripe, so a member’s agent can use it without ever seeing the key."
             : "Only owners add links. Ask an owner of this vault.",
-          ...(owner ? { action: html`<a class="button" href="#add-link">Add link</a>` } : {}),
         });
 
+    // With no links the form is already under the empty box, so a button
+    // that only scrolls to it is left out of the header.
     const formFirst = !!(form?.error || editing);
     const body = html`
       ${pageHeader({
         crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Links" }],
         title: "Links",
         description: "A vault’s credentials to upstream MCP servers, shared by everyone with access, seen by no one.",
-        primary: owner && !formFirst ? html`<a class="button primary" href="#add-link">Add link</a>` : "",
+        primary: owner && !formFirst && list.length ? html`<a class="button primary" href="#add-link">Add link</a>` : "",
       })}
       ${formFirst ? addForm : ""}
       ${table}

@@ -505,6 +505,8 @@ input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: 1; 
 input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, input[type="number"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
 input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible, input[type="number"]:focus-visible,
 textarea:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
+/* A locked field (the Rules form's path while changing a rule) must not look editable. */
+input[readonly] { background: var(--bg-subtle); }
 textarea { min-height: 280px; resize: vertical; line-height: 1.6; padding: 10px 12px; }
 textarea.short { min-height: 96px; }
 textarea.note-field { min-height: 0; }
@@ -641,6 +643,7 @@ a.dir { font-weight: 600; }
 .empty strong { display: block; color: var(--fg); font-size: var(--text-md); margin-bottom: var(--space-2); }
 .empty p { max-width: var(--measure); margin: 0 auto var(--space-4); }
 .empty p:last-child { margin-bottom: 0; }
+.empty + form.panel { margin-top: var(--space-6); }
 
 /* Tabs ----------------------------------------------------------------------- */
 
@@ -1613,6 +1616,10 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
 .rules-table .rule-owners { display: inline-block; margin-top: var(--space-1); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .owner-form, .watch-add { scroll-margin-top: var(--space-10); }
 .rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }
+/* Links reuses this table, but its second column is a URL of up to 2048
+   characters: it must wrap, or the table scrolls sideways and pushes the
+   actions out of sight. Same specificity as the rule above, so it follows it. */
+.rules-table td.link-url { width: auto; white-space: normal; overflow-wrap: anywhere; }
 .rules-table .rule-actions .action-list { min-width: 240px; }
 .rule-form { scroll-margin-top: var(--space-10); }
 .rule-form .hint + .hint { margin-top: var(--space-1); }
@@ -1785,6 +1792,8 @@ table.var-grid { border: 0; border-radius: 0; overflow: visible; }
 .var-grid th[scope="row"] { font-weight: 500; color: var(--fg); }
 .var-grid th[scope="row"] code { white-space: nowrap; font-size: var(--text-sm); color: var(--fg); }
 .var-env { color: var(--fg); }
+/* The footnote under the Environments table would otherwise touch its border. */
+.table-wrap:has(> .var-envtable) + p { margin-top: var(--space-4); }
 .var-owners { margin-left: var(--space-1); }
 .var-owners::before {
   /* A small padlock: shackle and body, drawn in CSS. */
@@ -1821,10 +1830,12 @@ td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
    centres its content). */
 .var-menu .menu-item { justify-content: start; }
 
-/* "Set" in an empty cell shows on hover or focus where there is a pointer
-   to hover with; always on touch screens and phones. */
+/* "Set" in an empty cell is quiet until hover or focus where there is a
+   pointer to hover with, but never invisible: hidden, "Not set" offered
+   nothing to click. Always full on touch screens and phones. 0.7 keeps it
+   above 3:1 (contrast.test.mjs). */
 @media (hover: hover) and (min-width: 641px) {
-  .var-grid .var-add { opacity: 0; transition: opacity 120ms ease-out; }
+  .var-grid .var-add { opacity: 0.7; transition: opacity 120ms ease-out; }
   .var-grid tr:hover .var-add, .var-grid .var-add:focus-visible { opacity: 1; }
 }
 

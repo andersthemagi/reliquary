@@ -43,7 +43,7 @@ function claimsTable(ctx: Ctx, id: string, v: Vault, rows: Claim[]): Raw {
       breakable ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""
     }</tr></thead>
     <tbody>${rows.map(
-      (r) => html`<tr><td data-label="Path"><a href="${filePath(id, r.path)}">${r.path}</a></td>
+      (r) => html`<tr><td><a href="${filePath(id, r.path)}">${r.path}</a></td>
         <td class="small" data-label="Held by">${who(ctx, r.holder, null)}${r.holder_label ? html`<span class="token-client">${r.holder_label}</span>` : ""}</td>
         <td class="small" data-label="Time left">${time(r.expires_at)}</td>
         ${breakable
