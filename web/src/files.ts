@@ -19,6 +19,7 @@ import {
   policyBadge,
   raw,
   tabs,
+  textareaText,
   time,
   type CrumbPart,
   type MenuItem,
@@ -486,7 +487,7 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
           <p class="hint" id="r-hint">Reviewers see this after the diff.</p>
           <input id="r" type="text" name="reason" required aria-describedby="r-hint">` : ""}
         <label for="content">Text</label>
-        <textarea id="content" name="content">${f.body}</textarea>
+        <textarea id="content" name="content">${textareaText(f.body)}</textarea>
         <div class="actions"><button class="primary">${canon ? "Propose change" : "Save"}</button>
           <a class="button quiet" href="${filePath(id, path)}">Cancel</a></div>
       </form>`;
@@ -571,7 +572,7 @@ async function conflictReply(ctx: Ctx, id: string, path: string, typed: string):
         <input type="hidden" name="action" value="write">
         <input type="hidden" name="expected_version" value="${cur.version}">
         <label for="content">Your edit, not yet saved</label>
-        <textarea id="content" name="content">${typed}</textarea>
+        <textarea id="content" name="content">${textareaText(typed)}</textarea>
         <div class="actions"><button class="primary">Save over the current version</button>
           <a class="button quiet" href="${filePath(id, path)}">Discard your edit</a></div>
       </form>`;

@@ -320,6 +320,23 @@ test("edit: saving an open file says so as a success", async () => {
   assert.match(await page(r.headers.get("location")), /<p class="callout success flash" role="status">Saved notes\/a\.md\.<\/p>/);
 });
 
+test("edit: a text that starts with a newline comes back from the box, and saves, unchanged", async () => {
+  const body = "\n\nAfter two blank lines.\n";
+  await as(BREE, "select public.write_file($1, 'notes/lead.md', $2)", [V.main, body]);
+  const h = await page(`/v/${V.main}/edit?path=notes%2Flead.md`);
+  // What the box holds once a browser has read it: the HTML parser drops one
+  // newline right after <textarea>.
+  const shown = /<textarea id="content" name="content">([\s\S]*?)<\/textarea>/.exec(h)[1].replace(/^\n/, "");
+  assert.equal(shown, body);
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(h), action: "write", path: "notes/lead.md", content: shown, expected_version: formFields(h, "Save").fields.expected_version });
+  assert.equal(r.status, 303);
+  const [{ body: saved }] = await sql(
+    "select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/lead.md'",
+    [V.main],
+  );
+  assert.equal(saved, body);
+});
+
 test("new file: in a canon folder the page shows the rule, asks why, and the button says Propose file", async () => {
   const h = await page(`/v/${V.main}/new?dir=canon`);
   assert.match(h, /From the rule on <a href="[^"]+"><code>canon\/<\/code><\/a>, set by you <time/);

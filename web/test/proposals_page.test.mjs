@@ -338,6 +338,36 @@ test("revise: the proposer's page is named for the file, under the proposal", as
   assert.match(h, /<details class="current-file">/);
 });
 
+// What a proposal editor's box holds once a browser has read it: the HTML
+// parser drops one newline right after <textarea>.
+const boxOf = (h) => /<textarea id="content" name="content">([\s\S]*?)<\/textarea>/.exec(h)[1].replace(/^\n/, "");
+
+test("revise: a text that starts with a newline comes back from the box, and saves as a revision, unchanged", async () => {
+  const body = "\nOn its own line.\n";
+  const pid = await propose("canon/lead-revise.md", body, "Starts with a newline.");
+  const h = await page("sol", pp(pid, "/revise"));
+  assert.equal(boxOf(h), body);
+  const r = await post("sol", pp(pid, "/revise"), { content: boxOf(h) });
+  assert.equal(r.status, 303);
+  assert.equal((await sql("select body from public.proposals where id = $1", [pid]))[0].body, body);
+  // Not left waiting: the Inbox tests below count what waits for Rhea.
+  await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
+});
+
+test("edit, then approve: a text that starts with a newline comes back from the box, and applies, unchanged", async () => {
+  const body = "\nOn its own line.\n";
+  const pid = await propose("canon/lead-approve.md", body, "Starts with a newline.");
+  const h = await page("rhea", pp(pid, "/edit"));
+  assert.equal(boxOf(h), body);
+  const r = await post("rhea", pp(pid, "/edit"), { content: boxOf(h) });
+  assert.equal(r.status, 303);
+  const [{ body: written }] = await sql(
+    "select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'canon/lead-approve.md'",
+    [V],
+  );
+  assert.equal(written, body);
+});
+
 // ---------------------------------------------------------------------------
 // The Inbox
 

@@ -6,7 +6,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { diffMode, diffSection } from "./diffview.js";
-import { callout, csrfField, emptyState, html, pageHeader, time, type CrumbPart, type Raw, type Tone } from "./html.js";
+import { callout, csrfField, emptyState, html, pageHeader, textareaText, time, type CrumbPart, type Raw, type Tone } from "./html.js";
 import { vaultShell } from "./files.js";
 import {
   canWrite,
@@ -264,7 +264,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
           <p class="hint" id="note-hint">Required to request changes or reject. The proposer sees it.</p>
           <textarea id="note" name="note" class="note-field" rows="2" aria-describedby="${noteMissing ? "decide-error note-hint" : "note-hint"}"${
             noteMissing ? html` aria-invalid="true"` : ""
-          }>${refused?.note ?? ""}</textarea>
+          }>${textareaText(refused?.note)}</textarea>
           <div class="actions">
             ${decidable
               ? html`<button class="primary" name="decision" value="approve">Approve</button>
@@ -379,7 +379,7 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string): Promise<R
       <form method="post" action="${proposalPath(id, pid, "/edit")}" class="panel" id="edit-approve">
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
-        <textarea id="content" name="content">${p.body}</textarea>
+        <textarea id="content" name="content">${textareaText(p.body)}</textarea>
         <label for="note">What you changed</label>
         <input id="note" type="text" name="note" placeholder="Optional, for the history">
         <div class="actions"><button class="primary">Save edit and approve</button>
@@ -430,7 +430,7 @@ export async function proposalRevise(ctx: Ctx, id: string, pid: string): Promise
       <form method="post" action="${proposalPath(id, pid, "/revise")}" class="panel" id="revise-proposal">
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
-        <textarea id="content" name="content">${p.body}</textarea>
+        <textarea id="content" name="content">${textareaText(p.body)}</textarea>
         <label for="reason">What changed</label>
         <input id="reason" type="text" name="reason" placeholder="Optional, for the reviewers">
         <div class="actions"><button class="primary">Save revision</button>
