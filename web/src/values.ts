@@ -145,10 +145,12 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
           body: html`Keep your projects’ secrets here instead of in <code>.env</code> files passed around by hand. Each value is encrypted, and every set, read and reveal is logged.`,
           action: canSet ? html`<a class="button" href="${base(id, "/set")}">Add a variable</a>` : undefined,
         })}
-    <h2>Use them</h2>
+    ${v.role === "viewer"
+      ? ""
+      : html`<h2>Use them</h2>
     <p>Run a command with this vault’s variables, without writing them to disk:</p>
     <pre class="code">npx @reliquary-ai/cli run --env development -- &lt;command&gt;</pre>
-    <p class="small muted">The first time, <code>npx @reliquary-ai/cli login</code> connects the Reliquary CLI to your account. <code>env pull</code> writes a <code>.env</code> instead, only where git ignores it. Setup is on the <a href="/connect?client=cli">Connect</a> page.</p>
+    <p class="small muted">The first time, <code>npx @reliquary-ai/cli login</code> connects the Reliquary CLI to your account. <code>env pull</code> writes a <code>.env</code> instead, only where git ignores it. Setup is on the <a href="/connect?client=cli">Connect</a> page.</p>`}
     <div class="callout warning var-caveats">
       <p><strong>Agents can read what reaches them.</strong> An agent that runs commands where a value was delivered can read it. <code>run</code> limits a value to one process; prefer short-lived, narrowly scoped keys.</p>
       <p><strong>The hosted operator can decrypt.</strong> Values are encrypted with a key the database never sees, but whoever runs this server holds both.</p>

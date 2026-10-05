@@ -255,6 +255,11 @@ test("variables page: a viewer sees names only: no value, no control, no access 
   assert.match(await f.text(), /Your role in this vault can’t set variables\./);
 });
 
+test("variables page: the CLI instructions are for owners and editors; a viewer, who can’t read values, isn’t shown them", async () => {
+  for (const id of [V.own, V.ed]) assert.match(await page(vp(id)), /<h2>Use them<\/h2>/);
+  assert.doesNotMatch(await page(vp(V.view)), /Use them|npx @reliquary-ai\/cli run/);
+});
+
 test("variables page: a vault you're not in is not found, and nothing is revealed or logged", async () => {
   const before = await reveals(V.priv);
   for (const p of ["", "/log", "/set"]) assert.equal((await get(vp(V.priv, p))).status, 404, p);
