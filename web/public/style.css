@@ -636,6 +636,7 @@ a.dir { font-weight: 600; }
 .empty strong { display: block; color: var(--fg); font-size: var(--text-md); margin-bottom: var(--space-2); }
 .empty p { max-width: var(--measure); margin: 0 auto var(--space-4); }
 .empty p:last-child { margin-bottom: 0; }
+.empty + form.panel { margin-top: var(--space-6); }
 
 /* Tabs ----------------------------------------------------------------------- */
 
@@ -1771,6 +1772,8 @@ table.var-grid { border: 0; border-radius: 0; overflow: visible; }
 .var-grid th[scope="row"] { font-weight: 500; color: var(--fg); }
 .var-grid th[scope="row"] code { white-space: nowrap; font-size: var(--text-sm); color: var(--fg); }
 .var-env { color: var(--fg); }
+/* The footnote under the Environments table would otherwise touch its border. */
+.table-wrap:has(> .var-envtable) + p { margin-top: var(--space-4); }
 .var-owners { margin-left: var(--space-1); }
 .var-owners::before {
   /* A small padlock: shackle and body, drawn in CSS. */

@@ -291,6 +291,11 @@ test("stylesheet: a link's URL wraps instead of widening the Links table, which 
   assert.ok(url.index > nowrap, "the URL rule follows the rule it overrides: same specificity, so order decides");
 });
 
+test("stylesheet: an empty-state box has clear space above the form under it, and the Environments footnote below its table", () => {
+  assert.match(CSS, /\n\.empty \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
+  assert.match(CSS, /\n\.table-wrap:has\(> \.var-envtable\) \+ p \{ margin-top: var\(--space-4\); \}/);
+});
+
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {
   for (const sel of [/\n\.secondary \{/, /\n\.ghost \{/, /\n\.ghost:hover \{/, /\n\.danger \{/, /\n\.danger\.solid \{/, /\n\.primary, a\.button\.primary \{/]) assert.match(CSS, sel);
 });

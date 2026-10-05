@@ -175,6 +175,7 @@ test("links page: an empty vault says so, and offers Add link to an owner", asyn
   const h = await page(lp(V.empty));
   assert.match(h, /No links yet/);
   assert.match(h, /Add link/);
+  assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel rule-form"/, "the form follows the empty box, where the stylesheet spaces them");
 });
 
 test("links page: owner adds a link; the credential never appears on any page", async () => {
