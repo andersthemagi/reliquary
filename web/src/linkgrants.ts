@@ -1,6 +1,6 @@
 // A link's tool grants (docs/design.md, "Links" -> "Grants per link and
-// role"): which of a link's discovered tools each role's agent may call,
-// once the MCP proxy (mcp/, not built yet) exists to call them. The
+// role"): which of a link's discovered tools each role's agent may call
+// through the MCP proxy (mcp/, linkcall.ts). The
 // database decides (set_link_grant, 20260928120000_links.sql): owners
 // only, in person; every member reads the list (link_grants' member_read
 // RLS policy). This page only chooses what to offer.
@@ -98,10 +98,10 @@ export async function linkGrants(ctx: Ctx, id: string, linkId: string): Promise<
       ${pageHeader({
         crumb: crumb(v.name, id, link),
         title: `Grants for ${link.name}`,
-        description: "Which of this link's tools each role's agent may call once the MCP proxy calls them. Read tools default on for editors and owners; write tools stay off until turned on here.",
+        description: "Which of this link’s tools each role’s agent may call. Read tools default on for editors and owners; write tools stay off until turned on here.",
       })}
       ${table}
-      <p class="hint">Calling a link's tool isn't built yet: nothing acts on a grant until the MCP proxy does. <a href="/docs/concepts/links">How links work</a></p>`;
+      <p class="hint">A granted tool is callable over MCP as <code>${link.name}.&lt;tool&gt;</code>; a write tool also needs a connection that can write. Unchecking a tool stops agents calling it at once. <a href="/docs/concepts/links">How links work</a></p>`;
     return { v, link, shell: await vaultShell(c, ctx, v, { section: "links" }, body) };
   });
   if (!data) return notFound(ctx);

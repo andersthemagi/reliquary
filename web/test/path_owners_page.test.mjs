@@ -161,15 +161,15 @@ after(async () => {
 // ---------------------------------------------------------------------------
 // The Rules page
 
-test("owners page: an owner's Rules page has Owners in each rule's menu, and every member sees how many named owners a rule has", async () => {
+test("owners page: an owner's Rules page has Named owners in each rule's menu, and every member sees how many named owners a rule has", async () => {
   const h = await page(pat, `/v/${V.main}/rules`);
   const legal = /<tr>\s*<td data-label="Path"><code class="rule-path">legal\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(legal, new RegExp(`<a class="rule-owners" href="${re(owners(V.main, "legal/"))}">2 named owners</a>`));
-  assert.match(legal, new RegExp(`<a class="menu-item" href="${re(owners(V.main, "legal/"))}"><span class="menu-item-title">Owners</span><span class="menu-item-meta">2 named owners</span></a>`));
-  assert.ok(legal.indexOf(">Change<") < legal.indexOf(">Owners<") && legal.indexOf(">Owners<") < legal.indexOf(">Remove<"), "between Change and Remove");
+  assert.match(legal, new RegExp(`<a class="menu-item" href="${re(owners(V.main, "legal/"))}"><span class="menu-item-title">Named owners</span><span class="menu-item-meta">2 named owners</span></a>`));
+  assert.ok(legal.indexOf(">Change<") < legal.indexOf(">Named owners<") && legal.indexOf(">Named owners<") < legal.indexOf(">Remove<"), "between Change and Remove");
   const notes = /<tr>\s*<td data-label="Path"><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.doesNotMatch(notes, /rule-owners/, "no count where nobody is named");
-  assert.match(notes, /<span class="menu-item-title">Owners<\/span><span class="menu-item-meta">Name people who write it directly<\/span>/);
+  assert.match(notes, /<span class="menu-item-title">Named owners<\/span><span class="menu-item-meta">Name people who write it directly<\/span>/);
   const e = await page(edda, `/v/${V.main}/rules`);
   assert.match(e, new RegExp(`<a class="rule-owners" href="${re(owners(V.main, "hr/"))}">1 named owner</a>`), "an editor sees the count");
   assert.doesNotMatch(e, /Actions for the rule/, "and no menu");
@@ -177,7 +177,7 @@ test("owners page: an owner's Rules page has Owners in each rule's menu, and eve
 
 test("owners page: removing a rule with named owners says they go with it", async () => {
   const h = await page(pat, `/v/${V.main}/rules?remove=legal%2F`);
-  assert.match(h, /<li>Its 2 named owners are removed with it\. Adding the rule again doesn’t bring them back: name them again from <strong>Owners<\/strong>\.<\/li>/);
+  assert.match(h, /<li>Its 2 named owners are removed with it\. Adding the rule again doesn’t bring them back: name them again from <strong>Named owners<\/strong>\.<\/li>/);
   assert.deepEqual(await named(V.main, "legal/"), [EDDA, OTTO].sort(), "asking removes nothing");
 });
 
@@ -186,9 +186,9 @@ test("owners page: removing a rule with named owners says they go with it", asyn
 
 test("owners page: lists a path's named owners with their role in the vault, a viewer as writing this path only, under the Rules crumb", async () => {
   const h = await page(pat, owners(V.main, "hr/"));
-  assert.match(h, new RegExp(`<li><a href="/v/${V.main}/rules">Rules</a></li><li aria-current="page">Owners</li>`));
-  assert.match(h, /<h1 class="path">Owners of hr\/<\/h1>/);
-  assert.match(h, /theirs are the only approvals its quorum counts/);
+  assert.match(h, new RegExp(`<li><a href="/v/${V.main}/rules">Rules</a></li><li aria-current="page">Named owners</li>`));
+  assert.match(h, /<h1 class="path">Named owners of hr\/<\/h1>/);
+  assert.match(h, /only their approvals count toward the approvals needed/);
   assert.match(h, /<span class="badge policy canon"[^>]*>Canon<\/span> <span>The rule on <code>hr\/<\/code>: changes need 1 approval\./);
   const row = /<tr><td>vio@example\.test[\s\S]*?<\/tr>/.exec(h)?.[0];
   assert.ok(row, "Vio's row, by email");

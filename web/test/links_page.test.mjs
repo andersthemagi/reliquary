@@ -177,6 +177,16 @@ test("links page: an empty vault says so, and offers Add link to an owner", asyn
   assert.match(h, /Add link/);
 });
 
+test("links page: says a granted tool can be called over MCP, not that calling isn’t built", async () => {
+  const h = await page(lp(V.own));
+  assert.doesNotMatch(h, /isn.t built|once that.s built/);
+  assert.match(h, /an agent with a granted role can then call it over MCP as <code>&lt;link&gt;\.&lt;tool&gt;<\/code>/);
+});
+
+test("links page: the URL example is an MCP endpoint, not a product’s API host", async () => {
+  assert.match(await page(lp(V.own)), /name="url" placeholder="https:\/\/mcp\.example\.com\/mcp"/);
+});
+
 test("links page: owner adds a link; the credential never appears on any page", async () => {
   const h1 = await page(lp(V.own));
   const cred = credential("linear");
@@ -267,6 +277,14 @@ test("links page: owner edits a link's name and url; the credential is untouched
   assert.ok(sealedRow, "the credential row survives an edit");
 });
 
+test("links page: the Edit form says the credential isn’t shown or changed there, and how to replace it", async () => {
+  const row = await linkRow(V.own, "linear2");
+  const edit = await page(lp(V.own, `?edit=${row.id}`));
+  assert.match(edit, /The credential isn’t shown or changed here\. To replace it, delete this link and add it again; its grants are deleted too\./);
+  assert.match(edit, /Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered\./);
+  assert.doesNotMatch(await page(lp(V.own)), /isn’t shown or changed here/);
+});
+
 test("links page: deleting goes through a confirm page, not a bare button", async () => {
   const row = await linkRow(V.own, "linear2");
   const h1 = await page(lp(V.own, `?delete=${row.id}`));
@@ -288,7 +306,7 @@ test("links page: without VARIABLES_KEY, links still list but Add is disabled", 
 
 // ---------------------------------------------------------------------------
 // The Grants page (linkgrants.ts): which of a link's discovered tools each
-// role may call, once the MCP proxy exists. set_link_grant's own hostile
+// role may call through the MCP proxy. set_link_grant's own hostile
 // tests (supabase/tests/links_test.sql) cover the database side; this
 // proves the web UI on top of it.
 
@@ -383,6 +401,12 @@ test("grants page: unchecking a cell disables it without deleting the grant row"
   assert.match(flashOf(h2)?.[2] ?? "", /Saved 1 grant change for gh\./);
   const row = await sql(`select enabled from public.link_grants where link_id = $1 and role = 'owner' and tool_name = 'list_issues'`, [grantsLink]);
   assert.deepEqual(row, [{ enabled: false }]);
+});
+
+test("grants page: says a granted tool is callable over MCP, not that calling isn’t built", async () => {
+  const h = await page(gp(V.own, grantsLink));
+  assert.doesNotMatch(h, /isn.t built|nothing acts on a grant/);
+  assert.match(h, /A granted tool is callable over MCP as <code>gh\.&lt;tool&gt;<\/code>/);
 });
 
 test("grants page: an editor sees a read-only view, no checkboxes or Save button", async () => {

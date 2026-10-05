@@ -1,7 +1,7 @@
 // A vault's Links page (docs/design.md, "Links"): a credential to an
 // upstream MCP server, named and reachable by an agent as `<link>.<tool>`
-// once the MCP proxy exists (mcp/, not built yet -- see the note this page
-// shows on an empty vault). Add, edit and delete are owners' only, in
+// through the MCP proxy (mcp/, linkcall.ts) for any tool an owner has
+// granted. Add, edit and delete are owners' only, in
 // person; the database enforces this (20260928120000_links.sql) and this
 // page only chooses what to offer. Credentials are sealed here with the
 // same VARIABLES_KEYS as environment variables (secrets.ts, sealLink/
@@ -71,15 +71,15 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
             : ""}
           <div class="fields">
             <div><label for="ln">Name</label><input id="ln" type="text" name="name" placeholder="linear" required maxlength="64" pattern="[A-Za-z_][A-Za-z0-9_]*" value="${values?.name ?? ""}"${described("name", "ln-hint")}></div>
-            <div><label for="lu">URL</label><input id="lu" type="text" name="url" placeholder="https://api.linear.app" required maxlength="2048" value="${values?.url ?? ""}"${described("url", "lu-hint")}></div>
+            <div><label for="lu">URL</label><input id="lu" type="text" name="url" placeholder="https://mcp.example.com/mcp" required maxlength="2048" value="${values?.url ?? ""}"${described("url", "lu-hint")}></div>
             ${editing
               ? ""
               : html`<div><label for="lc">Credential</label><input id="lc" type="password" name="credential" autocomplete="new-password" required maxlength="65536"${described("credential", "lc-hint")}></div>`}
           </div>
-          <p class="hint" id="ln-hint">Letters, digits and underscores, not starting with a digit: an agent calls this link’s tools as <code>&lt;name&gt;.&lt;tool&gt;</code> once that’s built.</p>
+          <p class="hint" id="ln-hint">Letters, digits and underscores, not starting with a digit: an agent calls this link’s granted tools as <code>&lt;name&gt;.&lt;tool&gt;</code>.</p>
           <p class="hint" id="lu-hint">The upstream MCP server’s URL. Must be https.</p>
           ${editing
-            ? ""
+            ? html`<p class="hint" id="lc-hint">The credential isn’t shown or changed here. To replace it, delete this link and add it again; its grants are deleted too. Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered.</p>`
             : html`<p class="hint" id="lc-hint">An API key or token for the upstream server. Stored encrypted, the same way environment variable values are; never shown again once saved.</p>`}
           <div class="actions"><button class="primary"${!editing && !configured ? " disabled" : ""}>${editing ? "Save changes" : "Add link"}</button>${editing ? html`<a class="button quiet" href="${vaultPath(id, "/links")}">Cancel</a>` : ""}</div>
         </form>`
@@ -125,7 +125,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
       ${formFirst ? addForm : ""}
       ${table}
       ${formFirst ? "" : addForm}
-      <p class="hint">An agent can already list a vault’s links over MCP, and adding one discovers its tools. An owner grants a tool per role from its Grants page; calling one isn’t built yet. <a href="/docs/concepts/links">How links work</a></p>`;
+      <p class="hint">Adding a link discovers its tools. An owner grants a tool per role from its Grants page, and an agent with a granted role can then call it over MCP as <code>&lt;link&gt;.&lt;tool&gt;</code>. An agent can list a vault’s links, never their credentials, with <code>list_links</code>. <a href="/docs/concepts/links">How links work</a></p>`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "links" }, body) };
   });
   if (!data) return notFound(ctx);
@@ -189,10 +189,8 @@ export async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
 }
 
 // The confirm step before a link is deleted: an agent that could call its
-// tools loses that ability at once (moot today: nothing calls a link's
-// tools yet, but this page is written for when that changes, not just for
-// today). Owners only; anyone else, or a link that doesn't exist, is sent
-// back with a note.
+// tools loses that ability at once. Owners only; anyone else, or a link
+// that doesn't exist, is sent back with a note.
 async function deletePage(ctx: Ctx, id: string, linkId: string): Promise<Reply> {
   const data = await asPerson(ctx.userId, async (c): Promise<{ gone: string } | { shell: Raw } | null> => {
     const v = await vault(c, ctx, id);

@@ -168,10 +168,16 @@ test("rules: the header has the crumb and Add rule; the rules table comes first,
   const h = await page(rulesOf(V.main));
   assert.match(h, new RegExp(`<nav class="crumb" aria-label="Breadcrumb"><ol><li><a href="/v/${V.main}">Rules main</a></li><li><a href="/v/${V.main}/config">Settings</a></li><li aria-current="page">Rules</li></ol></nav>`));
   assert.match(h, /<div class="page-actions"><a class="button primary" href="#add-rule">Add rule<\/a><\/div>/);
-  assert.match(h, /<p class="page-desc">Everything is <span class="badge policy open"[^>]*>Open<\/span> unless a rule says otherwise; the most specific rule wins\.<\/p>/);
+  assert.match(h, new RegExp(`<p class="page-desc">Everything is <span class="badge policy open"[^>]*>Open</span> unless a rule says otherwise; the most specific rule wins\\. <a href="/v/${V.main}/config">Change the default on General</a></p>`));
   assert.ok(at(h, '<div class="page-actions">') < at(h, '<table class="table-stack rules-table">'));
   assert.ok(at(h, '<table class="table-stack rules-table">') < at(h, 'id="add-rule"'));
   assert.ok(at(h, 'id="add-rule"') < at(h, "What applies to a path?"));
+});
+
+test("rules: the header's Change the default link is for owners; someone who isn't an owner isn't offered it", async () => {
+  const h = await page(rulesOf(V.kit));
+  assert.match(h, /<p class="page-desc">Everything is [\s\S]*the most specific rule wins\.<\/p>/);
+  assert.doesNotMatch(h, /Change the default on General/);
 });
 
 test("rules: every row labels its cells for phones", async () => {

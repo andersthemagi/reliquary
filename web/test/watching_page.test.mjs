@@ -147,15 +147,19 @@ test("watch button: a viewer's file page offers Watch, for that exact path, comi
   assert.doesNotMatch(h, /class="badge info"[^>]*>Watching/, "not watched yet: Ola's watch is hers");
 });
 
+test("watch button: says changes are flagged to you and your agents, not only to your agents", async () => {
+  assert.match(actionsOf(await page(file(V.main, "notes/a.md"))), /<button title="Flag changes here to you and your agents">Watch<\/button>/);
+});
+
 test("watch button: watching a file comes back to it saying so, and the page then shows Watching with Unwatch", async () => {
   const h0 = await page(file(V.main, "notes/a.md"));
   const { action, fields } = formFields(h0, "Watch");
   const r = await post(action, fields);
   assert.equal(r.headers.get("location"), file(V.main, "notes/a.md"));
   const h = await landed(r);
-  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/a.md. From now on, changes there are flagged to your agents."]);
+  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/a.md. From now on, changes there are flagged to you and your agents."]);
   assert.deepEqual(await watches(WREN, V.main), ["notes/a.md"]);
-  assert.match(h, /<div class="page-title"><h1 class="path">a\.md<\/h1><span class="badge info" title="Changes here are flagged to your agents\. Only you see this\.">Watching<\/span><\/div>/);
+  assert.match(h, /<div class="page-title"><h1 class="path">a\.md<\/h1><span class="badge info" title="Changes here are flagged to you and your agents\. Only you see this\.">Watching<\/span><\/div>/);
   const { fields: un } = formFields(actionsOf(h), "Unwatch");
   assert.equal(un.action, "unwatch");
   assert.match(un.subscription, /^[0-9a-f-]{36}$/);
@@ -175,7 +179,7 @@ test("watch button: a folder has Watch too; a file in a watched folder says whic
   assert.equal(fields.path, "notes/");
   assert.equal(fields.back, tree(V.main, "notes/"));
   const h = await landed(await post(action, fields));
-  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/. From now on, changes there are flagged to your agents."]);
+  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/. From now on, changes there are flagged to you and your agents."]);
   const b = await page(file(V.main, "notes/b.md"));
   assert.match(b, /<span class="badge info" title="Your watch on notes\/ covers this\. Only you see it\.">Watching via notes\/<\/span>/);
   assert.doesNotMatch(actionsOf(b), /config\/watching/, "no Watch or Unwatch here");
@@ -229,7 +233,7 @@ test("watching tab: every member has Settings, Watching, listing only their own 
   assert.match(h, /<h1>Settings<\/h1>/);
   assert.match(h, new RegExp(`<li><a href="/v/${V.main}/config">Settings</a></li><li aria-current="page">Watching</li>`));
   assert.match(h, new RegExp(`<a href="/v/${V.main}/config/watching" aria-current="page">Watching</a>`));
-  assert.match(h, /Changes there are flagged to your agents when they ask \(<code>list_flags<\/code>\)\. Only you see this list\./);
+  assert.match(h, new RegExp(`Changes there are flagged to you and to your agents\\. You see them in <a href="/v/${V.main}/flags">Flags</a> \\(under Diagnostics\\) and in <a href="/v/${V.main}/changes\\?show=watching">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>\\. Only you see this list\\.`));
   assert.match(h, new RegExp(`<a href="${re(tree(V.main, "notes/"))}"><code>notes/</code></a><span class="token-client">Folder, and everything in it</span>`));
   assert.doesNotMatch(h, /<code>notes\/a\.md<\/code>/, "Ola's watch isn't Wren's");
   const { action, fields } = formFields(h, "Unwatch");
@@ -240,14 +244,14 @@ test("watching tab: every member has Settings, Watching, listing only their own 
 
 test("watching tab: with nothing watched, it says how to start, and the header offers Watch a path", async () => {
   const h = await page(watching(V.empty));
-  assert.match(h, /<div class="empty"><strong>You don’t watch anything here<\/strong><p>Watch a folder or file from its page, or type one below\. Changes there are flagged to your agents from then on\.<\/p><\/div>/);
+  assert.match(h, /<div class="empty"><strong>You don’t watch anything here<\/strong><p>Watch a folder or file from its page, or type one below\. Changes there are flagged to you and your agents from then on\.<\/p><\/div>/);
   assert.match(h, /<div class="page-actions"><a class="button primary" href="#watch-path">Watch a path<\/a><\/div>/);
 });
 
 test("watching tab: a typed path is watched, existing yet or not; one the database won't take is refused in its own words, with a reference", async () => {
   const token = csrfOf(await page(watching(V.empty)));
   const h = await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: " clients/ ", back: watching(V.empty) }));
-  assert.deepEqual(flashOf(h), ["success", "status", "Watching clients/. From now on, changes there are flagged to your agents."]);
+  assert.deepEqual(flashOf(h), ["success", "status", "Watching clients/. From now on, changes there are flagged to you and your agents."]);
   assert.match(h, /<code>clients\/<\/code><\/a><span class="token-client">Folder, and everything in it<\/span>/);
   const bad = flashOf(await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: "/clients/", back: watching(V.empty) })));
   assert.equal(bad[0], "danger");

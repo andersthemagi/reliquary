@@ -280,6 +280,12 @@ test("confirmPage: a typed-name step asks for the exact value; an error comes ba
   assert.match(named, /<label for="confirm-typed">Type the path<\/label>\s*<input id="confirm-typed" type="text" name="confirm_path"/);
 });
 
+test("confirmPage: cancelLabel renames the way out, so it doesn't read the same as a danger button that is itself a Cancel", () => {
+  const out = h.confirmPage({ title: "Cancel it?", lede: "x", action: "/c", csrf: "c", button: "Cancel “Draft”", cancel: "/plan", cancelLabel: "Keep the task" }).html;
+  assert.match(out, /<button class="danger solid">Cancel “Draft”<\/button><a class="button quiet" href="\/plan">Keep the task<\/a>/);
+  assert.doesNotMatch(out, />Cancel<\/a>/);
+});
+
 // ---------------------------------------------------------------------------
 // Stylesheet
 
