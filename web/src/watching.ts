@@ -77,13 +77,26 @@ async function watchingPage(ctx: Ctx, id: string): Promise<Reply> {
       )
     ).rows as Watch[];
     const here = watchingPath(id);
+    // A watch may name what isn't written yet ("It needn't exist yet"), and
+    // a folder or file page that isn't there is a 404, so only what exists
+    // is linked.
+    const there = new Set<string>(
+      (
+        await c.query(
+          `select w.target from unnest($2::text[]) as w(target)
+            where exists (select 1 from public.files f where f.vault_id = $1 and f.deleted_at is null and ${watchCovers("w.target", "f.path")})`,
+          [id, list.map((w) => w.target)],
+        )
+      ).rows.map((r) => r.target as string),
+    );
     const table = list.length
       ? html`<div class="section-head"><h2>What you watch</h2><p class="section-meta">${list.length === 1 ? "1 path" : `${list.length} paths`}</p></div>
         <div class="table-wrap"><table class="table-stack member-list watch-list">
           <thead><tr><th scope="col">Path</th><th scope="col">Since</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody>${list.map((w) => {
             const folder = w.target.endsWith("/");
-            return html`<tr><td><a href="${folder ? treePath(id, w.target) : filePath(id, w.target)}"><code>${w.target}</code></a><span class="token-client">${folder ? "Folder, and everything in it" : "File"}</span></td>
+            const name = html`<code>${w.target}</code>`;
+            return html`<tr><td>${there.has(w.target) ? html`<a href="${folder ? treePath(id, w.target) : filePath(id, w.target)}">${name}</a>` : name}<span class="token-client">${folder ? "Folder, and everything in it" : "File"}${there.has(w.target) ? "" : ", nothing there yet"}</span></td>
               <td class="small" data-label="Since">${time(w.created_at)}</td>
               <td class="num row-actions"><form method="post" action="${here}">${csrfField(ctx.csrf)}<input type="hidden" name="action" value="unwatch"><input type="hidden" name="subscription" value="${w.id}"><input type="hidden" name="back" value="${here}"><button class="quiet" aria-label="Unwatch ${w.target}">Unwatch</button></form></td></tr>`;
           })}</tbody></table></div>`
