@@ -320,6 +320,39 @@ test("env import: an editor can't import into production, even by posting it", a
   assert.equal((await sql("select count(*)::int as n from public.env_imports where vault_id = $1 and 'ED_PROD' = any(names)", [V.own]))[0].n, 0);
 });
 
+// The server's log line for a reference a page showed (failure.ts), once the
+// server has had a moment to write it.
+async function failureLine(text, where) {
+  const ref = /\(ref ([0-9a-f]{8})\)/.exec(text)?.[1];
+  assert.ok(ref, "the page shows a reference");
+  const start = `failure ref=${ref} `;
+  for (let i = 0; i < 20 && !log.includes(start); i++) await new Promise((r) => setTimeout(r, 100));
+  const line = log.split("\n").find((l) => l.startsWith(start));
+  assert.ok(line, `ref ${ref} is in the server log`);
+  assert.ok(line.includes(`"where":"${where}"`), line);
+  noValues(line);
+  return line;
+}
+
+test("env import: a refused import says why with a reference whose log line says where it broke", async () => {
+  const r = await post(vp(V.own, "/import"), [["dotenv", `ED_PROD_REF=${value("ed-prod-ref")}`], ["environment", "production"]], { s: sam });
+  assert.equal(r.status, 403);
+  const line = await failureLine(await r.text(), "database (function public.create_env_import)");
+  assert.match(line, /"status":403/);
+});
+
+test("env import: a refused apply says why with a reference whose log line says where it broke", async () => {
+  const pushed = await pushTo(V.own, "production", await cliToken(RUTH, ruth.origin, true), { variables: { PROD_ONLY: value("prod-only") } });
+  assert.equal(pushed.status, 201);
+  const id = (await pushed.json()).import;
+  const r = await post(vp(V.own, `/imports/${id}/apply`), {}, { s: sam });
+  assert.equal(r.status, 303);
+  const h = await page(r.headers.get("location"), sam);
+  assert.match(h, /<p class="callout danger flash" role="alert">Your role can’t set values in every environment of this import\. \(ref [0-9a-f]{8}\)<\/p>/);
+  await failureLine(h, "database (function public.apply_env_import)");
+  assert.equal((await post(vp(V.own, `/imports/${id}/reject`), {})).status, 303, "an owner rejects it, so nothing is left waiting");
+});
+
 test("env import: a draft is its author's: another member of the vault gets not found, and can't apply it", async () => {
   const r = await post(vp(V.own, "/import"), [["dotenv", `MINE=${value("mine")}`], ["environment", "development"]]);
   const id = importOf(r.headers.get("location"));

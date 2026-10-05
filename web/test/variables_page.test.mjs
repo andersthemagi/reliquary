@@ -520,6 +520,29 @@ test("variables page: without VARIABLES_KEY, names are listed and values can't b
   assert.equal((await vars.listVariables(PIA, V.own)).variables.some((x) => x.name === "NOKEY"), false);
 });
 
+// The server's log line for a reference a page showed (failure.ts), once the
+// server has had a moment to write it.
+async function failureLine(text, where) {
+  const ref = /\(ref ([0-9a-f]{8})\)/.exec(text)?.[1];
+  assert.ok(ref, "the page shows a reference");
+  const start = `failure ref=${ref} `;
+  for (let i = 0; i < 20 && !log.includes(start); i++) await new Promise((r) => setTimeout(r, 100));
+  const line = log.split("\n").find((l) => l.startsWith(start));
+  assert.ok(line, `ref ${ref} is in the server log`);
+  assert.ok(line.includes(`"where":"${where}"`), line);
+  noValues(line);
+  return line;
+}
+
+test("variables import: without VARIABLES_KEY a pasted import is refused with a reference whose log line says where it broke", async () => {
+  const r = await post(vp(V.own, "/import"), { dotenv: `NOKEY_IMPORT=${value("nokey-import")}`, environment: "development" }, { s: bare });
+  assert.equal(r.status, 403);
+  const h = await r.text();
+  assert.match(h, /This server has no encryption key, so values can’t be set here\. \(ref [0-9a-f]{8}\)/);
+  noValues(h);
+  await failureLine(h, "encryption");
+});
+
 test("variables page: the Connect page shows the CLI: login, run and env pull", async () => {
   const h = await page("/connect?client=cli");
   assert.match(h, /<a href="\/connect\?client=cli" aria-current="page">Environment variables<\/a>/);

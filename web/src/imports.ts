@@ -10,11 +10,10 @@
 
 import { callout, csrfField, emptyState, html, pageHeader, raw, relativeTime, time, type Raw } from "./html.js";
 import { message, notFound, who, type Ctx, type Reply, type Vault } from "./pages.js";
-import { failure } from "./failure.js";
 import { SecretsError, variablesConfigured } from "./secrets.js";
 import { dotenvTooBig, parseDotenv, DOTENV_MAX_ENTRIES } from "./dotenv.js";
 import { applyImport, createImport, getImport, listVariables, rejectImport, type EnvImport } from "./variables.js";
-import { base, crumbs, ENV, plural, readsLog, refusal, sectionHeader, shell, theVault, waitingIn, writes } from "./variablespage.js";
+import { base, crumbs, ENV, plural, readsLog, refusal, sectionHeader, shell, theVault, waitingIn, withRef, writes } from "./variablespage.js";
 
 // An import this long gets its Apply and Reject again under the list.
 const LONG_IMPORT = 12;
@@ -89,7 +88,9 @@ export async function importForm(ctx: Ctx, v: Vault, f: ImportForm, status = 200
   const crumb = crumbs(v, { label: "Imports", href: base(v.id, "/imports") }, { label: title });
   if (!allowed.length || !variablesConfigured()) {
     const why = variablesConfigured() ? "Your role in this vault can’t set variables. Ask an owner." : "This server has no encryption key, so values can’t be set here.";
-    return shell(ctx, v, title, html`${pageHeader({ crumb, title })}${callout("warning", why)}`, 403);
+    // A POST that lands here was refused, so it gets a reference; a GET only explains.
+    const shown = ctx.method === "POST" ? withRef(403, variablesConfigured() ? "web app (the import form)" : "encryption", why) : why;
+    return shell(ctx, v, title, html`${pageHeader({ crumb, title })}${callout("warning", shown)}`, 403);
   }
   const chosen = f.environments?.length ? f.environments : ["development"];
   const body = html`
@@ -138,15 +139,23 @@ export async function importPost(ctx: Ctx, v: Vault): Promise<Reply> {
   try {
     const r = await createImport(ctx.userId, v.id, environments, entries, refused);
     if (r.ok) return { redirect: importPath(v.id, r.id) };
-    const why: Record<string, string> = {
-      forbidden: "Your role can’t set values in every environment you ticked.",
-      not_found: "There’s no such environment in this vault.",
-      rate_limited: "You’ve started too many imports. Apply or discard some, or try again in an hour.",
+    const db = "database (function public.create_env_import)";
+    const why: Record<string, [number, string, string]> = {
+      forbidden: [403, db, "Your role can’t set values in every environment you ticked."],
+      not_found: [404, db, "There’s no such environment in this vault."],
+      rate_limited: [429, "rate limit (imports a person may start)", "You’ve started too many imports. Apply or discard some, or try again in an hour."],
+      unauthorized: [401, db, "Your session ended. Sign in and try again."],
     };
-    return again(why[r.error] ?? "That import was refused.", r.error === "rate_limited" ? 429 : r.error === "not_found" ? 404 : 403);
+    const [status, where, text] = why[r.error] ?? [403, db, `The database refused the import (${r.error}), so nothing was imported.`];
+    return again(withRef(status, where, text), status);
   } catch (err) {
     if (err instanceof SecretsError) {
-      return again(variablesConfigured() ? "A value is at most 64 KiB." : "This server has no encryption key, so values can’t be set here.");
+      // The parser has already refused a NUL or an oversize value, so this is
+      // normally the missing key, which the form explains with a reference
+      // (importForm); the error's own words (they name no value) say anything
+      // else.
+      if (!variablesConfigured()) return again("This server has no encryption key, so values can’t be set here.", 403);
+      return again(withRef(400, "encryption", `The values couldn’t be encrypted: ${err.message}.`));
     }
     return again(message(err));
   }
@@ -223,17 +232,18 @@ export async function decideImport(ctx: Ctx, v: Vault, importId: string, apply: 
   if (r.error === "not_found") return notFound(ctx);
   if (r.error === "storage_limit" && r.message) {
     // The database's own words (20260925230000_plans.sql), with a reference.
-    const f = failure({ status: 403, where: "database (plan limits)", why: `${r.message.charAt(0).toUpperCase()}${r.message.slice(1)}` });
-    ctx.setFlash(`${f.why} (ref ${f.ref})`);
+    ctx.setFlash(withRef(403, "database (plan limits)", `${r.message.charAt(0).toUpperCase()}${r.message.slice(1)}`));
     return { redirect: importPath(v.id, importId) };
   }
-  const why: Record<string, string> = {
-    forbidden: "Your role can’t set values in every environment of this import.",
-    expired: "This import expired; its values are gone. Import the file again.",
-    applied: "This import was already applied.",
-    rejected: "This import was already rejected or discarded.",
-    unauthorized: "Your session ended. Sign in and try again.",
+  const db = `database (function public.${apply ? "apply_env_import" : "reject_env_import"})`;
+  const why: Record<string, [number, string]> = {
+    forbidden: [403, "Your role can’t set values in every environment of this import."],
+    expired: [409, "This import expired; its values are gone. Import the file again."],
+    applied: [409, "This import was already applied."],
+    rejected: [409, "This import was already rejected or discarded."],
+    unauthorized: [401, "Your session ended. Sign in and try again."],
   };
-  ctx.setFlash(why[r.error] ?? "That was refused.", "danger");
+  const [status, text] = why[r.error] ?? [403, `The database refused to ${apply ? "apply" : "reject"} this import (${r.error}), so nothing changed.`];
+  ctx.setFlash(withRef(status, db, text), "danger");
   return { redirect: importPath(v.id, importId) };
 }
