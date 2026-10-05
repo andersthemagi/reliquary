@@ -620,6 +620,9 @@ export function confirmPage(o: {
   typed?: { value: string; name?: string; label?: Raw | string };
   button: string;
   cancel: string; // where Cancel goes: the page the person came from
+  // For a confirm whose danger button is itself a "Cancel …" (cancelling a
+  // task), so the two controls don't read the same and mean opposites.
+  cancelLabel?: string;
   error?: string;
 }): Raw {
   const t = o.typed;
@@ -633,6 +636,6 @@ export function confirmPage(o: {
         ? html`<label for="confirm-typed">${t.label ?? html`Type <strong>${t.value}</strong> to confirm`}</label>
           <input id="confirm-typed" type="text" name="${t.name ?? "confirm_name"}" required autocomplete="off" spellcheck="false" autocapitalize="off">`
         : ""}
-      <div class="actions"><button class="danger solid">${o.button}</button><a class="button quiet" href="${o.cancel}">Cancel</a></div>
+      <div class="actions"><button class="danger solid">${o.button}</button><a class="button quiet" href="${o.cancel}">${o.cancelLabel ?? "Cancel"}</a></div>
     </form>`;
 }
