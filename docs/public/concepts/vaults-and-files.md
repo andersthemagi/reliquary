@@ -7,7 +7,7 @@ A vault is the container for one team, client or project: its files, its environ
 Each vault has a name, a default policy (open or canon), members with roles, and an append-only log of everything that happened in it. A member of one vault sees no trace of any other vault.
 
 - **Create one** from Home with **New vault**, blank or from a [template](templates.md). You become its owner. An agent can create one too, through `create_vault`, but only with a read-write connection that reaches all your vaults; you still own it. See [Agents and the ceiling](agents.md).
-- **Rename it or change its default policy** on the vault's **Settings** page. Only an owner can, in person, and each change is logged with the previous value.
+- **Rename it or change its default policy** on the vault's **Settings** page. Only an owner can, in person, and each change is logged with the previous value. A name is 1 to 100 characters: a blank or longer one is refused on the form, with the reason, before the page that asks you to confirm, and what you typed stays there.
 - **Vault names** are 1 to 100 characters. Tools take a vault by name or by id; if two of your vaults share a name, use the id.
 
 ## Files and folders
