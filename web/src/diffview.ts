@@ -37,7 +37,7 @@ export function unified(lines: DiffLine[]): Raw {
   )}</div>`;
 }
 
-export function split(lines: DiffLine[]): Raw {
+export function split(lines: DiffLine[], earlier = false): Raw {
   const cell = (l: DiffLine | undefined, side: "a" | "b") =>
     l
       ? html`<span class="ln" aria-hidden="true">${side === "a" ? l.a : l.b}</span><span class="${l.kind}">${words(l)}</span>`
@@ -45,29 +45,34 @@ export function split(lines: DiffLine[]): Raw {
   const row = (r: SplitRow) => html`<div class="row">${cell(r.left, "a")}${cell(r.right, "b")}</div>`;
   const same = (r: SplitRow) => r.left?.kind === "same";
   return html`<div class="split-scroll"><div class="diff split" aria-label="Changes, side by side">
-    <div class="row head"><span></span><span>Current</span><span></span><span>Proposed</span></div>
+    <div class="row head"><span></span><span>${earlier ? "Before" : "Current"}</span><span></span><span>Proposed</span></div>
     ${fold(splitRows(lines), same).map((c) =>
       c.fold ? folded(c.items.length, html`${c.items.map(row)}`) : html`${c.items.map(row)}`,
     )}</div></div>`;
 }
 
-export function rendered(current: string | null, proposed: string | null): Raw {
+export function rendered(current: string | null, proposed: string | null, earlier = false): Raw {
   const panel = (label: string, cls: string, body: string | null, missing: string) =>
     html`<section class="${cls}" aria-label="${label}"><h2 class="pane-label">${label}</h2>${
       body === null ? html`<div class="empty">${missing}</div>` : html`<div class="prose entry">${raw(renderMarkdown(body))}</div>`
     }</section>`;
   return html`<div class="rendered">
     ${panel("Proposed", "proposed", proposed, "This proposal deletes the file.")}
-    ${panel("Current", "current", current, "There’s no current version: this creates the file.")}
+    ${earlier
+      ? panel("Before", "current", current, "There was no earlier version: this created the file.")
+      : panel("Current", "current", current, "There’s no current version: this creates the file.")}
   </div>`;
 }
 
 // The whole section, in one bordered box: a header with the change counts
 // and the view switch, then the chosen view. `href` builds the link for each
-// mode. `before` is null for a new file; `after` null for a delete.
+// mode. `before` is null for a new file; `after` null for a delete. `earlier`
+// says `before` is the version the proposal was made against, not the file
+// as it is now.
 export function diffSection(opts: {
   before: string | null;
   after: string | null;
+  earlier?: boolean;
   mode: DiffMode;
   href: (mode: DiffMode) => string;
 }): Raw {
@@ -84,12 +89,12 @@ export function diffSection(opts: {
   )}</nav></div>`;
   const view =
     mode === "rendered"
-      ? rendered(before, after)
+      ? rendered(before, after, opts.earlier)
       : !lines
         ? html`<p class="diff-note muted">Too large to compare line by line. Read it as a whole-file replacement: this is the full proposed text.</p>
       <div class="file">${after ?? ""}</div>`
         : mode === "split"
-          ? split(lines)
+          ? split(lines, opts.earlier)
           : unified(lines);
   return html`<section class="diff-box" id="changes" aria-label="Proposed change">${head}${view}</section>`;
 }

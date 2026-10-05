@@ -31,12 +31,12 @@ before(async () => {
   cookie = r.headers.get("set-cookie").split(";")[0];
 });
 
-// Creates a file at `path` in the editor; the page the refusal lands on.
+// Creates a file at `path` in the editor; the page the refusal answers with.
 async function create(path) {
   const token = await csrf(`${V}/new`);
   const r = await post(`${V}/file`, { csrf: token, action: "create", path, content: "Portable?" });
-  assert.equal(r.status, 303);
-  return decode(await page(r.headers.get("location")));
+  assert.equal(r.status, 400);
+  return decode(await r.text());
 }
 
 test("portable paths: the editor refuses a backslash with the reason, and saves nothing", async () => {

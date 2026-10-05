@@ -168,31 +168,46 @@ test("rules: the header has the crumb and Add rule; the rules table comes first,
   const h = await page(rulesOf(V.main));
   assert.match(h, new RegExp(`<nav class="crumb" aria-label="Breadcrumb"><ol><li><a href="/v/${V.main}">Rules main</a></li><li><a href="/v/${V.main}/config">Settings</a></li><li aria-current="page">Rules</li></ol></nav>`));
   assert.match(h, /<div class="page-actions"><a class="button primary" href="#add-rule">Add rule<\/a><\/div>/);
-  assert.match(h, /<p class="page-desc">Everything is <span class="badge policy open"[^>]*>Open<\/span> unless a rule says otherwise; the most specific rule wins\.<\/p>/);
+  assert.match(h, new RegExp(`<p class="page-desc">Everything is <span class="badge policy open"[^>]*>Open</span> unless a rule says otherwise; the most specific rule wins\\. <a href="/v/${V.main}/config">Change the default on General</a></p>`));
   assert.ok(at(h, '<div class="page-actions">') < at(h, '<table class="table-stack rules-table">'));
   assert.ok(at(h, '<table class="table-stack rules-table">') < at(h, 'id="add-rule"'));
   assert.ok(at(h, 'id="add-rule"') < at(h, "What applies to a path?"));
 });
 
+test("rules: the header's Change the default link is for owners; someone who isn't an owner isn't offered it", async () => {
+  const h = await page(rulesOf(V.kit));
+  assert.match(h, /<p class="page-desc">Everything is [\s\S]*the most specific rule wins\.<\/p>/);
+  assert.doesNotMatch(h, /Change the default on General/);
+});
+
 test("rules: every row labels its cells for phones", async () => {
   const h = await page(rulesOf(V.main));
-  const row = /<tr>\s*<td data-label="Path"><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)?.[0];
+  const row = /<tr>\s*<td data-label="Path"><div><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)?.[0];
   assert.ok(row);
   for (const label of ["Path", "Policy", "Approvals needed", "Set by"]) assert.match(row, new RegExp(`data-label="${label}"`));
   assert.match(row, /<td data-label="Approvals needed" class="num">2<\/td>/);
-  const open = /<tr>\s*<td data-label="Path"><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  const open = /<tr>\s*<td data-label="Path"><div><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(open, /<td data-label="Approvals needed" class="num"><span class="muted">Not needed<\/span><\/td>/);
 });
 
 test("rules: each rule says who set it and when, relative with the exact time on hover", async () => {
   const h = await page(rulesOf(V.main));
-  const row = /<tr>\s*<td data-label="Path"><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
-  assert.match(row, /<td data-label="Set by" class="small muted">you · <time datetime="\d{4}-\d\d-\d\dT[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/td>/);
+  const row = /<tr>\s*<td data-label="Path"><div><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  assert.match(row, /<td data-label="Set by" class="small muted"><div>you · <time datetime="\d{4}-\d\d-\d\dT[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/div><\/td>/);
+});
+
+// A phone's stacked row makes each child of a cell its own grid item, which
+// put "Folder" under the label column and "you ·" apart from its time.
+test("rules: a cell of several parts keeps them in one block, so a phone's stacked row doesn't split them", async () => {
+  const h = await page(rulesOf(V.main));
+  const row = /<tr>\s*<td data-label="Path">[\s\S]*?<\/tr>/.exec(h)[0];
+  assert.match(row, /<td data-label="Path"><div><code class="rule-path">[^<]+<\/code><span class="rule-scope">[\s\S]*?<\/span><\/div><\/td>/);
+  assert.match(row, /<td data-label="Set by" class="small muted"><div>[\s\S]*?<\/div><\/td>/);
 });
 
 test("rules: owners get Change and Remove for each rule in one menu", async () => {
   const h = await page(rulesOf(V.main));
-  const row = /<tr>\s*<td data-label="Path"><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  const row = /<tr>\s*<td data-label="Path"><div><code class="rule-path">clients\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(row, /<summary class="button quiet icon-button" aria-label="Actions for the rule on clients\/"/);
   assert.match(row, new RegExp(`<a class="menu-item" href="/v/${V.main}/rules\\?change=clients%2F#add-rule"><span class="menu-item-title">Change</span>`));
   assert.match(row, new RegExp(`<a class="menu-item danger" href="/v/${V.main}/rules\\?remove=clients%2F"><span class="menu-item-title">Remove</span>`));
@@ -221,6 +236,15 @@ test("rules: approvals outside 1 to 20 are refused in the form, with a ref in th
   assert.equal(await ruleRow(V.main, "q/"), undefined);
 });
 
+test("rules: the page that answers a refused save keeps the top bar's vault switcher and inbox", async () => {
+  const token = csrfOf(await page(rulesOf(V.main)));
+  const r = await post(rulesOf(V.main), { csrf: token, path: "q/", policy: "canon", quorum: "21" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<details class="menu-wrap vault-switch">/);
+  assert.match(h, /<details class="menu-wrap inbox">/);
+});
+
 test("rules: an open rule needs no approvals, so the number is not checked", async () => {
   const token = csrfOf(await page(rulesOf(V.main)));
   const h = await landed(await post(rulesOf(V.main), { csrf: token, path: "scratch/", policy: "open", quorum: "99" }));
@@ -243,6 +267,23 @@ test("rules: Change fills the form with the rule as it is, first on the page", a
   assert.match(h, /name="quorum" min="1" max="20" step="1" required value="2"/);
   assert.match(h, new RegExp(`<button class="primary">Save rule</button><a class="button quiet" href="/v/${V.main}/rules">Cancel</a>`));
   assert.ok(at(h, 'id="add-rule"') < at(h, '<table class="table-stack rules-table">'));
+});
+
+// A path edited in the Change form was saved as a second rule, leaving the
+// one being changed in place. readonly (not disabled) so the path still posts.
+test("rules: Change locks the path, in the form and after a refusal, and says why; Add keeps it editable", async () => {
+  const h = await page(`${rulesOf(V.main)}?change=clients%2F`);
+  assert.match(h, /name="path" placeholder="clients\/" required value="clients\/" readonly aria-describedby="pp-hint">/);
+  assert.match(h, /<p class="hint" id="pp-hint">A rule’s path can’t be changed here, since saving a new path would add a second rule\. To move it, add a rule on the new path, then remove this one\.<\/p>/);
+  assert.match(h, /<input type="hidden" name="changing" value="1">/);
+  const refused = await post(rulesOf(V.main), { csrf: csrfOf(h), path: "clients/", policy: "canon", quorum: "0", changing: "1" });
+  assert.equal(refused.status, 400);
+  const again = await refused.text();
+  assert.match(again, /Change the rule on <code>clients\/<\/code>/);
+  assert.match(again, /name="path" placeholder="clients\/" required value="clients\/" readonly aria-describedby="pp-hint">/, "a refusal doesn't unlock it");
+  const add = await page(rulesOf(V.main));
+  assert.doesNotMatch(add, /readonly|name="changing"/);
+  assert.match(add, /Saving a path that has a rule replaces it\./);
 });
 
 test("rules: Remove asks first, naming what the path follows next, the files that change, the rules inside and the proposals waiting", async () => {
@@ -296,9 +337,11 @@ test("rules: people who aren't owners see the rules without Add rule, Change or 
   assert.deepEqual(await ruleRow(V.kit, "kit/"), { policy: "canon", quorum: 1 });
 });
 
-test("rules: with no rules, the page says what every path is and offers Add rule", async () => {
+test("rules: with no rules, the page says what every path is and shows the Add form under it, with no button that only scrolls to it", async () => {
   const h = await page(rulesOf(V.blank));
-  assert.match(h, /<div class="empty"><strong>No rules yet<\/strong><p>Every path is <span class="badge policy open"[^>]*>Open<\/span>, the vault default\. Add a rule to make a folder like clients\/ canon\.<\/p><p class="empty-action"><a class="button" href="#add-rule">Add rule<\/a><\/p><\/div>/);
+  assert.match(h, /<div class="empty"><strong>No rules yet<\/strong><p>Every path is <span class="badge policy open"[^>]*>Open<\/span>, the vault default\. Add a rule to make a folder like clients\/ canon\.<\/p><\/div>/);
+  assert.doesNotMatch(h, /href="#add-rule"/);
+  assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel rule-form"/, "the form follows the empty box, where the stylesheet spaces them");
 });
 
 test("rules: the confirm page for someone else's vault looks missing", async () => {

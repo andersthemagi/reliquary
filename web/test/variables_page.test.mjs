@@ -209,10 +209,10 @@ test("variables page: an owner sees each environment set or not, its version, wh
   assert.match(h, /<code>API_KEY<\/code>/);
   assert.match(h, /<td data-label="development"><div class="var-cell">\s*<span class="var-state" title="Set by you, [^"]+ UTC \(version 1\)"><span class="var-set">Set<\/span> <span class="var-meta"><time datetime="[^"]+">[^<]+<\/time><span class="var-by"> by you<\/span>/);
   assert.match(h, /<td data-label="preview"><div class="var-cell"><span class="var-none">Not set<\/span><a class="button ghost var-add" href="[^"]+\/set\?name=API_KEY&amp;environment=preview" aria-label="Set API_KEY in preview">Set<\/a>/);
-  // Reveal, Rotate and Delete in both set environments, production included.
+  // Reveal, Change value and Delete in both set environments, production included.
   for (const env of ["development", "production"]) {
     assert.match(h, new RegExp(`name="name" value="API_KEY"><input type="hidden" name="environment" value="${env}"><button class="menu-item"><span class="menu-item-title">Reveal</span>`));
-    assert.ok(h.includes(`href="${vp(V.own, "/set")}?name=API_KEY&amp;environment=${env}"><span class="menu-item-title">Rotate`));
+    assert.ok(h.includes(`href="${vp(V.own, "/set")}?name=API_KEY&amp;environment=${env}"><span class="menu-item-title">Change value`));
     assert.ok(h.includes(`href="${vp(V.own, "/delete")}?name=API_KEY&amp;environment=${env}"><span class="menu-item-title">Delete`));
   }
   assert.match(h, new RegExp(`<a class="button" href="${vp(V.own, "/import")}">Import .env</a><a class="button primary" href="${vp(V.own, "/set")}">Add a variable</a>`));
@@ -223,7 +223,7 @@ test("variables page: an editor gets controls outside production only, and a lin
   const h = await page(vp(V.ed));
   noValues(h);
   assert.match(h, /<code>STRIPE_KEY<\/code>/);
-  assert.match(h, /Only owners set, rotate, delete or reveal values in production\./);
+  assert.match(h, /Only owners set, change, delete or reveal values in production\./);
   assert.match(h, /name="environment" value="development"><button class="menu-item"><span class="menu-item-title">Reveal<\/span>/);
   assert.doesNotMatch(h, /value="production"/);
   assert.doesNotMatch(h, /environment=production/);
@@ -255,6 +255,11 @@ test("variables page: a viewer sees names only: no value, no control, no access 
   assert.match(await f.text(), /Your role in this vault can’t set variables\./);
 });
 
+test("variables page: the CLI instructions are for owners and editors; a viewer, who can’t read values, isn’t shown them", async () => {
+  for (const id of [V.own, V.ed]) assert.match(await page(vp(id)), /<h2>Use them<\/h2>/);
+  assert.doesNotMatch(await page(vp(V.view)), /Use them|npx @reliquary-ai\/cli run/);
+});
+
 test("variables page: a vault you're not in is not found, and nothing is revealed or logged", async () => {
   const before = await reveals(V.priv);
   for (const p of ["", "/log", "/set"]) assert.equal((await get(vp(V.priv, p))).status, 404, p);
@@ -280,13 +285,13 @@ test("variables page: setting a value redirects with a flash naming it and its e
   const w = value("new-rotated");
   const r2 = await post(vp(V.own, "/set"), { name: "NEW_KEY", environment: "preview", replace: "preview", value: w });
   assert.equal(r2.headers.get("location"), vp(V.own));
-  assert.match(await page(vp(V.own)), /Rotated NEW_KEY in preview\./);
+  assert.match(await page(vp(V.own)), /Changed NEW_KEY in preview\./);
   assert.equal((await vars.revealVariable(PIA, V.own, "NEW_KEY", "preview")).value, w);
 });
 
-test("variables page: Rotate opens the form with the name and environment fixed and an empty value", async () => {
+test("variables page: Change value opens the form with the name and environment fixed and an empty value", async () => {
   const h = await page(vp(V.own, "/set?name=API_KEY&environment=production"));
-  assert.match(h, /<h1 class="path">Rotate API_KEY<\/h1>/);
+  assert.match(h, /<h1 class="path">Change API_KEY in production<\/h1>/);
   assert.match(h, /<input type="hidden" name="name" value="API_KEY">/);
   assert.match(h, /<input type="hidden" name="environment" value="production">/);
   assert.match(h, /<textarea id="vv" name="value" class="short secret-input" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><\/textarea>/);
@@ -607,7 +612,7 @@ test("variables values: a set value reads Set and how long ago, with who, the ex
   assert.doesNotMatch(dev.replace(/title="[^"]*"/g, ""), /\bv\d+\b|version/);
 });
 
-test("variables values: each set value has one menu (Reveal as a POST, Rotate, Delete) instead of loose buttons, and an empty one offers Set", async () => {
+test("variables values: each set value has one menu (Reveal as a POST, Change value, Delete) instead of loose buttons, and an empty one offers Set", async () => {
   const h = await page(vp(V.own));
   const row = h.slice(h.indexOf("<code>API_KEY</code>"));
   const tr = row.slice(0, row.indexOf("</tr>"));
@@ -664,7 +669,7 @@ test("variables add: the environments are a checkbox for each one, the one asked
   assert.match(e, /<label class="choice is-disabled"><input type="checkbox" name="environment" value="production" disabled> production/);
 });
 
-test("variables add: ticking several environments sets the one value in each, and the flash names each as set or rotated", async () => {
+test("variables add: ticking several environments sets the one value in each, and the flash names each as set or changed", async () => {
   const first = value("many");
   const r = await post(vp(V.own, "/set"), { name: "MANY_KEY", environment: ["development", "preview"], value: first });
   assert.equal(r.status, 303);
@@ -672,7 +677,7 @@ test("variables add: ticking several environments sets the one value in each, an
   for (const env of ["development", "preview"]) assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", env)).value, first);
   const second = value("many-again");
   await post(vp(V.own, "/set"), { name: "MANY_KEY", environment: ["development", "production"], replace: "development", value: second });
-  assert.match(await page(vp(V.own)), /Set MANY_KEY in production\. Rotated MANY_KEY in development\./);
+  assert.match(await page(vp(V.own)), /Set MANY_KEY in production\. Changed MANY_KEY in development\./);
   assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "development")).value, second);
   assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "production")).value, second);
   assert.equal((await vars.revealVariable(PIA, V.own, "MANY_KEY", "preview")).value, first, "an environment left unticked keeps its value");

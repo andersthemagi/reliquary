@@ -62,7 +62,9 @@ test("comment: Ana comments and it joins the timeline", async () => {
 test("comment: empty and over-long comments are refused with a reason", async () => {
   const token = await csrf(`${T}/proposals/${TW_COMMENT}`);
   const url = `${T}/proposals/${TW_COMMENT}/comment`;
-  assert.match(await follow(await post(url, { csrf: token, body: "  " })), /A comment needs some text\./);
+  const empty = await post(url, { csrf: token, body: "  " });
+  assert.equal(empty.status, 400);
+  assert.match(await empty.text(), /A comment needs some text\./);
   assert.match(await follow(await post(url, { csrf: token, body: "x".repeat(4001) })), /Comments are at most 4000 characters\./);
 });
 
@@ -96,7 +98,8 @@ test("viewer: reads the thread, agent words escaped and marked, and can't commen
   assert.doesNotMatch(h, /\/snooze"/);
   const token = await csrf(`/v/${SHOP_VAULT}/proposals/${TW_VIEW}`);
   const r = await post(`/v/${SHOP_VAULT}/proposals/${TW_VIEW}/comment`, { csrf: token, body: "Me too" });
-  assert.match(await follow(r), /Only editors, owners and a path&#39;s named owners comment on proposals\./);
+  assert.equal(r.status, 400);
+  assert.match(await r.text(), /Only editors, owners and a path&#39;s named owners comment on proposals\./);
   assert.doesNotMatch(await page(`/v/${SHOP_VAULT}/proposals/${TW_VIEW}`), /Me too/);
 });
 

@@ -220,11 +220,23 @@ test("menu: no script and no role=menu; keyboard use is the summary (Enter, Spac
 });
 
 test("menu: a ⋯ button has its label as its accessible name; ghost and left-aligned variants", () => {
-  const out = h.menu({ label: "Actions for DATABASE_URL", icon: "more", align: "left", className: "var-menu", items: [{ href: "/r", label: "Reveal" }] }).html;
+  const out = h.menu({ label: "Actions for DATABASE_URL", icon: "more", align: "left", items: [{ href: "/r", label: "Reveal" }] }).html;
   assert.match(out, /<details class="menu-wrap action-menu var-menu">/);
   assert.match(out, /<summary class="button quiet icon-button" aria-label="Actions for DATABASE_URL" title="Actions for DATABASE_URL"><svg class="icon"[^>]*aria-hidden="true"/);
   assert.match(out, /<div class="menu action-list menu-left">/);
   assert.match(h.menu({ label: "Snooze", ghost: true, items: [] }).html, /<summary class="button quiet">Snooze<\/summary>/);
+});
+
+test("menu: a ⋯ menu opens from its button, not its table cell, so a table or scrolling box never clips it", () => {
+  assert.match(h.menu({ label: "Actions for the rule on canon/", icon: "more", items: [] }).html, /^<details class="menu-wrap action-menu var-menu">/);
+  assert.doesNotMatch(h.menu({ label: "More", items: [] }).html, /var-menu/);
+  assert.match(CSS, /\.var-menu\.menu-wrap \{ position: static;/);
+  assert.match(CSS, /\.var-menu > \.menu \{[^}]*transform: translateX\(calc\(-100% \+ 32px\)\)/);
+});
+
+test("stylesheet: a list box doesn't clip a row's open menu (the inbox's Snooze), though it clips rows to its corners otherwise", () => {
+  assert.match(CSS, /\.rows \{[^}]*overflow: hidden;/);
+  assert.match(CSS, /\.rows:has\(\.menu-wrap\[open\]\) \{ overflow: visible; \}/);
 });
 
 // ---------------------------------------------------------------------------
@@ -268,6 +280,12 @@ test("confirmPage: a typed-name step asks for the exact value; an error comes ba
   assert.match(named, /<label for="confirm-typed">Type the path<\/label>\s*<input id="confirm-typed" type="text" name="confirm_path"/);
 });
 
+test("confirmPage: cancelLabel renames the way out, so it doesn't read the same as a danger button that is itself a Cancel", () => {
+  const out = h.confirmPage({ title: "Cancel it?", lede: "x", action: "/c", csrf: "c", button: "Cancel “Draft”", cancel: "/plan", cancelLabel: "Keep the task" }).html;
+  assert.match(out, /<button class="danger solid">Cancel “Draft”<\/button><a class="button quiet" href="\/plan">Keep the task<\/a>/);
+  assert.doesNotMatch(out, />Cancel<\/a>/);
+});
+
 // ---------------------------------------------------------------------------
 // Stylesheet
 
@@ -282,6 +300,34 @@ test("stylesheet: stacked tables on phones label each cell from data-label", () 
   assert.match(phone, /@media \(max-width: 640px\) \{/);
   assert.match(phone, /\.table-stack td::before, \.table-stack tbody th::before \{ content: attr\(data-label\);/);
   assert.match(phone, /table\.table-stack \{ min-width: 0; \}/);
+});
+
+test("stylesheet: a link's URL wraps instead of widening the Links table, which shares the Rules table's nowrap second column", () => {
+  const nowrap = CSS.indexOf(".rules-table td:nth-child(2), .rules-table .rule-actions { width: 1%; white-space: nowrap; }");
+  const url = /\n\.rules-table td\.link-url \{ width: auto; white-space: normal; overflow-wrap: anywhere; \}/.exec(CSS);
+  assert.ok(nowrap >= 0 && url, "both rules exist");
+  assert.ok(url.index > nowrap, "the URL rule follows the rule it overrides: same specificity, so order decides");
+});
+
+test("stylesheet: an empty-state box has clear space above the form under it, and the Environments footnote below its table", () => {
+  assert.match(CSS, /\n\.empty \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
+  assert.match(CSS, /\n\.table-wrap:has\(> \.var-envtable\) \+ p \{ margin-top: var\(--space-4\); \}/);
+});
+
+test("stylesheet: a read-only input is shaded, so a locked field doesn't look editable", () => {
+  const field = CSS.indexOf('input[type="text"], input[type="search"]');
+  const locked = CSS.indexOf("\ninput[readonly] { background: var(--bg-subtle); }");
+  assert.ok(field >= 0 && locked > field, "after the field rule it overrides, which has the same specificity");
+});
+
+test("stylesheet: a form panel right under a table has space above it", () => {
+  assert.match(CSS, /\.table-wrap \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
+});
+
+test("stylesheet: number fields look like the other fields: border, height, hover and focus", () => {
+  assert.match(CSS, /input\[type="date"\], input\[type="number"\], textarea, select \{\s*width: 100%;/);
+  assert.match(CSS, /input\[type="number"\]:hover/);
+  assert.match(CSS, /input\[type="number"\]:focus-visible/);
 });
 
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {
