@@ -490,6 +490,8 @@ form.panel {
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: var(--space-5) var(--space-6) var(--space-6); margin: 0 0 var(--space-6); max-width: 80ch;
 }
+/* A form straight under a table (Rules, Links) is a separate thing, not the table's last row. */
+.table-wrap + form.panel { margin-top: var(--space-6); }
 label { display: block; font-weight: 600; font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-5) 0 6px; }
 form.panel > label:first-of-type, form > label:first-child { margin-top: 0; }
 .hint { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-2) 0 0; font-weight: 400; }

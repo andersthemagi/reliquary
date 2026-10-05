@@ -284,6 +284,10 @@ test("stylesheet: stacked tables on phones label each cell from data-label", () 
   assert.match(phone, /table\.table-stack \{ min-width: 0; \}/);
 });
 
+test("stylesheet: a form panel right under a table has space above it", () => {
+  assert.match(CSS, /\.table-wrap \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
+});
+
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {
   for (const sel of [/\n\.secondary \{/, /\n\.ghost \{/, /\n\.ghost:hover \{/, /\n\.danger \{/, /\n\.danger\.solid \{/, /\n\.primary, a\.button\.primary \{/]) assert.match(CSS, sel);
 });
