@@ -87,6 +87,8 @@ const landed = async (r) => {
   return page(r.headers.get("location"));
 };
 const flashOf = (h) => /<p class="callout (\w+) flash" role="(\w+)">([\s\S]*?)<\/p>/.exec(h)?.slice(1);
+// A refused Watch on the Watching tab answers the form again, with the reason in it.
+const refusedForm = (h) => /<p class="callout danger" role="alert" id="watch-error">([\s\S]*?)<\/p>/.exec(h)?.[1];
 
 // The fields of the form on `h` whose submit button says `label`.
 function formFields(h, label) {
@@ -249,12 +251,32 @@ test("watching tab: a typed path is watched, existing yet or not; one the databa
   const h = await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: " clients/ ", back: watching(V.empty) }));
   assert.deepEqual(flashOf(h), ["success", "status", "Watching clients/. From now on, changes there are flagged to your agents."]);
   assert.match(h, /<code>clients\/<\/code><\/a><span class="token-client">Folder, and everything in it<\/span>/);
-  const bad = flashOf(await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: "/clients/", back: watching(V.empty) })));
-  assert.equal(bad[0], "danger");
-  assert.match(bad[2], /^A watched path starts with \/, but paths in a vault are relative: write clients\/ rather than \/clients\/\. \(ref [0-9a-f]{8}\)$/);
-  const none = flashOf(await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: "", back: watching(V.empty) })));
-  assert.match(none[2], /^Say which path to watch: a folder ending in \/ \(like clients\/\) or a file \(like notes\/plan\.md\)\. \(ref [0-9a-f]{8}\)$/);
+  const bad = await post(watching(V.empty), { csrf: token, action: "watch", path: "/clients/", back: watching(V.empty) });
+  assert.equal(bad.status, 400, "the form again, not a flash");
+  assert.match(refusedForm(await bad.text()), /^A watched path starts with \/, but paths in a vault are relative: write clients\/ rather than \/clients\/\. \(ref [0-9a-f]{8}\)$/);
+  const none = await post(watching(V.empty), { csrf: token, action: "watch", path: "", back: watching(V.empty) });
+  assert.equal(none.status, 400);
+  assert.match(refusedForm(await none.text()), /^Say which path to watch: a folder ending in \/ \(like clients\/\) or a file \(like notes\/plan\.md\)\. \(ref [0-9a-f]{8}\)$/);
   assert.deepEqual(await watches(WREN, V.empty), ["clients/"]);
+});
+
+test("watching tab: a refused path stays in the Watch form, marked, with the form first on the page and nothing watched", async () => {
+  const token = csrfOf(await page(watching(V.empty)));
+  const r = await post(watching(V.empty), { csrf: token, action: "watch", path: "/typed/folder/", back: watching(V.empty) });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<input id="wp" type="text" name="path" placeholder="clients\/" required maxlength="1024" autocomplete="off" spellcheck="false" value="\/typed\/folder\/" aria-invalid="true" aria-describedby="watch-error wp-hint">/);
+  assert.ok(h.indexOf('id="watch-path"') < h.indexOf('<table class="table-stack member-list watch-list">'), "the refused form is on the first screen");
+  assert.doesNotMatch(h, /page-actions/, "no Watch a path while the form is first");
+  assert.deepEqual(await watches(WREN, V.empty), ["clients/"]);
+});
+
+test("watching tab: a refusal from the Watch button on a page still comes back to that page as a flash", async () => {
+  const token = csrfOf(await page(watching(V.main)));
+  const r = await post(watching(V.main), { csrf: token, action: "watch", path: "/bad/", back: file(V.main, "top.md") });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), file(V.main, "top.md"));
+  assert.equal(flashOf(await page(r.headers.get("location")))[0], "danger");
 });
 
 test("watching tab: at the most paths one person can watch, the database's refusal is shown as it says it, with a reference, and nothing is added", async () => {
@@ -262,9 +284,8 @@ test("watching tab: at the most paths one person can watch, the database's refus
   assert.equal(n, 100);
   const token = csrfOf(await page(watching(V.cap)));
   const r = await post(watching(V.cap), { csrf: token, action: "watch", path: "one-more/", back: watching(V.cap) });
-  assert.equal(r.status, 303, "a flash on the page, not an error page");
-  const [tone, role, text] = flashOf(await landed(r));
-  assert.deepEqual([tone, role], ["danger", "alert"]);
+  assert.equal(r.status, 400, "the form again, not an error page");
+  const text = refusedForm(await r.text());
   const m = /^You watch 100 paths in this vault already, the most one person can: stop watching one first\. \(ref ([0-9a-f]{8})\)$/.exec(text);
   assert.ok(m, text);
   assert.match(log, new RegExp(`failure ref=${m[1]} `), "the ref is in the server log");
