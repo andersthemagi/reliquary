@@ -27,11 +27,13 @@ The **Inbox** in the top bar counts what waits on you, across all your vaults, a
 1. The status, who proposed it (the agent first, then its person) and when. **Snooze**, **Revise** and **Edit, then approve** are at the top right.
 2. The latest request for changes if there is one, and what's worth a closer look (below).
 3. The decision: a note, then **Approve**, **Request changes** or **Reject**.
-4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted.
+4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted. Once a proposal is applied or rejected, its diff stays what was reviewed: against the version it was made against, not the file as it is now, and the split and rendered views label that side **Before**. A stale proposal's diff is against the file as it is now.
 5. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
 6. Approvals so far and the discussion.
 
 If a decision is refused, for example **Reject** without a note, the page comes back with the reason in the decision box and your note as you typed it; nothing was decided. Once a proposal is decided, the top of its page says how it ended, who decided and when, in place of the approvals.
+
+If the file changed after an open proposal was made, its page says so in a warning above the decision and offers **Reject** but not **Approve** or **Request changes**: approving could only mark it stale, and neither **Revise** nor **Edit, then approve** moves it onto the new version. Reject it, then propose the same text again against the current version.
 
 - **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it.
 - **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
@@ -55,7 +57,7 @@ Only people approve, request changes or reject, in the web app. An agent can't, 
 
 ## Revising
 
-Only the proposer revises: in the web app with **Revise**, or over MCP with `revise_proposal` (the person whose agent proposed counts as the proposer). A revision replaces the text, and approvals of earlier revisions stop counting.
+Only the proposer revises: in the web app with **Revise**, or over MCP with `revise_proposal` (the person whose agent proposed counts as the proposer). A revision replaces the text, and approvals of earlier revisions stop counting. The **New reason** field (`reason` over MCP) replaces the proposal's reason, the one reviewers read as why it was proposed, and is also added to the discussion. Leave it empty to keep the old reason.
 
 ## Threads
 

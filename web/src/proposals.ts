@@ -27,8 +27,17 @@ import { risks } from "./risk.js";
 
 export { risks } from "./risk.js";
 
-const verbOf = (p: { kind: string; current_body: string | null }) =>
-  p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
+// What a proposal is measured against. While it waits: the file as it is
+// now. Once it has applied or been rejected: the version it was made
+// against, because after approval the file already says what was proposed
+// and "now" would show an empty diff, and a Change where there was a Create.
+// A stale one stays against the current file: its page offers to propose the
+// same text again against that.
+type Basis = { status?: string; base_version_id?: string | null; base_body?: string | null; current_body: string | null };
+const againstBase = (p: Basis) => p.status === "applied" || p.status === "rejected";
+const beforeOf = (p: Basis) => (againstBase(p) ? (p.base_body ?? null) : p.current_body);
+const createsFile = (p: Basis) => (againstBase(p) ? (p.base_version_id ?? null) === null : p.current_body === null);
+const verbOf = (p: Basis & { kind: string }) => (p.kind === "delete" ? "Delete" : createsFile(p) ? "Create" : "Change");
 
 // A file's name, the last part of its path, for titles that name it.
 const fileName = (path: string) => path.split("/").filter(Boolean).pop() ?? path;
@@ -144,7 +153,7 @@ export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
         // revision, or who rejected it. Decided ones by when, newest first.
         `with page as (
            select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
-                  p.status, p.decided_at,
+                  p.status, p.decided_at, p.base_version_id,
                   row_number() over (order by coalesce(p.decided_at, p.created_at) desc) as ord
              from public.proposals p where p.vault_id = $1 and p.status = any($2::text[])
             order by coalesce(p.decided_at, p.created_at) desc limit 100)
@@ -180,7 +189,7 @@ export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
 
 // Where a proposal's pages sit: the vault, its Proposals, the proposal, and
 // the page under it, if any.
-function proposalCrumb(v: Vault, p: { id: string; kind: string; path: string; current_body: string | null }, here?: string): CrumbPart[] {
+function proposalCrumb(v: Vault, p: Basis & { id: string; kind: string; path: string }, here?: string): CrumbPart[] {
   return [
     { label: v.name, href: vaultPath(v.id) },
     { label: "Proposals", href: vaultPath(v.id, "/proposals") },
@@ -202,10 +211,11 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     if (!v) return null;
     const p = (
       await c.query(
-        `select p.*, cur.body as current_body, (private.rule_for(p.vault_id, p.path)).quorum
+        `select p.*, cur.body as current_body, f.current_version_id, base.body as base_body, (private.rule_for(p.vault_id, p.path)).quorum
            from public.proposals p
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
+           left join public.file_versions base on base.id = p.base_version_id
           where p.id = $1 and p.vault_id = $2`,
         [pid, id],
       )
@@ -228,6 +238,10 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
       : false;
     const verb = verbOf(p);
     const live = p.status === "open" || p.status === "changes_requested";
+    // decide() applies a proposal only while the file is at the version it
+    // was proposed against, and neither Revise nor Edit, then approve moves
+    // that base, so a proposal whose file has moved on can only go stale.
+    const moved = p.status === "open" && (p.base_version_id ?? null) !== (p.current_version_id ?? null);
     const approvers = approvals.filter((a) => a.decision === "approve");
     const mine = approvals.some((a) => a.user_id === ctx.userId);
     const flags = live
@@ -268,7 +282,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
             noteMissing ? html` aria-invalid="true"` : ""
           }>${textareaText(refused?.note)}</textarea>
           <div class="actions">
-            ${decidable
+            ${decidable && !moved
               ? html`<button class="primary" name="decision" value="approve">Approve</button>
                 <button name="decision" value="request_changes">Request changes</button>`
               : ""}
@@ -293,7 +307,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
           ? html`<p class="callout ${p.status === "applied" ? "success" : "neutral"} outcome-line">${ended}.</p>`
           : p.status === "changes_requested"
             ? html`<p class="callout neutral">Waiting for the proposer to revise.${rejectable ? " You can still edit it yourself, or reject it." : ""}</p>`
-            : p.status === "open" && mine
+            : p.status === "open" && mine && !moved
               ? html`<p class="callout neutral">You’ve decided on this revision. It needs more approvals before it applies.</p>`
               : "";
 
@@ -330,13 +344,20 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
               (f) => html`<li><span class="badge attention">${f.short}</span> <span class="risk-long">${f.long}</span></li>`,
             )}</ul>`
           : ""}
+        ${moved
+          ? callout(
+              "warning",
+              "The file changed after this was proposed. Approving it would mark it stale instead of applying it, and revising or editing it doesn’t change that. The diff below compares with the file as it is now. To go ahead, reject it and propose the same text again against the current version.",
+            )
+          : ""}
         ${status}${controls ?? refusal}
       </div>
 
       ${p.body === null && p.kind === "write"
         ? html`<div class="empty">This proposal’s content was erased.</div>`
         : diffSection({
-            before: p.current_body,
+            before: beforeOf(p),
+            earlier: againstBase(p),
             after: p.kind === "delete" ? null : p.body,
             mode: diffMode(ctx.url.searchParams),
             href: (m) => proposalPath(id, pid, `?diff=${m}`),
@@ -447,8 +468,9 @@ export async function proposalRevise(ctx: Ctx, id: string, pid: string): Promise
         ${csrfField(ctx.csrf)}
         <label for="content">Proposed text</label>
         <textarea id="content" name="content">${textareaText(p.body)}</textarea>
-        <label for="reason">What changed</label>
-        <input id="reason" type="text" name="reason" placeholder="Optional, for the reviewers">
+        <label for="reason">New reason (replaces the old one; leave empty to keep it)</label>
+        <p class="hint" id="reason-hint">Reviewers read this as why the proposal exists, so say why, not only what changed. It is also added to the discussion.</p>
+        <input id="reason" type="text" name="reason" aria-describedby="reason-hint">
         <div class="actions"><button class="primary">Save revision</button>
           <a class="button quiet" href="${proposalPath(id, pid)}">Cancel</a></div>
       </form>`;
