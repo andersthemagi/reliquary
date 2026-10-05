@@ -1809,10 +1809,12 @@ td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
    centres its content). */
 .var-menu .menu-item { justify-content: start; }
 
-/* "Set" in an empty cell shows on hover or focus where there is a pointer
-   to hover with; always on touch screens and phones. */
+/* "Set" in an empty cell is quiet until hover or focus where there is a
+   pointer to hover with, but never invisible: hidden, "Not set" offered
+   nothing to click. Always full on touch screens and phones. 0.7 keeps it
+   above 3:1 (contrast.test.mjs). */
 @media (hover: hover) and (min-width: 641px) {
-  .var-grid .var-add { opacity: 0; transition: opacity 120ms ease-out; }
+  .var-grid .var-add { opacity: 0.7; transition: opacity 120ms ease-out; }
   .var-grid tr:hover .var-add, .var-grid .var-add:focus-visible { opacity: 1; }
 }
 

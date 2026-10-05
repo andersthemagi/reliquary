@@ -70,6 +70,18 @@ for (const [name, t] of [["light", light], ["dark", dark]]) {
   });
 }
 
+// "Set" in an empty variable cell is faded until hover, with a pointer; the
+// blend of its muted text over the cell is what a person sees at rest.
+for (const [name, t] of [["light", light], ["dark", dark]]) {
+  test(`contrast: the faded Set in an empty variable cell stays visible, 3:1 over the cell, in the ${name} theme`, () => {
+    const alpha = Number(/\.var-grid \.var-add \{ opacity: ([\d.]+);/.exec(css)?.[1]);
+    assert.ok(alpha > 0 && alpha < 1, "faded, not hidden");
+    const blend = (i) => Math.round(alpha * parseInt(t["fg-muted"].slice(i, i + 2), 16) + (1 - alpha) * parseInt(t.bg.slice(i, i + 2), 16));
+    const seen = `#${[1, 3, 5].map((i) => blend(i).toString(16).padStart(2, "0")).join("")}`;
+    assert.ok(ratio(seen, t.bg) >= UI, `${seen} on ${t.bg} is ${ratio(seen, t.bg).toFixed(2)}`);
+  });
+}
+
 test("contrast: the explicit dark theme matches the automatic one", () => {
   assert.deepEqual(darkSet, darkAuto);
 });
