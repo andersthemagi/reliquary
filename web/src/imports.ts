@@ -48,7 +48,7 @@ export async function importsPage(ctx: Ctx, id: string): Promise<Reply> {
     content = emptyState({ title: "Only owners and editors see this vault’s imports." });
   } else if (!pushes.length) {
     content = emptyState({
-      title: "No imports waiting.",
+      title: "No imports from the CLI waiting.",
       body: html`Send a <code>.env</code> from a project with <code>npx @reliquary-ai/cli env push --env development</code>: it waits here until a person applies it. A <code>.env</code> you paste with Import .env opens straight on its preview.`,
     });
   } else {
@@ -66,7 +66,7 @@ export async function importsPage(ctx: Ctx, id: string): Promise<Reply> {
   }
   const body = html`
     ${sectionHeader(v, "imports", pushes.length, {
-      description: "A .env brought in at once waits here until a person applies it; nothing is set before.",
+      description: "Imports sent from the CLI wait here until a person applies them; nothing is set before. One you paste opens on its own preview and isn’t listed.",
       primary: canSet ? html`<a class="button primary" href="${base(id, "/import")}">Import .env</a>` : "",
     })}
     ${content}`;

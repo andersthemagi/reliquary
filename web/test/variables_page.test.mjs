@@ -637,13 +637,19 @@ test("variables tabs: owners get Values, Environments, Access log and Imports un
 
 test("variables tabs: the Imports tab says when nothing waits and how to send an import; viewers are told it's for owners and editors", async () => {
   const h = await page(vp(V.own, "/imports"));
-  assert.match(h, /<strong>No imports waiting\.<\/strong>/);
+  assert.match(h, /<strong>No imports from the CLI waiting\.<\/strong>/);
   assert.match(h, /npx @reliquary-ai\/cli env push --env development/);
   assert.match(h, new RegExp(`<a class="button primary" href="${vp(V.own, "/import")}">Import .env</a>`));
   const v = await get(vp(V.view, "/imports"));
   assert.equal(v.status, 200);
   assert.match(await v.text(), /Only owners and editors see this vault’s imports\./);
   assert.equal((await get(vp(V.priv, "/imports"))).status, 404);
+});
+
+test("variables tabs: the Imports tab says it lists imports sent from the CLI, and that a pasted one opens on its own preview", async () => {
+  const h = await page(vp(V.own, "/imports"));
+  assert.match(h, /Imports sent from the CLI wait here until a person applies them; nothing is set before\. One you paste opens on its own preview and isn’t listed\./);
+  assert.doesNotMatch(h, /brought in at once/);
 });
 
 test("variables add: the environments are a checkbox for each one, the one asked for (else the first) ticked, owners-only ones badged, and those a role can't set disabled", async () => {
