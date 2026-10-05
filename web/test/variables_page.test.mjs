@@ -623,6 +623,14 @@ test("variables add: a refused set keeps the ticks, and no tick at all is told t
   assert.doesNotMatch(h, /value="production" checked/);
 });
 
+test("variables add: a multi-line value is stored with LF line endings, though a browser sends CRLF", async () => {
+  const first = value("crlf-a");
+  const second = value("crlf-b");
+  const r = await post(vp(V.own, "/set"), { name: "CRLF_KEY", environment: "development", value: `${first}\r\n${second}\r\n` });
+  assert.equal(r.status, 303);
+  assert.equal((await vars.revealVariable(PIA, V.own, "CRLF_KEY", "development")).value, `${first}\n${second}\n`);
+});
+
 test("variables log cells: a row naming no variable shows a dash, the environment has its own column, and who is followed by the client", async () => {
   await vars.createEnvironment(PIA, V.own, "logdash", false);
   const h = await page(vp(V.own, "/log?action=create_environment"));

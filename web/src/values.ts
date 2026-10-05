@@ -230,7 +230,9 @@ export async function setForm(ctx: Ctx, v: Vault, f: SetForm, status = 200): Pro
 export async function saveVariable(ctx: Ctx, v: Vault): Promise<Reply> {
   const name = (ctx.form.get("name") ?? "").trim();
   const environments = [...new Set(ctx.form.getAll("environment"))].filter((e) => ENV.test(e));
-  const value = ctx.form.get("value") ?? "";
+  // A browser sends a textarea's line breaks as CRLF, and a multi-line secret
+  // (a PEM key) has to reach a program as it was written.
+  const value = (ctx.form.get("value") ?? "").replaceAll("\r\n", "\n");
   // The form again, with name and environments kept and the value dropped.
   // One environment alone still reads as a rotate when the name has a value there.
   const again = (error: string, status = 400) =>
