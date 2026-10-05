@@ -13,7 +13,9 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { changesPath } from "./changes.js";
 import { csrfField, emptyState, html, time, type Raw } from "./html.js";
+import { flagsPath } from "./flagspage.js";
 import { Refusal } from "./failure.js";
 import { vaultShell } from "./files.js";
 import { filePath, message, notFound, render, treePath, UUID, vault, vaultPath, type Ctx, type Reply } from "./pages.js";
@@ -47,7 +49,7 @@ export function watchControl(ctx: Ctx, id: string, path: string, w: WatchState):
   const back = html`<input type="hidden" name="back" value="${ctx.url.pathname + ctx.url.search}">`;
   if (w.direct) {
     return {
-      badge: html`<span class="badge info" title="Changes here are flagged to your agents. Only you see this.">Watching</span>`,
+      badge: html`<span class="badge info" title="Changes here are flagged to you and your agents. Only you see this.">Watching</span>`,
       action: html`<form method="post" action="${watchingPath(id)}" class="watch-form">${csrfField(ctx.csrf)}<input type="hidden" name="action" value="unwatch"><input type="hidden" name="subscription" value="${w.direct.id}">${back}<button aria-label="Unwatch ${path}">Unwatch</button></form>`,
     };
   }
@@ -58,7 +60,7 @@ export function watchControl(ctx: Ctx, id: string, path: string, w: WatchState):
     };
   }
   return {
-    action: html`<form method="post" action="${watchingPath(id)}" class="watch-form">${csrfField(ctx.csrf)}<input type="hidden" name="action" value="watch"><input type="hidden" name="path" value="${path}">${back}<button title="Flag changes here to your agents">Watch</button></form>`,
+    action: html`<form method="post" action="${watchingPath(id)}" class="watch-form">${csrfField(ctx.csrf)}<input type="hidden" name="action" value="watch"><input type="hidden" name="path" value="${path}">${back}<button title="Flag changes here to you and your agents">Watch</button></form>`,
   };
 }
 
@@ -93,7 +95,7 @@ async function watchingPage(ctx: Ctx, id: string, form?: WatchForm): Promise<Rep
           })}</tbody></table></div>`
       : emptyState({
           title: "You don’t watch anything here",
-          body: "Watch a folder or file from its page, or type one below. Changes there are flagged to your agents from then on.",
+          body: "Watch a folder or file from its page, or type one below. Changes there are flagged to you and your agents from then on.",
         });
     const addForm = html`<form method="post" action="${here}" class="panel watch-add" id="watch-path" aria-labelledby="watch-path-title">
         <h2 id="watch-path-title" class="form-title">Watch a folder or file</h2>
@@ -108,8 +110,8 @@ async function watchingPage(ctx: Ctx, id: string, form?: WatchForm): Promise<Rep
     // A refused form goes first, so its reason is on the first screen.
     const body = html`
       ${settingsHeader(id, v, "watching", {
-        description: html`Folders and files you watch in ${v.name}. Changes there are flagged to your agents when they ask (<code>list_flags</code>). Only you see this list.`,
-        primary: form ? "" : html`<a class="button primary" href="#watch-path">Watch a path</a>`,
+        description: html`Folders and files you watch in ${v.name}. Changes there are flagged to you and to your agents. You see them in <a href="${flagsPath(id)}">Flags</a> (under Diagnostics) and in <a href="${changesPath(id, "watching")}">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>. Only you see this list.`,
+        primary: form || !list.length ? "" : html`<a class="button primary" href="#watch-path">Watch a path</a>`,
       })}
       ${form ? addForm : ""}
       ${table}
@@ -150,7 +152,7 @@ async function watchAction(ctx: Ctx, id: string): Promise<Reply> {
       });
       if (!r) return notFound(ctx);
       if (r.had) ctx.setFlash(`You already watch ${path}.`, "info");
-      else ctx.setFlash(`Watching ${path}. From now on, changes there are flagged to your agents.`, "success");
+      else ctx.setFlash(`Watching ${path}. From now on, changes there are flagged to you and your agents.`, "success");
     } catch (err) {
       // Refused by the database: a path it won't take, or the most paths
       // one person can watch in a vault. Its own words, with a reference.

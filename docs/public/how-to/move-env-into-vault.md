@@ -41,6 +41,6 @@ An import from the CLI waits 24 hours for a decision, one you pasted 30 minutes;
    ```
 
 3. When it works, delete the local `.env`. If a tool insists on a file, use `reliquary env pull`, which writes only where git ignores it.
-4. If the file was ever committed to git or shared in a chat, rotate those values at their provider, then set the new ones on the Variables page with **Rotate**.
+4. If the file was ever committed to git or shared in a chat, rotate those values at their provider, then set the new ones on the Variables page with **Change value**.
 
 Repeat for `preview` and `production` with `--env`.

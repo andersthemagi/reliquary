@@ -44,7 +44,7 @@ The page shows the plan as it is when you open it. Reload to see changes.
 
 ## Cancelling and skipping a task
 
-If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has two buttons, **Cancel** and **Skip**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. Only a person can do either: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
+If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has two buttons, **Cancel** and **Skip**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it. Only a person can do either: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
 
 - **Cancel** drops the task. A cancelled task never counts as done, so every task waiting on it stays blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them. A cancelled task can't be reopened.
 - **Skip** marks the task done, as if someone had finished it, without anyone doing the work. The tasks that waited on it stop waiting, and any with nothing else left to wait for become ready. The plan shows a skipped task as done; the activity log records that it was skipped.

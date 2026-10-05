@@ -55,7 +55,7 @@ export async function environmentsPage(ctx: Ctx, v: Vault, f: { name?: string; o
           <th scope="row" data-label="Environment"><strong>${e.name}</strong>${isDefault ? html` <span class="badge">Default</span>` : ""}</th>
           <td data-label="Values">${plural(n, "value")}</td>
           <td data-label="Who can set">${e.ownersOnly ? html`<span class="badge var-owners" title="${OWNERS_ONLY_HELP}">Owners only</span>` : "Owners and editors"}</td>
-          <td data-label="" class="var-row-end">${items.length ? menu({ label: `Actions for ${e.name}`, icon: "more", items, className: "var-menu" }) : ""}</td>
+          <td data-label="" class="var-row-end">${items.length ? menu({ label: `Actions for ${e.name}`, icon: "more", items }) : ""}</td>
         </tr>`;
       })}</tbody></table></div>
     <p class="small muted">The defaults keep their names, and are deleted only when they hold no value. A vault has at most 20 environments.</p>

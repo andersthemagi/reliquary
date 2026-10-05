@@ -161,15 +161,16 @@ after(async () => {
 // ---------------------------------------------------------------------------
 // The Rules page
 
-test("owners page: an owner's Rules page has Owners in each rule's menu, and every member sees how many named owners a rule has", async () => {
+test("owners page: an owner's Rules page has Named owners in each rule's menu, and every member sees how many named owners a rule has", async () => {
   const h = await page(pat, `/v/${V.main}/rules`);
-  const legal = /<tr>\s*<td data-label="Path"><code class="rule-path">legal\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  const legal = /<tr>\s*<td data-label="Path"><div><code class="rule-path">legal\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.match(legal, new RegExp(`<a class="rule-owners" href="${re(owners(V.main, "legal/"))}">2 named owners</a>`));
-  assert.match(legal, new RegExp(`<a class="menu-item" href="${re(owners(V.main, "legal/"))}"><span class="menu-item-title">Owners</span><span class="menu-item-meta">2 named owners</span></a>`));
-  assert.ok(legal.indexOf(">Change<") < legal.indexOf(">Owners<") && legal.indexOf(">Owners<") < legal.indexOf(">Remove<"), "between Change and Remove");
-  const notes = /<tr>\s*<td data-label="Path"><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
+  assert.match(legal, /<\/span><a class="rule-owners"[^>]*>[^<]+<\/a><\/div><\/td>/, "the count stays in the path's block, so a phone doesn't split it from the path");
+  assert.match(legal, new RegExp(`<a class="menu-item" href="${re(owners(V.main, "legal/"))}"><span class="menu-item-title">Named owners</span><span class="menu-item-meta">2 named owners</span></a>`));
+  assert.ok(legal.indexOf(">Change<") < legal.indexOf(">Named owners<") && legal.indexOf(">Named owners<") < legal.indexOf(">Remove<"), "between Change and Remove");
+  const notes = /<tr>\s*<td data-label="Path"><div><code class="rule-path">notes\/<\/code>[\s\S]*?<\/tr>/.exec(h)[0];
   assert.doesNotMatch(notes, /rule-owners/, "no count where nobody is named");
-  assert.match(notes, /<span class="menu-item-title">Owners<\/span><span class="menu-item-meta">Name people who write it directly<\/span>/);
+  assert.match(notes, /<span class="menu-item-title">Named owners<\/span><span class="menu-item-meta">Name people who write it directly<\/span>/);
   const e = await page(edda, `/v/${V.main}/rules`);
   assert.match(e, new RegExp(`<a class="rule-owners" href="${re(owners(V.main, "hr/"))}">1 named owner</a>`), "an editor sees the count");
   assert.doesNotMatch(e, /Actions for the rule/, "and no menu");
@@ -177,7 +178,7 @@ test("owners page: an owner's Rules page has Owners in each rule's menu, and eve
 
 test("owners page: removing a rule with named owners says they go with it", async () => {
   const h = await page(pat, `/v/${V.main}/rules?remove=legal%2F`);
-  assert.match(h, /<li>Its 2 named owners are removed with it\. Adding the rule again doesn’t bring them back: name them again from <strong>Owners<\/strong>\.<\/li>/);
+  assert.match(h, /<li>Its 2 named owners are removed with it\. Adding the rule again doesn’t bring them back: name them again from <strong>Named owners<\/strong>\.<\/li>/);
   assert.deepEqual(await named(V.main, "legal/"), [EDDA, OTTO].sort(), "asking removes nothing");
 });
 
@@ -186,14 +187,14 @@ test("owners page: removing a rule with named owners says they go with it", asyn
 
 test("owners page: lists a path's named owners with their role in the vault, a viewer as writing this path only, under the Rules crumb", async () => {
   const h = await page(pat, owners(V.main, "hr/"));
-  assert.match(h, new RegExp(`<li><a href="/v/${V.main}/rules">Rules</a></li><li aria-current="page">Owners</li>`));
-  assert.match(h, /<h1 class="path">Owners of hr\/<\/h1>/);
-  assert.match(h, /theirs are the only approvals its quorum counts/);
+  assert.match(h, new RegExp(`<li><a href="/v/${V.main}/rules">Rules</a></li><li aria-current="page">Named owners</li>`));
+  assert.match(h, /<h1 class="path">Named owners of hr\/<\/h1>/);
+  assert.match(h, /only their approvals count toward the approvals needed/);
   assert.match(h, /<span class="badge policy canon"[^>]*>Canon<\/span> <span>The rule on <code>hr\/<\/code>: changes need 1 approval\./);
   const row = /<tr><td>vio@example\.test[\s\S]*?<\/tr>/.exec(h)?.[0];
   assert.ok(row, "Vio's row, by email");
   assert.match(row, /<td class="small" data-label="Role in the vault">Viewer<span class="token-client">Writes and approves this path only; reads the rest<\/span><\/td>/);
-  assert.match(row, /<td class="small" data-label="Named">by you · <time /);
+  assert.match(row, /<td class="small" data-label="Named"><div>by you · <time [^>]+>[^<]+<\/time><\/div><\/td>/, "who and when stay in one block on a phone");
   assert.match(row, new RegExp(`<a class="button quiet" href="${re(owners(V.main, "hr/"))}&amp;remove=${VIO}" aria-label="Remove vio@example\\.test as an owner of hr/">Remove</a>`));
   const legal = await page(pat, owners(V.main, "legal/"));
   assert.match(legal, /<td class="small" data-label="Role in the vault">Editor<\/td>/, "an editor is just an editor");
@@ -215,6 +216,8 @@ test("owners page: an open rule says named owners make a difference once it's ca
   const h = await page(pat, owners(V.main, "notes/"));
   assert.match(h, /<code>notes\/<\/code> is open, so everyone with write access already writes it directly\. Named owners make a difference once its rule is canon\./);
   assert.match(h, /<div class="empty"><strong>No named owners<\/strong><p>Everyone with write access follows the rule on <code>notes\/<\/code>\. Name someone below to let them write it directly\.<\/p><\/div>/);
+  assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel owner-form"/, "the form follows the empty box, where the stylesheet spaces them");
+  assert.doesNotMatch(h, /href="#add-owner"/, "no header button that only scrolls to a form already in view");
 });
 
 test("owners page: every member sees the owners; someone who isn't an owner gets no form and no Remove", async () => {

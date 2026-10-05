@@ -8,7 +8,9 @@
 -- claim's expiry. Path validity itself (set_claim_rule reuses private.
 -- rule_path_problem) is exhaustively covered by rule_paths_test.sql; this
 -- file spot-checks that it's actually called, not the validator's own
--- cases again. Each resolution check claims and releases its own fresh
+-- cases again. A rule on the whole vault (path '', 20261009110000_claim_rule_
+-- whole_vault) is tested at the end: who may set it, and where it ranks.
+-- Each resolution check claims and releases its own fresh
 -- path, so one connection's caps never interact across sections.
 
 insert into t.ids select 'cr', t.run('ana', $q$select public.create_vault('Claim rules')$q$)::uuid;
@@ -206,3 +208,40 @@ select t.expect('tables: no direct insert into claim_rules',
 select t.expect('rls: an outsider sees no claim rules in a vault they are not in',
   t.run('dee', format($q$select count(*)::text from public.claim_rules where vault_id = %L$q$, t.id('cr'))), '0');
 select t.expect_true('rls: a member reads the rules set here', t.run('ben', format($q$select count(*)::text from public.claim_rules where vault_id = %L$q$, t.id('cr')))::int > 0);
+
+-- ---------------------------------------------------------------------------
+-- the whole vault: the rule with no path (20261009110000_claim_rule_whole_vault)
+
+select t.expect('whole vault: an agent is refused', t.run('ana', format($q$select public.set_claim_rule(%L, '', 30, 120)$q$, t.id('cr')), 'Claude Code'), 'ERR 42501');
+select t.expect('whole vault: an editor is refused',
+  left(t.cr_err('ben', format($q$select public.set_claim_rule(%L, '', 30, 120)$q$, t.id('cr'))), 5), '42501');
+select t.expect_true('whole vault: neither refused attempt stored a rule', (t.rule_row('')) is null);
+
+select t.seed('w/other.md');
+select t.expect('whole vault: an owner sets one', t.set_rule('', 30, 120), null);
+select t.expect_true('whole vault: stored with an empty path',
+  (t.rule_row('')).lease_minutes = 30 and (t.rule_row('')).hold_limit_minutes = 120 and (t.rule_row('')).max_lease_minutes = 30);
+select t.expect_true('whole vault: a path no other rule covers follows it', abs(t.claim_minutes('w/other.md') - 30) < 1);
+select t.expect_true('whole vault: so does a file at the top of the vault', abs(t.claim_minutes('top.md') - 30) < 1);
+
+select t.expect('whole vault: a folder rule is set under it', t.set_rule('w/', 90, 300, 90), null);
+select t.expect_true('whole vault: the folder rule beats it', abs(t.claim_minutes('w/other.md') - 90) < 1);
+select t.expect('whole vault: an exact-path rule is set under the folder''s', t.set_rule('w/exact.md', 15, 60, 15), null);
+select t.expect_true('whole vault: the exact path beats both', abs(t.claim_minutes('w/exact.md') - 15) < 1);
+select t.expect_true('whole vault: a path outside the folder still follows it', abs(t.claim_minutes('top.md') - 30) < 1);
+
+select t.expect('whole vault: changing it replaces it', t.set_rule('', 45, 180), null);
+select t.expect_true('whole vault: there is still one, with the new numbers',
+  (select count(*) from public.claim_rules where vault_id = t.id('cr') and path = '') = 1 and (t.rule_row('')).lease_minutes = 45);
+select t.expect_true('whole vault: the log names no path for it',
+  exists (select 1 from public.log where vault_id = t.id('cr') and event = 'claim_rule.set' and path is null and (detail->>'whole_vault')::boolean));
+
+select t.expect('whole vault: removing it', t.set_rule('', null, null), null);
+select t.expect_true('whole vault: removed', (t.rule_row('')) is null);
+select t.expect_true('whole vault: a path with no other rule is back on the fixed default', abs(t.claim_minutes('top.md') - 48 * 60) < 1);
+select t.expect_true('whole vault: the folder rule it sat under is untouched', abs(t.claim_minutes('w/other.md') - 90) < 1);
+
+-- An empty path is only ever the whole-vault rule: every other bad path is still refused.
+select t.expect_true('whole vault: a leading slash is still refused', t.set_rule('/x', 30, 120) like '22023%', t.set_rule('/x', 30, 120));
+select t.expect_true('whole vault: so is a ..', t.set_rule('../x', 30, 120) like '22023%', t.set_rule('../x', 30, 120));
+select t.expect_true('whole vault: and a null path', t.cr_err('ana', format($q$select public.set_claim_rule(%L, null, 30, 120)$q$, t.id('cr'))) like '22023%');
