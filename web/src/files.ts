@@ -29,7 +29,7 @@ import { claimBanner } from "./claimbanner.js";
 import { siteHref } from "./hosts.js";
 import { renderMarkdown } from "./markdown.js";
 import { errorPage, typed as echoable } from "./errorpage.js";
-import { failure } from "./failure.js";
+import { failure, Refusal } from "./failure.js";
 import { watchControl, watchState } from "./watching.js";
 import {
   filePath,
@@ -619,18 +619,26 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
     // One query in the transaction: the vault is checked inside it
     // (private.vault_ref, under RLS: RLV01 when the person can't see it), as
     // the MCP tools do. "create" follows the path's rule: a canon path
-    // becomes a proposal, an open one a write (only the branch taken runs).
+    // becomes a proposal, an open one a write (only the branch taken runs),
+    // unless a file is already there: write_file would replace it with no
+    // version to compare, so Create file never writes over one.
     const outcome = await asPerson(ctx.userId, async (c) => {
       const V = `(select private.vault_ref($1) as id offset 0) v`;
       if (action === "create") {
         const r = (
           await c.query(
             `select case when x.canon then public.propose(x.id, $2, $3, $4, false) end as pid,
-                    case when not x.canon then public.write_file(x.id, $2, $3) end as written
-               from (select v.id, (private.rule_for(v.id, $2)).policy = 'canon' as canon from ${V} offset 0) x`,
+                    case when not x.canon and not x.taken then public.write_file(x.id, $2, $3) end as written,
+                    not x.canon and x.taken as taken
+               from (select v.id, (private.rule_for(v.id, $2)).policy = 'canon' as canon,
+                            exists (select 1 from public.files f where f.vault_id = v.id and f.path = $2 and f.deleted_at is null) as taken
+                       from ${V} offset 0) x`,
             [id, path, content, reason],
           )
         ).rows[0];
+        if (r.taken) {
+          throw new Refusal({ status: 409, where: "web app (the New file form)", why: `A file already exists at ${path}. Open it and choose Edit, or pick another path` });
+        }
         return r.pid ? ({ kind: "proposed", pid: r.pid as string } as const) : ({ kind: "write" } as const);
       }
       if (action === "write") {

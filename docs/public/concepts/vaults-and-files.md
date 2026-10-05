@@ -31,7 +31,7 @@ The refusal says which rule the path broke. In the web app the same form comes b
 
 ## Reading and searching
 
-In the web app, a vault's page is its folder tree: each folder and file shows whether it is canon or open, the top says what files without a rule are, and a folder's `README.md` is shown under its list. **Search** finds files by their words and paths. **New file** in a folder follows that folder's rule: in a canon folder it asks why and becomes a proposal.
+In the web app, a vault's page is its folder tree: each folder and file shows whether it is canon or open, the top says what files without a rule are, and a folder's `README.md` is shown under its list. **Search** finds files by their words and paths. **New file** in a folder follows that folder's rule: in a canon folder it asks why and becomes a proposal. In an open folder it never writes over a file that is already there: it says so and keeps what you typed, so open that file and choose **Edit**, or pick another path.
 
 On a phone, a vault's sections (**Files**, **Proposals**, **Threads**, **Tasks**, **Changes**, **Variables**, **Links**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 

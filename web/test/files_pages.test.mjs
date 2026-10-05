@@ -383,6 +383,35 @@ test("refused: a create the database refuses answers New file again (400), the p
   assert.equal(await live(V.main, "notes/back\\slash.md"), 0);
 });
 
+const currentVersion = async (path) =>
+  (await sql("select current_version_id as v from public.files where vault_id = $1 and path = $2 and deleted_at is null", [V.main, path]))[0]?.v;
+
+test("new file: Create file at a path that already exists in an open folder is refused, the file is left as it is and the form keeps the text", async () => {
+  const before = await currentVersion("notes/a.md");
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new?dir=notes%2F`)), action: "create", path: "notes/a.md", content: "Typed over it?", reason: "New file" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(alertOf(h), /^A file already exists at notes\/a\.md\. Open it and choose Edit, or pick another path\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(h, /<textarea id="c" name="content">Typed over it\?<\/textarea>/);
+  assert.equal(await currentVersion("notes/a.md"), before);
+});
+
+test("new file: Create file at the path of a deleted file writes it, the path being free again", async () => {
+  assert.equal(await live(V.main, "notes/gone.md"), 0, "deleted by the delete tests above");
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new?dir=notes%2F`)), action: "create", path: "notes/gone.md", content: "Back.", reason: "New file" });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), file(V.main, "notes/gone.md"));
+  assert.equal(await live(V.main, "notes/gone.md"), 1);
+});
+
+test("new file: in a canon folder a create at an existing path is still a proposal, with the file untouched", async () => {
+  const before = await currentVersion("canon/terms.md");
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new?dir=canon`)), action: "create", path: "canon/terms.md", content: "Net 90.", reason: "Longer terms" });
+  assert.equal(r.status, 303);
+  assert.match(r.headers.get("location"), new RegExp(`^/v/${V.main}/proposals/[0-9a-f-]{36}$`));
+  assert.equal(await currentVersion("canon/terms.md"), before);
+});
+
 test("refused: the reason carries a reference that is in the server log", async () => {
   const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new`)), action: "create", path: "a//b.md", content: "x", reason: "New file" });
   const ref = refOf(await r.text());
