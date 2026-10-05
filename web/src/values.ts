@@ -288,7 +288,12 @@ export async function confirmDelete(ctx: Ctx, v: Vault): Promise<Reply> {
   const environment = ctx.url.searchParams.get("environment") ?? "";
   if (!NAME.test(name) || !ENV.test(environment)) return notFound(ctx);
   const { variables } = await listVariables(ctx.userId, v.id);
-  if (!variables.some((x) => x.name === name && x.values.some((y) => y.environment === environment))) return notFound(ctx);
+  // A Delete link outlives its value (deleted in another tab, or by someone
+  // else): the vault exists, so say what changed and go back.
+  if (!variables.some((x) => x.name === name && x.values.some((y) => y.environment === environment))) {
+    ctx.setFlash(`${name} no longer has a value in ${environment}.`, "warning");
+    return { redirect: base(v.id) };
+  }
   const title = `Delete ${name}`;
   const body = html`<div class="var-confirm">${confirmPage({
     title,

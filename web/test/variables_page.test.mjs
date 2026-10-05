@@ -349,13 +349,20 @@ test("variables page: delete asks to confirm, then removes one environment's val
   assert.match(c, new RegExp(`<form method="post" action="${vp(V.own, "/delete")}" class="panel confirm">`));
   assert.match(c, /<button class="danger solid">Delete GONE_KEY from development<\/button>/);
   noValues(c);
-  assert.equal((await get(vp(V.own, "/delete?name=GONE_KEY&environment=production"))).status, 404);
   const r = await post(vp(V.own, "/delete"), { name: "GONE_KEY", environment: "development" });
   assert.equal(r.status, 303);
   const h = await page(r.headers.get("location"));
   assert.match(h, /Deleted GONE_KEY from development\./);
   const gone = (await vars.listVariables(PIA, V.own)).variables.find((x) => x.name === "GONE_KEY");
   assert.deepEqual(gone.values.map((x) => x.environment), ["preview"]);
+});
+
+test("variables page: a Delete link for a value that is gone goes back to the values with a warning naming it, not to not found", async () => {
+  const stale = await get(vp(V.own, "/delete?name=GONE_KEY&environment=development"));
+  assert.equal(stale.status, 303);
+  assert.equal(stale.headers.get("location"), vp(V.own));
+  assert.match(await page(vp(V.own)), /<p class="callout warning flash" role="status">GONE_KEY no longer has a value in development\.<\/p>/);
+  assert.equal((await get(vp(V.own, "/delete?name=1BAD&environment=development"))).status, 404, "a name that isn't one stays not found");
 });
 
 // ---------------------------------------------------------------------------
