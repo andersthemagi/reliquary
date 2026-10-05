@@ -383,7 +383,7 @@ function moreMenu(id: string, path: string, o: { canon: boolean; writable: boole
         : { href: deletePath(id, path), label: "Delete file…", description: "Removes the file; its history stays", danger: true },
     );
   }
-  if (o.owner) items.push({ href: erasePath(id, path), label: "Erase content…", description: "Blanks every version; for personal data", danger: true });
+  if (o.owner) items.push({ href: erasePath(id, path), label: "Erase file…", description: "Blanks every version, then removes the file; for personal data", danger: true });
   return items.length ? menu({ label: "More", items, className: "file-more" }) : "";
 }
 

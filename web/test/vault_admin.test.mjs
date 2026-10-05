@@ -385,8 +385,8 @@ test("export: an editor gets no download; the database refuses a forged post", a
 test("erase: an owner's file page has a More menu with Erase; an editor's has none", async () => {
   const h = await page(`/v/${V.erase}/file?path=people/pat.md`);
   assert.match(h, /<details class="menu-wrap action-menu file-more">\s*<summary class="button">More<\/summary>/);
-  assert.match(h, new RegExp(`<a class="menu-item danger" href="/v/${V.erase}/erase\\?path=people%2Fpat\\.md"><span class="menu-item-title">Erase content…</span>`));
-  assert.doesNotMatch(await page(`/v/${V.walt}/file?path=walt.md`), /\/erase\?|Erase content/);
+  assert.match(h, new RegExp(`<a class="menu-item danger" href="/v/${V.erase}/erase\\?path=people%2Fpat\\.md"><span class="menu-item-title">Erase file…</span>`));
+  assert.doesNotMatch(await page(`/v/${V.walt}/file?path=walt.md`), /\/erase\?|Erase file/);
 });
 
 test("erase: the confirm page explains that every version is blanked and the log keeps its sequence, and asks for the path", async () => {
