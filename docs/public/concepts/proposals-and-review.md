@@ -27,7 +27,7 @@ The **Inbox** in the top bar counts what waits on you, across all your vaults, a
 1. The status, who proposed it (the agent first, then its person) and when. **Snooze**, **Revise** and **Edit, then approve** are at the top right.
 2. The latest request for changes if there is one, and what's worth a closer look (below).
 3. The decision: a note, then **Approve**, **Request changes** or **Reject**.
-4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted.
+4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted. Once a proposal is applied or rejected, its diff stays what was reviewed: against the version it was made against, not the file as it is now. A stale proposal's diff is against the file as it is now.
 5. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
 6. Approvals so far and the discussion.
 

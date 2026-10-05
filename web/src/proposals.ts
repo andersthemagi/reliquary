@@ -27,8 +27,17 @@ import { risks } from "./risk.js";
 
 export { risks } from "./risk.js";
 
-const verbOf = (p: { kind: string; current_body: string | null }) =>
-  p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change";
+// What a proposal is measured against. While it waits: the file as it is
+// now. Once it has applied or been rejected: the version it was made
+// against, because after approval the file already says what was proposed
+// and "now" would show an empty diff, and a Change where there was a Create.
+// A stale one stays against the current file: its page offers to propose the
+// same text again against that.
+type Basis = { status?: string; base_version_id?: string | null; base_body?: string | null; current_body: string | null };
+const againstBase = (p: Basis) => p.status === "applied" || p.status === "rejected";
+const beforeOf = (p: Basis) => (againstBase(p) ? (p.base_body ?? null) : p.current_body);
+const createsFile = (p: Basis) => (againstBase(p) ? (p.base_version_id ?? null) === null : p.current_body === null);
+const verbOf = (p: Basis & { kind: string }) => (p.kind === "delete" ? "Delete" : createsFile(p) ? "Create" : "Change");
 
 // A file's name, the last part of its path, for titles that name it.
 const fileName = (path: string) => path.split("/").filter(Boolean).pop() ?? path;
@@ -144,7 +153,7 @@ export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
         // revision, or who rejected it. Decided ones by when, newest first.
         `with page as (
            select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
-                  p.status, p.decided_at,
+                  p.status, p.decided_at, p.base_version_id,
                   row_number() over (order by coalesce(p.decided_at, p.created_at) desc) as ord
              from public.proposals p where p.vault_id = $1 and p.status = any($2::text[])
             order by coalesce(p.decided_at, p.created_at) desc limit 100)
@@ -180,7 +189,7 @@ export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
 
 // Where a proposal's pages sit: the vault, its Proposals, the proposal, and
 // the page under it, if any.
-function proposalCrumb(v: Vault, p: { id: string; kind: string; path: string; current_body: string | null }, here?: string): CrumbPart[] {
+function proposalCrumb(v: Vault, p: Basis & { id: string; kind: string; path: string }, here?: string): CrumbPart[] {
   return [
     { label: v.name, href: vaultPath(v.id) },
     { label: "Proposals", href: vaultPath(v.id, "/proposals") },
@@ -200,10 +209,11 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     if (!v) return null;
     const p = (
       await c.query(
-        `select p.*, cur.body as current_body, (private.rule_for(p.vault_id, p.path)).quorum
+        `select p.*, cur.body as current_body, base.body as base_body, (private.rule_for(p.vault_id, p.path)).quorum
            from public.proposals p
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
+           left join public.file_versions base on base.id = p.base_version_id
           where p.id = $1 and p.vault_id = $2`,
         [pid, id],
       )
@@ -327,7 +337,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
       ${p.body === null && p.kind === "write"
         ? html`<div class="empty">This proposal’s content was erased.</div>`
         : diffSection({
-            before: p.current_body,
+            before: beforeOf(p),
             after: p.kind === "delete" ? null : p.body,
             mode: diffMode(ctx.url.searchParams),
             href: (m) => proposalPath(id, pid, `?diff=${m}`),
