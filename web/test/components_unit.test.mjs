@@ -288,6 +288,12 @@ test("stylesheet: a form panel right under a table has space above it", () => {
   assert.match(CSS, /\.table-wrap \+ form\.panel \{ margin-top: var\(--space-6\); \}/);
 });
 
+test("stylesheet: number fields look like the other fields: border, height, hover and focus", () => {
+  assert.match(CSS, /input\[type="date"\], input\[type="number"\], textarea, select \{\s*width: 100%;/);
+  assert.match(CSS, /input\[type="number"\]:hover/);
+  assert.match(CSS, /input\[type="number"\]:focus-visible/);
+});
+
 test("stylesheet: button variants for the hierarchy (secondary, ghost, danger, filled danger)", () => {
   for (const sel of [/\n\.secondary \{/, /\n\.ghost \{/, /\n\.ghost:hover \{/, /\n\.danger \{/, /\n\.danger\.solid \{/, /\n\.primary, a\.button\.primary \{/]) assert.match(CSS, sel);
 });

@@ -495,15 +495,15 @@ form.panel {
 label { display: block; font-weight: 600; font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-5) 0 6px; }
 form.panel > label:first-of-type, form > label:first-child { margin-top: 0; }
 .hint { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-2) 0 0; font-weight: 400; }
-input[type="text"], input[type="search"], input[type="date"], textarea, select {
+input[type="text"], input[type="search"], input[type="date"], input[type="number"], textarea, select {
   width: 100%; min-height: var(--control-md);
   font: 400 var(--text-md)/1.4 var(--font-sans); color: var(--fg);
   background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
   padding: 6px 12px; transition: border-color 120ms ease-out;
 }
 input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: 1; }
-input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
-input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible,
+input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, input[type="number"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
+input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible, input[type="number"]:focus-visible,
 textarea:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
 textarea { min-height: 280px; resize: vertical; line-height: 1.6; padding: 10px 12px; }
 textarea.short { min-height: 96px; }
