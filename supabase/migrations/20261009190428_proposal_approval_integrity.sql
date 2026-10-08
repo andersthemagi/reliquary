@@ -17,6 +17,19 @@
 -- no row to lock, so it is what makes a second create wait and go stale.
 -- edit_and_approve takes the same locks before touching the proposal,
 -- since it holds the proposal's row when it calls decide().
+--
+-- The revision a reviewer read. Both took no revision and acted on
+-- whichever one was current when the click arrived, so a revise_proposal
+-- (an agent may call it) between the page loading and Approve meant the
+-- person approved text they never saw, and at quorum 1 it became canon;
+-- an edit replaced a revision its editor never saw the same way. Both now
+-- take p_expected_revision: given and not the current revision, nothing is
+-- recorded and the refusal says which revision to read. Given nothing,
+-- both behave as before, so the old signatures are dropped first (as
+-- 20260930100000_compare_and_swap.sql does) to keep calls unambiguous.
+
+drop function public.decide(uuid, text, text);
+drop function public.edit_and_approve(uuid, text, text);
 
 create function private.lock_path(p_vault uuid, p_path text) returns void
 language plpgsql volatile security definer set search_path = '' as $$
@@ -27,7 +40,8 @@ end $$;
 
 revoke all on function private.lock_path(uuid, text) from public, anon, authenticated;
 
-create or replace function public.decide(p_proposal uuid, p_decision text, p_note text default null)
+create function public.decide(p_proposal uuid, p_decision text, p_note text default null,
+  p_expected_revision int default null)
 returns text
 language plpgsql volatile security definer set search_path = '' as $$
 declare
@@ -52,6 +66,10 @@ begin
   end if;
   if not (p.status = 'open' or (p.status = 'changes_requested' and p_decision = 'reject')) then
     raise exception 'proposal is %', replace(p.status, '_', ' ') using errcode = '55000';
+  end if;
+  if p_expected_revision <> p.revision then
+    raise exception 'this proposal was revised while you were reading it: you read revision %, and it is now revision %. Read revision % before you decide',
+      p_expected_revision, p.revision, p.revision using errcode = '55000';
   end if;
   if p_decision <> 'approve' and length(trim(coalesce(p_note, ''))) = 0 then
     raise exception 'say why, so the proposer can act on it' using errcode = '22023';
@@ -115,7 +133,8 @@ begin
   return 'applied';
 end $$;
 
-create or replace function public.edit_and_approve(p_proposal uuid, p_body text, p_note text default null)
+create function public.edit_and_approve(p_proposal uuid, p_body text, p_note text default null,
+  p_expected_revision int default null)
 returns text
 language plpgsql volatile security definer set search_path = '' as $$
 declare
@@ -137,6 +156,10 @@ begin
   if p.kind <> 'write' then
     raise exception 'only proposals that write a file can be edited' using errcode = '22023';
   end if;
+  if p_expected_revision <> p.revision then
+    raise exception 'this proposal was revised while you were editing it: you started from revision %, and it is now revision %. Your edit is not saved; read revision % before you save it again',
+      p_expected_revision, p.revision, p.revision using errcode = '55000';
+  end if;
   update public.proposals
   set body = p_body, revision = revision + 1, status = 'open', edited_by = private.uid()
   where id = p.id
@@ -146,3 +169,8 @@ begin
     jsonb_build_object('revision', p.revision));
   return public.decide(p.id, 'approve', null);
 end $$;
+
+revoke all on function public.decide(uuid, text, text, int), public.edit_and_approve(uuid, text, text, int)
+  from public, anon;
+grant execute on function public.decide(uuid, text, text, int), public.edit_and_approve(uuid, text, text, int)
+  to authenticated;
