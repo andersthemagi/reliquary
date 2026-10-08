@@ -151,7 +151,9 @@ caller's own token), `private.valid_variable_name(name)`.
 ## Key rotation
 
 Rotating the key never takes values offline: the web app holds the old and
-the new key while every ciphertext moves to the new one. The owner's steps
+the new key while every ciphertext moves to the new one. Link credentials
+(`private.link_secrets`, sealed by `sealLink` with the same keys) move with
+the values. The owner's steps
 are in the [runbook](ops/runbook.md#rotating-variables_key); what each
 piece does:
 
@@ -174,14 +176,16 @@ piece does:
   `supabase/.ops-db-password` (`rekey.ts` logs in as `reliquary_ops` to the
   database the web app's `DATABASE_URL` names, keeping the pooler's
   `.project-ref` suffix, from `OPS_DB_PASSWORD`). Vault by vault, in one transaction each, it
-  reads the sealed values and pending imports' values under any other key
-  (`private.sealed_rows`), opens each with its key and its slot's additional
-  data, seals it again under the current key for the same slot, and swaps it
-  in (`private.reseal`). It prints counts and key ids only, and exits 0 only
+  reads the sealed values, pending imports' values and link credentials
+  under any other key (`private.sealed_rows`), opens each with its key and
+  its slot's additional data (a link's is its vault alone), seals it again
+  under the current key for the same slot, and swaps it in
+  (`private.reseal`). It prints counts and key ids only, and exits 0 only
   when nothing is left on another key.
 - **What a reseal changes.** Only the ciphertext, nonce and key id. Version,
   `updated_by`, `updated_at` and the feed stay as they were; the access log
-  gets one `rotate_key` row per vault. A row is replaced only if it still
+  gets one `rotate_key` row per vault (variable names, and counts:
+  `values`, `imports`, and `links` when any moved). A row is replaced only if it still
   has the nonce that was read, so a value a person sets meanwhile (already
   under the new key) is left alone. A value that doesn't open with its key
   (moved between rows, or a key given the wrong id) stays as it is and the
@@ -202,11 +206,11 @@ piece does:
 
 | Function | Returns | Who may call |
 |---|---|---|
-| `private.variable_key_ids()` | table `(key_id, values, imports)`: key ids in use by values and by pending, unexpired imports | `reliquary_ops` |
+| `private.variable_key_ids()` | table `(key_id, values, imports, links)`: key ids in use by values, by pending, unexpired imports and by link credentials | `reliquary_ops` |
 | `private.rekey_vaults(p_key_id text)` | setof uuid: vaults with anything under another key | `reliquary_ops` |
-| `private.sealed_rows(p_vault uuid, p_environment text default null, p_not_key text default null)` | table `(kind 'value' or 'import', ref, name, environment, key_id, nonce, ciphertext)` | `reliquary_ops` |
-| `private.reseal(p_vault uuid, p_reason text, p_items jsonb)` | int, the rows replaced. `p_reason` `rotate_key` or `rename_environment` (only for an environment renamed in this transaction, else 42501); items `[{"kind", "ref", "name", "environment", "old_nonce", "key_id", "nonce", "ciphertext"}]` (base64); malformed 22023 | `reliquary_ops` |
-| `private.stored_key_ids()` | setof text: the key ids stored values and pending imports name | `reliquary_web` |
+| `private.sealed_rows(p_vault uuid, p_environment text default null, p_not_key text default null)` | table `(kind 'value', 'import' or 'link', ref, name, environment, key_id, nonce, ciphertext)`; a link's ref is the link id, its environment null, and it is left out when `p_environment` is given | `reliquary_ops` |
+| `private.reseal(p_vault uuid, p_reason text, p_items jsonb)` | int, the rows replaced. `p_reason` `rotate_key` or `rename_environment` (only for an environment renamed in this transaction, else 42501); items `[{"kind", "ref", "name", "environment", "old_nonce", "key_id", "nonce", "ciphertext"}]` (base64), a `link` item with no environment (so never for a rename); malformed 22023 | `reliquary_ops` |
+| `private.stored_key_ids()` | setof text: the key ids stored values, pending imports and link credentials name | `reliquary_web` |
 | `private.renamed_rows(p_vault uuid, p_environment text)` | table `(ref, name, key_id, nonce, ciphertext)`: the values of an environment renamed to `p_environment` in this transaction; otherwise 42501 | `reliquary_web` |
 | `private.reseal_renamed(p_vault uuid, p_items jsonb)` | `private.reseal(p_vault, 'rename_environment', p_items)` | `reliquary_web` |
 

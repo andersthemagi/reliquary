@@ -121,11 +121,12 @@ try {
 }
 setAccountMode(MODE);
 
-// Every stored value must name a key this server holds: otherwise a key was
-// dropped before its values were re-encrypted (docs/ops/runbook.md), and
-// they would fail one by one. Refuse to start instead, naming the ids (never
-// a key). If the database can't be asked (down, or the migration not yet
-// applied), say so and start: the value routes fail on their own then.
+// Every stored value and link credential must name a key this server holds
+// (private.stored_key_ids counts both): otherwise a key was dropped before
+// they were re-encrypted (docs/ops/runbook.md), and they would fail one by
+// one. Refuse to start instead, naming the ids (never a key). If the
+// database can't be asked (down, or the migration not yet applied), say so
+// and start: the value routes fail on their own then.
 if (variablesConfigured()) {
   let stored: string[] | null = null;
   try {

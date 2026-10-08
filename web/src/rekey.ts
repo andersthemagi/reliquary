@@ -8,8 +8,8 @@
 //   node dist/rekey.js            re-encrypt, then report
 //   node dist/rekey.js --check    report only: which key ids hold how many
 //
-// Vault by vault, in one transaction each: read the sealed values and
-// pending imports' values that aren't under the current key
+// Vault by vault, in one transaction each: read the sealed values, pending
+// imports' values and link credentials that aren't under the current key
 // (private.sealed_rows), open each with the key its id names and the
 // additional data of its slot, seal it again under the current key for the
 // same slot, and swap it in (private.reseal), which changes no version or
@@ -30,7 +30,7 @@
 
 import { pathToFileURL } from "node:url";
 import pg from "pg";
-import { configureVariables, currentKeyId, missingKeyIds, reseal, SecretsError } from "./secrets.js";
+import { configureVariables, currentKeyId, missingKeyIds, openLink, reseal, sealLink, SecretsError } from "./secrets.js";
 
 // The operator's connection string from the web app's and the operator's
 // password. Errors never include either.
@@ -54,15 +54,17 @@ export function opsDatabaseUrl(url: string | undefined, password: string | undef
   return u.toString();
 }
 
-type Row = { kind: "value" | "import"; ref: string; name: string; environment: string; key_id: string; nonce: Buffer; ciphertext: Buffer };
-export type KeyCount = { keyId: string; values: number; imports: number };
+// A link's environment is null: its additional data is the vault alone.
+type Row = { kind: "value" | "import" | "link"; ref: string; name: string; environment: string | null; key_id: string; nonce: Buffer; ciphertext: Buffer };
+export type KeyCount = { keyId: string; values: number; imports: number; links: number };
 export type RekeyResult = { vaults: number; moved: number; failed: number; changed: number };
 
 export async function keyCounts(db: pg.Pool | pg.PoolClient): Promise<KeyCount[]> {
-  return (await db.query(`select key_id, "values", imports from private.variable_key_ids()`)).rows.map((r) => ({
+  return (await db.query(`select key_id, "values", imports, links from private.variable_key_ids()`)).rows.map((r) => ({
     keyId: r.key_id,
     values: Number(r.values),
     imports: Number(r.imports),
+    links: Number(r.links),
   }));
 }
 
@@ -77,9 +79,12 @@ async function rekeyVault(pool: pg.Pool, vaultId: string, keyId: string): Promis
     const items = [];
     let failed = 0;
     for (const r of rows) {
-      const slot = { vaultId, environment: r.environment, name: r.name };
+      const sealed = { keyId: r.key_id, nonce: r.nonce, ciphertext: r.ciphertext };
       try {
-        const s = reseal({ keyId: r.key_id, nonce: r.nonce, ciphertext: r.ciphertext }, slot);
+        const s =
+          r.kind === "link"
+            ? sealLink(openLink(sealed, vaultId), vaultId)
+            : reseal(sealed, { vaultId, environment: r.environment!, name: r.name });
         items.push({
           kind: r.kind,
           ref: r.ref,
@@ -125,7 +130,15 @@ export async function rekeyAll(pool: pg.Pool): Promise<RekeyResult> {
 }
 
 const describe = (counts: KeyCount[]) =>
-  counts.length ? counts.map((c) => `${c.keyId}: ${c.values} value${c.values === 1 ? "" : "s"}, ${c.imports} pending import value${c.imports === 1 ? "" : "s"}`).join("; ") : "nothing stored";
+  counts.length
+    ? counts
+        .map(
+          (c) =>
+            `${c.keyId}: ${c.values} value${c.values === 1 ? "" : "s"}, ${c.imports} pending import value${c.imports === 1 ? "" : "s"}` +
+            (c.links ? `, ${c.links} link credential${c.links === 1 ? "" : "s"}` : ""),
+        )
+        .join("; ")
+    : "nothing stored";
 
 export async function main(argv: string[], env: NodeJS.ProcessEnv, say: (line: string) => void): Promise<number> {
   const check = argv.includes("--check");
@@ -169,7 +182,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv, say: (line: s
     }
     const after = check ? before : await keyCounts(pool);
     if (!check) say(`Stored now: ${describe(after)}.`);
-    const left = after.filter((c) => c.keyId !== current).reduce((n, c) => n + c.values + c.imports, 0);
+    const left = after.filter((c) => c.keyId !== current).reduce((n, c) => n + c.values + c.imports + c.links, 0);
     if (left) {
       say(`${left} still on another key: keep ${after.filter((c) => c.keyId !== current).map((c) => c.keyId).join(", ")} in VARIABLES_KEYS${check ? "" : " and run this again"}.`);
       return 1;

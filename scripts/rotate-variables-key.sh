@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Re-encrypts every stored variable value (and every pending import's value)
-# under the current key of VARIABLES_KEYS: the middle step of rotating the
+# Re-encrypts every stored variable value, every pending import's value and
+# every link's credential under the current key of VARIABLES_KEYS (links are
+# sealed with the same keys): the middle step of rotating the
 # key (docs/ops/runbook.md, "Rotating VARIABLES_KEY"). It runs the web app's
 # own code (web/src/rekey.ts) in a container, against the database the web
 # app uses, with the keys the web app has, as the operator's database role
@@ -12,7 +13,7 @@
 # the database DATABASE_URL names. Those reach the container through a
 # mode-600 env file, never the command line.
 #
-#   scripts/rotate-variables-key.sh --check   which key ids hold how many values
+#   scripts/rotate-variables-key.sh --check   which key ids hold how many values and link credentials
 #   scripts/rotate-variables-key.sh           re-encrypt, then the same report
 #
 # Deploy the VARIABLES_KEYS in that file to the web app first: values moved
@@ -21,8 +22,9 @@
 # It prints counts and key ids only, never a key, a password, a value, a
 # variable name or a vault id, so it is safe to run from anywhere. Exit 0:
 # everything is on the current key, so older keys may be dropped. 1:
-# something isn't (run it again; if it persists, a value can't be opened
-# with its key: set it again in the web UI). 2: it couldn't run.
+# something isn't (run it again; if it persists, a value or credential can't
+# be opened with its key: set the value again in the web UI, or delete the
+# link and add it again). 2: it couldn't run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
