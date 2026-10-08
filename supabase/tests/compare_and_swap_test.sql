@@ -108,3 +108,46 @@ select t.expect('delete: no expected_version behaves as before',
   t.run('ben', format($q$select public.delete_file(%L, 'notes/scratch2.md')::text$q$, t.id('swap'))), '');
 select t.expect_true('delete: no expected_version succeeding still marks the file deleted',
   exists (select 1 from public.files where vault_id = t.id('swap') and path = 'notes/scratch2.md' and deleted_at is not null));
+
+-- ---------------------------------------------------------------------------
+-- A deleted file is "no file yet": a stale save can't bring it back, and an
+-- expected_version for it is stale whether or not anyone wrote there since.
+
+select t.expect_true('deleted file: seed notes/gone.md',
+  t.run('ben', format($q$select public.write_file(%L, 'notes/gone.md', 'mine')$q$, t.id('swap'))) ~ '^[0-9a-f-]{36}$');
+insert into t.ids select 'gone-v1', t.cas_version('notes/gone.md');
+select t.expect('deleted file: its version still deletes it',
+  t.run('ana', format($q$select public.delete_file(%L, 'notes/gone.md', %L::uuid)::text$q$, t.id('swap'), t.id('gone-v1'))),
+  '');
+
+select t.expect('deleted file: a save holding the version read before the delete is refused',
+  t.run('ben', format($q$select public.write_file(%L, 'notes/gone.md', 'stale', %L::uuid)$q$, t.id('swap'), t.id('gone-v1'))),
+  'ERR RLF01');
+select t.expect_true('deleted file: the refusal says the file no longer exists, not a current version by nobody',
+  t.cas_err('ben', format($q$select public.write_file(%L, 'notes/gone.md', 'stale', %L::uuid)$q$, t.id('swap'), t.id('gone-v1')))
+    like '%no longer exists%'
+  and t.cas_err('ben', format($q$select public.write_file(%L, 'notes/gone.md', 'stale', %L::uuid)$q$, t.id('swap'), t.id('gone-v1')))
+    not like '%nobody%');
+select t.expect_true('deleted file: a refused save leaves it deleted, with no new version',
+  exists (select 1 from public.files where vault_id = t.id('swap') and path = 'notes/gone.md' and deleted_at is not null)
+  and (select count(*) from public.file_versions where file_id = (select id from public.files where vault_id = t.id('swap') and path = 'notes/gone.md')) = 1);
+select t.expect('deleted file: a second delete holding the old version is refused as stale, not as missing',
+  t.run('ben', format($q$select public.delete_file(%L, 'notes/gone.md', %L::uuid)::text$q$, t.id('swap'), t.id('gone-v1'))),
+  'ERR RLF01');
+
+select t.expect_true('deleted file: a write with no expected version creates it again',
+  t.run('ben', format($q$select public.write_file(%L, 'notes/gone.md', 'again')$q$, t.id('swap'))) ~ '^[0-9a-f-]{36}$');
+select t.expect_true('deleted file: creating it again brings it back, as a new version',
+  exists (select 1 from public.files where vault_id = t.id('swap') and path = 'notes/gone.md' and deleted_at is null)
+  and t.cas_version('notes/gone.md') <> t.id('gone-v1'));
+select t.expect('deleted file: once created again, the version from before the delete is still stale',
+  t.run('ben', format($q$select public.write_file(%L, 'notes/gone.md', 'stale', %L::uuid)$q$, t.id('swap'), t.id('gone-v1'))),
+  'ERR RLF01');
+
+select t.expect('deleted file: a path never written is no file yet either',
+  t.run('ben', format($q$select public.write_file(%L, 'notes/never.md', 'x', %L::uuid)$q$, t.id('swap'), t.id('gone-v1'))),
+  'ERR RLF01');
+
+select t.expect('deleted file: the version check is not callable by a signed-in person',
+  t.run('ana', format($q$select private.check_expected_version(%L, 'notes/gone.md', %L::uuid)::text$q$, t.id('swap'), t.id('gone-v1'))),
+  'ERR 42501');
