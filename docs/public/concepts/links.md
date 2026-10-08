@@ -16,6 +16,8 @@ A vault's owner adds, edits and deletes links from its **Links** page in the web
 
 A granted tool shows up in `tools/list` as `<link>.<tool>` (a link named `stripe` with a granted `create_invoice` tool becomes `stripe.create_invoice`) -- see [MCP tools](../reference/mcp-tools.md#link-tools). Which ones appear depends on the connection: a role's grant, and for a write tool, a write-capable connection too (a read-only token never reaches one, whatever its role is granted). Reliquary makes the call server-side and attaches the credential itself; it's never sent to, or held by, the agent. The result comes back fenced as data from the upstream server, the same as any other text an agent reads through Reliquary -- never as instructions.
 
+If two vaults you belong to each have a link with the same name, and both offer a tool with the same name, `tools/list` offers only one of them, the same one every time, and leaves the other out. Rename one of the links to reach both.
+
 ## Who may do what
 
 Adding, editing or deleting a link, and setting its grants, is an owner's, in person, same as [the ceiling](agents.md#the-ceiling): no agent, token or connection may do it, whatever surface offers the call. Calling a granted tool is different: any connection whose role is granted it may, agents included, the same as any other tool. Members read a vault's links and their grants within their role; an agent does the same over MCP with `list_links`, read-only connections included.

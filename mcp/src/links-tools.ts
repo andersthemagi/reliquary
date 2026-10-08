@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
+import { failure } from "./failure.js";
 import { callLinkProxy, LinkProxyError } from "./linkproxy.js";
 import { at, explain, freshNonce, makeRun, ok, refuse, type ToolResult, VAULT, VAULT_REF } from "./tools-shared.js";
 
@@ -68,13 +69,31 @@ const hash = (v: unknown): string => createHash("sha256").update(JSON.stringify(
 async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: pg.PoolClient) => Promise<T>) => Promise<T>): Promise<void> {
   let rows: LinkToolRow[] = [];
   try {
-    rows = await runAs(async (c) => (await c.query(`select * from private.list_callable_link_tools()`)).rows);
+    // A link's name is unique per vault, not per person: two vaults one
+    // person reaches can both have a link `linear` with a `search` tool.
+    // The link id breaks the tie, so the same one is offered on every
+    // request instead of whichever row the database returned first.
+    rows = await runAs(async (c) => (await c.query(`select * from private.list_callable_link_tools() order by link_name, tool_name, link_id`)).rows);
   } catch {
     // Best effort: the fixed tools above still register either way.
     return;
   }
+  const offered = new Set<string>();
   for (const row of rows) {
     const toolName = `${row.link_name}.${row.tool_name}`;
+    if (offered.has(toolName)) {
+      // The SDK throws on a second registration of a name, and that throw
+      // would fail every request this person makes, not only the listing.
+      failure({
+        status: 409,
+        where: "MCP link tools",
+        what: "Registering the tools of the links you can call",
+        why: `Two links you reach are both named ${row.link_name} and both offer ${row.tool_name}, so only one is offered as ${toolName}`,
+        code: "duplicate_link_tool",
+      });
+      continue;
+    }
+    offered.add(toolName);
     const { shape, named } = argsShape(row.input_schema);
     const description = [
       row.description || `A tool on the ${row.link_name} link, proxied through Reliquary.`,
