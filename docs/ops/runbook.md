@@ -603,6 +603,11 @@ failure ref=7f3a2c9e {"status":504,"what":"POST /v/:id/file <vault id> action=wr
    or `53300` is the database connection: check Supabase's status and the
    pooler. A `sign-in (Supabase Auth)` failure names the call and its status
    or network error.
+5. When a linked MCP server answered with an error of its own (adding a link,
+   or a `<link>.<tool>` call), the web app's log also has
+   `link upstream error ref=<ref> {"code":...,"said":"..."}`: what the server
+   said, cut to 200 characters, with the link's credential replaced by
+   `[credential]`. The person and the agent never see it.
 
 Logs never hold a value, a token, a file's text, an email address or a
 failing row's values; if one ever does, that is a bug to fix before
