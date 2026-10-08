@@ -229,7 +229,7 @@ test("connect: a tab shows only its client, and an unknown one shows Claude Code
   assert.match(cursor, /<a href="\/connect\?client=cursor" aria-current="page">Cursor<\/a>/);
   assert.match(cursor, /<section id="cursor">/);
   assert.doesNotMatch(cursor, /<section id="claude-code">/);
-  assert.match(cursor, /<a href="\/connections\/new">Create a token<\/a>/);
+  assert.match(cursor, /<a href="\/connections\/new\?client=cursor">use the full form<\/a>/);
   const odd = await page("/connect?client=%3Cscript%3E");
   assert.match(odd, /<section id="claude-code">/);
   assert.doesNotMatch(odd, /<script>/);

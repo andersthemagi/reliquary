@@ -9,7 +9,7 @@ The **Type** column on the Connections page shows which one each is.
 | | App | Token | Reliquary CLI |
 |---|---|---|---|
 | For | MCP clients that sign in: Claude Code, Claude.ai, ChatGPT | MCP clients that can only send a header: Cursor, VS Code, scripts, headless agents | the `reliquary` CLI on one computer |
-| Made by | signing in from the client and choosing **Allow** | **New token** on the Connections page, then **Create token** | `reliquary login` and choosing **Allow** |
+| Made by | signing in from the client and choosing **Allow** | **Create read-only token** on the Cursor, VS Code or Other clients tab of Connect, or **New token** on the Connections page | `reliquary login` and choosing **Allow** |
 | Reaches | the MCP endpoint | the MCP endpoint | the env API only: variable values, never files |
 | Vaults | all yours, or the ones you tick | all yours, or the ones you tick | all yours, or the ones you tick |
 | Access | read only, or read and write | read only, or read and write | reads values; optionally sends a `.env` for approval |
@@ -26,9 +26,19 @@ When a client signs in, there is no secret to copy: it signs in through your bro
 
 ## Make a token
 
-1. On the Connections page, choose **New token**.
-2. Name it after the agent and machine, choose its vaults, **Read only** or **Read and write**, and when it expires.
-3. Choose **Create token**, copy the token, then **Done**. It is shown once.
+Quickest, for Cursor, VS Code or another client that can't sign in:
+
+1. On the **Connect** page, open that client's tab.
+2. Name the token after the agent and machine, then choose **Create read-only token** or **Create read and write token**. It reaches all your vaults and expires in 90 days.
+3. The next page shows the token once, with the steps for that client and the token already in them.
+
+For some vaults, or another expiry, choose **use the full form** on the tab, or **New token** on the Connections page: name it, choose its vaults, **Read only** or **Read and write**, and when it expires, then **Create token**. Copy the token, then choose **Done**. It is shown once.
+
+## Check that it connected
+
+The **Connect** page says **Connected** and names a connection used in the last 15 minutes, with when and from which client. If none was, it says so. Reload it after the last step. A revoked or expired connection never counts.
+
+A vault's page shows a **Connect an agent** step to its writers, for the first 14 days after the vault is made, until you have any connection at all (a token, an app or the CLI).
 
 If **Create token** is refused (no name, **Only the vaults I tick** with none ticked, an expiry past a year), the form comes back with the reason and a reference, and everything you chose is still there to correct. Nothing was created.
 
