@@ -60,6 +60,37 @@ select t.expect('create: a non-https url is refused',
   t.create_link('ana', 'gone', 'linear', 'http://api.linear.app'), 'ERR 22023');
 select t.expect('create: a bare scheme with no host is refused',
   t.create_link('ana', 'gone', 'linear', 'https://'), 'ERR 22023');
+select t.expect('create: a url with a user name or password, a query string or a fragment is refused, and nothing is added',
+  t.create_link('ana', 'gone', 'linear', 'https://user:tok@api.linear.app/mcp')
+  || ',' || t.create_link('ana', 'gone', 'linear', 'https://api.linear.app/mcp?api_key=x')
+  || ',' || t.create_link('ana', 'gone', 'linear', 'https://api.linear.app?x')
+  || ',' || t.create_link('ana', 'gone', 'linear', 'https://api.linear.app/mcp#x')
+  || ',' || t.link_count('gone'),
+  'ERR 22023,ERR 22023,ERR 22023,ERR 22023,0');
+select t.expect_ok('create: a host with a port and a path, even one with an @ in it, is fine',
+  t.create_link('ana', 'keep', 'scoped', 'https://mcp.example:8443/v1/@scope/mcp'));
+create function t.url_refusal(p_url text) returns text language plpgsql as $$
+begin
+  perform private.check_link_url(p_url);
+  return 'ok';
+exception when others then
+  return sqlstate || ' ' || sqlerrm;
+end $$;
+select t.expect('create: the refusal says which rule the url broke and that a key goes in the credential',
+  t.url_refusal('https://user:tok@api.linear.app/mcp') || ' | ' || t.url_refusal('https://api.linear.app/mcp?api_key=x'),
+  '22023 a link''s url can''t hold a user name or password (user:password@): every member and agent can read it, and it is logged. Put the key or token in the link''s credential'
+  || ' | 22023 a link''s url can''t have a query string (?) or a fragment (#): every member and agent can read it, and it is logged. Put a key or token in the link''s credential, and leave the rest out');
+create function t.insert_link_url(p_url text) returns text language plpgsql as $$
+begin
+  insert into public.links (vault_id, name, url, created_by) values (t.id('keep'), 'direct', p_url, t.id('ana'));
+  raise exception 'inserted' using errcode = 'P0001';
+exception when others then
+  return sqlstate;
+end $$;
+select t.expect('create: the table itself refuses such a url, whoever writes it',
+  t.insert_link_url('https://user:tok@api.linear.app') || ',' || t.insert_link_url('https://api.linear.app/?k=x')
+  || ',' || t.insert_link_url('https://api.linear.app/#x') || ',' || t.insert_link_url('https://api.linear.app/mcp'),
+  '23514,23514,23514,P0001');
 select t.expect('create: a short nonce is refused',
   t.run('ana', format($q$select public.create_link(%L, 'badnonce', 'https://x.example', 'k1', decode('00', 'hex'), decode(%L, 'hex'))$q$,
     t.id('gone'), t.lk('bad'))), 'ERR 22023');
@@ -108,6 +139,12 @@ select t.expect('update: the owner''s agent cannot rename a link',
   t.run('ana', format($q$select 'ok' from public.update_link(%L, 'renamed', 'https://api.linear.app')$q$, t.id('lk1')), 'Claude Code'), 'ERR 42501');
 select t.expect('update: the owner''s token cannot rename a link',
   t.run_tok('ana', 'all-rw', format($q$select 'ok' from public.update_link(%L, 'renamed', 'https://api.linear.app')$q$, t.id('lk1'))), 'ERR 42501');
+select t.expect('update: a url with a user name or password, a query string or a fragment is refused',
+  t.run('ana', format($q$select 'ok' from public.update_link(%L, 'linear', 'https://user:tok@api.linear.app')$q$, t.id('lk1')))
+  || ',' || t.run('ana', format($q$select 'ok' from public.update_link(%L, 'linear', 'https://api.linear.app/?key=x')$q$, t.id('lk1')))
+  || ',' || t.run('ana', format($q$select 'ok' from public.update_link(%L, 'linear', 'https://api.linear.app/#x')$q$, t.id('lk1')))
+  || ',' || t.run('ana', format($q$select url from public.links where id = %L$q$, t.id('lk1'))),
+  'ERR 22023,ERR 22023,ERR 22023,https://api.linear.app');
 select t.expect('update: refused calls change nothing and log nothing',
   t.link_name('lk1') || ' ' || t.log_count('gone', 'link.update'), 'linear 0');
 select t.expect('update: the same name and url again logs nothing',
@@ -119,6 +156,33 @@ select t.expect('update: the owner renames and re-urls it',
 select t.expect('update: logged with the new and previous values',
   (select detail from public.log where vault_id = t.id('gone') and event = 'link.update')::text,
   format('{"url": "https://api2.linear.app", "link": "%s", "name": "linear2", "previous_url": "https://api.linear.app", "previous_name": "linear"}', t.id('lk1')));
+
+-- A link saved before the url rule tightened: put in with the table's check
+-- lifted, then the check put back exactly as the migrations left it.
+create function t.put_legacy_link() returns text language plpgsql as $$
+declare
+  d text;
+  v uuid;
+begin
+  select pg_get_constraintdef(oid) into d from pg_constraint
+   where conrelid = 'public.links'::regclass and conname = 'links_url_check';
+  alter table public.links drop constraint links_url_check;
+  insert into public.links (vault_id, name, url, created_by)
+  values (t.id('keep'), 'legacy', 'https://user:tok@legacy.example/mcp?key=x', t.id('ana')) returning id into v;
+  insert into t.ids values ('legacy', v);
+  execute 'alter table public.links add constraint links_url_check ' || d;
+  return 'ok';
+exception when others then
+  return 'ERR ' || sqlstate;
+end $$;
+select t.expect('update: a link saved before the url rule tightened stays as it was (the check is NOT VALID), readable by its members',
+  t.put_legacy_link()
+  || ',' || t.run('ana', format($q$select url from public.links where id = %L$q$, t.id('legacy'))),
+  'ok,https://user:tok@legacy.example/mcp?key=x');
+select t.expect('update: saving that link again needs a url that passes',
+  t.run('ana', format($q$select 'ok' from public.update_link(%L, 'legacy', 'https://user:tok@legacy.example/mcp?key=x')$q$, t.id('legacy')))
+  || ',' || t.run('ana', format($q$select 'ok' from public.update_link(%L, 'legacy', 'https://legacy.example/mcp')$q$, t.id('legacy'))),
+  'ERR 22023,ok');
 
 -- ---------------------------------------------------------------------------
 -- set_link_grant
