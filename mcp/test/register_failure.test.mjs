@@ -6,57 +6,21 @@
 // registration throw in a server this file starts for itself.
 
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import http from "node:http";
-import net from "node:net";
-import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { post, startServer } from "./own-server.mjs";
 
-const { GUS_RW, TEST_DATABASE_URL } = process.env;
-const FAULT = fileURLToPath(new URL("./fault-register.mjs", import.meta.url));
-
-let child;
-let log = "";
-let origin = "";
-
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = net.createServer().listen(0, "127.0.0.1", () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on("error", reject);
-  });
-}
-
+let server;
 before(async () => {
-  const port = await freePort();
-  child = spawn(process.execPath, ["--import", FAULT, "dist/server.js"], {
-    env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL, HOST: "127.0.0.1", PORT: String(port), FAULT_REGISTER_TOOL: "list_links" },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  child.stdout.on("data", (d) => (log += d));
-  child.stderr.on("data", (d) => (log += d));
-  origin = `http://127.0.0.1:${port}`;
-  for (let i = 0; i < 100; i++) {
-    if (await fetch(`${origin}/healthz`).then((r) => r.ok, () => false)) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`server did not start: ${log}`);
+  server = await startServer("./fault-register.mjs", { FAULT_REGISTER_TOOL: "list_links" });
 });
-after(() => child?.kill());
+after(() => server?.stop());
 
-const post = (body) =>
-  fetch(`${origin}/mcp`, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${GUS_RW}` },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(8000),
-  });
+const call = (id) => post(server.origin, { jsonrpc: "2.0", id, method: "tools/call", params: { name: "list_vaults", arguments: {} } });
 
 async function openTransactions() {
-  const db = new pg.Client({ connectionString: TEST_DATABASE_URL });
+  const db = new pg.Client({ connectionString: process.env.TEST_DATABASE_URL });
   await db.connect();
   try {
     const { rows } = await db.query(
@@ -69,7 +33,7 @@ async function openTransactions() {
 }
 
 test("registration failure: a tool call whose tools fail to register is answered with a failure and its reference", async () => {
-  const r = await post({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "list_vaults", arguments: {} } });
+  const r = await call(7);
   assert.equal(r.status, 500);
   const body = await r.json();
   assert.equal(body.id, 7);
@@ -77,12 +41,12 @@ test("registration failure: a tool call whose tools fail to register is answered
   assert.match(body.error.data.where, /^MCP server/);
   assert.match(body.error.message, new RegExp(`ref ${body.error.data.ref}\\)$`));
   const logged = new RegExp(`failure ref=${body.error.data.ref} `);
-  for (let i = 0; i < 20 && !logged.test(log); i++) await new Promise((r) => setTimeout(r, 50));
-  assert.match(log, logged, "the same reference is in the server log");
+  for (let i = 0; i < 20 && !logged.test(server.log()); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(server.log(), logged, "the same reference is in the server log");
 });
 
 test("registration failure: the request's database connection is not left inside a transaction", async () => {
-  await post({ jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "list_vaults", arguments: {} } });
+  await call(8);
   let open = 1;
   for (let i = 0; i < 20 && open > 0; i++) {
     open = await openTransactions();
@@ -95,7 +59,7 @@ test("registration failure: the request's database connection is not left inside
 test("unhandled failure: a request that throws before any tool is registered is answered with a failure and its reference", async () => {
   // serve() parses the request target first, and `//` has no host: new URL throws.
   const { status, body } = await new Promise((resolve, reject) => {
-    const req = http.get({ host: "127.0.0.1", port: new URL(origin).port, path: "//", timeout: 8000 }, (res) => {
+    const req = http.get({ host: "127.0.0.1", port: server.port, path: "//", timeout: 8000 }, (res) => {
       let text = "";
       res.on("data", (d) => (text += d));
       res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(text) }));
