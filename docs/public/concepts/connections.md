@@ -38,6 +38,8 @@ For some vaults, or another expiry, choose **use the full form** on the tab, or 
 
 The **Connect** page says **Connected** and names a connection used in the last 15 minutes, with when and from which client. If none was, it says so. Reload it after the last step. A revoked or expired connection never counts.
 
+A vault's page shows a **Connect an agent** step to its writers, for the first 14 days after the vault is made, until you have any connection at all (a token, an app or the CLI).
+
 ## Scope is fixed
 
 A connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.

@@ -192,6 +192,17 @@ const erasePath = (id: string, path: string) => vaultPath(id, `/erase?path=${q(p
 // ---------------------------------------------------------------------------
 // Folders and files
 
+// A first-run step, not a status: a writer of a young vault who has no
+// connection of any kind yet. The age bound is the dismiss, so someone who
+// never connects an agent isn't pointed at Connect on every visit, forever.
+const NUDGE_DAYS = 14;
+const CONNECT_NUDGE = callout(
+  "info",
+  html`<p>Your agents read and propose to your vaults once they’re connected. It takes about a minute.</p>
+    <p class="callout-actions"><a class="button primary" href="/connect">Connect an agent</a></p>`,
+  { title: "Next: connect an agent" },
+);
+
 export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Reply> {
   const dir = rawDir ? rawDir.replace(/^\/+/, "").replace(/\/*$/, "/") : "";
   const data = await asPerson(ctx.userId, async (c) => {
@@ -240,13 +251,16 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
           await c.query(
             `select v.default_policy,
                     (select count(*)::int from public.path_policies pp where pp.vault_id = v.id) as rules,
-                    (select count(*)::int from public.proposals p where p.vault_id = v.id and p.status = 'open') as open
+                    (select count(*)::int from public.proposals p where p.vault_id = v.id and p.status = 'open') as open,
+                    exists(select 1 from public.access_tokens) as connected,
+                    v.created_at > now() - interval '${NUDGE_DAYS} days' as young
                from public.vaults v where v.id = $1`,
             [id],
           )
-        ).rows[0] as { default_policy: string; rules: number; open: number });
+        ).rows[0] as { default_policy: string; rules: number; open: number; connected: boolean; young: boolean });
     const readme = here.find((f) => /^readme\.md$/i.test(f.path.slice(dir.length)));
     const writer = await writablePath(c, v, dir);
+    const nudge = info && writer && info.young && !info.connected ? CONNECT_NUDGE : "";
     // Any member watches a folder (watching.ts); the vault's root isn't a
     // path that can be watched.
     const watch = dir ? watchControl(ctx, id, dir, await watchState(c, ctx, id, dir)) : undefined;
@@ -262,7 +276,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         ? emptyState({
             title: "No files yet",
             body: "Create the first file, or connect an agent and ask it to write one.",
-            action: html`<a class="button" href="${vaultPath(id, "/new")}">New file</a> <a class="button ghost" href="/connect">Connect an agent</a>`,
+            action: html`<a class="button" href="${vaultPath(id, "/new")}">New file</a>${nudge ? "" : html` <a class="button ghost" href="/connect">Connect an agent</a>`}`,
           })
         : emptyState({ title: "No files yet", body: "Nothing has been shared here yet. Files appear here once a member writes one." });
     };
@@ -278,6 +292,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         secondary: !dir ? html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a>` : "",
         primary: writer ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : "",
       })}
+      ${nudge}
       ${children.length === 0
         ? empty()
         : html`<div class="table-wrap"><table class="folder-list">

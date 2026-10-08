@@ -1,5 +1,7 @@
-// The first run, from a token to a connected agent (src/access.ts): the token
-// tabs create a token in place, the answer goes on with that client's steps (the token already in
+// The first run, from a new vault to a connected agent (src/access.ts, with
+// the nudge on src/files.ts): a young vault's root points a writer at Connect
+// until anything has connected, the token tabs create a token in
+// place, the answer goes on with that client's steps (the token already in
 // them), and Connect says whether anything has connected. One new person
 // walks it in order, so each test builds on the one before. What a token may
 // reach is the database's (supabase/tests/access_tokens_test.sql); these
@@ -66,6 +68,8 @@ const at = (h, s) => {
   assert.ok(i >= 0, `missing: ${s}`);
   return i;
 };
+const NEXT = /Next: connect an agent/;
+let vault = "";
 let userId = "";
 
 before(async () => {
@@ -88,6 +92,36 @@ const createdBy = async (fields) => {
   assert.equal(r.status, 200);
   return r.text();
 };
+
+test("first run: a new vault's page points its writer at Connect", async () => {
+  const made = await post("/vaults/new", { csrf: csrfOf(await page("/vaults/new")), name: "Flow vault", default_policy: "open" });
+  assert.equal(made.status, 303);
+  vault = made.headers.get("location");
+  const h = await page(vault);
+  assert.match(h, NEXT);
+  assert.match(h, /<a class="button primary" href="\/connect">Connect an agent<\/a>/);
+  assert.doesNotMatch(h, /<a class="button ghost" href="\/connect">/, "the empty vault does not offer Connect twice");
+});
+
+test("first run: an old vault doesn't show it, so nobody is pointed at Connect on every visit, forever", async () => {
+  const id = vault.split("/").pop();
+  await sql("update public.vaults set created_at = now() - interval '30 days' where id = $1", [id]);
+  assert.doesNotMatch(await page(vault), NEXT);
+  await sql("update public.vaults set created_at = now() where id = $1", [id]);
+  assert.match(await page(vault), NEXT);
+});
+
+test("first run: a CLI login counts as connected, so someone who only uses the CLI isn't asked to connect an agent", async () => {
+  const [{ id }] = await sql(
+    `insert into public.access_tokens (user_id, name, kind, client_id, resource, access, expires_at)
+     values ($1, 'Flow cli', 'cli', 'https://cli.example/cli/oauth-client.json', 'https://cli.example/api/env', 'read', now() + interval '30 days')
+     returning id`,
+    [userId],
+  );
+  assert.doesNotMatch(await page(vault), NEXT);
+  await sql("delete from public.access_tokens where id = $1", [id]);
+  assert.match(await page(vault), NEXT);
+});
 
 test("connect: before anything has connected the page says so", async () => {
   assert.match(await page("/connect?client=cursor"), /<strong>Nothing has connected in the last 15 minutes\.<\/strong>/);
@@ -181,9 +215,12 @@ test("connected: a revoked or expired token doesn't count however recently it wa
   assert.match(h, /Nothing has connected in the last 15 minutes/);
 });
 
-test("connected: a token used just now shows on Connect with its client", async () => {
+test("connected: a token used just now shows on Connect with its client, and the first-run step is gone from the vault", async () => {
   await sql("update public.access_tokens set last_used_at = now(), client_name = 'Cursor 1.2' where user_id = $1 and name = 'Flow cursor'", [userId]);
   const h = await page("/connect?client=cursor");
   assert.match(h, /<strong>Connected\.<\/strong> Flow cursor was last used <time[^>]*>[^<]*<\/time><span class="token-client"> · from Cursor 1\.2<\/span>\./);
   assert.doesNotMatch(h, /Nothing has connected/);
+  const v = await page(vault);
+  assert.doesNotMatch(v, NEXT);
+  assert.match(v, /New file<\/a> <a class="button ghost" href="\/connect">Connect an agent<\/a>/, "the empty vault's own button is back");
 });
