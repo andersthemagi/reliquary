@@ -165,8 +165,19 @@ function refuseHttp(res: http.ServerResponse, status: number, error: string, why
 }
 
 // Every request runs with its own reference (failure.ts); a tool call gets
-// one of its own (tools.ts).
-const httpServer = http.createServer((req, res) => withRequest("Handling an MCP request", `mcp ${req.method}`, () => serve(req, res)));
+// one of its own (tools.ts). node:http doesn't await the handler, so a throw
+// that escaped serve() would be an unhandled rejection: the request would
+// never be answered, and on a long-running process the server would exit.
+const httpServer = http.createServer((req, res) =>
+  withRequest("Handling an MCP request", `mcp ${req.method}`, () =>
+    serve(req, res).catch((err) => {
+      const f = fail(err, { where: "MCP server" });
+      if (!res.headersSent) sendRpcError(res, f);
+      else if (!res.writableEnded) res.end();
+      console.info(`mcp ${f.status} ref=${f.ref}`);
+    }),
+  ),
+);
 
 async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
@@ -315,7 +326,6 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
 
   const mcp = new McpServer({ name: "reliquary", version: BUILD.version }, { instructions: INSTRUCTIONS });
   const runner = session;
-  await registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -326,6 +336,9 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
     void session?.close();
   });
   try {
+    // Inside the try: registering can throw, and the session opened above
+    // must be closed and the request answered with a reference either way.
+    await registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
     await mcp.connect(transport);
     await transport.handleRequest(req, res, body);
     console.info(`mcp ${res.statusCode} user=${identity.userId.slice(0, 8)}`);
