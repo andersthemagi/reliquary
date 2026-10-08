@@ -106,3 +106,41 @@ select t.run('ana', format($q$select public.erase_file(%L, 'canon/x.md')$q$, t.i
 select t.expect('notes: erasing a file erases its proposals'' notes',
   (select count(*)::text from public.proposal_notes n join public.proposals p on p.id = n.proposal_id
     where p.path = 'canon/x.md' and n.body is not null), '0');
+
+-- A decision is bound to the revision its reviewer read
+
+insert into t.ids select 'r1', t.run('ben',
+  format($q$select public.propose(%L, 'canon/read.md', 'Read 1', 'read')$q$, t.id('v1')), 'Hermes')::uuid;
+select t.run('ben', format($q$select public.revise_proposal(%L, 'Read 2', 'swapped')$q$, t.id('r1')), 'Hermes');
+select t.expect('read revision: approving a revision you didn''t read is refused',
+  t.run('ana', format($q$select public.decide(%L, 'approve', null, 1)$q$, t.id('r1'))), 'ERR 55000');
+select t.expect('read revision: the refused approval records nothing and applies nothing',
+  (select count(*)::text from public.approvals where proposal_id = t.id('r1'))
+    || ' / ' || (select count(*)::text from public.log where proposal_id = t.id('r1') and event = 'proposal.approve')
+    || ' / ' || (select count(*)::text from public.files where path = 'canon/read.md'),
+  '0 / 0 / 0');
+select t.expect('read revision: approving the revision you read applies it',
+  t.run('ana', format($q$select public.decide(%L, 'approve', null, 2)$q$, t.id('r1'))), 'applied');
+
+insert into t.ids select 'r2', t.run('ben',
+  format($q$select public.propose(%L, 'canon/edit-read.md', 'Edit 1', 'read')$q$, t.id('v1')), 'Hermes')::uuid;
+select t.run('ben', format($q$select public.revise_proposal(%L, 'Edit 2', 'swapped')$q$, t.id('r2')), 'Hermes');
+select t.expect('read revision: edit & approve from a revision you didn''t read is refused',
+  t.run('ana', format($q$select public.edit_and_approve(%L, 'Mine', null, 1)$q$, t.id('r2'))), 'ERR 55000');
+select t.expect('read revision: the refused edit leaves the revision the agent wrote',
+  (select revision || ' / ' || body || ' / ' || status from public.proposals where id = t.id('r2')), '2 / Edit 2 / open');
+select t.expect('read revision: edit & approve from the revision you read applies the edit',
+  t.run('ana', format($q$select public.edit_and_approve(%L, 'Mine', null, 2)$q$, t.id('r2'))), 'applied');
+
+-- A revision after a reviewer's edit is the proposer's again
+
+insert into t.ids select 'r3', t.run('ben',
+  format($q$select public.propose(%L, 'board/credit.md', 'Agent 1', 'credit')$q$, t.id('v1')), 'Hermes')::uuid;
+select t.run('ana', format($q$select public.edit_and_approve(%L, 'Ana edit')$q$, t.id('r3')));
+select t.run('ben', format($q$select public.revise_proposal(%L, 'Agent 3', 'after the edit')$q$, t.id('r3')), 'Hermes');
+select t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('r3')));
+select t.run('cal', format($q$select public.decide(%L, 'approve')$q$, t.id('r3')));
+select t.expect('revise after an edit: the applied text is credited to the proposer''s agent, not the earlier editor',
+  (select v.body || ' / ' || (v.author = t.id('ben')) || ' / ' || coalesce(v.agent, 'no agent')
+     from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'board/credit.md'),
+  'Agent 3 / true / Hermes');

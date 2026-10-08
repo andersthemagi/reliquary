@@ -387,6 +387,67 @@ test("races, lock order: a stale write and an erasure of the same file, interlea
   assert.equal(counter, scan);
 });
 
+// A vault where canon/ needs one approval, with the given canon files
+// already written, and two editors to propose.
+async function canonVault(name, paths) {
+  const v = await newVault(OWNER, name);
+  for (const p of people.slice(0, 2)) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  for (const path of paths) assert.ok((await as(db, OWNER, "select public.write_file($1, $2, 'base')", [v, path])).ok);
+  assert.ok((await as(db, OWNER, "select public.set_policy($1, 'canon/', 'canon', 1)", [v])).ok);
+  return v;
+}
+async function propose(v, by, path, body) {
+  const r = await as(db, by, "select public.propose($1, $2, $3, 'race') as id", [v, path, body]);
+  assert.ok(r.ok, r.message);
+  return r.rows[0].id;
+}
+const decided = (x) => (x.ok ? x.rows[0].r : x.code);
+
+test("races, one wins: two proposals for the same file approved at once, interleaved, one applies and the other goes stale", async () => {
+  const v = await canonVault("Races two approvals", ["canon/old.md"]);
+  const outcomes = [];
+  // A file both proposals change, then one neither proposal's file exists yet.
+  for (const path of ["canon/old.md", "canon/new.md"]) {
+    const first = await propose(v, people[0], path, "first");
+    const second = await propose(v, people[1], path, "second");
+    // The first approval has written the file and stops before it commits.
+    const [a, b, bState] = await interleave(
+      (c) => as(c, OWNER, "select public.decide($1, 'approve') as r", [first], "files"),
+      (c) => as(c, OWNER, "select public.decide($1, 'approve') as r", [second]),
+    );
+    outcomes.push(`${decided(a)}/${decided(b)} (${bState})`);
+    const [row] = await sql(
+      `select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.vault_id = $1 and f.path = $2`,
+      [v, path],
+    );
+    assert.equal(row.body, "first", path);
+  }
+  log("approve vs approve", outcomes);
+  assert.deepEqual(outcomes, ["applied/stale (blocked)", "applied/stale (blocked)"]);
+});
+
+test("races, lock order: a final approval and an erasure of its file, interleaved, don't deadlock", async () => {
+  const approvals = [
+    ["canon/approve.md", "select public.decide($1, 'approve') as r"],
+    ["canon/edit.md", "select public.edit_and_approve($1, 'edited') as r"],
+  ];
+  const v = await canonVault("Races approve erase", approvals.map(([path]) => path));
+  const outcomes = [];
+  for (const [path, approve] of approvals) {
+    const pid = await propose(v, people[0], path, "second");
+    // The approval stops at its first log row, holding what it has locked.
+    const [d, e, eState] = await interleave(
+      (c) => as(c, OWNER, approve, [pid], "log"),
+      (c) => as(c, OWNER, "select public.erase_file($1, $2)::text", [v, path]),
+    );
+    outcomes.push(`${decided(d)}/${outcome(e)} (${eState})`);
+  }
+  log("approve vs erase", outcomes);
+  assert.deepEqual(outcomes, ["applied/ok (blocked)", "applied/ok (blocked)"]);
+  const { counter, scan } = await counted(v);
+  assert.equal(counter, scan);
+});
+
 test("races, lock order: accepting an invite while its owner re-invites the same address, interleaved, doesn't deadlock", async () => {
   const v = await newVault(OWNER, "Races reinvite");
   const outcomes = [];
