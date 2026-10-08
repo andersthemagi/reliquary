@@ -50,21 +50,31 @@ import { emailKey, inviteTokenOf, maskEmail, peekInvite, roleName, type Peek } f
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage } from "./errorpage.js";
-import { failure, noteUpstream, upstreamNote } from "./failure.js";
+import { failure, noteUpstream, sqlstateName, upstreamNote } from "./failure.js";
 import { requestAccessHref } from "./site.js";
 
 // The live invite a sign-in is for, if `next` is an invite page. Looking
 // one up counts against the address's invite limit (ratelimit.ts), like
-// opening the invite page; over it, the page is plain sign-in.
-async function inviteFor(next: string, ip: string): Promise<Peek | undefined> {
+// opening the invite page. `refused`: the lookup couldn't answer (over its
+// limit, or the database failing). That is not "no invite": asking Auth to
+// sign in without making the account, for an address that has none, sends
+// nothing, and the page would still say a code was sent. Where nothing has
+// been asked yet (the email form), a plain page is harmless; sending a code
+// is not, and uses `refused`.
+async function inviteFor(next: string, ip: string, theme: Theme): Promise<{ invite?: Peek; refused?: Reply }> {
   const token = inviteTokenOf(next);
-  if (!token) return undefined;
-  if (await limit([{ name: "invite_ip", kind: "ip", value: ip }])) return undefined;
+  if (!token) return {};
+  const wait = await limit([{ name: "invite_ip", kind: "ip", value: ip }]);
+  if (wait) {
+    return { refused: { status: 429, retryAfter: wait, html: tooManyPage(wait, theme, "That was too many invite links opened or checked in a short time") } };
+  }
   try {
     const p = await peekInvite(token);
-    return p?.state === "pending" ? p : undefined;
-  } catch {
-    return undefined;
+    return p?.state === "pending" ? { invite: p } : {};
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    noteUpstream("invite lookup (database)", `The database couldn’t be asked whether this invite is still open${code ? ` (${sqlstateName(code)})` : ""}, so no sign-in code was sent`);
+    return { refused: { status: 503, html: signinUnavailablePage(theme) } };
   }
 }
 
@@ -245,7 +255,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (i.method === "GET" && p === "/signin") {
     const next = safeNext(i.url.searchParams.get("next"));
     if (i.session) return out({ redirect: next });
-    return out({ html: emailForm(pre(), next, i.theme, undefined, await inviteFor(next, i.ip)) });
+    return out({ html: emailForm(pre(), next, i.theme, undefined, (await inviteFor(next, i.ip, i.theme)).invite) });
   }
 
   if (i.method === "GET" && p === "/auth/confirm") {
@@ -276,10 +286,11 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
 
   if (p === "/signin") {
     const email = (i.form.get("email") ?? "").trim();
-    const invite = await inviteFor(next, i.ip);
+    const { invite, refused } = await inviteFor(next, i.ip, i.theme);
     if (!EMAIL.test(email) || email.length > 254) {
       return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.", invite) });
     }
+    if (refused) return out(refused);
     const limited = await signinLimit([
       { name: "signin_email_address", kind: "email", value: emailKey(email) },
       { name: "signin_email_ip", kind: "ip", value: i.ip },

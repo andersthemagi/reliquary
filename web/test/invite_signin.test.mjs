@@ -174,6 +174,26 @@ test("invite sign-in: the invited address matches however its accent is typed, c
   assert.match(await r.text(), /<h1>No account yet<\/h1>/);
 });
 
+test("invite sign-in: when the invite can't be looked up, no code is asked for and the page says so instead of 'check your email'", async () => {
+  await sql("revoke execute on function private.invite_peek(text) from reliquary_web");
+  try {
+    const sent = (await stats()).otp;
+    const jar = new Jar();
+    const page = await (await get(`/signin?next=${encodeURIComponent(next(T.newbie))}`, jar)).text();
+    const r = await post("/signin", { csrf: csrfOf(page), email: "newbie@example.test", next: next(T.newbie) }, jar);
+    assert.equal(r.status, 503);
+    const h = await r.text();
+    assert.match(h, /<h1>Sign-in is unavailable<\/h1>/);
+    assert.match(h, /<dt>Where<\/dt><dd>invite lookup \(database\)<\/dd>/);
+    assert.match(h, /so no sign-in code was sent/);
+    assert.match(h, /<dt>Reference<\/dt><dd><code>ref [0-9a-f]{8}<\/code><\/dd>/);
+    assert.doesNotMatch(h, /Check your email/);
+    assert.equal((await stats()).otp, sent, "Auth was not asked");
+  } finally {
+    await sql("grant execute on function private.invite_peek(text) to reliquary_web");
+  }
+});
+
 test("invite sign-in: with sign-ups on, the invited address gets an account, signs in and joins", async () => {
   await signups(true);
   const jar = new Jar();
