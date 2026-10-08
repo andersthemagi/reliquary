@@ -436,7 +436,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
 
     const auth = await getSession(req);
     if (auth.unavailable) {
-      send(res, { status: 503, html: signinUnavailablePage(theme) });
+      send(res, { status: 503, html: signinUnavailablePage(theme) }, {}, auth.cookies);
       console.info(`${req.method} ${url.pathname} 503`);
       return;
     }
