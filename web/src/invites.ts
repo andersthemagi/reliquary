@@ -119,6 +119,13 @@ export function inviteTokenOf(next: string): string | undefined {
   }
 }
 
+// An address as Reliquary compares it: private.email_key in the database
+// (trimmed, Unicode NFC, lower-cased). Auth stores an accented address in a
+// different form than people type it, so anything here that compares or
+// counts an address must use this and not toLowerCase(), or the same
+// address is two in JavaScript and one in the database.
+export const emailKey = (email: string): string => email.trim().normalize("NFC").toLowerCase();
+
 // "fay@example.com" -> "f•••@example.com": enough to recognise your own
 // address on a page anyone holding the link could open.
 export function maskEmail(email: string): string {

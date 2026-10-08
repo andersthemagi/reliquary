@@ -45,6 +45,7 @@ import { refusalText } from "./errorpage.js";
 import { Refusal } from "./failure.js";
 import { callout, confirmPage, csrfField, html, notice, pageHeader, plural, signsOut, themeButtons, time } from "./html.js";
 import { loadShell } from "./inbox.js";
+import { emailKey } from "./invites.js";
 import { EMAIL } from "./signin.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 import { shortId } from "./personref.js";
@@ -205,7 +206,7 @@ export async function changeEmail(ctx: Ctx): Promise<Reply> {
     accountSettings(ctx, { email: { value: email, error: refusalText(new Refusal({ status: 400, where: at, why })) } });
   if (!EMAIL.test(email) || email.length > 254) return refuse("Enter the new address like name@example.com. Nothing was changed");
   const current = (await asPerson(ctx.userId, async (c) => (await c.query(`select public.my_email() as e`)).rows[0].e as string | null)) ?? "";
-  if (email.normalize("NFC").toLowerCase() === current.normalize("NFC").toLowerCase()) {
+  if (emailKey(email) === emailKey(current)) {
     return refuse("That is already your address. Nothing was changed");
   }
   const r = await ctx.session.changeEmail(email);
