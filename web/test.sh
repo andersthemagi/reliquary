@@ -136,7 +136,7 @@ done
 # The rate-limit instance: small limits (test/rate_limits.test.mjs), the
 # same fake Auth and session secret, client addresses from x-real-ip.
 rl_limits="signin_email_address=2/3600,signin_email_ip=3/3600,signin_code_address=2/900,signin_code_ip=3/900"
-rl_limits="$rl_limits,signin_refresh_session=2/3600,oauth_authorize_ip=2/600,oauth_token_ip=2/600,oauth_token_client=3/600"
+rl_limits="$rl_limits,signin_refresh_session=2/3600,signin_refresh_ip=3/3600,oauth_authorize_ip=2/600,oauth_token_ip=2/600,oauth_token_client=3/600"
 rl_limits="$rl_limits,oauth_revoke_ip=2/600,oauth_revoke_client=3/600,cimd_fetch_host=1/600,invite_ip=2/3600"
 rl_limits="$rl_limits,env_grant_minute=2/60,web_write_minute=3/60"
 "$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \

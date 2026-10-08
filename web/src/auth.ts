@@ -21,7 +21,7 @@
 import { createHmac, createPublicKey, randomBytes, timingSafeEqual, verify as verifySignature } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import type http from "node:http";
-import { limit } from "./ratelimit.js";
+import { clientIp, limit } from "./ratelimit.js";
 import { networkReason, noteUpstream } from "./failure.js";
 import { decodeFlash, encodeFlash, type Flash } from "./flash.js";
 import { UUID } from "./personref.js";
@@ -338,12 +338,19 @@ async function supabaseSession(req: http.IncomingMessage): Promise<Lookup> {
     }
     if (!claims) {
       if (!rt) return none(!!at);
-      // Refreshes per session; with no access token to name it, per
-      // refresh token (which Supabase rotates, so that only stops reuse).
-      // Fails open (ratelimit.ts).
-      const wait = await limit([
-        { name: "signin_refresh_session", kind: "session", value: expiredSession ?? `refresh:${rt}` },
-      ]);
+      // Not something Supabase issues: no counter write, no call to Auth.
+      if (!REFRESH_TOKEN.test(rt)) {
+        console.info("auth: refresh token malformed");
+        return none(true);
+      }
+      // Per IP first, and alone: the session counter below is keyed on a value
+      // the caller picks (the refresh token in their own cookie; the access
+      // token that would name the session has expired out of the browser by
+      // now), and a call it refuses still writes its row. Fails open
+      // (ratelimit.ts).
+      const wait =
+        (await limit([{ name: "signin_refresh_ip", kind: "ip", value: clientIp(req) }])) ||
+        (await limit([{ name: "signin_refresh_session", kind: "session", value: expiredSession ?? `refresh:${rt}` }]));
       if (wait) return { session: null, cookies, unavailable: false, limited: wait };
       // Expired or missing access token: refresh once. Supabase rotates the
       // refresh token; reusing an old one outside its 10 s window revokes
