@@ -1041,6 +1041,9 @@ reaching Reliquary.)
 - **Remote servers only.** Hosted Reliquary can't run a server that lives
   on someone's laptop (stdio MCP). Upstream URLs must be public HTTPS: no
   private or link-local addresses, and redirects are re-checked (SSRF).
+  A URL is a host and a path only, with no userinfo, query or fragment
+  (`20261009120041_link_url_shape.sql`): members, agents and the log all
+  see it, so a credential must never ride in it.
 - **What the gate doesn't cover:** upstream data isn't vault context. A
   member granted a link sees whatever that upstream account returns.
   The link's grant is the control, so grant accordingly.

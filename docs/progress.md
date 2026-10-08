@@ -198,6 +198,14 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   dropping the old key as the runbook says broke every link call. Design's
   open question ("reuse `VARIABLES_KEYS`'s rotation as it stands?")
   answered yes.
+- A link's url is a host and a path only (2026-10-09,
+  `20261009120041_link_url_shape.sql`, `web/src/linkspage.ts`; tests in
+  `supabase/tests/links_test.sql` and `web/test/links_page.test.mjs`): the
+  check had been a prefix test, so a `user:password@`, `?key=` or `#`
+  passed into a url every member and agent reads and the append-only log
+  keeps. Now refused, saying which rule broke and that a key goes in the
+  credential. The table's check is `NOT VALID`: a link saved before keeps
+  its url, and its next edit must give one that passes.
 
 Not built: rediscovering a link's tools by hand (`web/src/discovery.ts`'s
 own header: today, retrying a failed discovery means deleting and
