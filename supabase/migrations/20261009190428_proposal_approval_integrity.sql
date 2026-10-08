@@ -1,7 +1,8 @@
--- Turning a proposal into canon (decide, edit_and_approve), each copied from
--- its latest definition (decide: 20260928130000_path_ownership.sql;
--- edit_and_approve: 20261002100000_path_owner_review_parity.sql) and
--- changed only where said.
+-- Turning a proposal into canon (decide, edit_and_approve, revise_proposal),
+-- each copied from its latest definition (decide:
+-- 20260928130000_path_ownership.sql; edit_and_approve:
+-- 20261002100000_path_owner_review_parity.sql; revise_proposal:
+-- 20260924150000_review.sql) and changed only where said.
 --
 -- Lock order. decide() locked the proposal's row, then (inside
 -- apply_write) the file's, and compared the file's version with a plain
@@ -27,6 +28,13 @@
 -- recorded and the refusal says which revision to read. Given nothing,
 -- both behave as before, so the old signatures are dropped first (as
 -- 20260930100000_compare_and_swap.sql does) to keep calls unambiguous.
+--
+-- Credit after a revision. revise_proposal never cleared edited_by, which
+-- edit_and_approve sets, so a revision made after a reviewer's edit (with
+-- a quorum above one, the proposal stays open) was applied as the
+-- reviewer's text, with no agent, though the reviewer never saw it. A
+-- revision now clears edited_by: the text is the proposer's (and their
+-- agent's) again.
 
 drop function public.decide(uuid, text, text);
 drop function public.edit_and_approve(uuid, text, text);
@@ -168,6 +176,34 @@ begin
   perform private.log_event(p.vault_id, 'proposal.edit', p.path, null, p.id,
     jsonb_build_object('revision', p.revision));
   return public.decide(p.id, 'approve', null);
+end $$;
+
+create or replace function public.revise_proposal(p_proposal uuid, p_body text, p_reason text default null)
+returns int
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  p public.proposals;
+begin
+  perform private.require_person();
+  select * into p from public.proposals where id = p_proposal for update;
+  if p.id is null or p.proposed_by <> private.uid() or not private.can_write(p.vault_id) then
+    raise exception 'no such proposal of yours' using errcode = 'P0002';
+  end if;
+  if p.status not in ('open', 'changes_requested') then
+    raise exception 'proposal is %', replace(p.status, '_', ' ') using errcode = '55000';
+  end if;
+  if p.kind <> 'write' then
+    raise exception 'only proposals that write a file can be revised' using errcode = '22023';
+  end if;
+  update public.proposals
+  set body = p_body, reason = coalesce(nullif(trim(p_reason), ''), reason),
+      revision = revision + 1, status = 'open', edited_by = null
+  where id = p.id
+  returning * into p;
+  perform private.add_note(p, 'revise', p_reason);
+  perform private.log_event(p.vault_id, 'proposal.revise', p.path, null, p.id,
+    jsonb_build_object('revision', p.revision));
+  return p.revision;
 end $$;
 
 revoke all on function public.decide(uuid, text, text, int), public.edit_and_approve(uuid, text, text, int)

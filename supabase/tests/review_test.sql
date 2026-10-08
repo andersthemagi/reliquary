@@ -131,3 +131,16 @@ select t.expect('read revision: the refused edit leaves the revision the agent w
   (select revision || ' / ' || body || ' / ' || status from public.proposals where id = t.id('r2')), '2 / Edit 2 / open');
 select t.expect('read revision: edit & approve from the revision you read applies the edit',
   t.run('ana', format($q$select public.edit_and_approve(%L, 'Mine', null, 2)$q$, t.id('r2'))), 'applied');
+
+-- A revision after a reviewer's edit is the proposer's again
+
+insert into t.ids select 'r3', t.run('ben',
+  format($q$select public.propose(%L, 'board/credit.md', 'Agent 1', 'credit')$q$, t.id('v1')), 'Hermes')::uuid;
+select t.run('ana', format($q$select public.edit_and_approve(%L, 'Ana edit')$q$, t.id('r3')));
+select t.run('ben', format($q$select public.revise_proposal(%L, 'Agent 3', 'after the edit')$q$, t.id('r3')), 'Hermes');
+select t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('r3')));
+select t.run('cal', format($q$select public.decide(%L, 'approve')$q$, t.id('r3')));
+select t.expect('revise after an edit: the applied text is credited to the proposer''s agent, not the earlier editor',
+  (select v.body || ' / ' || (v.author = t.id('ben')) || ' / ' || coalesce(v.agent, 'no agent')
+     from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'board/credit.md'),
+  'Agent 3 / true / Hermes');
