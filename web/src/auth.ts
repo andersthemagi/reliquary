@@ -345,8 +345,8 @@ async function supabaseSession(req: http.IncomingMessage): Promise<Lookup> {
       if (wait) return { session: null, cookies, unavailable: false, limited: wait };
       // Expired or missing access token: refresh once. Supabase rotates the
       // refresh token; reusing an old one outside its 10 s window revokes
-      // the session, which lands here as a failure: signed out.
-      const t = await tokenRequest("/token?grant_type=refresh_token", { refresh_token: rt });
+      // the session, which lands here as a refusal: signed out.
+      const t = await refreshSession(rt);
       if (!t) {
         console.info("auth: refresh refused");
         return none(true);
@@ -479,11 +479,18 @@ async function gotrue(
 
 const REFRESH_TOKEN = /^[\x21-\x7e]{1,512}$/;
 
-// A session from Supabase, or undefined if it refused (4xx). Throws
-// Unavailable on network failure or 5xx.
-async function tokenRequest(path: string, body: unknown): Promise<Tokens | undefined> {
-  const { status, json } = await gotrue(path, body);
-  return tokensOf(status, json);
+// A session from Supabase, or undefined if it refused the token. Throws
+// Unavailable on network failure and on any answer that isn't a clear yes or
+// no. Only 400, 401 and 403 say the refresh token itself is dead (unknown,
+// used, or its session revoked). Anything else (Auth's shared 429 over Vercel's
+// egress IPs, a timeout, a 5xx) says nothing about this session, and clearing
+// the cookies on it would sign out a person whose session is fine.
+async function refreshSession(refreshToken: string): Promise<Tokens | undefined> {
+  const path = "/token?grant_type=refresh_token";
+  const { status, json } = await gotrue(path, { refresh_token: refreshToken });
+  if (status === 200) return tokensOf(status, json);
+  if (status === 400 || status === 401 || status === 403) return undefined;
+  throw new Unavailable(`POST ${path} answered ${status}`);
 }
 
 function tokensOf(status: number, json: any): Tokens | undefined {

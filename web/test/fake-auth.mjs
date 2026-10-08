@@ -36,6 +36,9 @@
 //   POST /_users                  { email }: makes that account if it has none; { id }
 //   POST /_fail_global_logout     { status }: answer global logouts with that status
 //                                 (0: as normal)
+//   POST /_fail_refresh           { status }: answer every refresh with that status, rotating
+//                                 nothing (0: as normal). 429 is Auth's own limit, shared by
+//                                 every user behind one egress IP.
 //   POST /_secure_email_change    { on }: whether PUT /user emails both addresses (on at start)
 //   POST /_fail_user_update       { status, body }: answer PUT /user with that (0: as normal)
 //   POST /_email_change           { email, new_email, both }: as if that account asked to
@@ -88,6 +91,7 @@ const pendingChanges = new Map(); // account id -> { newEmail, sentAt }, from PU
 const secureEmailChange = { on: true }; // /_secure_email_change: both addresses confirm (Supabase's default)
 const failUserUpdate = { status: 0, body: {} }; // /_fail_user_update: answer PUT /user with this instead
 const failGlobal = { status: 0 }; // /_fail_global_logout: answer global logouts with this status instead
+const failRefresh = { status: 0 }; // /_fail_refresh: answer refreshes with this status instead
 const TTL = 3600;
 const signups = { on: false };
 const otpRace = { on: false }; // /_otp_race
@@ -162,6 +166,10 @@ http
     if (p === "/_fail_global_logout" && req.method === "POST") {
       failGlobal.status = Number((await readJson(req)).status) || 0;
       return json(res, 200, failGlobal);
+    }
+    if (p === "/_fail_refresh" && req.method === "POST") {
+      failRefresh.status = Number((await readJson(req)).status) || 0;
+      return json(res, 200, failRefresh);
     }
     if (p === "/_email_change" && req.method === "POST") {
       const { email, new_email, both } = await readJson(req);
@@ -285,6 +293,7 @@ http
 
     if (p === "/auth/v1/token" && url.searchParams.get("grant_type") === "refresh_token") {
       stats.refresh++;
+      if (failRefresh.status) return json(res, failRefresh.status, { code: failRefresh.status, error_code: "over_request_rate_limit", msg: "fake refusal" });
       const rt = refreshTokens.get(body.refresh_token);
       if (!rt || revoked.has(rt.sessionId)) return json(res, 400, { code: 400, error_code: "refresh_token_not_found", msg: "Invalid Refresh Token" });
       if (rt.used) {
