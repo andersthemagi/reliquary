@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 import { clearCookie, configureAuth, cookieName, getSession, localLogin, readCookie, rotateLoginCode, sameSecret, type AuthMode } from "./auth.js";
 import { html, notice, setAccountMode, setStyleVersion, type Theme } from "./html.js";
 import { describe, errorPage } from "./errorpage.js";
-import { doing, fail, failure, withRequest } from "./failure.js";
+import { doing, fail, failure, Refusal, withRequest } from "./failure.js";
 import { toFlash } from "./flash.js";
 import { signinUnavailablePage } from "./signin.js";
 import { envApi } from "./envapi.js";
@@ -193,11 +193,21 @@ function readForm(req: http.IncomingMessage, limit = MAX_BODY): Promise<URLSearc
         req.removeAllListeners("data");
         req.pause();
         chunks.length = 0;
-        reject(new Error("too large"));
+        reject(
+          new Refusal({
+            status: 413,
+            where: "web app (form size limit)",
+            why: `That form is over ${Math.round(limit / (1024 * 1024))} MB, so nothing was saved. Go back and send less.`,
+          }),
+        );
       } else chunks.push(c);
     });
     req.on("end", () => resolve(new URLSearchParams(Buffer.concat(chunks).toString("utf8"))));
-    req.on("error", reject);
+    // The browser went away mid-upload: not a form that was too large, and
+    // nobody is left to read an answer.
+    req.on("error", () =>
+      reject(new Refusal({ status: 400, where: "web app (form upload)", why: "The upload stopped before the whole form arrived, so nothing was saved." })),
+    );
   });
 }
 
@@ -435,6 +445,24 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       return;
     }
 
+    // A form over its limit is answered here, with the session's cookies: a
+    // refresh may have rotated its token, and an answer without them would
+    // lose it. The connection closes after the 413, which is what ends the
+    // upload (readForm stopped reading).
+    const readPosted = async (limit = MAX_BODY): Promise<URLSearchParams | undefined> => {
+      try {
+        return await readForm(req, limit);
+      } catch (err) {
+        if (!(err instanceof Refusal)) throw err;
+        const f = fail(err);
+        const tooLarge = f.status === 413;
+        const page = errorPage(f, { theme, title: tooLarge ? "Too large" : undefined, back: formPage(req) });
+        send(res, { status: f.status, html: page }, tooLarge ? { connection: "close" } : {}, auth.cookies);
+        console.info(`POST ${url.pathname} ${f.status}`);
+        return undefined;
+      }
+    };
+
     // Sign-in pages (AUTH_MODE=supabase): reachable without a session.
     if (MODE === "supabase" && SIGNIN_PATHS.has(url.pathname)) {
       let signinForm = new URLSearchParams();
@@ -445,7 +473,9 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
           logRefused(url.pathname, o.origin);
           return;
         }
-        signinForm = await readForm(req);
+        const posted = await readPosted();
+        if (!posted) return;
+        signinForm = posted;
       }
       const out = await signinRoutes({ req, method: req.method ?? "", url, form: signinForm, theme, session: auth.session, ip: clientIp(req) });
       if (out) {
@@ -481,15 +511,9 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
         logRefused(url.pathname, o.origin);
         return;
       }
-      try {
-        form = await readForm(req, bodyLimit(url.pathname));
-      } catch {
-        const cap = bodyLimit(url.pathname) === MAX_BODY ? "2 MB" : "3 MB";
-        const f = failure({ status: 413, where: "web app (form size limit)", why: `That form is over ${cap}, so nothing was saved. Go back and send less.` });
-        send(res, { status: 413, html: errorPage(f, { theme, title: "Too large", back: formPage(req) }) }, { connection: "close" }, auth.cookies);
-        console.info(`POST ${url.pathname} 413`);
-        return;
-      }
+      const posted = await readPosted(bodyLimit(url.pathname));
+      if (!posted) return;
+      form = posted;
       // Now what the form asks for is known ("Saving canon/pricing.md").
       {
         const d = describe(req.method, url, form);
