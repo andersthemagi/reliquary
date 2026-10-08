@@ -424,13 +424,13 @@ async function deletePage(ctx: Ctx, id: string, refused?: Refused): Promise<Repl
     if (!v || !(await writablePath(c, v, path))) return null;
     const f = (
       await c.query(
-        `select (private.rule_for(f.vault_id, f.path)).policy,
+        `select (private.rule_for(f.vault_id, f.path)).policy, fv.id as version,
                 (select count(*)::int from public.file_versions x where x.file_id = f.id) as versions
            from public.files f join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
         [id, path],
       )
-    ).rows[0] as { policy: string; versions: number } | undefined;
+    ).rows[0] as { policy: string; version: string; versions: number } | undefined;
     if (!f) return null;
     const name = path.split("/").pop()!;
     const canon = f.policy === "canon";
@@ -461,7 +461,10 @@ async function deletePage(ctx: Ctx, id: string, refused?: Refused): Promise<Repl
           ],
           action: vaultPath(id, "/file"),
           csrf: ctx.csrf,
-          fields: { path, action: "delete" },
+          // The version this page shows, so a delete confirmed after someone
+          // saved the file is refused instead of deleting text nobody here saw.
+          // A refusal for another reason keeps the version that was sent.
+          fields: { path, action: "delete", expected_version: refused?.expectedVersion ?? f.version },
           button: `Delete ${name}`,
           cancel: filePath(id, path),
           error: refused?.error,
@@ -596,7 +599,7 @@ async function conflictReply(ctx: Ctx, id: string, path: string, typed: string):
         [id, path],
       )
     ).rows[0];
-    if (!cur) return null;
+    if (!cur) return { gone: true as const };
     const body = html`
       ${pageHeader({ crumb: crumbs(id, v, path, false, "Edit"), title: `Someone saved ${path.split("/").pop()} first`, path: true })}
       ${callout(
@@ -617,9 +620,15 @@ async function conflictReply(ctx: Ctx, id: string, path: string, typed: string):
         <div class="actions"><button class="primary">Save over the current version</button>
           <a class="button quiet" href="${filePath(id, path)}">Discard your edit</a></div>
       </form>`;
-    return { shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
+    return { gone: false as const, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
+  // Deleted while they edited: a save would be creating the file again, which
+  // is New file's job, so it comes back there with their text in it.
+  if (data.gone) {
+    const why = `${path} was deleted while you were editing it, so your edit was not saved. Your text is still below; Create file puts the file back`;
+    return newFile(ctx, id, { error: message(new Refusal({ status: 409, where: "web app (the Edit form)", why })), path, content: typed, reason: "", expectedVersion: null });
+  }
   return render(ctx, `Conflict editing ${path}`, data.shell, "vaults");
 }
 
@@ -667,7 +676,7 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
         return { kind: "write" } as const;
       }
       if (action === "delete") {
-        await c.query(`select public.delete_file(v.id, $2) from ${V}`, [id, path]);
+        await c.query(`select public.delete_file(v.id, $2, $3) from ${V}`, [id, path, expectedVersion]);
         return { kind: "delete" } as const;
       }
       const del = action === "propose-delete";
@@ -688,12 +697,17 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
   } catch (err) {
     if ((err as { code?: string }).code === "RLV01") return notFound(ctx);
     if ((err as { code?: string }).code === "RLF01" && action === "write") return conflictReply(ctx, id, path, content);
-    const error = message(err);
+    const stale = (err as { code?: string }).code === "RLF01" && action === "delete";
+    // The confirm page offers the file as it is now, so confirming again is a
+    // choice made after this says it changed.
+    const error = stale
+      ? message(new Refusal({ status: 409, where: "web app (the Delete form)", why: `${path} changed after you opened this page, so it was not deleted. Open the file to see what changed, then delete it again if you still mean to` }))
+      : message(err);
     // Not for a path that can't be shown back (control characters, over 200
     // characters): the page would print it in its title and breadcrumb.
     if (echoable(path)) {
       const show = action === "create" ? newFile : action === "write" || action === "propose" ? editView : deletePage;
-      const again = await show(ctx, id, { error, path, content, reason, expectedVersion });
+      const again = await show(ctx, id, { error, path, content, reason, expectedVersion: stale ? null : expectedVersion });
       if (again.status === 400) return again;
     }
     ctx.setFlash(error);

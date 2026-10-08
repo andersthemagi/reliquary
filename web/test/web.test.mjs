@@ -219,6 +219,32 @@ test("edit: a stale save shows a conflict page with both texts, and saving again
   assert.match(await page(`${V}/file?path=notes%2Fconflict.md&tab=source`), /from B/);
 });
 
+test("edit: a save after the file was deleted keeps what was typed and doesn't bring the file back", async () => {
+  const path = "notes/deleted-mid-edit.md";
+  const file = `${V}/file?path=${encodeURIComponent(path)}`;
+  let token = await csrf(`${V}/new`);
+  await post(`${V}/file`, { csrf: token, action: "create", path, content: "original", reason: "x" });
+
+  const editPage = await page(`${V}/edit?path=${encodeURIComponent(path)}`);
+  const version = /name="expected_version" value="([0-9a-f-]{36})"/.exec(editPage)[1];
+  token = /name="csrf" value="([0-9a-f]+)"/.exec(editPage)[1];
+
+  // Someone deletes the file while the editor is open.
+  assert.equal((await post(`${V}/file`, { csrf: token, action: "delete", path })).status, 303);
+
+  const saved = await post(`${V}/file`, { csrf: token, action: "write", path, content: "typed after the delete", expected_version: version });
+  assert.equal(saved.status, 400);
+  const refused = await text(saved);
+  assert.match(refused, /deleted while you were editing it, so your edit was not saved[^<]*\(ref [0-9a-f]{8}\)/);
+  assert.match(refused, /<textarea id="c" name="content">typed after the delete<\/textarea>/);
+  assert.equal((await get(file)).status, 404);
+
+  // Create file, on that page, is the way to put it back.
+  const created = await post(`${V}/file`, { csrf: token, action: "create", path, content: "typed after the delete", reason: "New file" });
+  assert.equal(created.status, 303);
+  assert.match(await page(`${file}&tab=source`), /typed after the delete/);
+});
+
 test("create under canon becomes a proposal and opens it", async () => {
   const token = await csrf(`${V}/new`);
   const r = await post(`${V}/file`, { csrf: token, action: "create", path: "canon/new.md", content: "x", reason: "new canon file" });
