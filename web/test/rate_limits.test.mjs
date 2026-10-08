@@ -344,6 +344,22 @@ test("rate limits: form posts per session: the fourth in a minute is refused wit
   assert.equal((await get("/", jar, addr())).status, 200);
 });
 
+// Invites ----------------------------------------------------------------------
+
+test("rate limits: sign-in from an invite link whose lookup is over its limit is a 429 and asks for no code", async () => {
+  const from = addr();
+  const next = `/invite?token=rli_${"0".repeat(64)}`;
+  const email = `rl-invite-${RUN}@example.test`;
+  const jar = new Jar();
+  // Two lookups an hour: the email page counts one, the first post another.
+  const csrf = csrfOf(await (await get(`/signin?next=${encodeURIComponent(next)}`, jar, from)).text());
+  assert.equal((await post("/signin", { csrf, email, next }, jar, from)).status, 200);
+  const asked = (await fake("/_stats")).otp;
+  const r = await post("/signin", { csrf, email, next }, jar, from);
+  await isTooMany(r, 3600);
+  assert.equal((await fake("/_stats")).otp, asked, "Auth was not asked");
+});
+
 // When the counter fails -----------------------------------------------------
 
 test("rate limits: with the counter out of reach, sign-in fails closed and the rest fails open", async () => {

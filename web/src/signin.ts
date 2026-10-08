@@ -46,25 +46,35 @@ import {
 } from "./auth.js";
 import { html, notice, page, type Theme } from "./html.js";
 import { siteHref } from "./hosts.js";
-import { inviteTokenOf, maskEmail, peekInvite, roleName, type Peek } from "./invites.js";
+import { emailKey, inviteTokenOf, maskEmail, peekInvite, roleName, type Peek } from "./invites.js";
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
-import { errorPage } from "./errorpage.js";
-import { failure, noteUpstream, upstreamNote } from "./failure.js";
+import { errorPage, refusalText } from "./errorpage.js";
+import { failure, noteUpstream, Refusal, sqlstateName, upstreamNote } from "./failure.js";
 import { requestAccessHref } from "./site.js";
 
 // The live invite a sign-in is for, if `next` is an invite page. Looking
 // one up counts against the address's invite limit (ratelimit.ts), like
-// opening the invite page; over it, the page is plain sign-in.
-async function inviteFor(next: string, ip: string): Promise<Peek | undefined> {
+// opening the invite page. `refused`: the lookup couldn't answer (over its
+// limit, or the database failing). That is not "no invite": asking Auth to
+// sign in without making the account, for an address that has none, sends
+// nothing, and the page would still say a code was sent. Where nothing has
+// been asked yet (the email form), a plain page is harmless; sending a code
+// is not, and uses `refused`.
+async function inviteFor(next: string, ip: string, theme: Theme): Promise<{ invite?: Peek; refused?: Reply }> {
   const token = inviteTokenOf(next);
-  if (!token) return undefined;
-  if (await limit([{ name: "invite_ip", kind: "ip", value: ip }])) return undefined;
+  if (!token) return {};
+  const wait = await limit([{ name: "invite_ip", kind: "ip", value: ip }]);
+  if (wait) {
+    return { refused: { status: 429, retryAfter: wait, html: tooManyPage(wait, theme, "That was too many invite links opened or checked in a short time") } };
+  }
   try {
     const p = await peekInvite(token);
-    return p?.state === "pending" ? p : undefined;
-  } catch {
-    return undefined;
+    return p?.state === "pending" ? { invite: p } : {};
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    noteUpstream("invite lookup (database)", `The database couldn’t be asked whether this invite is still open${code ? ` (${sqlstateName(code)})` : ""}, so no sign-in code was sent`);
+    return { refused: { status: 503, html: signinUnavailablePage(theme) } };
   }
 }
 
@@ -230,7 +240,6 @@ async function signinLimit(checks: Check[], theme: Theme): Promise<Reply | undef
   if (wait) return { status: 429, retryAfter: wait, html: tooManyPage(wait, theme, "That was too many sign-in attempts in a short time") };
   return undefined;
 }
-const address = (email: string) => email.toLowerCase();
 
 export async function signinRoutes(i: In): Promise<Out | undefined> {
   const p = i.url.pathname;
@@ -246,7 +255,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (i.method === "GET" && p === "/signin") {
     const next = safeNext(i.url.searchParams.get("next"));
     if (i.session) return out({ redirect: next });
-    return out({ html: emailForm(pre(), next, i.theme, undefined, await inviteFor(next, i.ip)) });
+    return out({ html: emailForm(pre(), next, i.theme, undefined, (await inviteFor(next, i.ip, i.theme)).invite) });
   }
 
   if (i.method === "GET" && p === "/auth/confirm") {
@@ -272,21 +281,23 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   const next = safeNext(i.form.get("next"));
   if (!preTokenOk(i.req, i.form)) {
     // Also the answer to a cross-site post that got past the Origin rule.
-    return out({ status: 403, html: emailForm(pre(), next, i.theme, "That form expired. Enter your email again.") });
+    const why = "That form expired: its security cookie was missing or didn’t match, which happens when this browser blocks cookies or the page was opened before this one. Enter your email again";
+    return out({ status: 403, html: emailForm(pre(), next, i.theme, refusalText(new Refusal({ status: 403, where: "sign-in form check", why }))) });
   }
 
   if (p === "/signin") {
     const email = (i.form.get("email") ?? "").trim();
-    const invite = await inviteFor(next, i.ip);
+    const { invite, refused } = await inviteFor(next, i.ip, i.theme);
     if (!EMAIL.test(email) || email.length > 254) {
       return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.", invite) });
     }
+    if (refused) return out(refused);
     const limited = await signinLimit([
-      { name: "signin_email_address", kind: "email", value: address(email) },
+      { name: "signin_email_address", kind: "email", value: emailKey(email) },
       { name: "signin_email_ip", kind: "ip", value: i.ip },
     ], i.theme);
     if (limited) return out(limited);
-    const r = await sendSigninEmail(email, invite !== undefined && (invite.email === null || email.toLowerCase() === invite.email));
+    const r = await sendSigninEmail(email, invite !== undefined && (invite.email === null || emailKey(email) === invite.email));
     if (r.unavailable) return out(unavailable(i.theme));
     if (r.signupsOff) {
       // The reason is logged, so it names no address; the page does.
@@ -318,7 +329,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     // Guessing protection: a few codes per address, then that address's
     // codes are locked until the window ends (its emailed link still works).
     const limited = await signinLimit([
-      { name: "signin_code_address", kind: "email", value: address(email) },
+      { name: "signin_code_address", kind: "email", value: emailKey(email) },
       { name: "signin_code_ip", kind: "ip", value: i.ip },
     ], i.theme);
     if (limited) return out(limited);

@@ -181,6 +181,14 @@ test("sign-in: forms need the pre-sign-in token and the site's Origin", async ()
   assert.equal((await stats()).otp, otp, "no email may be sent");
 });
 
+test("sign-in: a form refused for its token says why and ends with a reference", async () => {
+  const r = await post(A, "/signin", { email: "ana@example.test" }, new Jar());
+  assert.equal(r.status, 403);
+  const h = await r.text();
+  assert.match(h, /<p class="callout danger" role="alert" id="email-error">That form expired: its security cookie was missing or didn’t match, which happens when this browser blocks cookies/);
+  assert.match(h, /Enter your email again\. \(ref [0-9a-f]{8}\)<\/p>/);
+});
+
 test("sign-in: next never leaves the site", async () => {
   for (const next of ["//evil.example/x", "https://evil.example", "/\\evil.example", "javascript:alert(1)"]) {
     const page = await (await get(A, `/signin?next=${encodeURIComponent(next)}`, new Jar())).text();
