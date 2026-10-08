@@ -20,6 +20,8 @@ The upstream server's description of a tool is its own text, not Reliquary's, so
 
 If two vaults you belong to each have a link with the same name, and both offer a tool with the same name, `tools/list` offers only one of them, the same one every time, and leaves the other out. Rename one of the links to reach both.
 
+When a call fails, the agent is told what was being done, where it broke and why, with a [reference](../reference/errors.md). It has two, the MCP server's and the web app's, since the detail is in the web app's log. If the linked server refuses with an error of its own, the agent gets only the error's code, as the warning shown when you add a link does.
+
 ## Who may do what
 
 Adding, editing or deleting a link, and setting its grants, is an owner's, in person, same as [the ceiling](agents.md#the-ceiling): no agent, token or connection may do it, whatever surface offers the call. Calling a granted tool is different: any connection whose role is granted it may, agents included, the same as any other tool. Members read a vault's links and their grants within their role; an agent does the same over MCP with `list_links`, read-only connections included.
