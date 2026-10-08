@@ -35,7 +35,7 @@ If a decision is refused, for example **Reject** without a note, the page comes 
 
 If the file changed after an open proposal was made, its page says so in a warning above the decision and offers **Reject** but not **Approve** or **Request changes**: approving could only mark it stale, and neither **Revise** nor **Edit, then approve** moves it onto the new version. Reject it, then propose the same text again against the current version.
 
-- **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it.
+- **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it. If another proposal for the same file applied first, it goes stale instead, even when both were approved at the same moment.
 - **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
 - **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit. If the edit is refused while the proposal is still open (for example, applying it would pass the vault's storage limit), the editor comes back with the reason and your text and note as you typed them.
 
