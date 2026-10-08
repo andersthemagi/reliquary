@@ -46,6 +46,7 @@ A vault is named by the first 8 characters of its id. The web app shows a path y
 | `08006`, `57P01` | connection failure, admin shutdown | The connection to the database broke |
 | `53300` | too many connections | The database has no free connections |
 
+- **A dropped connection** to the database is logged by itself with a reference (where `database`), whether or not a request was using it, and Reliquary keeps running. A request that held it fails as any database failure does, with its own reference; the next request gets a fresh connection.
 - **Another service** is named with the call and its HTTP status or network error: `POST /otp answered 503`, `the connection timed out (ETIMEDOUT)`.
 - **A bug** is named by its kind and where in the code it was thrown: `TypeError at dist/pages.js:412`.
 

@@ -28,7 +28,12 @@ import { compact, fail, failure, withRequest, type Failure } from "./failure.js"
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8787);
-const MAX_BODY = 1024 * 1024;
+// The database takes 1 MiB of text in a file or proposal, and JSON makes a
+// newline or a quote two bytes and a client that escapes non-ASCII sends a
+// UTF-8 byte as up to three, so 3 MiB plus 64 KiB for the rest of the call
+// holds 1 MiB of any text, as the web app's file forms do. Vercel's own
+// ceiling for a function's request body is 4.5 MB.
+const MAX_BODY = 3 * 1024 * 1024 + 64 * 1024;
 // A JSON-RPC batch runs one transaction per message: without a ceiling, one
 // 1 MB POST could queue thousands of database calls.
 const MAX_BATCH = 10;
@@ -104,20 +109,29 @@ async function identify(token: string) {
   return resolveToken(token);
 }
 
-function readJson(req: http.IncomingMessage): Promise<unknown> {
+function readJson(req: http.IncomingMessage, res: http.ServerResponse): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let size = 0;
+    let over = false;
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => {
+      if (over) return;
       size += chunk.length;
       if (size > MAX_BODY) {
+        // Destroying the socket here would reset the connection before the
+        // answer is written, and the client would see ECONNRESET, never why.
+        // The rest of the upload is read and dropped, and the connection
+        // closes after the answer.
+        over = true;
+        chunks.length = 0;
+        res.setHeader("connection", "close");
         reject(new Error("body too large"));
-        req.destroy();
         return;
       }
       chunks.push(chunk);
     });
     req.on("end", () => {
+      if (over) return;
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
       } catch {
@@ -250,11 +264,11 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
 
   let body: unknown;
   try {
-    body = await readJson(req);
+    body = await readJson(req, res);
   } catch (err) {
     if (await knownOr401()) {
       const m = (err as Error).message;
-      refuseHttp(res, 400, m, m === "body too large" ? `The request body is over ${MAX_BODY / 1024 / 1024} MiB` : "The request body isn’t valid JSON");
+      refuseHttp(res, 400, m, m === "body too large" ? `The request body is over ${Math.floor(MAX_BODY / 1024 / 1024)} MiB, so nothing was run. Send less in one request` : "The request body isn’t valid JSON");
     }
     return;
   }

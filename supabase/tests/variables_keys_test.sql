@@ -403,3 +403,51 @@ select t.expect('limits: a vault holds at most 1000 variables; a new value for a
        t.id('priv'), t.nonce(3001), t.ct('v1-again')))
   || ',' || t.q($s$select count(*) from public.variables where vault_id = t.id('priv')$s$),
   '999,ERR 55000,rotate,1000');
+
+-- ---------------------------------------------------------------------------
+-- Link credentials: sealed with the same keys, so rotated with them. Solo
+-- has no values left; its one link's credential is all there is under k9.
+
+select t.run('dee', format($q$select public.create_link(%L, 'upstream', 'https://mcp.example/mcp', 'k9', %L::bytea, %L::bytea)$q$,
+  t.id('solo'), t.nonce(9000), t.ct('link')));
+create function t.link_secret() returns private.link_secrets language sql as $$
+  select s.* from private.link_secrets s join public.links l on l.id = s.link_id where l.vault_id = t.id('solo')
+$$;
+create function t.link_item(p_key text, p_nonce int, p_extra jsonb default '{}') returns jsonb language sql as $$
+  select jsonb_build_object('kind', 'link', 'ref', s.link_id, 'name', 'upstream', 'old_nonce', t.b64(s.nonce),
+    'key_id', p_key, 'nonce', t.b64(t.nonce(p_nonce)), 'ciphertext', t.b64(t.ct('link-' || p_key))) || p_extra
+  from t.link_secret() s
+$$;
+
+select t.expect('link credentials: variable_key_ids counts them by key id, so the web app''s start-up check sees theirs',
+  t.run_role('reliquary_ops', $q$select key_id || ':' || "values" || '+' || imports || '+' || links from private.variable_key_ids() where key_id = 'k9'$q$)
+  || ',' || t.run_role('reliquary_web', $q$select count(*) from private.stored_key_ids() k where k = 'k9'$q$),
+  'k9:0+0+1,1');
+
+select t.expect('link credentials: rekey_vaults names a vault whose only sealed thing is a link; sealed_rows lists it with no environment',
+  t.run_role('reliquary_ops', format($q$select count(*) from private.rekey_vaults('k2') v where v = %L$q$, t.id('solo')))
+  || ',' || t.run_role('reliquary_ops', format($q$select string_agg(kind || ':' || name || ':' || coalesce(environment, '-') || ':' || key_id, ' ') from private.sealed_rows(%L)$q$, t.id('solo')))
+  || ',' || t.run_role('reliquary_ops', format($q$select count(*) from private.sealed_rows(%L, 'development')$q$, t.id('solo'))),
+  '1,link:upstream:-:k9,0');
+
+select t.expect('link credentials: an item for another vault, or with a stale nonce, changes nothing',
+  t.run_role('reliquary_ops', t.reseal_sql('priv', 'rotate_key', jsonb_build_array(t.link_item('k2', 9001))))
+  || ',' || t.run_role('reliquary_ops', t.reseal_sql('solo', 'rotate_key',
+              jsonb_build_array(t.link_item('k2', 9001, jsonb_build_object('old_nonce', t.b64(t.nonce(1)))))))
+  || ',' || (select key_id from t.link_secret()),
+  '0,0,k9');
+
+select t.expect('link credentials: an item with an environment, or for a rename, is refused',
+  t.run_role('reliquary_ops', t.reseal_sql('solo', 'rotate_key', jsonb_build_array(t.link_item('k2', 9001, '{"environment": "development"}'))))
+  || ',' || t.run_role('reliquary_ops', t.reseal_sql('solo', 'rename_environment', jsonb_build_array(t.link_item('k2', 9001)))),
+  'ERR 22023,ERR 42501');
+
+select t.expect('link credentials: reseal moves one to the new key, logged in one rotate_key row with a links count and no names',
+  t.run_role('reliquary_ops', t.reseal_sql('solo', 'rotate_key', jsonb_build_array(t.link_item('k2', 9001))))
+  || ',' || (select key_id || '|' || encode(nonce, 'hex') || '|' || convert_from(ciphertext, 'utf8') from t.link_secret())
+  || ',' || t.q($s$select cardinality(names) || '|' || detail::text from public.env_access_log where vault_id = t.id('solo') and action = 'rotate_key'$s$),
+  '1,k2|000000000000000000002329|CT-MARKER-link-k2.,0|{"links": 1, "values": 0, "imports": 0, "key_ids": ["k2"]}');
+
+select t.expect('link credentials: once moved, nothing names the old key',
+  t.run_role('reliquary_ops', $q$select count(*) from private.variable_key_ids() where key_id = 'k9'$q$),
+  '0');

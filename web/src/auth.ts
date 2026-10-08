@@ -21,7 +21,7 @@
 import { createHmac, createPublicKey, randomBytes, timingSafeEqual, verify as verifySignature } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import type http from "node:http";
-import { limit } from "./ratelimit.js";
+import { clientIp, limit } from "./ratelimit.js";
 import { networkReason, noteUpstream } from "./failure.js";
 import { decodeFlash, encodeFlash, type Flash } from "./flash.js";
 import { UUID } from "./personref.js";
@@ -228,7 +228,9 @@ export function flashCookie(f: Flash): string {
 // What a request carries. `cookies` are Set-Cookie values the response must
 // send (a refreshed session, cleared cookies, a flash): send them even when
 // there is no session. `unavailable`: Supabase couldn't be reached to check
-// or refresh the session; answer 503 and keep the cookies. `limited`: the
+// or refresh the session; answer 503 and keep the cookies, sending `cookies`
+// (none, or the new refresh token of a session that was renewed but whose new
+// access token couldn't be checked: the old one is spent). `limited`: the
 // session was refreshed too often (ratelimit.ts); answer 429 with this
 // Retry-After and keep the cookies.
 export type Lookup = { session: Session | null; cookies: string[]; unavailable: boolean; limited?: number };
@@ -336,35 +338,50 @@ async function supabaseSession(req: http.IncomingMessage): Promise<Lookup> {
     }
     if (!claims) {
       if (!rt) return none(!!at);
-      // Refreshes per session; with no access token to name it, per
-      // refresh token (which Supabase rotates, so that only stops reuse).
-      // Fails open (ratelimit.ts).
-      const wait = await limit([
-        { name: "signin_refresh_session", kind: "session", value: expiredSession ?? `refresh:${rt}` },
-      ]);
+      // Not something Supabase issues: no counter write, no call to Auth.
+      if (!REFRESH_TOKEN.test(rt)) {
+        console.info("auth: refresh token malformed");
+        return none(true);
+      }
+      // Per IP first, and alone: the session counter below is keyed on a value
+      // the caller picks (the refresh token in their own cookie; the access
+      // token that would name the session has expired out of the browser by
+      // now), and a call it refuses still writes its row. Fails open
+      // (ratelimit.ts).
+      const wait =
+        (await limit([{ name: "signin_refresh_ip", kind: "ip", value: clientIp(req) }])) ||
+        (await limit([{ name: "signin_refresh_session", kind: "session", value: expiredSession ?? `refresh:${rt}` }]));
       if (wait) return { session: null, cookies, unavailable: false, limited: wait };
       // Expired or missing access token: refresh once. Supabase rotates the
       // refresh token; reusing an old one outside its 10 s window revokes
-      // the session, which lands here as a failure: signed out.
-      const t = await tokenRequest("/token?grant_type=refresh_token", { refresh_token: rt });
+      // the session, which lands here as a refusal: signed out.
+      const t = await refreshSession(rt);
       if (!t) {
         console.info("auth: refresh refused");
         return none(true);
       }
+      // The old refresh token is spent now: the browser gets the new one
+      // whatever happens next, or its next use would revoke the session.
+      cookies.push(refreshCookie(t));
       const r = await verifyAccessToken(t.accessToken);
       if (!r.ok) {
         console.info(`auth: refreshed access token refused (${r.reason})`);
+        // A key id the JWKS doesn't list yet is a key rotation still
+        // reaching us, not a bad token. Without an access token, the next
+        // request renews again, by then with the key.
+        if (r.unknownKey) throw new Unavailable("the renewed access token names a signing key the project's published keys don't list yet");
+        cookies.length = 0;
         return none(true);
       }
       claims = r.claims;
       accessToken = t.accessToken;
-      cookies.push(...sessionCookies(t));
+      cookies.push(accessCookie(t));
     }
     return { session: supabaseSessionFor(req, claims, accessToken, cookies), cookies, unavailable: false };
   } catch (err) {
     if (err instanceof Unavailable) {
       console.error(`auth: Supabase Auth unreachable: ${err.message}`);
-      return { session: null, cookies: [], unavailable: true };
+      return { session: null, cookies, unavailable: true };
     }
     throw err;
   }
@@ -444,9 +461,9 @@ function supabaseSessionFor(req: http.IncomingMessage, claims: Claims, accessTok
 
 export type Tokens = { accessToken: string; refreshToken: string; expiresIn: number };
 
-export function sessionCookies(t: Tokens): string[] {
-  return [setCookie(AT, t.accessToken, t.expiresIn), setCookie(RT, t.refreshToken, REFRESH_DAYS * 86400)];
-}
+const accessCookie = (t: Tokens) => setCookie(AT, t.accessToken, t.expiresIn);
+const refreshCookie = (t: Tokens) => setCookie(RT, t.refreshToken, REFRESH_DAYS * 86400);
+export const sessionCookies = (t: Tokens): string[] => [accessCookie(t), refreshCookie(t)];
 
 // ---------------------------------------------------------------------------
 // Supabase Auth REST (server to server, with the publishable key)
@@ -479,11 +496,18 @@ async function gotrue(
 
 const REFRESH_TOKEN = /^[\x21-\x7e]{1,512}$/;
 
-// A session from Supabase, or undefined if it refused (4xx). Throws
-// Unavailable on network failure or 5xx.
-async function tokenRequest(path: string, body: unknown): Promise<Tokens | undefined> {
-  const { status, json } = await gotrue(path, body);
-  return tokensOf(status, json);
+// A session from Supabase, or undefined if it refused the token. Throws
+// Unavailable on network failure and on any answer that isn't a clear yes or
+// no. Only 400, 401 and 403 say the refresh token itself is dead (unknown,
+// used, or its session revoked). Anything else (Auth's shared 429 over Vercel's
+// egress IPs, a timeout, a 5xx) says nothing about this session, and clearing
+// the cookies on it would sign out a person whose session is fine.
+async function refreshSession(refreshToken: string): Promise<Tokens | undefined> {
+  const path = "/token?grant_type=refresh_token";
+  const { status, json } = await gotrue(path, { refresh_token: refreshToken });
+  if (status === 200) return tokensOf(status, json);
+  if (status === 400 || status === 401 || status === 403) return undefined;
+  throw new Unavailable(`POST ${path} answered ${status}`);
 }
 
 function tokensOf(status: number, json: any): Tokens | undefined {

@@ -12,6 +12,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import http from "node:http";
 import net from "node:net";
 import { after, before, test } from "node:test";
 import pg from "pg";
@@ -132,7 +133,7 @@ async function startServer(env) {
   const exited = new Promise((resolve) => child.on("exit", (code) => resolve({ up: false, code })));
   for (let i = 0; i < 100; i++) {
     const r = await Promise.race([exited, fetch(`http://127.0.0.1:${port}/healthz`).then((x) => (x.ok ? { up: true } : null), () => null)]);
-    if (r) return { ...r, out: () => out, child };
+    if (r) return { ...r, out: () => out, child, port };
     await new Promise((res) => setTimeout(res, 100));
   }
   throw new Error("server neither started nor exited");
@@ -401,4 +402,86 @@ test("values: a NUL character is refused before anything is stored", async () =>
   await assert.rejects(vars.setVariable(QUINN, vault, "NUL_VALUE", "development", "a\u0000b"), /NUL character/);
   assert.equal(await keyIdOf("NUL_VALUE", "development"), undefined);
   crypto.configureVariables({ VARIABLES_KEY: K1 });
+});
+
+// ---------------------------------------------------------------------------
+// Link credentials: sealed with the same keys (secrets.ts, sealLink), so a
+// rotation that left them behind would break every link call once the old
+// key is dropped. Every value above is on k2 by now; the link goes on k1.
+
+const PROXY_SECRET = randomBytes(18).toString("base64url");
+let linkId = "";
+let upstream; // a fixture MCP server that keeps the Authorization it is sent
+let upstreamUrl = "";
+const sentAuth = [];
+
+async function startUpstream() {
+  upstream = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    sentAuth.push(req.headers.authorization);
+    const reply = (result) => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", id: body.id, result }));
+    if (body.method === "initialize") reply({ protocolVersion: body.params.protocolVersion, capabilities: {} });
+    else if (body.method === "notifications/initialized") res.writeHead(202).end();
+    else if (body.method === "tools/call") reply({ content: [{ type: "text", text: "pong" }] });
+    else res.writeHead(404).end();
+  });
+  await new Promise((r) => upstream.listen(0, "127.0.0.1", r));
+  // Plain http underneath: the server runs with LINK_DISCOVERY_ALLOW_LOOPBACK.
+  upstreamUrl = `https://127.0.0.1:${upstream.address().port}/mcp`;
+}
+
+after(() => {
+  upstream?.closeAllConnections();
+  upstream?.close();
+});
+
+test("keys: the server refuses to start while a link credential names a key it doesn't hold", async () => {
+  await startUpstream();
+  crypto.configureVariables({ VARIABLES_KEY: K1 });
+  vals.link = value("link");
+  const s = crypto.sealLink(vals.link, vault);
+  [{ id: linkId }] = await as(QUINN, "select public.create_link($1, 'upstream', $2, $3, $4, $5) as id", [vault, upstreamUrl, s.keyId, s.nonce, s.ciphertext]);
+  const srv = await startServer({ VARIABLES_KEYS: `k2:${K2}` });
+  assert.equal(srv.up, false);
+  assert.match(srv.out(), /sealed with key id k1, which VARIABLES_KEYS doesn't hold/);
+  clean(srv.out());
+});
+
+test("rekey: --check counts link credentials by key id, and exits 1 while one is on an older key", () => {
+  const r = rekey({ VARIABLES_KEYS: `k2:${K2},k1:${K1}` }, ["--check"]);
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.out, /Stored now: k1: 0 values, 0 pending import values, 1 link credential; k2: /);
+  assert.match(r.out, /1 still on another key: keep k1 in VARIABLES_KEYS\./);
+  clean(r.out);
+});
+
+test("rekey: moves link credentials to the current key, leaving nothing on the old one, and exits 0", async () => {
+  const r = rekey({ VARIABLES_KEYS: `k2:${K2},k1:${K1}` });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /Re-encrypted 1 in 1 vault\./);
+  assert.match(r.out, /Everything is on k2\./);
+  clean(r.out);
+  assert.deepEqual(await sql("select key_id, links::int from private.variable_key_ids()"), [{ key_id: "k2", links: 1 }]);
+});
+
+test("rekey: with the old key dropped afterwards, a link call opens its credential and sends it upstream", async () => {
+  const s = await startServer({ VARIABLES_KEYS: `k2:${K2}`, LINK_PROXY_SECRET: PROXY_SECRET, LINK_DISCOVERY_ALLOW_LOOPBACK: "1" });
+  assert.equal(s.up, true, s.out());
+  const [row] = await sql("select key_id, nonce, ciphertext from private.link_secrets where link_id = $1", [linkId]);
+  const r = await fetch(`http://127.0.0.1:${s.port}/internal/link-call`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${PROXY_SECRET}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      vault_id: vault, url: upstreamUrl, key_id: row.key_id, nonce: row.nonce.toString("base64"),
+      ciphertext: row.ciphertext.toString("base64"), tool_name: "ping", args: {},
+    }),
+  });
+  const body = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(body));
+  assert.deepEqual(body.result.content, [{ type: "text", text: "pong" }]);
+  assert.equal(sentAuth.at(-1), `Bearer ${vals.link}`);
+  s.child.kill();
+  clean(s.out());
 });
