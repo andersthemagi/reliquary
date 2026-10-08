@@ -45,13 +45,13 @@ function logFilters(ctx: Ctx, id: string, action: string, name: string): Raw {
 // A pasted import is its author's alone, who is also who applied it, so only
 // a CLI import names who sent it.
 function detail(ctx: Ctx, r: AccessLogRow): string {
-  const d = r.detail as { attempt?: string; reason?: string; from?: string; values?: number; imports?: number; key_ids?: string[]; import?: string; source?: string; by?: string };
+  const d = r.detail as { attempt?: string; reason?: string; from?: string; values?: number; imports?: number; links?: number; key_ids?: string[]; import?: string; source?: string; by?: string };
   if ((r.action === "set" || r.action === "rotate") && d.import) {
     return d.source === "cli" ? `from a CLI import sent by ${who(ctx, d.by ?? null, null)}` : "from a pasted import";
   }
   if (r.action === "rename_environment") return `from ${d.from ?? "?"}`;
   if (r.action === "delete_environment") return `${d.values ?? 0} value${d.values === 1 ? "" : "s"} destroyed`;
-  if (r.action === "rotate_key") return `${(d.values ?? 0) + (d.imports ?? 0)} to key ${(d.key_ids ?? []).join(", ")}`;
+  if (r.action === "rotate_key") return `${(d.values ?? 0) + (d.imports ?? 0) + (d.links ?? 0)} to key ${(d.key_ids ?? []).join(", ")}`;
   if (r.action === "reject" && d.reason) return d.reason;
   if (r.action !== "refused") return "";
   return `${d.attempt ? `${d.attempt}: ` : ""}${d.reason ?? ""}`;

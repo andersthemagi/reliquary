@@ -1111,9 +1111,12 @@ Open questions this doesn't resolve:
 - Whether an upstream's own `readOnlyHint: true` is trustworthy enough to
   default that tool on, or whether every newly discovered tool starts
   disabled regardless of what the upstream claims about itself.
-- Key rotation for `link_secrets`: reuse `VARIABLES_KEYS`'s rotation
-  script as it stands, or does a compromised upstream credential need
-  same-day rotation independent of a vault's environment variable keys?
+- Key rotation for `link_secrets`: answered (2026-10-09), it reuses
+  `VARIABLES_KEYS`'s rotation as it stands
+  (`20261009120040_link_secrets_rotation.sql`: `rotate-variables-key.sh`
+  moves link credentials with the values). Still open: does a compromised
+  upstream credential need same-day replacement without deleting and
+  re-adding the link?
 
 ## Routines
 

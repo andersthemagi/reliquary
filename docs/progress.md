@@ -189,6 +189,15 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   registered tool carries the upstream's own argument names (untyped:
   the SDK's `registerTool` has no hook for a raw JSON Schema, only Zod);
   a tool discovered with none takes one `args` field instead.
+- Key rotation covers link credentials (2026-10-09,
+  `20261009120040_link_secrets_rotation.sql`, `web/src/rekey.ts`; tests in
+  `supabase/tests/variables_keys_test.sql` and
+  `web/test/variables_keys.test.mjs`): until then the rotation functions
+  read only variable values and pending imports, so a rotation left every
+  link credential on the old key, the start-up check didn't see it, and
+  dropping the old key as the runbook says broke every link call. Design's
+  open question ("reuse `VARIABLES_KEYS`'s rotation as it stands?")
+  answered yes.
 
 Not built: rediscovering a link's tools by hand (`web/src/discovery.ts`'s
 own header: today, retrying a failed discovery means deleting and
