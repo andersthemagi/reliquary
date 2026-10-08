@@ -20,7 +20,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
 import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnauthorized, rateLimitedBody, THREAD_WRITES } from "./ratelimit.js";
-import { registerTools } from "./tools.js";
+import { needsLinkTools, registerTools } from "./tools.js";
 import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
 import { BUILD, versionJson } from "./version.js";
@@ -338,7 +338,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
   try {
     // Inside the try: registering can throw, and the session opened above
     // must be closed and the request answered with a reference either way.
-    await registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined);
+    await registerTools(mcp, identity, runner ? (fn) => runner.run(fn) : undefined, needsLinkTools(messages));
     await mcp.connect(transport);
     await transport.handleRequest(req, res, body);
     console.info(`mcp ${res.statusCode} user=${identity.userId.slice(0, 8)}`);

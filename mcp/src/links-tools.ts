@@ -198,6 +198,7 @@ export async function registerLinksTools(
   server: McpServer,
   id: Identity,
   runAs: <T>(fn: (c: pg.PoolClient) => Promise<T>) => Promise<T>,
+  upstream = true,
 ): Promise<void> {
   const run = makeRun(runAs);
 
@@ -226,5 +227,5 @@ export async function registerLinksTools(
       }),
   );
 
-  await registerUpstreamLinkTools(server, runAs);
+  if (upstream) await registerUpstreamLinkTools(server, runAs);
 }
