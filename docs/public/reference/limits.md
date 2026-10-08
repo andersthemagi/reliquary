@@ -25,13 +25,14 @@ What your plan and a vault's tier allow. How they count, and what happens at a l
 | A comment | 1 to 4000 characters, at most 200 per proposal |
 | Quorum (approvals a canon change needs) | 1 to 20 |
 | Paths you watch for [flags](../concepts/flags.md) | 100 per vault; a path up to 1024 characters |
-| A web form | 2 MB; forms carrying a file's text 3 MiB + 64 KiB, so 1 MiB of any text fits |
+| A web form | 2 MB; forms carrying a file's text 3 MiB + 64 KiB, so 1 MiB of any text fits. A form over its limit is answered 413 with the limit and a reference, sign-in forms too |
 
 ## MCP
 
 | What | Limit |
 |---|---|
 | Messages in one batch | 10 |
+| A request body | 3 MiB + 64 KiB, so 1 MiB of file text fits once it is written as JSON. A larger one is refused with a 400 that names the limit, before any tool runs |
 | `read_file` | 100000 bytes by default, up to 1048576 with `max_bytes`; `from_line` and `to_line` pick lines |
 | `list_files` | 200 files by default, up to 1000; continue with `after` |
 | `search` | 10 files by default, up to 50; a query up to 500 characters; up to 3 matching lines per file |
