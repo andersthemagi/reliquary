@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { fail, withRequest } from "./failure.js";
 
 // DEFAULT_POOL_MAX differs deliberately from mcp/src/db.ts's (3 here, 5
 // there): chosen together with the TLS handling below in commit f7e54f3
@@ -87,6 +88,24 @@ export function poolConfig(env: NodeJS.ProcessEnv = process.env, appDir = APP_DI
 }
 
 export const pool = new pg.Pool(poolConfig());
+
+// A connection that drops (a pooler reset, a database restart, the network)
+// makes pg emit 'error' on its client, and an 'error' nobody listens for is an
+// uncaught exception: the process ends, and every request on it. pg-pool
+// listens only while a client is idle; this listens for the client's whole
+// life, so one a request is holding is covered too. The pool discards the dead
+// client by itself. pg can emit twice for one drop (the server's FATAL, then
+// "Connection terminated"); the first is the cause, so only it is logged.
+pool.on("connect", (client) => {
+  let logged = false;
+  client.on("error", (err) => {
+    if (logged) return;
+    logged = true;
+    withRequest("Keeping a database connection open", "db connection", () => fail(err, { where: "database" }));
+  });
+});
+// pg-pool re-emits an idle client's error here, after the listener above.
+pool.on("error", () => {});
 
 // The pool asPerson() checks out from; tests swap in one that counts.
 let db: pg.Pool = pool;
