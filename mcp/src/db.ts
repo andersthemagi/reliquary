@@ -24,8 +24,9 @@ export type Identity = {
 // request that calls a tool holds one pooled connection for its Session
 // (docs/research/server-load.md, "Second pass"), and one that also passes
 // the rate limit checks out a second, parallel connection to count it
-// ("Third pass": "one more checkout; DB_POOL_MAX is 5") — the web app never
-// holds more than one connection per request. Below this point, through the
+// ("Third pass": "one more checkout; DB_POOL_MAX is 5"). A web request is
+// meant to hold one connection at a time (web/src/db.ts, readOnlyRequest).
+// Below this point, through the
 // end of poolConfig(), this file and web/src/db.ts are kept byte-identical;
 // web/test/db_tls.test.mjs pins that.
 const DEFAULT_POOL_MAX = 5;

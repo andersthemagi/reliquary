@@ -17,8 +17,11 @@ import pg from "pg";
 // less: a request there holds one pooled connection for its Session
 // (docs/research/server-load.md, "Second pass"), and one that also passes
 // the rate limit checks out a second, parallel connection to count it
-// ("Third pass": "one more checkout; DB_POOL_MAX is 5") — this app never
-// holds more than one connection per request. Below this point, through the
+// ("Third pass": "one more checkout; DB_POOL_MAX is 5"). A web request is
+// meant to hold one connection at a time (a GET page shares one:
+// readOnlyRequest below), so a page that also queries `pool` itself, as
+// GET /invite does for the rate limit, must stay out of it (pages.ts,
+// routes()). Below this point, through the
 // end of poolConfig(), this file and mcp/src/db.ts are kept byte-identical;
 // web/test/db_tls.test.mjs pins that.
 const DEFAULT_POOL_MAX = 3;
