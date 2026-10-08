@@ -23,6 +23,7 @@ import {
   type Vault,
 } from "./pages.js";
 import { byWhom, latestFeedback, person, rowSnooze, snoozeControl, threadSection, type Commented } from "./thread.js";
+import { Refusal } from "./failure.js";
 import { risks } from "./risk.js";
 
 export { risks } from "./risk.js";
@@ -270,7 +271,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     // anything. The diff follows immediately. (docs/research/ux-patterns.md)
     // A refused decision comes back here with the reason inside the box and
     // the note as typed; a missing note marks the field.
-    const noteMissing = !!refused && refused.decision !== "approve" && !refused.note.trim();
+    const noteMissing = (refused?.decision === "reject" || refused?.decision === "request_changes") && !refused.note.trim();
     const refusal = refused ? callout("danger", refused.error, { id: "decide-error" }) : html``;
     const controls = rejectable
       ? html`<form method="post" action="${proposalPath(id, pid, "/decide")}" class="panel decide" aria-label="Your review">
@@ -526,10 +527,14 @@ const decidedFlash = (ctx: Ctx, result: string) => {
 // note kept and the latest revision shown, not a redirect that loses them.
 export async function decide(ctx: Ctx, id: string, pid: string): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
-  const d = ctx.form.get("decision");
-  const decision = d === "reject" || d === "request_changes" ? d : "approve";
+  const decision = ctx.form.get("decision") ?? "";
   const note = ctx.form.get("note") ?? "";
   const revision = ctx.form.get("revision") || null;
+  // Never a default: a form that lost its button's value must not approve.
+  if (decision !== "approve" && decision !== "reject" && decision !== "request_changes") {
+    const why = "The form named no decision (approve, request_changes or reject), so nothing was decided";
+    return proposalView(ctx, id, pid, { error: message(new Refusal({ status: 400, where: "web app (the decision form)", why })), decision, note });
+  }
   try {
     const result = await asPerson(
       ctx.userId,

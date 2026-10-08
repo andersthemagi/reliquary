@@ -391,6 +391,24 @@ test("comment refused: the proposal page answers again (400), the reason at the 
   await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
 });
 
+// Here, after the list's counts: it closes a proposal of its own.
+test("decision refused: a form with no decision, or one it doesn't know, approves nothing and answers the page again (400) naming the three", async () => {
+  const pid = await propose("canon/no-decision.md", "Not approved by accident.", "For the decision tests.");
+  for (const fields of [{ note: "Kept." }, { decision: "yes", note: "Kept." }]) {
+    const r = await post("rhea", pp(pid, "/decide"), fields);
+    assert.equal(r.status, 400);
+    const form = /<form method="post" action="[^"]+\/decide" class="panel decide"[\s\S]*?<\/form>/.exec(await r.text())[0];
+    assert.match(
+      form,
+      /<div class="callout danger" role="alert" id="decide-error"><p>The form named no decision \(approve, request_changes or reject\), so nothing was decided\. \(ref [0-9a-f]{8}\)<\/p><\/div>/,
+    );
+    assert.match(form, /<textarea id="note" name="note" class="note-field" rows="2" aria-describedby="note-hint">Kept\.<\/textarea>/);
+  }
+  assert.equal(await status(pid), "open");
+  // Not left waiting: the Inbox tests below count what waits for Rhea.
+  await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
+});
+
 // ---------------------------------------------------------------------------
 // A proposal revised while its reviewer reads it
 
