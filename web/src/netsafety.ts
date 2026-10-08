@@ -120,8 +120,8 @@ export type SafeFetchOptions = {
   // For tests: resolve a name to addresses (default: the system resolver).
   resolve?: (host: string) => Promise<Resolved[]>;
   // Called once a non-redirect status arrives, before any body is read.
-  // Return an Error to abort right there -- the body is drained, never
-  // buffered -- or undefined to continue. cimd.ts uses this so a wrong
+  // Return an Error to abort right there -- the connection is dropped, the
+  // body never read -- or undefined to continue. cimd.ts uses this so a wrong
   // status or a non-JSON content type never buffers a body at all. Omit it
   // to accept any non-redirect status and always read the body:
   // discovery.ts needs the raw status (200 vs. the 202 a notification
@@ -186,14 +186,17 @@ export function safeFetch(url: URL, opts: SafeFetchOptions): Promise<SafeFetchRe
       },
       (res) => {
         const status = res.statusCode ?? 0;
+        // A refusal drops the connection: done() has stopped the timeout, so
+        // draining the body would hold the socket for as long as the server
+        // cares to trickle it.
         if (status >= 300 && status < 400) {
-          res.resume();
+          res.destroy();
           return done(new opts.errorClass(opts.messages.redirected));
         }
         if (opts.onHeaders) {
           const headerErr = opts.onHeaders(res);
           if (headerErr) {
-            res.resume();
+            res.destroy();
             return done(headerErr);
           }
         }
