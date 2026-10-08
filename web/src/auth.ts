@@ -228,7 +228,9 @@ export function flashCookie(f: Flash): string {
 // What a request carries. `cookies` are Set-Cookie values the response must
 // send (a refreshed session, cleared cookies, a flash): send them even when
 // there is no session. `unavailable`: Supabase couldn't be reached to check
-// or refresh the session; answer 503 and keep the cookies. `limited`: the
+// or refresh the session; answer 503 and keep the cookies, sending `cookies`
+// (none, or the new refresh token of a session that was renewed but whose new
+// access token couldn't be checked: the old one is spent). `limited`: the
 // session was refreshed too often (ratelimit.ts); answer 429 with this
 // Retry-After and keep the cookies.
 export type Lookup = { session: Session | null; cookies: string[]; unavailable: boolean; limited?: number };
@@ -351,20 +353,28 @@ async function supabaseSession(req: http.IncomingMessage): Promise<Lookup> {
         console.info("auth: refresh refused");
         return none(true);
       }
+      // The old refresh token is spent now: the browser gets the new one
+      // whatever happens next, or its next use would revoke the session.
+      cookies.push(refreshCookie(t));
       const r = await verifyAccessToken(t.accessToken);
       if (!r.ok) {
         console.info(`auth: refreshed access token refused (${r.reason})`);
+        // A key id the JWKS doesn't list yet is a key rotation still
+        // reaching us, not a bad token. Without an access token, the next
+        // request renews again, by then with the key.
+        if (r.unknownKey) throw new Unavailable("the renewed access token names a signing key the project's published keys don't list yet");
+        cookies.length = 0;
         return none(true);
       }
       claims = r.claims;
       accessToken = t.accessToken;
-      cookies.push(...sessionCookies(t));
+      cookies.push(accessCookie(t));
     }
     return { session: supabaseSessionFor(req, claims, accessToken, cookies), cookies, unavailable: false };
   } catch (err) {
     if (err instanceof Unavailable) {
       console.error(`auth: Supabase Auth unreachable: ${err.message}`);
-      return { session: null, cookies: [], unavailable: true };
+      return { session: null, cookies, unavailable: true };
     }
     throw err;
   }
@@ -444,9 +454,9 @@ function supabaseSessionFor(req: http.IncomingMessage, claims: Claims, accessTok
 
 export type Tokens = { accessToken: string; refreshToken: string; expiresIn: number };
 
-export function sessionCookies(t: Tokens): string[] {
-  return [setCookie(AT, t.accessToken, t.expiresIn), setCookie(RT, t.refreshToken, REFRESH_DAYS * 86400)];
-}
+const accessCookie = (t: Tokens) => setCookie(AT, t.accessToken, t.expiresIn);
+const refreshCookie = (t: Tokens) => setCookie(RT, t.refreshToken, REFRESH_DAYS * 86400);
+export const sessionCookies = (t: Tokens): string[] => [accessCookie(t), refreshCookie(t)];
 
 // ---------------------------------------------------------------------------
 // Supabase Auth REST (server to server, with the publishable key)

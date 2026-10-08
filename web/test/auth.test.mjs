@@ -409,6 +409,26 @@ test("session: a refresh Auth refuses with 401 or 403 signs out and clears both 
   }
 });
 
+test("session: a renewed session whose new access token names a key not yet published keeps the new refresh token", async () => {
+  const { jar } = await signInByCode(A);
+  const spent = jar.c.get(RT);
+  jar.c.delete(AT);
+  const set = (on) => fake("/_refresh_key_unknown", { method: "POST", body: JSON.stringify({ on }) });
+  await set(true);
+  let r;
+  try {
+    r = await get(A, "/", jar);
+  } finally {
+    await set(false);
+  }
+  assert.equal(r.status, 503);
+  assert.ok(!clearsBoth(r), "not signed out");
+  assert.notEqual(jar.c.get(RT), spent, "the browser holds the rotated refresh token");
+  assert.ok(!jar.c.has(AT), "and no access token it could not check");
+  // The next request renews again from the new token: the spent one would have revoked the session.
+  assert.equal((await get(A, "/", jar)).status, 200);
+});
+
 test("session: sign out ends the Supabase session and clears the cookies", async () => {
   const { jar } = await signInByCode(A);
   const rt = jar.c.get(RT);

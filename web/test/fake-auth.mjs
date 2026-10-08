@@ -39,6 +39,8 @@
 //   POST /_fail_refresh           { status }: answer every refresh with that status, rotating
 //                                 nothing (0: as normal). 429 is Auth's own limit, shared by
 //                                 every user behind one egress IP.
+//   POST /_refresh_key_unknown    { on }: sign the access token of each refresh with a key id the
+//                                 JWKS doesn't list, as just after a key rotation
 //   POST /_secure_email_change    { on }: whether PUT /user emails both addresses (on at start)
 //   POST /_fail_user_update       { status, body }: answer PUT /user with that (0: as normal)
 //   POST /_email_change           { email, new_email, both }: as if that account asked to
@@ -92,22 +94,23 @@ const secureEmailChange = { on: true }; // /_secure_email_change: both addresses
 const failUserUpdate = { status: 0, body: {} }; // /_fail_user_update: answer PUT /user with this instead
 const failGlobal = { status: 0 }; // /_fail_global_logout: answer global logouts with this status instead
 const failRefresh = { status: 0 }; // /_fail_refresh: answer refreshes with this status instead
+const refreshKey = { unknown: false }; // /_refresh_key_unknown
 const TTL = 3600;
 const signups = { on: false };
 const otpRace = { on: false }; // /_otp_race
 const failOtp = { status: 0 }; // /_fail_otp: answer every /otp with this status instead
 
-function accessToken(sub, email, sessionId) {
+function accessToken(sub, email, sessionId, kid = KID) {
   const now = Math.floor(Date.now() / 1000);
   return signJwt(
-    { alg: "ES256", typ: "JWT", kid: KID },
+    { alg: "ES256", typ: "JWT", kid },
     { iss: ISSUER, aud: "authenticated", sub, email, role: "authenticated", aal: "aal1", session_id: sessionId, is_anonymous: false, iat: now, exp: now + TTL },
   );
 }
-function session(sub, email, sessionId = randomUUID()) {
+function session(sub, email, sessionId = randomUUID(), kid = KID) {
   const refresh = `rt${randomBytes(9).toString("hex")}`;
   refreshTokens.set(refresh, { sessionId, sub, email, used: false });
-  return { access_token: accessToken(sub, email, sessionId), token_type: "bearer", expires_in: TTL, expires_at: Math.floor(Date.now() / 1000) + TTL, refresh_token: refresh, user: { id: sub, email, ...(email.startsWith("new-") ? { created_at: new Date().toISOString() } : {}) } };
+  return { access_token: accessToken(sub, email, sessionId, kid), token_type: "bearer", expires_in: TTL, expires_at: Math.floor(Date.now() / 1000) + TTL, refresh_token: refresh, user: { id: sub, email, ...(email.startsWith("new-") ? { created_at: new Date().toISOString() } : {}) } };
 }
 
 const json = (res, status, body) => res.writeHead(status, { "content-type": "application/json" }).end(body === undefined ? "" : JSON.stringify(body));
@@ -170,6 +173,10 @@ http
     if (p === "/_fail_refresh" && req.method === "POST") {
       failRefresh.status = Number((await readJson(req)).status) || 0;
       return json(res, 200, failRefresh);
+    }
+    if (p === "/_refresh_key_unknown" && req.method === "POST") {
+      refreshKey.unknown = (await readJson(req)).on === true;
+      return json(res, 200, refreshKey);
     }
     if (p === "/_email_change" && req.method === "POST") {
       const { email, new_email, both } = await readJson(req);
@@ -301,7 +308,7 @@ http
         return json(res, 400, { code: 400, error_code: "refresh_token_already_used", msg: "Invalid Refresh Token: Already Used" });
       }
       rt.used = true;
-      return json(res, 200, session(rt.sub, rt.email, rt.sessionId));
+      return json(res, 200, session(rt.sub, rt.email, rt.sessionId, refreshKey.unknown ? "rotated-key-not-in-the-jwks" : KID));
     }
 
     if (p === "/auth/v1/logout") {
