@@ -62,14 +62,27 @@ const CLIENTS = [
 ] as const;
 type Client = (typeof CLIENTS)[number]["id"];
 
+const RECENT_MINUTES = 15;
 const CEILING = "The agent acts as you, but can’t approve, change rules, manage members or read variable values.";
 const TOKEN_SAFETY =
   "Keep the token out of config files and chats: anything an agent can read, it can leak. Read it from an environment variable or a password prompt, as below.";
 
-export function connect(ctx: Ctx): Reply {
+export async function connect(ctx: Ctx): Promise<Reply> {
   const url = ctx.mcpUrl;
   const asked = ctx.url.searchParams.get("client");
   const client: Client = CLIENTS.find((c) => c.id === asked)?.id ?? "claude-code";
+  // Only recent use answers "did it work?": last_used_at moves at most once a
+  // minute, and an older connection says nothing about the setup just finished.
+  const last = await asPerson(
+    ctx.userId,
+    async (c) =>
+      (
+        await c.query(
+          `${SELECT} where t.kind <> 'cli' and t.revoked_at is null and t.expires_at > now()
+             and t.last_used_at > now() - interval '${RECENT_MINUTES} minutes' order by t.last_used_at desc limit 1`,
+        )
+      ).rows[0] as Row | undefined,
+  );
   return render(
     ctx,
     "Connect",
@@ -81,6 +94,9 @@ export function connect(ctx: Ctx): Reply {
       tabs: CLIENTS.map((c) => ({ href: `/connect?client=${c.id}`, label: c.label, current: c.id === client })) as Tab[],
       tabsLabel: "Clients",
     })}
+    ${last
+      ? callout("success", html`<p><strong>Connected.</strong> ${last.name} was last used ${lastUse(last)}. <a href="/connections">All connections</a></p>`)
+      : callout("info", html`<p><strong>Nothing has connected in the last ${RECENT_MINUTES} minutes.</strong> When your agent does, it shows here: reload this page after the last step.</p>`)}
     <div class="connect-panel">${clientSection(ctx, client)}</div>`,
     "connect",
   );
@@ -102,38 +118,23 @@ function clientSection(ctx: Ctx, client: Client): Raw {
       <p><strong>ChatGPT:</strong> Settings, Apps and Connectors, turn on developer mode under Advanced, then create a connector with the MCP URL and OAuth authentication. ChatGPT sends you here to sign in and approve.</p>
       <p>Each shows on <a href="/connections">Connections</a> under the app’s name, where you can revoke it.</p>
       ${callout("info", CEILING)}</section>`;
-    case "cursor": {
-      const cursorConfig = { url, headers: { Authorization: "Bearer ${env:RELIQUARY_TOKEN}" } };
-      const cursorJson = JSON.stringify({ mcpServers: { reliquary: cursorConfig } }, null, 2);
-      const cursorLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=reliquary&config=${q(
-        Buffer.from(JSON.stringify(cursorConfig)).toString("base64"),
-      )}`;
+    case "cursor":
       return html`<section id="cursor"><h2>Cursor</h2>
-      <p>Cursor can’t sign in, so it uses a token. <a href="/connections/new">Create a token</a>, set it as <code>RELIQUARY_TOKEN</code> in the environment Cursor starts from, then <a href="${cursorLink}">add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:</p>
-      <pre class="code" tabindex="0">${cursorJson}</pre>
+      <p>Cursor can’t sign in, so it uses a token.</p>
+      ${tokenList(ctx, "cursor")}
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}</section>`;
-    }
-    case "vscode": {
-      const vscodeJson = JSON.stringify(
-        {
-          inputs: [{ type: "promptString", id: "reliquary-token", description: "Reliquary access token", password: true }],
-          servers: { reliquary: { type: "http", url, headers: { Authorization: "Bearer ${input:reliquary-token}" } } },
-        },
-        null,
-        2,
-      );
+    case "vscode":
       return html`<section id="vscode"><h2>VS Code</h2>
-      <p>VS Code uses a token. <a href="/connections/new">Create a token</a>, then add this to <code>.vscode/mcp.json</code>. VS Code asks for the token once and stores it securely.</p>
-      <pre class="code" tabindex="0">${vscodeJson}</pre>
+      <p>VS Code uses a token.</p>
+      ${tokenList(ctx, "vscode")}
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}</section>`;
-    }
     case "other": {
       const helper = JSON.stringify({ reliquary: { type: "http", url, headersHelper: "/path/to/reliquary/mcp/headers-helper.sh" } }, null, 2);
       return html`<section id="other"><h2>Other clients</h2>
-      <p>A client that supports MCP sign-in (OAuth) only needs the MCP URL: it sends you here to sign in and approve. Any other client that speaks Streamable HTTP uses a token: <a href="/connections/new">create one</a> and send it in this header, read from wherever the client keeps secrets:</p>
-      <pre class="code" tabindex="0">Authorization: Bearer &lt;your token&gt;</pre>
+      <p>A client that supports MCP sign-in (OAuth) only needs the MCP URL: it sends you here to sign in and approve. Any other client that speaks Streamable HTTP uses a token.</p>
+      ${tokenList(ctx, "other")}
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}
       <details><summary>Local development (a Reliquary checkout on this machine)</summary>
@@ -153,6 +154,97 @@ function clientSection(ctx: Ctx, client: Client): Raw {
       <p class="small muted">Add <code>--vault &lt;name&gt;</code> if you belong to more than one vault. The CLI shows on <a href="/connections">Connections</a> as Reliquary CLI; revoke it there. Set values on a vault’s Variables page.</p></section>`;
   }
 }
+
+// The clients that connect with a token. Connect makes one in place, so the
+// person never leaves for the full form to get started, and the page that
+// shows the token goes on with that client's steps.
+const TOKEN_CLIENTS = ["cursor", "vscode", "other"] as const;
+type TokenClient = (typeof TOKEN_CLIENTS)[number];
+const tokenClient = (v: string | null | undefined) => TOKEN_CLIENTS.find((c) => c === v);
+const TOKEN_NAME: Record<TokenClient, string> = { cursor: "Cursor", vscode: "VS Code", other: "My agent" };
+
+// Read only is the first button: the safe choice is the one a hurried
+// person takes, and the reach of either button is said before the click. All
+// vaults and 90 days are createToken's defaults, so the form leaves them out;
+// the full form is one link away.
+function quickToken(ctx: Ctx, client: TokenClient): Raw {
+  return html`<form method="post" action="/connections/new" class="panel token-form quick-token">
+      ${csrfField(ctx.csrf)}<input type="hidden" name="client" value="${client}">
+      <label for="qt-${client}">Name it after the agent and machine</label>
+      <input id="qt-${client}" type="text" name="name" value="${TOKEN_NAME[client]}" required maxlength="100" autocomplete="off">
+      <p class="hint">Either token reaches all your vaults, including ones you join later, for 90 days. Read only lets the agent read and search. Read and write also lets it write open files and propose changes. For some vaults or another expiry, <a href="/connections/new?client=${client}">use the full form</a>.</p>
+      <div class="actions"><button class="primary" name="access" value="read">Create read-only token</button><button name="access" value="write">Create read and write token</button></div>
+    </form>`;
+}
+
+function cursorSetup(url: string) {
+  const config = { url, headers: { Authorization: "Bearer ${env:RELIQUARY_TOKEN}" } };
+  return {
+    json: JSON.stringify({ mcpServers: { reliquary: config } }, null, 2),
+    link: `cursor://anysphere.cursor-deeplink/mcp/install?name=reliquary&config=${q(Buffer.from(JSON.stringify(config)).toString("base64"))}`,
+  };
+}
+
+const vscodeJson = (url: string) =>
+  JSON.stringify(
+    {
+      inputs: [{ type: "promptString", id: "reliquary-token", description: "Reliquary access token", password: true }],
+      servers: { reliquary: { type: "http", url, headers: { Authorization: "Bearer ${input:reliquary-token}" } } },
+    },
+    null,
+    2,
+  );
+
+// A token client's steps, one copy for its Connect tab and for the page that
+// shows the token (then `token` is set and the commands carry it), so the two
+// can't drift. Every command reads the token from the environment or a
+// prompt, as TOKEN_SAFETY says.
+function tokenSteps(ctx: Ctx, client: TokenClient, token?: string): Raw[] {
+  const url = ctx.mcpUrl;
+  const app = client === "cursor" ? "Cursor" : client === "vscode" ? "VS Code" : "the client";
+  const pre = (code: Raw | string) => html`<pre class="code" tabindex="0">${code}</pre>`;
+  const setToken = token
+    ? html`In your own terminal, set the token${client === "other" ? "" : html`, then start ${app} from that terminal`}. In bash or zsh:${pre(html`export RELIQUARY_TOKEN='${token}'`)}In PowerShell:${pre(html`$env:RELIQUARY_TOKEN='${token}'`)}`
+    : html`Set it as <code>RELIQUARY_TOKEN</code> in your terminal (<code>export</code> in bash or zsh, <code>$env:</code> in PowerShell)${client === "other" ? "" : html`, then start ${app} from that terminal`}.`;
+  const check = token
+    ? html`Then open <a href="/connect?client=${client}">Connect</a>: it shows the connection once ${app} has used the token.`
+    : html`Then reload this page: it shows the connection.`;
+  const steps: Raw[] = [];
+  if (client === "cursor") {
+    const { json, link } = cursorSetup(url);
+    steps.push(
+      setToken,
+      html`<a href="${link}">Add Reliquary to Cursor</a>. If the link doesn’t open, put this in <code>~/.cursor/mcp.json</code>:${pre(json)}`,
+      html`In Cursor’s MCP settings, check that reliquary is on and lists its tools. ${check}`,
+    );
+  } else if (client === "vscode") {
+    steps.push(
+      html`Add this to <code>.vscode/mcp.json</code>:${pre(vscodeJson(url))}`,
+      html`Start the server from that file. VS Code asks for the token once and stores it securely: ${token ? "paste the one above" : "paste it"}. ${check}`,
+    );
+  } else {
+    steps.push(
+      setToken,
+      html`Test it. A JSON answer that lists tools means it works. In bash or zsh:${pre(html`curl -s ${url} \\
+  -H "Authorization: Bearer $RELIQUARY_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -H "Accept: application/json, text/event-stream" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`)}In PowerShell:${pre(html`Invoke-RestMethod -Method Post -Uri ${url} -Headers @{ Authorization = "Bearer $env:RELIQUARY_TOKEN"; Accept = "application/json, text/event-stream" } -ContentType "application/json" -Body '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`)}`,
+      html`Give your client the MCP URL and this header, read from wherever it keeps secrets:${pre("Authorization: Bearer <your token>")}`,
+      token
+        ? html`Open <a href="/connect?client=other">Connect</a>: it shows the connection once the client has used the token.`
+        : html`Reload this page: it shows the connection once the client has used the token.`,
+    );
+  }
+  return steps;
+}
+
+// A Connect tab's list: create a token, then the client's steps.
+const tokenList = (ctx: Ctx, client: TokenClient): Raw =>
+  html`<ol class="setup"><li>Create a token. The next page shows it with the commands filled in.${quickToken(ctx, client)}</li>${tokenSteps(ctx, client).map((s) => html`<li>${s}</li>`)}</ol>`;
+
+const afterToken = (ctx: Ctx, client: TokenClient, token: string): Raw =>
+  html`<h2>Set up ${client === "other" ? "your client" : TOKEN_NAME[client]}</h2><ol class="setup">${tokenSteps(ctx, client, token).map((s) => html`<li>${s}</li>`)}</ol>`;
 
 // ---------------------------------------------------------------------------
 // Connections
@@ -269,6 +361,7 @@ export async function connections(ctx: Ctx): Promise<Reply> {
 const newCrumb = [{ label: "Connections", href: "/connections" }, { label: "New token" }];
 
 export async function newToken(ctx: Ctx): Promise<Reply> {
+  const client = tokenClient(ctx.url.searchParams.get("client"));
   const vaults = await asPerson(
     ctx.userId,
     async (c) =>
@@ -293,7 +386,7 @@ export async function newToken(ctx: Ctx): Promise<Reply> {
     })}
     <p class="hint new-token-hint">Claude Code, Claude.ai and ChatGPT don’t need one: they sign in. See <a href="/connect">Connect</a>.</p>
     <form method="post" action="/connections/new" class="panel token-form" id="new-token">
-      ${csrfField(ctx.csrf)}
+      ${csrfField(ctx.csrf)}${client ? html`<input type="hidden" name="client" value="${client}">` : ""}
       <label for="tn">Name it after the agent and machine</label>
       <input id="tn" type="text" name="name" placeholder="Hermes on Linux" required maxlength="100" autocomplete="off">
       <fieldset>
@@ -330,10 +423,12 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
   const ticked = ctx.form.getAll("vault");
   const some = ticked.length > 0 || ctx.form.get("scope") === "some";
   const access = ctx.form.get("access") === "write" ? "write" : "read";
+  const client = tokenClient(ctx.form.get("client"));
+  const back = client ? `/connections/new?client=${client}` : "/connections/new";
   const days = Number.parseInt(ctx.form.get("days") ?? "90", 10);
   if (some && ticked.length === 0) {
     ctx.setFlash("Tick at least one vault, or choose all your vaults.", "danger");
-    return { redirect: "/connections/new" };
+    return { redirect: back };
   }
   if (!ticked.every((v) => UUID.test(v))) return notFound(ctx);
   let token: string;
@@ -352,7 +447,7 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
     );
   } catch (err) {
     ctx.setFlash(message(err));
-    return { redirect: "/connections/new" };
+    return { redirect: back };
   }
   // The one time the token is shown: this answer only, never a redirect
   // (it would have to be stored), and no form here inviting a second one.
@@ -367,7 +462,9 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
     <div class="callout warning reveal" role="status"><strong>${name}</strong>
       <p class="muted small">Copy it now. It won’t be shown again. Put it where your client reads secrets (an environment variable or a password prompt), never in a chat or a file an agent can read.</p>
       <p class="secret">${token}</p></div>
-    <p>Next, set up the client: <a href="/connect?client=cursor">Cursor</a>, <a href="/connect?client=vscode">VS Code</a> or <a href="/connect?client=other">another client</a>.</p>`,
+    ${client
+      ? afterToken(ctx, client, token)
+      : html`<p>Next, set up the client: <a href="/connect?client=cursor">Cursor</a>, <a href="/connect?client=vscode">VS Code</a> or <a href="/connect?client=other">another client</a>.</p>`}`,
     "connections",
   );
 }
