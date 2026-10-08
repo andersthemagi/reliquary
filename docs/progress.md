@@ -376,6 +376,13 @@ start the next one.
   `supabase/tests/compare_and_swap_test.sql`, races in
   `web/test/races.test.mjs` (exactly one of many simultaneous writers
   from one base wins; a stale write racing an erasure never deadlocks).
+  A deleted file counts as no file yet (`20261009153417_cas_deleted_files.sql`):
+  the check became one private function, `private.check_expected_version`,
+  that both functions call, so a stale save made after someone deleted the
+  file is refused instead of bringing it back. In the web app that save
+  comes back as New file with the typed text (`conflictReply()`), and the
+  Delete confirm page carries the version it showed, so a delete confirmed
+  after someone saved the file is refused (`web/src/files.ts`).
   Registry: `tests/features.md` F437-F439.
 - **Phase 2: path claims** (who's working a path, with a lease). Built,
   2026-10-01, across five pull requests (CL-2.1 through CL-2.7; CL-2.2 and
