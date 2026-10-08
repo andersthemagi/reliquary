@@ -46,7 +46,7 @@ import {
 } from "./auth.js";
 import { html, notice, page, type Theme } from "./html.js";
 import { siteHref } from "./hosts.js";
-import { inviteTokenOf, maskEmail, peekInvite, roleName, type Peek } from "./invites.js";
+import { emailKey, inviteTokenOf, maskEmail, peekInvite, roleName, type Peek } from "./invites.js";
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage } from "./errorpage.js";
@@ -230,7 +230,6 @@ async function signinLimit(checks: Check[], theme: Theme): Promise<Reply | undef
   if (wait) return { status: 429, retryAfter: wait, html: tooManyPage(wait, theme, "That was too many sign-in attempts in a short time") };
   return undefined;
 }
-const address = (email: string) => email.toLowerCase();
 
 export async function signinRoutes(i: In): Promise<Out | undefined> {
   const p = i.url.pathname;
@@ -282,11 +281,11 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
       return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.", invite) });
     }
     const limited = await signinLimit([
-      { name: "signin_email_address", kind: "email", value: address(email) },
+      { name: "signin_email_address", kind: "email", value: emailKey(email) },
       { name: "signin_email_ip", kind: "ip", value: i.ip },
     ], i.theme);
     if (limited) return out(limited);
-    const r = await sendSigninEmail(email, invite !== undefined && (invite.email === null || email.toLowerCase() === invite.email));
+    const r = await sendSigninEmail(email, invite !== undefined && (invite.email === null || emailKey(email) === invite.email));
     if (r.unavailable) return out(unavailable(i.theme));
     if (r.signupsOff) {
       // The reason is logged, so it names no address; the page does.
@@ -318,7 +317,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     // Guessing protection: a few codes per address, then that address's
     // codes are locked until the window ends (its emailed link still works).
     const limited = await signinLimit([
-      { name: "signin_code_address", kind: "email", value: address(email) },
+      { name: "signin_code_address", kind: "email", value: emailKey(email) },
       { name: "signin_code_ip", kind: "ip", value: i.ip },
     ], i.theme);
     if (limited) return out(limited);

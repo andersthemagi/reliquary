@@ -114,7 +114,9 @@ before(async () => {
   [{ t: T.two }] = await as(ANA, "select public.create_invite($1, 'newbie@example.test', 'viewer') as t", [V.two]);
   [{ id: V.open }] = await as(ANA, "select public.create_vault('Invite Signin Open') as id");
   [{ t: T.open }] = await as(ANA, "select public.create_invite($1, null, 'viewer', 2) as t", [V.open]);
+  [{ t: T.accent }] = await as(ANA, "select public.create_invite($1, $2, 'viewer') as t", [V.two, "jos\u00e9@example.test"]);
   remember(T.newbie, T.two, T.open);
+  remember(T.accent);
   await signups(false);
 });
 
@@ -162,6 +164,14 @@ test("invite sign-in: with sign-ups off, the invited address is told plainly it 
   assert.match(h, /Ask the person who invited you to have an account made for that address, then open the invite link again\./);
   assert.equal((await stats()).lastCreateUser, true);
   assert.equal(await fake("/_user?email=newbie%40example.test"), null);
+});
+
+test("invite sign-in: the invited address matches however its accent is typed, composed or decomposed", async () => {
+  // The database keeps the address in Unicode NFC; some keyboards and pastes give e + a combining accent.
+  const r = await askForCode(new Jar(), T.accent, "JOSE\u0301@Example.test");
+  assert.equal((await stats()).lastCreateUser, true, "sign-in may make this address's account");
+  assert.equal(r.status, 403);
+  assert.match(await r.text(), /<h1>No account yet<\/h1>/);
 });
 
 test("invite sign-in: with sign-ups on, the invited address gets an account, signs in and joins", async () => {
