@@ -392,6 +392,61 @@ test("comment refused: the proposal page answers again (400), the reason at the 
 });
 
 // ---------------------------------------------------------------------------
+// A proposal revised while its reviewer reads it
+
+const revisionOf = (form) => /<input type="hidden" name="revision" value="(\d+)">/.exec(form)?.[1];
+const decideForm = (h) => /<form method="post" action="[^"]+\/decide" class="panel decide"[\s\S]*?<\/form>/.exec(h)?.[0] ?? "";
+const revise = (pid, body) => as(SOL, "select public.revise_proposal($1, $2, 'Swapped.')", [pid, body], "Desk agent");
+
+test("read revision: approving sends the revision the page shows, and that revision applies", async () => {
+  const pid = await propose("canon/read-shown.md", "Shown text.", "For the revision tests.");
+  await revise(pid, "Shown again.");
+  const revision = revisionOf(decideForm(await page("rhea", pp(pid))));
+  assert.equal(revision, "2");
+  const r = await post("rhea", pp(pid, "/decide"), { decision: "approve", note: "", revision });
+  assert.equal(r.status, 303);
+  assert.equal(await status(pid), "applied");
+});
+
+test("read revision: an approval of a revision the agent replaced is refused, and the page answers again with the latest one and the reason", async () => {
+  const pid = await propose("canon/read-swapped.md", "What Rhea read.", "For the revision tests.");
+  const revision = revisionOf(decideForm(await page("rhea", pp(pid))));
+  await revise(pid, "What the agent swapped in.");
+  const r = await post("rhea", pp(pid, "/decide"), { decision: "approve", note: "Looks right.", revision });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  const form = decideForm(h);
+  assert.match(
+    form,
+    /<div class="callout danger" role="alert" id="decide-error"><p>This proposal was revised while you were reading it: you read revision 1, and it is now revision 2\. Read revision 2 before you decide\. \(ref [0-9a-f]{8}\)<\/p><\/div>/,
+  );
+  assert.equal(revisionOf(form), "2");
+  assert.match(form, /<textarea id="note"[^>]*>Looks right\.<\/textarea>/);
+  assert.match(h, /What the agent swapped in\./);
+  assert.equal(await status(pid), "open");
+  assert.equal((await sql("select count(*)::int as n from public.approvals where proposal_id = $1", [pid]))[0].n, 0);
+  // Not left waiting: the Inbox tests below count what waits for Rhea.
+  await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
+});
+
+test("read revision: Edit, then approve on a revision the agent replaced is refused, and the editor comes back with your text and the latest revision", async () => {
+  const pid = await propose("canon/read-edit.md", "What Rhea opened.", "For the revision tests.");
+  const editor = await page("rhea", pp(pid, "/edit"));
+  const revision = revisionOf(editor);
+  assert.equal(revision, "1");
+  await revise(pid, "What the agent swapped in.");
+  const r = await post("rhea", pp(pid, "/edit"), { content: "An edit by Rhea.", note: "Tightened.", revision });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /This proposal was revised while you were editing it: you started from revision 1, and it is now revision 2\. Your edit is not saved; read revision 2 before you save it again\. \(ref [0-9a-f]{8}\)/);
+  assert.match(h, /<textarea id="content" name="content">An edit by Rhea\.<\/textarea>/);
+  assert.equal(revisionOf(h), "2");
+  assert.equal((await sql("select body from public.proposals where id = $1", [pid]))[0].body, "What the agent swapped in.");
+  // Not left waiting: the Inbox tests below count what waits for Rhea.
+  await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
+});
+
+// ---------------------------------------------------------------------------
 // The Inbox
 
 test("inbox: one sentence under the title, and a count of what's waiting to review", async () => {

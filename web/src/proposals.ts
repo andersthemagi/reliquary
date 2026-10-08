@@ -275,6 +275,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     const controls = rejectable
       ? html`<form method="post" action="${proposalPath(id, pid, "/decide")}" class="panel decide" aria-label="Your review">
           ${csrfField(ctx.csrf)}
+          <input type="hidden" name="revision" value="${p.revision}">
           ${refusal}
           <label for="note">Note</label>
           <p class="hint" id="note-hint">Required to request changes or reject. The proposer sees it.</p>
@@ -392,7 +393,9 @@ function currentFile(current: string | null): Raw {
 // A refused Edit, then approve, shown again on its own page (answered 400)
 // with the reason and the text and note as typed: a redirect would lose
 // them. It happens when approving applies the edit and the database refuses
-// that (the vault's storage limit), leaving the proposal live.
+// that (the vault's storage limit), leaving the proposal live, or when the
+// proposal was revised after the editor loaded. The form then carries the
+// latest revision, so saving again, once told, replaces that one on purpose.
 type Retyped = { error: string; content: string; note: string };
 
 export async function proposalEdit(ctx: Ctx, id: string, pid: string, refused?: Retyped): Promise<Reply> {
@@ -415,6 +418,7 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string, refused?: 
       ${currentFile(p.current_body)}
       <form method="post" action="${proposalPath(id, pid, "/edit")}" class="panel" id="edit-approve">
         ${csrfField(ctx.csrf)}
+        <input type="hidden" name="revision" value="${p.revision}">
         <label for="content">Proposed text</label>
         <textarea id="content" name="content">${textareaText(refused?.content ?? p.body)}</textarea>
         <label for="note">What you changed</label>
@@ -515,18 +519,21 @@ const decidedFlash = (ctx: Ctx, result: string) => {
   ctx.setFlash(text, tone);
 };
 
-// A decision. Refused (a missing note, a decision already made, a proposal
-// no longer open), the proposal page is answered again with the reason in
-// the decision box and the note kept, not a redirect that loses it.
+// A decision, on the revision the page showed (the form's `revision`: the
+// database refuses it if the proposal was revised since). Refused (a missing
+// note, a decision already made, a proposal no longer open or revised), the
+// proposal page is answered again with the reason in the decision box, the
+// note kept and the latest revision shown, not a redirect that loses them.
 export async function decide(ctx: Ctx, id: string, pid: string): Promise<Reply> {
   if (!UUID.test(pid)) return notFound(ctx);
   const d = ctx.form.get("decision");
   const decision = d === "reject" || d === "request_changes" ? d : "approve";
   const note = ctx.form.get("note") ?? "";
+  const revision = ctx.form.get("revision") || null;
   try {
     const result = await asPerson(
       ctx.userId,
-      async (c) => (await c.query(`select public.decide($1, $2, $3) as r`, [pid, decision, note || null])).rows[0].r as string,
+      async (c) => (await c.query(`select public.decide($1, $2, $3, $4) as r`, [pid, decision, note || null, revision])).rows[0].r as string,
     );
     decidedFlash(ctx, result);
   } catch (err) {
@@ -539,10 +546,12 @@ export async function editAndApprove(ctx: Ctx, id: string, pid: string): Promise
   if (!UUID.test(pid)) return notFound(ctx);
   const content = (ctx.form.get("content") ?? "").replaceAll("\r\n", "\n");
   const note = ctx.form.get("note") ?? "";
+  const revision = ctx.form.get("revision") || null;
   try {
     const result = await asPerson(
       ctx.userId,
-      async (c) => (await c.query(`select public.edit_and_approve($1, $2, $3) as r`, [pid, content, note || null])).rows[0].r as string,
+      async (c) =>
+        (await c.query(`select public.edit_and_approve($1, $2, $3, $4) as r`, [pid, content, note || null, revision])).rows[0].r as string,
     );
     decidedFlash(ctx, result);
   } catch (err) {
