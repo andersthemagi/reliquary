@@ -32,4 +32,4 @@ Keep the new one out of chats and files an agent can read.
 
 ## If a variable's value leaked
 
-That is a different secret: rotate it at its provider, then set the new value on the vault's **Variables** page with **Rotate**. The Variables page shows who read or revealed the old value since it was set. See [Environment variables](../concepts/variables.md#the-access-log).
+That is a different secret: rotate it at its provider, then set the new value on the vault's **Variables** page with **Change value**. The Variables page shows who read or revealed the old value since it was set. See [Environment variables](../concepts/variables.md#the-access-log).

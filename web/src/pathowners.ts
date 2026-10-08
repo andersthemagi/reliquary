@@ -24,7 +24,7 @@ import { vaultShell } from "./files.js";
 import { roleName } from "./invites.js";
 import { personRef } from "./people.js";
 import { message, notFound, render, UUID, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
-import { approvals, ownersPath, rulesCrumb } from "./rules.js";
+import { approvals, approvers, ownersPath, rulesCrumb, shortfall } from "./rules.js";
 
 type Rule = { path: string; policy: string; quorum: number };
 type Member = { user_id: string; email: string | null; role: string };
@@ -123,7 +123,7 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
           <tbody>${owners.map(
             (o) => html`<tr><td>${label(o)}${o.user_id === ctx.userId ? html` <span class="badge">You</span>` : ""}</td>
               <td class="small" data-label="Role in the vault">${roleCell(o)}</td>
-              <td class="small" data-label="Named">${o.added_by ? html`by ${who(ctx, o.added_by, null)} · ` : ""}${time(o.added_at)}</td>
+              <td class="small" data-label="Named"><div>${o.added_by ? html`by ${who(ctx, o.added_by, null)} · ` : ""}${time(o.added_at)}</div></td>
               ${owner
                 ? html`<td class="num row-actions"><a class="button quiet" href="${ownersPath(id, path)}&amp;remove=${o.user_id}" aria-label="Remove ${label(o)} as an owner of ${path}">Remove</a></td>`
                 : ""}</tr>`,
@@ -150,12 +150,12 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
 
     const body = html`
       ${pageHeader({
-        crumb: rulesCrumb(v, "Owners"),
-        title: `Owners of ${path}`,
+        crumb: rulesCrumb(v, "Named owners"),
+        title: `Named owners of ${path}`,
         path: true,
-        description: "Named owners write this path directly, with no review, and theirs are the only approvals its quorum counts. Everyone else follows the rule.",
+        description: "Named owners write this path directly, with no review, and only their approvals count toward the approvals needed. Everyone else follows the rule.",
         meta: html`<p class="rule">${policyBadge(rule.policy)} <span>The rule on <code>${path}</code>${canon ? `: changes need ${approvals(rule.quorum)}` : ""}. <a href="${vaultPath(id, "/rules")}">Rules</a></span></p>`,
-        primary: owner && candidates.length ? html`<a class="button primary" href="#add-owner">Name an owner</a>` : "",
+        primary: owner && candidates.length && owners.length ? html`<a class="button primary" href="#add-owner">Name an owner</a>` : "",
       })}
       ${canon
         ? ""
@@ -163,7 +163,7 @@ export async function pathOwners(ctx: Ctx, id: string): Promise<Reply> {
       ${table}
       ${form}
       <p class="hint rules-help">A vault owner who isn’t named here proposes on this path like anyone else. <a href="/docs/concepts/path-ownership">Path ownership</a></p>`;
-    return { body, title: `Owners of ${path}` };
+    return { body, title: `Named owners of ${path}` };
   });
 }
 
@@ -182,12 +182,15 @@ async function confirmAdd(ctx: Ctx, id: string, path: string, user: string): Pro
     if (owners.some((o) => o.user_id === user)) return { back, note: `${plainName(m, user)} is already a named owner of ${path}.`, tone: "info" };
     const inner = await innerRules(c, id, path);
     const who_ = label(m);
+    // Counting only members: someone named who has since left can't approve.
+    const short = rule.policy === "canon" ? shortfall(rule.quorum, await approvers(c, id, owners.filter((o) => o.role !== null).length + 1)) : null;
     const consequences: (Raw | string)[] = [
       rule.policy === "canon"
         ? owners.length
           ? html`Their approval counts toward its ${approvals(rule.quorum)}, with ${owners.length === 1 ? "the other named owner’s" : `the other ${owners.length} named owners’`}. Nobody else’s does.`
           : html`From now on only named owners’ approvals count toward its ${approvals(rule.quorum)}. Until now any editor’s or owner’s did; they now propose and wait like anyone else.`
         : html`The rule on <code>${path}</code> is open today, so this changes nothing yet. It takes effect if the rule becomes canon.`,
+      ...(short ? [html`<strong>Changes there would wait.</strong> ${short}`] : []),
       m.role === "viewer" ? `They stay a viewer everywhere else in ${v.name}: this is write access to this path only.` : `They stay ${aRole(m.role)} everywhere else in ${v.name}.`,
       ...(inner.length
         ? [html`${inner.length === 1 ? html`The rule on <code>${inner[0]}</code>` : `The ${inner.length} rules`} inside it keep${inner.length === 1 ? "s" : ""} ${inner.length === 1 ? "its" : "their"} own owners: naming someone here doesn’t cover ${inner.length === 1 ? "it" : "them"}.`]
@@ -223,6 +226,7 @@ async function confirmRemove(ctx: Ctx, id: string, path: string, user: string): 
     if (!o) return { back, note: `That person isn’t a named owner of ${shown(path)}; they may have been removed already.`, tone: "warning" };
     const who_ = label(o);
     const canon = rule.policy === "canon";
+    const short = canon ? shortfall(rule.quorum, await approvers(c, id, owners.filter((x) => x.role !== null && x.user_id !== user).length)) : null;
     const after =
       o.role === null
         ? "They’re no longer a member of this vault."
@@ -240,6 +244,7 @@ async function confirmRemove(ctx: Ctx, id: string, path: string, user: string): 
         ...(owners.length === 1 && canon
           ? [`They’re its last named owner, so any editor’s or owner’s approval counts toward its ${approvals(rule.quorum)} again.`]
           : []),
+        ...(short ? [html`<strong>Changes there would wait.</strong> ${short}`] : []),
         "It’s logged in Activity. You can name them again at any time.",
       ],
       action: vaultPath(id, "/rules/owners"),

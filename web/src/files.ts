@@ -19,6 +19,7 @@ import {
   policyBadge,
   raw,
   tabs,
+  textareaText,
   time,
   type CrumbPart,
   type MenuItem,
@@ -27,8 +28,9 @@ import {
 import { claimBanner } from "./claimbanner.js";
 import { siteHref } from "./hosts.js";
 import { renderMarkdown } from "./markdown.js";
-import { errorPage } from "./errorpage.js";
-import { failure } from "./failure.js";
+import { errorPage, typed as echoable } from "./errorpage.js";
+import { loadShell } from "./inbox.js";
+import { failure, Refusal } from "./failure.js";
 import { watchControl, watchState } from "./watching.js";
 import {
   filePath,
@@ -53,6 +55,11 @@ type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: stri
 export type Section = "files" | "proposals" | "threads" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
+  // A GET has the top bar's summary already. A POST that answers with a page
+  // (a refused save is the form again) doesn't, and without it the bar loses
+  // its vault switcher and inbox count; one that redirects never gets here,
+  // so it still pays nothing for it.
+  ctx.shell ??= await loadShell(c);
   // One round trip: the live files, every folder above them, each one's
   // rule in one set-based call (one membership check, not rule_for() per
   // row), and the open proposals' count.
@@ -398,15 +405,20 @@ function moreMenu(id: string, path: string, o: { canon: boolean; writable: boole
         : { href: deletePath(id, path), label: "Delete file…", description: "Removes the file; its history stays", danger: true },
     );
   }
-  if (o.owner) items.push({ href: erasePath(id, path), label: "Erase content…", description: "Blanks every version; for personal data", danger: true });
+  if (o.owner) items.push({ href: erasePath(id, path), label: "Erase file…", description: "Blanks every version, then removes the file; for personal data", danger: true });
   return items.length ? menu({ label: "More", items, className: "file-more" }) : "";
 }
+
+// A file form the database refused, shown again on its own page (answered
+// 400) with the reason and what was typed. A redirect would lose the text
+// and, for a path that doesn't exist yet, land on Not found.
+type Refused = { error: string; path: string; content: string; reason: string; expectedVersion: string | null };
 
 // Delete a file, or propose deleting a canon one, behind a confirm page
 // reached from the More menu (GET /v/:id/file?path=…&confirm=delete). The
 // post is the file form's delete or propose-delete; the database decides.
-async function deletePage(ctx: Ctx, id: string): Promise<Reply> {
-  const path = ctx.url.searchParams.get("path") ?? "";
+async function deletePage(ctx: Ctx, id: string, refused?: Refused): Promise<Reply> {
+  const path = refused?.path ?? ctx.url.searchParams.get("path") ?? "";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v || !(await writablePath(c, v, path))) return null;
@@ -424,6 +436,7 @@ async function deletePage(ctx: Ctx, id: string): Promise<Reply> {
     const canon = f.policy === "canon";
     const body = canon
       ? html`${pageHeader({ crumb: crumbs(id, v, path, false, "Propose deleting"), title: `Propose deleting ${name}`, path: true })}
+        ${refused ? callout("danger", refused.error) : ""}
         <p class="lede confirm-lede">This file is canon, so deleting it is a proposal. The file stays, unchanged, until enough people approve it.</p>
         <ul class="consequences">
           <li>Once approved, <code>${path}</code> leaves the folder, search and agents’ reads. Its ${plural(f.versions, "version")} and the activity log stay.</li>
@@ -432,7 +445,7 @@ async function deletePage(ctx: Ctx, id: string): Promise<Reply> {
         <form method="post" action="${vaultPath(id, "/file")}" class="panel confirm">
           ${csrfField(ctx.csrf)}<input type="hidden" name="path" value="${path}"><input type="hidden" name="action" value="propose-delete">
           <label for="why">Why delete it</label>
-          <input id="why" type="text" name="reason" required value="Delete ${path}">
+          <input id="why" type="text" name="reason" required value="${refused?.reason || `Delete ${path}`}">
           <div class="actions"><button class="danger">Propose deleting ${name}</button><a class="button quiet" href="${filePath(id, path)}">Cancel</a></div>
         </form>`
       : confirmPage({
@@ -451,26 +464,36 @@ async function deletePage(ctx: Ctx, id: string): Promise<Reply> {
           fields: { path, action: "delete" },
           button: `Delete ${name}`,
           cancel: filePath(id, path),
+          error: refused?.error,
         });
     return { v, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, `Delete ${path}`, data.shell, "vaults");
+  return { ...render(ctx, `Delete ${path}`, data.shell, "vaults"), ...(refused ? { status: 400 } : {}) };
 }
 
-export async function editView(ctx: Ctx, id: string): Promise<Reply> {
-  const path = ctx.url.searchParams.get("path") ?? "";
+export async function editView(ctx: Ctx, id: string, refused?: Refused): Promise<Reply> {
+  const path = refused?.path ?? ctx.url.searchParams.get("path") ?? "";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v || !(await writablePath(c, v, path))) return null;
-    const f = (
-      await c.query(
-        `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, fv.body
-           from public.files f join public.file_versions fv on fv.id = f.current_version_id
-          where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
-        [id, path],
-      )
-    ).rows[0];
+    // A refused save shows the form as it was sent, with the version it
+    // loaded: reloading the file here would drop the text, and would let the
+    // next Save pass the stale-save check against a version never seen.
+    let f: { policy: string; version: string | null; body: string } | undefined;
+    if (refused) {
+      const rule = await ruleFor(c, id, path);
+      f = { policy: rule.rule?.policy ?? rule.def, version: refused.expectedVersion, body: refused.content };
+    } else {
+      f = (
+        await c.query(
+          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, fv.body
+             from public.files f join public.file_versions fv on fv.id = f.current_version_id
+            where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
+          [id, path],
+        )
+      ).rows[0];
+    }
     if (!f) return null;
     const canon = f.policy === "canon";
     const claim = await claimBanner(c, ctx, v, path, canon ? "propose" : "write", filePath(id, path));
@@ -491,28 +514,31 @@ export async function editView(ctx: Ctx, id: string): Promise<Reply> {
         secondary: html`<a class="button quiet" href="${filePath(id, path)}">Cancel</a>`,
         primary: html`<button class="primary" form="edit-file">${canon ? "Propose change" : "Save"}</button>`,
       })}
+      ${refused ? callout("danger", refused.error) : ""}
       ${claim}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="edit-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="path" value="${path}">
         <input type="hidden" name="action" value="${canon ? "propose" : "write"}">
-        ${canon ? "" : html`<input type="hidden" name="expected_version" value="${f.version}">`}
+        ${canon || !f.version ? "" : html`<input type="hidden" name="expected_version" value="${f.version}">`}
         ${canon ? html`<label for="r">Why this change</label>
           <p class="hint" id="r-hint">Reviewers see this after the diff.</p>
-          <input id="r" type="text" name="reason" required aria-describedby="r-hint">` : ""}
+          <input id="r" type="text" name="reason" required aria-describedby="r-hint" value="${refused?.reason ?? ""}">` : ""}
         <label for="content">Text</label>
-        <textarea id="content" name="content">${f.body}</textarea>
+        <textarea id="content" name="content">${textareaText(f.body)}</textarea>
         <div class="actions"><button class="primary">${canon ? "Propose change" : "Save"}</button>
           <a class="button quiet" href="${filePath(id, path)}">Cancel</a></div>
       </form>`;
     return { v, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, `Edit ${path}`, data.shell, "vaults");
+  return { ...render(ctx, `Edit ${path}`, data.shell, "vaults"), ...(refused ? { status: 400 } : {}) };
 }
 
-export async function newFile(ctx: Ctx, id: string): Promise<Reply> {
-  const given = (ctx.url.searchParams.get("dir") ?? "").replace(/^\/+/, "");
+export async function newFile(ctx: Ctx, id: string, refused?: Refused): Promise<Reply> {
+  // A refused create is shown again in the folder of the path that was typed.
+  const typedDir = refused?.path.slice(0, refused.path.lastIndexOf("/") + 1);
+  const given = (typedDir ?? ctx.url.searchParams.get("dir") ?? "").replace(/^\/+/, "");
   const dir = given ? given.replace(/\/*$/, "/") : "";
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
@@ -532,25 +558,26 @@ export async function newFile(ctx: Ctx, id: string): Promise<Reply> {
         secondary: html`<a class="button quiet" href="${treePath(id, dir)}">Cancel</a>`,
         primary: html`<button class="primary" form="new-file">${verb}</button>`,
       })}
+      ${refused ? callout("danger", refused.error) : ""}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="new-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="action" value="create">
         <label for="p">Path</label>
         <p class="hint" id="p-hint">Folders are part of the path. A path under a canon folder becomes a proposal.</p>
-        <input id="p" type="text" name="path" value="${dir}" placeholder="${dir}new-file.md" required aria-describedby="p-hint">
+        <input id="p" type="text" name="path" value="${refused?.path ?? dir}" placeholder="${dir}new-file.md" required aria-describedby="p-hint">
         ${canon
           ? html`<label for="r">Why this file</label>
             <p class="hint" id="r-hint">Reviewers see this with the proposal.</p>
-            <input id="r" type="text" name="reason" required aria-describedby="r-hint">`
+            <input id="r" type="text" name="reason" required aria-describedby="r-hint" value="${refused?.reason ?? ""}">`
           : html`<input type="hidden" name="reason" value="New file">`}
-        <label for="c">Text</label><textarea id="c" name="content"></textarea>
+        <label for="c">Text</label><textarea id="c" name="content">${textareaText(refused?.content)}</textarea>
         <div class="actions"><button class="primary">${verb}</button>
           <a class="button quiet" href="${treePath(id, dir)}">Cancel</a></div>
       </form>`;
     return { v, shell: await vaultShell(c, ctx, v, { path: dir, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, "New file", data.shell, "vaults");
+  return { ...render(ctx, "New file", data.shell, "vaults"), ...(refused ? { status: 400 } : {}) };
 }
 
 // A stale save (public.write_file's RLF01): the file's current text and who
@@ -586,7 +613,7 @@ async function conflictReply(ctx: Ctx, id: string, path: string, typed: string):
         <input type="hidden" name="action" value="write">
         <input type="hidden" name="expected_version" value="${cur.version}">
         <label for="content">Your edit, not yet saved</label>
-        <textarea id="content" name="content">${typed}</textarea>
+        <textarea id="content" name="content">${textareaText(typed)}</textarea>
         <div class="actions"><button class="primary">Save over the current version</button>
           <a class="button quiet" href="${filePath(id, path)}">Discard your edit</a></div>
       </form>`;
@@ -613,18 +640,26 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
     // One query in the transaction: the vault is checked inside it
     // (private.vault_ref, under RLS: RLV01 when the person can't see it), as
     // the MCP tools do. "create" follows the path's rule: a canon path
-    // becomes a proposal, an open one a write (only the branch taken runs).
+    // becomes a proposal, an open one a write (only the branch taken runs),
+    // unless a file is already there: write_file would replace it with no
+    // version to compare, so Create file never writes over one.
     const outcome = await asPerson(ctx.userId, async (c) => {
       const V = `(select private.vault_ref($1) as id offset 0) v`;
       if (action === "create") {
         const r = (
           await c.query(
             `select case when x.canon then public.propose(x.id, $2, $3, $4, false) end as pid,
-                    case when not x.canon then public.write_file(x.id, $2, $3) end as written
-               from (select v.id, (private.rule_for(v.id, $2)).policy = 'canon' as canon from ${V} offset 0) x`,
+                    case when not x.canon and not x.taken then public.write_file(x.id, $2, $3) end as written,
+                    not x.canon and x.taken as taken
+               from (select v.id, (private.rule_for(v.id, $2)).policy = 'canon' as canon,
+                            exists (select 1 from public.files f where f.vault_id = v.id and f.path = $2 and f.deleted_at is null) as taken
+                       from ${V} offset 0) x`,
             [id, path, content, reason],
           )
         ).rows[0];
+        if (r.taken) {
+          throw new Refusal({ status: 409, where: "web app (the New file form)", why: `A file already exists at ${path}. Open it and choose Edit, or pick another path` });
+        }
         return r.pid ? ({ kind: "proposed", pid: r.pid as string } as const) : ({ kind: "write" } as const);
       }
       if (action === "write") {
@@ -653,7 +688,15 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
   } catch (err) {
     if ((err as { code?: string }).code === "RLV01") return notFound(ctx);
     if ((err as { code?: string }).code === "RLF01" && action === "write") return conflictReply(ctx, id, path, content);
-    ctx.setFlash(message(err));
+    const error = message(err);
+    // Not for a path that can't be shown back (control characters, over 200
+    // characters): the page would print it in its title and breadcrumb.
+    if (echoable(path)) {
+      const show = action === "create" ? newFile : action === "write" || action === "propose" ? editView : deletePage;
+      const again = await show(ctx, id, { error, path, content, reason, expectedVersion });
+      if (again.status === 400) return again;
+    }
+    ctx.setFlash(error);
     return { redirect: path ? filePath(id, path) : vaultPath(id) };
   }
 }

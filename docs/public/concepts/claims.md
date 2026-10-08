@@ -20,7 +20,14 @@ Whoever could write a path can claim it; a read-only connection can't. One activ
 
 ## Claim rules
 
-How long a claim lasts, and how many a connection or person may hold, is a rule, not a fixed number: a vault-wide default, with optional overrides by path prefix, the same specificity as [canon and open rules](canon-and-rules.md) (an exact path, or the longest folder prefix that covers it). With no rule at all, a claim lasts 48 hours, with a seven-day hold limit, one claim per connection and five per person.
+How long a claim lasts, and how many a connection or person may hold, is a rule, not a fixed number: one for the whole vault, with optional overrides by path prefix, the same specificity as [canon and open rules](canon-and-rules.md) (an exact path, then the longest folder that covers it, then the whole vault). With no rule at all, a claim lasts 48 hours, with a seven-day hold limit, one claim per connection and five per person.
+
+A rule sets four things:
+
+- **Lease:** how long a claim lasts if its agent goes quiet. Every check-in starts the lease again.
+- **Hold limit:** the longest one claim can be kept, however often it checks in. After that the agent releases it and claims again. At least the lease, at most 365 days.
+- **Claims per connection:** how many claims one connection (one agent) may hold in the vault at once.
+- **Claims per person:** how many all of one person's agents may hold together.
 
 Three presets are starting points, not measurements: tune one once it actually causes a problem.
 
@@ -30,11 +37,11 @@ Three presets are starting points, not measurements: tune one once it actually c
 | Team | 8 hours | 1 day |
 | Org (the default) | 48 hours | 7 days |
 
-Only an owner sets a claim rule, in person, on the vault's **Rules** page. Setting one never touches a claim already granted; it only changes what the next claim, or the next check-in, gets.
+Only an owner sets a claim rule, in person: in the vault, **Settings**, **Rules**, **Claim rules**. The first row is the whole vault, with the fixed defaults until you set one. To make every path in a vault lease for 30 minutes with a 2 hour hold limit, choose **The whole vault** and press **Hackathon**, or type the numbers and press **Save claim rule**. To give one folder or file its own numbers, choose **A folder or file** and type its path. **Change** on a row opens it filled in; **Remove** takes it away, and the paths it covered follow the next rule that applies. Setting a rule never touches a claim already granted; it only changes what the next claim, or the next check-in, gets.
 
 ## Seeing and breaking claims (people)
 
-In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
+In a vault, **Settings**, **Diagnostics**, **Claims** lists who's claimed what, and how much longer. A path is a link to its file; a claim can name a file nobody has written yet, and that one is plain text marked "no file there yet". A claim an agent took says which one, like "you via Hermes". An owner or editor can **Break** someone else's claim there, after a confirm page: it frees the path right away, for anyone to claim next. Breaking a claim changes nothing about the file itself; it's logged in [Activity](activity.md), the same as granting, renewing or releasing one.
 
 You see a claim where you meet the file. When someone holds a claim on a file, the file page and the editor open with a banner: whose it is (a person, or "Name's agent" when an agent took it), how much longer it lasts, and the note they left. The note is only what someone typed. It's shown in quotes and never proves who holds the claim. A claim covers one path, so the banner appears on that file and nowhere else, and not at all once the claim has run out or been released. Viewers see it too.
 

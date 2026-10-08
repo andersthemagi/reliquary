@@ -8,14 +8,14 @@ import type { Session } from "./auth.js";
 import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
-import { callout, csrfField, emptyState, html, page, pageHeader, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
+import { callout, csrfField, emptyState, html, page, pageHeader, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
 import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, signOutEverywhere } from "./settings.js";
 import { feedbackRoutes } from "./feedback.js";
 import { welcomeLanding, welcomeRoutes } from "./welcome.js";
 import { errorPage, refusalText } from "./errorpage.js";
-import { failure } from "./failure.js";
+import { failure, Refusal } from "./failure.js";
 import type { Flash, Tone } from "./flash.js";
 import { fillPeople, personRef } from "./people.js";
 import { UUID } from "./personref.js";
@@ -26,7 +26,7 @@ import { linksRoutes } from "./linkspage.js";
 import { linkGrantsRoutes } from "./linkgrants.js";
 import { claimAction, claims } from "./claimspage.js";
 import { plan, taskAction, tasks } from "./tasks.js";
-import { setClaimRuleAction } from "./claimrulespage.js";
+import { claimRules, setClaimRuleAction } from "./claimrulespage.js";
 import { flags } from "./flagspage.js";
 import { changes } from "./changes.js";
 import { diagnostics, diagnosticsFrame, diagSection } from "./diagnostics.js";
@@ -147,10 +147,15 @@ export const notFound = (ctx: Ctx): Reply => {
     where: inVault ? "database (only what’s shared with you is visible)" : "web app",
     why: inVault ? "There’s no such vault, file or proposal, or it isn’t shared with you." : `There’s no page at ${ctx.url.pathname}.`,
   });
+  // The way back is offered only to a member, from the top bar's own list of
+  // their vaults: someone else's vault must look exactly like one that
+  // doesn't exist.
+  const mine = inVault ? ctx.shell?.vaults.find((v) => v.id === ctx.url.pathname.split("/")[2]) : undefined;
   return {
     status: 404,
     html: errorPage(f, {
       title: "Not found",
+      ...(mine ? { back: vaultPath(mine.id), backLabel: `Back to ${mine.name}` } : {}),
       // The flash too: a refused write of a new path lands here, and its
       // message must not be dropped.
       user: ctx.userId, flash: ctx.flash, theme: ctx.theme, csrf: ctx.csrf, path: "/", shell: ctx.shell,
@@ -305,7 +310,11 @@ const REF = /^[0-9a-f]{8}$/;
 const refusedLine = (ref: string) =>
   html`<p class="small refused-ref">Your vault wasn’t created, for this reason (ref <code>${ref}</code>).</p>`;
 
-async function newVault(ctx: Ctx): Promise<Reply> {
+// The form's values as posted when creating was refused, with the reason
+// (and its reference), shown in the form.
+type VaultDraft = { name: string; template: string; policy: "open" | "canon"; error: string; field?: "name" };
+
+async function newVault(ctx: Ctx, d?: VaultDraft): Promise<Reply> {
   const { plan, admission } = await asPerson(ctx.userId, async (c) => ({ plan: await myPlan(c), admission: await myAdmission(c) }));
   const full = planFull(plan);
   const blocked = !admission.admitted || full;
@@ -323,7 +332,7 @@ async function newVault(ctx: Ctx): Promise<Reply> {
           <p class="callout-actions"><a class="button" href="/account">Plan and usage</a><a class="button ghost" href="${biggerPlanHref()}">Ask for a bigger plan</a></p>`,
         { title: "You’re at your plan’s vault limit" },
       );
-  return render(
+  const reply = render(
     ctx,
     "New vault",
     html`${pageHeader({
@@ -338,17 +347,20 @@ async function newVault(ctx: Ctx): Promise<Reply> {
       : html`<p class="small muted plan-line">${ownedLine(plan)}. <a href="/account">Plan and usage</a></p>
     <form method="post" action="/vaults/new" class="panel choice-form new-vault-form" id="new-vault">
       ${csrfField(ctx.csrf)}
+      ${d ? html`<p class="callout danger" role="alert" id="vault-error">${d.error}</p>` : ""}
       <label for="vn">Name</label>
-      <input id="vn" type="text" name="name" placeholder="Client work" required maxlength="100">
-      ${templateChoices()}
+      <input id="vn" type="text" name="name" placeholder="Client work" value="${d?.name ?? ""}"${
+        d?.field === "name" ? raw(' aria-invalid="true" aria-describedby="vault-error"') : ""
+      } required maxlength="100">
+      ${templateChoices(d?.template)}
       <fieldset class="choice-cards policy-cards" aria-describedby="policy-hint">
         <legend>Files without a rule are</legend>
         <p class="hint" id="policy-hint">Templates set rules for their folders; this applies to everything else, like the README at the top. You can change it later on the vault’s Settings, or per folder on Rules.</p>
         <div class="choice-card-grid">
-          <label class="choice-card"><input type="radio" name="default_policy" value="open" checked>
+          <label class="choice-card"><input type="radio" name="default_policy" value="open"${d?.policy === "canon" ? "" : raw(" checked")}>
             <span class="choice-card-body"><span class="choice-card-title">Open</span>
             <span class="choice-card-text">Members and their agents write directly. Every change is logged.</span></span></label>
-          <label class="choice-card"><input type="radio" name="default_policy" value="canon">
+          <label class="choice-card"><input type="radio" name="default_policy" value="canon"${d?.policy === "canon" ? raw(" checked") : ""}>
             <span class="choice-card-body"><span class="choice-card-title">Canon</span>
             <span class="choice-card-text">Every change is a proposal a person approves before it applies.</span></span></label>
         </div>
@@ -358,6 +370,7 @@ async function newVault(ctx: Ctx): Promise<Reply> {
     </form>`}`,
     "vaults",
   );
+  return d && !blocked ? { ...reply, status: 400 } : reply;
 }
 
 // The refusals New vault explains by itself, when it next shows: the plan's
@@ -381,9 +394,10 @@ async function createVault(ctx: Ctx): Promise<Reply> {
   const policy = ctx.form.get("default_policy") === "canon" ? "canon" : "open";
   // No template field is Blank, as before templates.
   const template = templateById(ctx.form.get("template") || "blank");
+  const again = (error: string, field?: VaultDraft["field"]) =>
+    newVault(ctx, { name, template: template?.id ?? "blank", policy, error, field });
   if (!template) {
-    ctx.setFlash("Choose one of the templates on the form.");
-    return { redirect: "/vaults/new" };
+    return again(message(new Refusal({ status: 400, where: "web app (New vault form)", why: "Choose one of the templates on the form. Nothing was created" })));
   }
   try {
     // One transaction: a template that fails partway leaves no vault.
@@ -400,8 +414,7 @@ async function createVault(ctx: Ctx): Promise<Reply> {
     const text = message(err);
     const ref = /\(ref ([0-9a-f]{8})\)/.exec(text)?.[1];
     if (ref && explainedByPage(err)) return { redirect: `/vaults/new?refused=${ref}` };
-    ctx.setFlash(text);
-    return { redirect: "/vaults/new" };
+    return again(text, (err as { code?: string }).code === "22023" ? "name" : undefined);
   }
 }
 
@@ -606,6 +619,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (!get && rest === "/rules") return setRule(ctx, id);
   if (get && rest === "/rules/owners") return pathOwners(ctx, id);
   if (!get && rest === "/rules/owners") return pathOwnerAction(ctx, id);
+  if (get && rest === "/rules/claims") return claimRules(ctx, id);
   if (!get && rest === "/rules/claims") return setClaimRuleAction(ctx, id);
   if (get && rest === "/search") return search(ctx, id);
   if (rest === "/variables" || rest.startsWith("/variables/")) return variablesRoutes(ctx, id, rest);
@@ -630,7 +644,7 @@ async function route(ctx: Ctx): Promise<Reply> {
     if (!get && action === "/revise") return reviseProposal(ctx, id, pid);
     if (!get && action === "/decide") return decide(ctx, id, pid);
     if (!get && action === "/repropose") return repropose(ctx, id, pid);
-    if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx));
+    if (!get && action === "/comment") return postComment(ctx, id, pid, () => notFound(ctx), (c) => proposalView(ctx, id, pid, undefined, c));
     if (!get && action === "/snooze") return snooze(ctx, id, pid, () => notFound(ctx));
     if (!get && action === "/unsnooze") return unsnooze(ctx, id, pid, () => notFound(ctx));
   }

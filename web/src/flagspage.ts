@@ -21,13 +21,14 @@ import { describe } from "./activity.js";
 import { emptyState, html, time, type Raw } from "./html.js";
 import { diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { vaultShell } from "./files.js";
+import { threadPath } from "./threadrefs.js";
 import { filePath, notFound, proposalPath, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
 
 export const flagsPath = (id: string) => vaultPath(id, "/flags");
 
 type Flag = {
   seq: string;
-  category: "responsibility" | "working_set" | "subscription";
+  category: "thread" | "responsibility" | "working_set" | "subscription";
   reason: string;
   event: string;
   path: string | null;
@@ -36,6 +37,8 @@ type Flag = {
   agent: string | null;
   at: string;
   watching: string | null;
+  thread_id: string | null;
+  message_id: number | null;
 };
 
 // The widest page list_flags takes, so "loading the page" and "marking it
@@ -44,6 +47,7 @@ type Flag = {
 const LIMIT = 200;
 
 function categoryBadge(f: Pick<Flag, "category" | "reason">): Raw {
+  if (f.category === "thread") return html`<span class="badge info">Thread</span>`;
   if (f.category === "responsibility") return html`<span class="badge warning">Waiting on you</span>`;
   if (f.reason === "base_changed") return html`<span class="badge info">File changed</span>`;
   if (f.category === "working_set") return html`<span class="badge info">Your proposal</span>`;
@@ -55,7 +59,11 @@ function flagsTable(ctx: Ctx, id: string, rows: Flag[]): Raw {
     <thead><tr><th>When</th><th>Why</th><th>What</th><th>Where</th><th>By</th></tr></thead>
     <tbody>${rows.map((f) => {
       const what = describe(ctx.userId, { event: f.event });
-      const whatCell = f.proposal_id ? html`<a href="${proposalPath(id, f.proposal_id)}">${what}</a>` : what;
+      const whatCell = f.proposal_id
+        ? html`<a href="${proposalPath(id, f.proposal_id)}">${what}</a>`
+        : f.thread_id
+          ? html`<a href="${threadPath(id, f.thread_id)}${f.message_id === null ? "" : `#message-${f.message_id}`}">${what}</a>`
+          : what;
       const whereCell = f.path
         ? f.event === "file.write"
           ? html`<a href="${filePath(id, f.path)}">${f.path}</a>`
@@ -80,14 +88,17 @@ export async function flags(ctx: Ctx, id: string): Promise<Reply> {
     // nothing (design.md, "A separate watermark").
     await c.query(`select public.advance_flags($1, $2)`, [id, r.through]);
     const body = html`
-      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: a proposal waiting on you, your own proposals, and paths you watch.`)}
+      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: threads for you, a proposal waiting on you, your own proposals, and paths you watch.`)}
       ${r.flags.length
         ? flagsTable(ctx, id, r.flags)
         : emptyState({
             title: "Nothing new",
-            body: "Nothing is waiting on you, none of your proposals have changed, and nothing you watch has either.",
+            // Opening this page marks what it shows as seen, so an empty list
+            // means nothing new, not nothing waiting: a proposal can still be
+            // waiting on the person, and Proposals is where it is counted.
+            body: html`Nothing has changed since you last looked. Proposals still waiting on you are in <a href="${vaultPath(id, "/proposals")}">Proposals</a>.`,
           })}
-      ${r.more ? html`<p class="hint">More than ${LIMIT} flags were waiting; the oldest are shown first. Check back after these clear.</p>` : ""}
+      ${r.more ? html`<p class="hint">More than ${LIMIT} flags were waiting; the oldest are shown first. Reload for the next batch.</p>` : ""}
       <p class="hint">Your agents see the same flags over MCP (<code>list_flags</code>), kept separately from yours: opening this page doesn’t mark theirs shown, and their calls don’t mark yours. <a href="/docs/concepts/flags">About flags</a> · <a href="${vaultPath(id, "/config/watching")}">What you watch</a></p>`;
     return vaultShell(c, ctx, v, { section: "diagnostics" }, diagnosticsFrame(id, v, "flags", body));
   });

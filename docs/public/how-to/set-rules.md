@@ -10,16 +10,18 @@ Open the vault, then **Settings**, **Rules**. The table lists every rule in fold
 
 ## Add or change a rule
 
-1. On **Rules**, choose **Add rule** at the top.
+1. On **Rules**, choose **Add rule** at the top. With no rules yet the form is already on the page, under the note, so go to step 2.
 2. Under **Add or change a rule**, fill in:
    - **Path or folder**: a folder ends in `/`, like `clients/`; a file is its full path, like `pricing.md`.
    - **Policy**: **Canon** or **Open**.
    - **Approvals needed**: for canon, how many different people must approve a change, a whole number from 1 to 20. Open rules don't use it.
 3. Choose **Save rule**.
 
-To change an existing rule, open the **⋯** menu on its row and choose **Change**: the form opens with the rule filled in. Saving a rule for a path that already has one replaces it. The change is logged.
+To change an existing rule, open the **⋯** menu on its row and choose **Change**: the form opens with the rule filled in and its path locked. To move a rule to another path, add a rule there, then remove the old one. Saving a rule for a path that already has one replaces it. The change is logged.
 
 If **Approvals needed** isn't a whole number from 1 to 20, the form refuses it and says why, with a reference; nothing is saved.
+
+A rule can ask for more approvals than there are people to give them. Only the vault's owners and editors can approve under a rule, or only the rule's named owners if it has any (see [Path ownership](../concepts/path-ownership.md)). Reliquary still saves the rule, since a team may be growing into it, but the message after saving is a warning that says how many people can approve now. Until more people can, or you lower the number, changes under that rule stay open.
 
 A rule's path is a path inside the vault, written the way files are. The form refuses, and says why, a path that:
 
@@ -44,11 +46,11 @@ A rule saved before paths were checked, on a path like `../x`, never applied to 
 
 ## Name a path's owners
 
-A rule's **⋯** menu also has **Owners**: the people who write that path directly while it stays canon for everyone else. See [Path ownership](../concepts/path-ownership.md#name-an-owner).
+A rule's **⋯** menu also has **Named owners**: the people who write that path directly while it stays canon for everyone else. See [Path ownership](../concepts/path-ownership.md#name-an-owner).
 
 ## Change the vault default
 
-The default for paths without a rule is on **Settings**: pick open or canon and save, then confirm.
+The default for paths without a rule is on **Settings**, **General**: pick open or canon and save, then confirm. On **Rules**, owners get a **Change the default on General** link under the title.
 
 ## Examples
 

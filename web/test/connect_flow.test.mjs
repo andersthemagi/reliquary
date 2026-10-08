@@ -179,12 +179,12 @@ test("full form: a token made from a client's tab goes on with that client's ste
   assert.match(h, /<h2>Set up Cursor<\/h2>/);
 });
 
-test("full form: a refused create goes back to the form with the client kept", async () => {
+test("full form: a refused create shows the form again with the client kept", async () => {
   const r = await post("/connections/new", { csrf: await csrf(), client: "cursor", name: "Flow refused", scope: "some", access: "read", days: "7" });
-  assert.equal(r.status, 303);
-  assert.equal(r.headers.get("location"), "/connections/new?client=cursor");
+  assert.equal(r.status, 400);
+  assert.match(await r.text(), /<input type="hidden" name="client" value="cursor">/);
   const none = await post("/connections/new", { csrf: await csrf(), name: "Flow refused", scope: "some", access: "read", days: "7" });
-  assert.equal(none.headers.get("location"), "/connections/new", "no client, no query");
+  assert.doesNotMatch(await none.text(), /name="client"/, "no client, no field");
 });
 
 test("unknown client: gets the plain answer, with the token and the links to each client", async () => {

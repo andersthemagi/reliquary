@@ -109,10 +109,36 @@ test("new vault: a blank name is refused with a reason, and nothing is created",
   const before = ownerRows(await page("/"));
   const token = csrfOf(await page("/vaults/new"));
   const r = await post("/vaults/new", { csrf: token, name: "   ", default_policy: "open" });
-  assert.equal(r.status, 303);
-  assert.equal(r.headers.get("location"), "/vaults/new");
-  assert.match(await page("/vaults/new"), /A vault name is 1 to 100 characters\./);
+  assert.equal(r.status, 400, "the form again, not a redirect to a blank one");
+  assert.match(await r.text(), /A vault name is 1 to 100 characters\./);
   assert.equal(ownerRows(await page("/")), before);
+});
+
+test("new vault: a refused create comes back with the name, template and default chosen, the reason and a reference first in the form, and the name marked", async () => {
+  const token = csrfOf(await page("/vaults/new"));
+  const r = await post("/vaults/new", { csrf: token, name: "  ", template: "client", default_policy: "canon" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<h1>New vault<\/h1>/);
+  assert.match(h, /<p class="callout danger" role="alert" id="vault-error">A vault name is 1 to 100 characters\. \(ref [0-9a-f]{8}\)<\/p>/);
+  assert.match(h, /<input id="vn" type="text" name="name" placeholder="Client work" value="" aria-invalid="true" aria-describedby="vault-error" required maxlength="100">/);
+  assert.match(h, /<input type="radio" name="template" value="client" checked>/);
+  assert.doesNotMatch(h, /<input type="radio" name="template" value="blank" checked>/);
+  assert.match(h, /name="default_policy" value="canon" checked>/);
+  assert.doesNotMatch(h, /name="default_policy" value="open" checked>/);
+  assert.ok(h.indexOf('id="vault-error"') < h.indexOf('id="vn"'), "the reason is the first thing in the form");
+});
+
+test("new vault: a name that was fine is kept when something else is refused", async () => {
+  const token = csrfOf(await page("/vaults/new"));
+  const r = await post("/vaults/new", { csrf: token, name: "Zephyr kept <b>", template: "no-such-template", default_policy: "canon" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /id="vault-error">Choose one of the templates on the form\. Nothing was created\. \(ref [0-9a-f]{8}\)<\/p>/);
+  assert.match(h, /<input id="vn" type="text" name="name" placeholder="Client work" value="Zephyr kept &lt;b&gt;" required maxlength="100">/);
+  assert.match(h, /<input type="radio" name="template" value="blank" checked>/, "an unknown template shows as Blank");
+  assert.match(h, /name="default_policy" value="canon" checked>/);
+  assert.equal(rowNamed(await page("/"), "Zephyr kept &lt;b&gt;"), "");
 });
 
 test("new vault: the notice after creating one is a success, not a plain note", async () => {

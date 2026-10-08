@@ -136,10 +136,11 @@ test("new token: once created, the page shows only the token and Done, never a s
 
 test("new token: a refusal goes back to the form as a danger message", async () => {
   const r = await post("/connections/new", [["csrf", await csrf()], ["name", "Conn none"], ["scope", "some"], ["access", "read"], ["days", "7"]]);
-  assert.equal(r.headers.get("location"), "/connections/new");
-  const h = await page("/connections/new");
-  assert.match(h, /<p class="callout danger flash" role="alert">Tick at least one vault, or choose all your vaults\.<\/p>/);
-  assert.ok(at(h, "Tick at least one vault") < at(h, 'id="new-token"'));
+  assert.equal(r.status, 400, "the form itself, not a redirect to an empty one");
+  const h = await r.text();
+  assert.match(h, /<h1>New token<\/h1>/);
+  assert.match(h, /<p class="callout danger" role="alert" id="token-error">Tick at least one vault, or choose all your vaults\. Nothing was created\. \(ref [0-9a-f]{8}\)<\/p>/);
+  assert.ok(at(h, 'id="new-token"') < at(h, "Tick at least one vault") && at(h, "Tick at least one vault") < at(h, 'name="name"'), "the reason is the first thing in the form");
 });
 
 // Revoke ------------------------------------------------------------------------

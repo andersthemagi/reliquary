@@ -329,6 +329,7 @@ async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: 
       fields: { path, key, action: verb, confirm: "1" },
       button: verb === "cancel" ? `Cancel “${t.title}”` : `Skip “${t.title}”`,
       cancel: back,
+      ...(verb === "cancel" ? { cancelLabel: "Keep the task" } : {}),
     });
     return { body, title: verb === "cancel" ? "Cancel a task" : "Skip a task" };
   });

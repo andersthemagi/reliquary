@@ -229,12 +229,12 @@ test("file: the meta says who wrote it last and when, relative, with the exact t
   assert.match(h, /<p class="meta file-meta">Last written by you · <time datetime="[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/p>/);
 });
 
-test("file: an owner's More menu on an open file has Delete file and Erase content, each with what it does, before the primary Edit", async () => {
+test("file: an owner's More menu on an open file has Delete file and Erase file, each with what it does, before the primary Edit", async () => {
   const h = await page(file(V.main, "notes/a.md"));
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>\s*<\/div>/.exec(h)[1];
   assert.match(actions, /<details class="menu-wrap action-menu file-more">\s*<summary class="button">More<\/summary>/);
   assert.match(actions, new RegExp(`<a class="menu-item danger" href="${re(file(V.main, "notes/a.md", "&amp;confirm=delete"))}"><span class="menu-item-title">Delete file…</span><span class="menu-item-meta">Removes the file; its history stays</span></a>`));
-  assert.match(actions, new RegExp(`<a class="menu-item danger" href="/v/${V.main}/erase\\?path=notes%2Fa\\.md"><span class="menu-item-title">Erase content…</span><span class="menu-item-meta">Blanks every version; for personal data</span></a>`));
+  assert.match(actions, new RegExp(`<a class="menu-item danger" href="/v/${V.main}/erase\\?path=notes%2Fa\\.md"><span class="menu-item-title">Erase file…</span><span class="menu-item-meta">Blanks every version, then removes the file; for personal data</span></a>`));
   assert.ok(actions.indexOf("file-more") < actions.indexOf(">Edit</a>"), "More before the primary action");
   assert.match(actions, /<a class="button primary" href="[^"]+">Edit<\/a>$/m);
 });
@@ -244,7 +244,7 @@ test("file: on a canon file the menu proposes deleting; an editor has no Erase; 
   assert.match(canon, new RegExp(`<a class="menu-item" href="${re(file(V.main, "canon/terms.md", "&amp;confirm=delete"))}"><span class="menu-item-title">Propose deleting…</span>`));
   const editor = await page(file(V.cal, "cal.md"));
   assert.match(editor, /Delete file…/);
-  assert.doesNotMatch(editor, /Erase content|\/erase\?/);
+  assert.doesNotMatch(editor, /Erase file|\/erase\?/);
   const viewer = await page(file(V.dora, "dora.md"));
   assert.doesNotMatch(viewer, /file-more|confirm=delete|\/erase\?/);
 });
@@ -321,6 +321,23 @@ test("edit: saving an open file says so as a success", async () => {
   assert.match(await page(r.headers.get("location")), /<p class="callout success flash" role="status">Saved notes\/a\.md\.<\/p>/);
 });
 
+test("edit: a text that starts with a newline comes back from the box, and saves, unchanged", async () => {
+  const body = "\n\nAfter two blank lines.\n";
+  await as(BREE, "select public.write_file($1, 'notes/lead.md', $2)", [V.main, body]);
+  const h = await page(`/v/${V.main}/edit?path=notes%2Flead.md`);
+  // What the box holds once a browser has read it: the HTML parser drops one
+  // newline right after <textarea>.
+  const shown = /<textarea id="content" name="content">([\s\S]*?)<\/textarea>/.exec(h)[1].replace(/^\n/, "");
+  assert.equal(shown, body);
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(h), action: "write", path: "notes/lead.md", content: shown, expected_version: formFields(h, "Save").fields.expected_version });
+  assert.equal(r.status, 303);
+  const [{ body: saved }] = await sql(
+    "select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/lead.md'",
+    [V.main],
+  );
+  assert.equal(saved, body);
+});
+
 test("new file: in a canon folder the page shows the rule, asks why, and the button says Propose file", async () => {
   const h = await page(`/v/${V.main}/new?dir=canon`);
   assert.match(h, /From the rule on <a href="[^"]+"><code>canon\/<\/code><\/a>, set by you <time/);
@@ -338,6 +355,109 @@ test("new file: in an open folder there's no Why field and the button says Creat
   assert.match(h, /<input type="hidden" name="reason" value="New file">/, "a path typed under canon still has a reason");
   const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(h), action: "create", path: "notes/new.md", content: "N", reason: "New file" });
   assert.match(await page(r.headers.get("location")), /<p class="callout success flash" role="status">Saved notes\/new\.md\.<\/p>/);
+});
+
+// ---------------------------------------------------------------------------
+// A file form the database refuses comes back as its own page
+
+const alertOf = (h) => /<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(h)?.[1] ?? "";
+const refOf = (h) => /\(ref ([0-9a-f]{8})\)$/.exec(alertOf(h))?.[1];
+const inLog = async (ref) => {
+  for (let i = 0; i < 20; i++) {
+    if (log.includes(`failure ref=${ref} `)) return true;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return false;
+};
+
+test("refused: a create the database refuses answers New file again (400), the path and text as typed, not a Not found page", async () => {
+  const h0 = await page(`/v/${V.main}/new?dir=notes%2F`);
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(h0), action: "create", path: "notes/back\\slash.md", content: "Typed <b>text</b>", reason: "New file" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(alertOf(h), /backslash/);
+  assert.match(h, /<h1>New file<\/h1>/);
+  assert.match(h, /<input id="p" type="text" name="path" value="notes\/back\\slash\.md"/);
+  assert.match(h, /<textarea id="c" name="content">Typed &lt;b&gt;text&lt;\/b&gt;<\/textarea>/);
+  assert.match(h, new RegExp(`<li><a href="/v/${V.main}/tree\\?path=notes%2F">notes</a></li><li aria-current="page">New file</li>`), "in the folder typed");
+  assert.doesNotMatch(h, /class="callout [a-z]+ flash"|Not found/);
+  assert.equal(await live(V.main, "notes/back\\slash.md"), 0);
+});
+
+const currentVersion = async (path) =>
+  (await sql("select current_version_id as v from public.files where vault_id = $1 and path = $2 and deleted_at is null", [V.main, path]))[0]?.v;
+
+test("new file: Create file at a path that already exists in an open folder is refused, the file is left as it is and the form keeps the text", async () => {
+  const before = await currentVersion("notes/a.md");
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new?dir=notes%2F`)), action: "create", path: "notes/a.md", content: "Typed over it?", reason: "New file" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(alertOf(h), /^A file already exists at notes\/a\.md\. Open it and choose Edit, or pick another path\. \(ref [0-9a-f]{8}\)$/);
+  assert.match(h, /<textarea id="c" name="content">Typed over it\?<\/textarea>/);
+  assert.equal(await currentVersion("notes/a.md"), before);
+});
+
+test("new file: Create file at the path of a deleted file writes it, the path being free again", async () => {
+  assert.equal(await live(V.main, "notes/gone.md"), 0, "deleted by the delete tests above");
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new?dir=notes%2F`)), action: "create", path: "notes/gone.md", content: "Back.", reason: "New file" });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), file(V.main, "notes/gone.md"));
+  assert.equal(await live(V.main, "notes/gone.md"), 1);
+});
+
+test("new file: in a canon folder a create at an existing path is still a proposal, with the file untouched", async () => {
+  const before = await currentVersion("canon/terms.md");
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new?dir=canon`)), action: "create", path: "canon/terms.md", content: "Net 90.", reason: "Longer terms" });
+  assert.equal(r.status, 303);
+  assert.match(r.headers.get("location"), new RegExp(`^/v/${V.main}/proposals/[0-9a-f-]{36}$`));
+  assert.equal(await currentVersion("canon/terms.md"), before);
+});
+
+test("refused: the reason carries a reference that is in the server log", async () => {
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new`)), action: "create", path: "a//b.md", content: "x", reason: "New file" });
+  const ref = refOf(await r.text());
+  assert.ok(ref, "the reason ends with (ref …)");
+  assert.ok(await inLog(ref), `ref ${ref} in the log`);
+});
+
+test("refused: a create in a canon folder keeps the Why as typed, with Propose file", async () => {
+  const h0 = await page(`/v/${V.main}/new?dir=canon`);
+  const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(h0), action: "create", path: "canon/x//y.md", content: "T", reason: "Because it is new" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<input id="r" type="text" name="reason" required aria-describedby="r-hint" value="Because it is new">/);
+  assert.match(h, /<button class="primary" form="new-file">Propose file<\/button>/);
+});
+
+test("refused: a save the database refuses answers the editor again (400), the text as typed, now as a proposal when the file became canon", async () => {
+  await as(BREE, "select public.write_file($1, 'notes/flip.md', 'Before')", [V.main]);
+  const h0 = await page(`/v/${V.main}/edit?path=notes%2Fflip.md`);
+  await as(BREE, "select public.set_policy($1, 'notes/flip.md', 'canon', 1)", [V.main]);
+  try {
+    const { fields } = formFields(h0, "Save");
+    const r = await post(`/v/${V.main}/file`, { ...fields, content: "My edit <i>kept</i>" });
+    assert.equal(r.status, 400);
+    const h = await r.text();
+    assert.match(alertOf(h), /canon/);
+    assert.match(h, /<h1 class="path">Propose a change to flip\.md<\/h1>/);
+    assert.match(h, /<textarea id="content" name="content">My edit &lt;i&gt;kept&lt;\/i&gt;<\/textarea>/);
+    assert.match(h, /<input id="r" type="text" name="reason" required/);
+    assert.doesNotMatch(h, /name="expected_version"/);
+    assert.equal((await sql("select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/flip.md'", [V.main]))[0].body, "Before");
+  } finally {
+    await as(BREE, "select public.set_policy($1, 'notes/flip.md', null, 1)", [V.main]);
+  }
+});
+
+test("refused: a proposal the database refuses answers the editor again (400), with the Why and the text as typed", async () => {
+  const h0 = await page(`/v/${V.main}/edit?path=canon%2Fterms.md`);
+  const { fields } = formFields(h0, "Propose change");
+  const r = await post(`/v/${V.main}/file`, { ...fields, path: "canon/bad//terms.md", content: "Net 90.", reason: "Longer terms" });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(alertOf(h), /^Invalid path/);
+  assert.match(h, /<input id="r" type="text" name="reason" required aria-describedby="r-hint" value="Longer terms">/);
+  assert.match(h, /<textarea id="content" name="content">Net 90\.<\/textarea>/);
 });
 
 // ---------------------------------------------------------------------------

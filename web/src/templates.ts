@@ -269,10 +269,11 @@ export async function applyTemplate(c: pg.ClientBase, name: string, policy: "can
 // The New vault form's "Start from" choices, as cards: a radio inside each
 // label, so the whole card picks it and the checked one is marked in CSS
 // (:has(:checked); no script). Blank is checked, so a form without the
-// field (or an older page) still makes a blank vault. Each template's card
+// field (or an older page) still makes a blank vault; a refused create
+// shows the one that was chosen instead. Each template's card
 // says what it is for in a line, then its folders' policies and its
 // suggested variable names.
-export function templateChoices(): Raw {
+export function templateChoices(selected = "blank"): Raw {
   const folders = (t: Template, policy: "canon" | "open") => t.rules.filter((r) => r.policy === policy).map((r) => r.path).join(", ");
   const detail = (t: Template) => {
     if (!t.files.length) return html``;
@@ -286,7 +287,7 @@ export function templateChoices(): Raw {
         <legend>Start from</legend>
         <p class="hint" id="template-hint">A template writes its starting files and sets its folders’ rules. Suggested variables are names only: you set values later, on the vault’s Variables page.</p>
         <div class="choice-card-grid">${TEMPLATES.map(
-          (t) => html`<label class="choice-card"><input type="radio" name="template" value="${t.id}"${t.id === "blank" ? html` checked` : ""}>
+          (t) => html`<label class="choice-card"><input type="radio" name="template" value="${t.id}"${t.id === selected ? html` checked` : ""}>
           <span class="choice-card-body"><span class="choice-card-title">${t.name}</span>
           <span class="choice-card-text">${t.summary}</span>${detail(t)}</span></label>`,
         )}</div>

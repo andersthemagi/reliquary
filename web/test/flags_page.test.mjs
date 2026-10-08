@@ -26,6 +26,7 @@ let child;
 const s = { origin: "", cookie: "" };
 const V = {};
 const P = {};
+const T = {};
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -99,6 +100,12 @@ before(async () => {
   [{ id: V.empty }] = await as(FRAN, "select public.create_vault('Flags empty', 'open') as id");
   [{ id: V.ola }] = await as(GIL, "select public.create_vault('Flags gil-only', 'open') as id");
 
+  // Its own vault, so the five flags V.main's tests count stay five.
+  [{ id: V.thread }] = await as(FRAN, "select public.create_vault('Flags threads', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.thread, GIL, FRAN]);
+  [{ id: T.open }] = await as(GIL, "select public.open_thread($1, 'Who owns the brief?', 'Asking the room.') as id", [V.thread]);
+  await as(GIL, "select public.post_message($1, 'Still asking.')", [T.open]);
+
   // Gil's actions: what Fran's Flags page should show, oldest first.
   [{ id: P.review }] = await as(GIL, "select public.propose($1, 'notes/a.md', 'Text v2', '') as id", [V.main]); // responsibility/review
   await as(GIL, "select public.comment_on_proposal($1, 'looks good')", [P.own]); // working_set/proposal (Fran already approved, so not also review)
@@ -165,6 +172,12 @@ test("flags page: a vault with nothing waiting says so", async () => {
   assert.match(h, /<strong>Nothing new<\/strong>/);
 });
 
+test("flags page: with nothing new it says so and points to Proposals for what is still waiting, not that nothing waits", async () => {
+  const h = await page(flagsUrl(V.empty));
+  assert.doesNotMatch(h, /Nothing is waiting on you/);
+  assert.match(h, new RegExp(`Nothing has changed since you last looked\\. Proposals still waiting on you are in <a href="/v/${V.empty}/proposals">Proposals</a>\\.`));
+});
+
 test("flags page: shows what waits on Fran, oldest first, none of it Fran's own actions", async () => {
   const h = await page(flagsUrl(V.main));
   const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
@@ -199,4 +212,30 @@ test("flags page: viewing it marks these shown; a second visit has nothing new u
   const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)];
   assert.equal(rows.length, 1);
   assert.match(rows[0][1], new RegExp(`<a href="/v/${V.main}/proposals/${P.own}">Commented on a proposal</a>`));
+});
+
+test("flags page: a thread flag is badged Thread and links to its thread, not left as a bare Watching row", async () => {
+  const h = await page(flagsUrl(V.thread));
+  const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 2, h);
+  for (const r of rows) {
+    assert.match(r, /<span class="badge info">Thread<\/span>/);
+    assert.doesNotMatch(r, /Watching/);
+  }
+  assert.match(rows[0], new RegExp(`<a href="/v/${V.thread}/threads/${T.open}(#message-\\d+)?">Opened a thread</a>`));
+  assert.match(rows[1], new RegExp(`<a href="/v/${V.thread}/threads/${T.open}#message-\\d+">Posted in a thread</a>`));
+});
+
+test("flags page: past 200 flags it says to reload for the next batch, and the reload shows it", async () => {
+  [{ id: V.many }] = await as(FRAN, "select public.create_vault('Flags many', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.many, GIL, FRAN]);
+  await as(FRAN, "select public.create_subscription($1, 'path', 'bulk/')", [V.many]);
+  await as(GIL, "select public.write_file($1, 'bulk/' || g || '.md', 'Text') from generate_series(1, 201) g", [V.many]);
+  const first = await page(flagsUrl(V.many));
+  assert.equal((first.match(/<tr class="ev">/g) ?? []).length, 200);
+  assert.match(first, /More than 200 flags were waiting; the oldest are shown first\. Reload for the next batch\./);
+  assert.doesNotMatch(first, /Check back/);
+  const second = await page(flagsUrl(V.many));
+  assert.equal((second.match(/<tr class="ev">/g) ?? []).length, 1);
+  assert.doesNotMatch(second, /More than 200 flags/);
 });

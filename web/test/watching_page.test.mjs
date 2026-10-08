@@ -87,6 +87,8 @@ const landed = async (r) => {
   return page(r.headers.get("location"));
 };
 const flashOf = (h) => /<p class="callout (\w+) flash" role="(\w+)">([\s\S]*?)<\/p>/.exec(h)?.slice(1);
+// A refused Watch on the Watching tab answers the form again, with the reason in it.
+const refusedForm = (h) => /<p class="callout danger" role="alert" id="watch-error">([\s\S]*?)<\/p>/.exec(h)?.[1];
 
 // The fields of the form on `h` whose submit button says `label`.
 function formFields(h, label) {
@@ -130,6 +132,14 @@ before(async () => {
   await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.empty, WREN, OLA]);
   [{ id: V.ola }] = await as(OLA, "select public.create_vault('Watch ola', 'open') as id");
   await as(OLA, "select public.write_file($1, 'x.md', 'Text')", [V.ola]);
+  // Watches that name something there and things that aren't (yet): a file
+  // and a folder with content, a file never written, a file since deleted,
+  // and a folder with nothing under it.
+  [{ id: V.gone }] = await as(OLA, "select public.create_vault('Watch gone', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.gone, WREN, OLA]);
+  for (const f of ["kept.md", "docs/a.md", "old.md"]) await as(OLA, "select public.write_file($1, $2, 'Text')", [V.gone, f]);
+  await as(OLA, "select public.delete_file($1, 'old.md')", [V.gone]);
+  for (const t of ["kept.md", "docs/", "later.md", "old.md", "ghost/"]) await as(WREN, "select public.create_subscription($1, 'path', $2)", [V.gone, t]);
 });
 
 after(async () => {
@@ -147,15 +157,19 @@ test("watch button: a viewer's file page offers Watch, for that exact path, comi
   assert.doesNotMatch(h, /class="badge info"[^>]*>Watching/, "not watched yet: Ola's watch is hers");
 });
 
+test("watch button: says changes are flagged to you and your agents, not only to your agents", async () => {
+  assert.match(actionsOf(await page(file(V.main, "notes/a.md"))), /<button title="Flag changes here to you and your agents">Watch<\/button>/);
+});
+
 test("watch button: watching a file comes back to it saying so, and the page then shows Watching with Unwatch", async () => {
   const h0 = await page(file(V.main, "notes/a.md"));
   const { action, fields } = formFields(h0, "Watch");
   const r = await post(action, fields);
   assert.equal(r.headers.get("location"), file(V.main, "notes/a.md"));
   const h = await landed(r);
-  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/a.md. From now on, changes there are flagged to your agents."]);
+  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/a.md. From now on, changes there are flagged to you and your agents."]);
   assert.deepEqual(await watches(WREN, V.main), ["notes/a.md"]);
-  assert.match(h, /<div class="page-title"><h1 class="path">a\.md<\/h1><span class="badge info" title="Changes here are flagged to your agents\. Only you see this\.">Watching<\/span><\/div>/);
+  assert.match(h, /<div class="page-title"><h1 class="path">a\.md<\/h1><span class="badge info" title="Changes here are flagged to you and your agents\. Only you see this\.">Watching<\/span><\/div>/);
   const { fields: un } = formFields(actionsOf(h), "Unwatch");
   assert.equal(un.action, "unwatch");
   assert.match(un.subscription, /^[0-9a-f-]{36}$/);
@@ -175,7 +189,7 @@ test("watch button: a folder has Watch too; a file in a watched folder says whic
   assert.equal(fields.path, "notes/");
   assert.equal(fields.back, tree(V.main, "notes/"));
   const h = await landed(await post(action, fields));
-  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/. From now on, changes there are flagged to your agents."]);
+  assert.deepEqual(flashOf(h), ["success", "status", "Watching notes/. From now on, changes there are flagged to you and your agents."]);
   const b = await page(file(V.main, "notes/b.md"));
   assert.match(b, /<span class="badge info" title="Your watch on notes\/ covers this\. Only you see it\.">Watching via notes\/<\/span>/);
   assert.doesNotMatch(actionsOf(b), /config\/watching/, "no Watch or Unwatch here");
@@ -229,7 +243,7 @@ test("watching tab: every member has Settings, Watching, listing only their own 
   assert.match(h, /<h1>Settings<\/h1>/);
   assert.match(h, new RegExp(`<li><a href="/v/${V.main}/config">Settings</a></li><li aria-current="page">Watching</li>`));
   assert.match(h, new RegExp(`<a href="/v/${V.main}/config/watching" aria-current="page">Watching</a>`));
-  assert.match(h, /Changes there are flagged to your agents when they ask \(<code>list_flags<\/code>\)\. Only you see this list\./);
+  assert.match(h, new RegExp(`Changes there are flagged to you and to your agents\\. You see them in <a href="/v/${V.main}/flags">Flags</a> \\(under Diagnostics\\) and in <a href="/v/${V.main}/changes\\?show=watching">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>\\. Only you see this list\\.`));
   assert.match(h, new RegExp(`<a href="${re(tree(V.main, "notes/"))}"><code>notes/</code></a><span class="token-client">Folder, and everything in it</span>`));
   assert.doesNotMatch(h, /<code>notes\/a\.md<\/code>/, "Ola's watch isn't Wren's");
   const { action, fields } = formFields(h, "Unwatch");
@@ -238,23 +252,58 @@ test("watching tab: every member has Settings, Watching, listing only their own 
   assert.match(h, /<button class="quiet" aria-label="Unwatch notes\/">Unwatch<\/button>/);
 });
 
-test("watching tab: with nothing watched, it says how to start, and the header offers Watch a path", async () => {
+test("watching tab: a watched path with no file or folder there is plain text, not a link to a page that doesn't exist", async () => {
+  const h = await page(watching(V.gone));
+  assert.match(h, new RegExp(`<a href="${re(file(V.gone, "kept.md"))}"><code>kept\\.md</code></a><span class="token-client">File</span>`));
+  assert.match(h, new RegExp(`<a href="${re(tree(V.gone, "docs/"))}"><code>docs/</code></a><span class="token-client">Folder, and everything in it</span>`));
+  for (const [t, label] of [["later.md", "File"], ["old.md", "File"], ["ghost/", "Folder, and everything in it"]]) {
+    assert.match(h, new RegExp(`<td><code>${re(t)}</code><span class="token-client">${label}, nothing there yet</span></td>`), t);
+  }
+});
+
+test("watching tab: with nothing watched, it says how to start, with the form under it and no header button that only scrolls to it", async () => {
   const h = await page(watching(V.empty));
-  assert.match(h, /<div class="empty"><strong>You don’t watch anything here<\/strong><p>Watch a folder or file from its page, or type one below\. Changes there are flagged to your agents from then on\.<\/p><\/div>/);
+  assert.match(h, /<div class="empty"><strong>You don’t watch anything here<\/strong><p>Watch a folder or file from its page, or type one below\. Changes there are flagged to you and your agents from then on\.<\/p><\/div>/);
+  assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel watch-add"/, "the form follows the empty box, where the stylesheet spaces them");
+  assert.doesNotMatch(h, /href="#watch-path"/);
+});
+
+test("watching tab: with watches listed, the header offers Watch a path, since the form may be a scroll away", async () => {
+  const h = await page(watching(V.main));
   assert.match(h, /<div class="page-actions"><a class="button primary" href="#watch-path">Watch a path<\/a><\/div>/);
 });
 
 test("watching tab: a typed path is watched, existing yet or not; one the database won't take is refused in its own words, with a reference", async () => {
   const token = csrfOf(await page(watching(V.empty)));
   const h = await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: " clients/ ", back: watching(V.empty) }));
-  assert.deepEqual(flashOf(h), ["success", "status", "Watching clients/. From now on, changes there are flagged to your agents."]);
-  assert.match(h, /<code>clients\/<\/code><\/a><span class="token-client">Folder, and everything in it<\/span>/);
-  const bad = flashOf(await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: "/clients/", back: watching(V.empty) })));
-  assert.equal(bad[0], "danger");
-  assert.match(bad[2], /^A watched path starts with \/, but paths in a vault are relative: write clients\/ rather than \/clients\/\. \(ref [0-9a-f]{8}\)$/);
-  const none = flashOf(await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: "", back: watching(V.empty) })));
-  assert.match(none[2], /^Say which path to watch: a folder ending in \/ \(like clients\/\) or a file \(like notes\/plan\.md\)\. \(ref [0-9a-f]{8}\)$/);
+  assert.deepEqual(flashOf(h), ["success", "status", "Watching clients/. From now on, changes there are flagged to you and your agents."]);
+  assert.match(h, /<code>clients\/<\/code><span class="token-client">Folder, and everything in it, nothing there yet<\/span>/);
+  const bad = await post(watching(V.empty), { csrf: token, action: "watch", path: "/clients/", back: watching(V.empty) });
+  assert.equal(bad.status, 400, "the form again, not a flash");
+  assert.match(refusedForm(await bad.text()), /^A watched path starts with \/, but paths in a vault are relative: write clients\/ rather than \/clients\/\. \(ref [0-9a-f]{8}\)$/);
+  const none = await post(watching(V.empty), { csrf: token, action: "watch", path: "", back: watching(V.empty) });
+  assert.equal(none.status, 400);
+  assert.match(refusedForm(await none.text()), /^Say which path to watch: a folder ending in \/ \(like clients\/\) or a file \(like notes\/plan\.md\)\. \(ref [0-9a-f]{8}\)$/);
   assert.deepEqual(await watches(WREN, V.empty), ["clients/"]);
+});
+
+test("watching tab: a refused path stays in the Watch form, marked, with the form first on the page and nothing watched", async () => {
+  const token = csrfOf(await page(watching(V.empty)));
+  const r = await post(watching(V.empty), { csrf: token, action: "watch", path: "/typed/folder/", back: watching(V.empty) });
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<input id="wp" type="text" name="path" placeholder="clients\/" required maxlength="1024" autocomplete="off" spellcheck="false" value="\/typed\/folder\/" aria-invalid="true" aria-describedby="watch-error wp-hint">/);
+  assert.ok(h.indexOf('id="watch-path"') < h.indexOf('<table class="table-stack member-list watch-list">'), "the refused form is on the first screen");
+  assert.doesNotMatch(h, /page-actions/, "no Watch a path while the form is first");
+  assert.deepEqual(await watches(WREN, V.empty), ["clients/"]);
+});
+
+test("watching tab: a refusal from the Watch button on a page still comes back to that page as a flash", async () => {
+  const token = csrfOf(await page(watching(V.main)));
+  const r = await post(watching(V.main), { csrf: token, action: "watch", path: "/bad/", back: file(V.main, "top.md") });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), file(V.main, "top.md"));
+  assert.equal(flashOf(await page(r.headers.get("location")))[0], "danger");
 });
 
 test("watching tab: at the most paths one person can watch, the database's refusal is shown as it says it, with a reference, and nothing is added", async () => {
@@ -262,9 +311,8 @@ test("watching tab: at the most paths one person can watch, the database's refus
   assert.equal(n, 100);
   const token = csrfOf(await page(watching(V.cap)));
   const r = await post(watching(V.cap), { csrf: token, action: "watch", path: "one-more/", back: watching(V.cap) });
-  assert.equal(r.status, 303, "a flash on the page, not an error page");
-  const [tone, role, text] = flashOf(await landed(r));
-  assert.deepEqual([tone, role], ["danger", "alert"]);
+  assert.equal(r.status, 400, "the form again, not an error page");
+  const text = refusedForm(await r.text());
   const m = /^You watch 100 paths in this vault already, the most one person can: stop watching one first\. \(ref ([0-9a-f]{8})\)$/.exec(text);
   assert.ok(m, text);
   assert.match(log, new RegExp(`failure ref=${m[1]} `), "the ref is in the server log");

@@ -51,6 +51,8 @@ test("delete: needs the form token", async () => {
 test("delete: a canon file can't be deleted directly, even by the owner", async () => {
   const token = await csrf(`${V}/file?path=canon%2Fpricing.md`);
   const r = await post(`${V}/file`, { csrf: token, action: "delete", path: "canon/pricing.md" });
-  assert.equal(r.status, 303);
+  assert.equal(r.status, 400);
+  // The refusal is on the page that offers what to do instead.
+  assert.match(await r.text(), /<div class="callout danger" role="alert"><p>[^<]*is canon[^<]*\(ref [0-9a-f]{8}\)<\/p><\/div>[\s\S]*Propose deleting pricing\.md/);
   assert.equal((await get(`${V}/file?path=canon%2Fpricing.md`)).status, 200);
 });

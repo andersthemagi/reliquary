@@ -40,6 +40,8 @@ The **Connect** page says **Connected** and names a connection used in the last 
 
 A vault's page shows a **Connect an agent** step to its writers, for the first 14 days after the vault is made, until you have any connection at all (a token, an app or the CLI).
 
+If **Create token** is refused (no name, **Only the vaults I tick** with none ticked, an expiry past a year), the form comes back with the reason and a reference, and everything you chose is still there to correct. Nothing was created.
+
 ## Scope is fixed
 
 A connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.
