@@ -49,8 +49,8 @@ import { siteHref } from "./hosts.js";
 import { emailKey, inviteTokenOf, maskEmail, peekInvite, roleName, type Peek } from "./invites.js";
 import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
-import { errorPage } from "./errorpage.js";
-import { failure, noteUpstream, sqlstateName, upstreamNote } from "./failure.js";
+import { errorPage, refusalText } from "./errorpage.js";
+import { failure, noteUpstream, Refusal, sqlstateName, upstreamNote } from "./failure.js";
 import { requestAccessHref } from "./site.js";
 
 // The live invite a sign-in is for, if `next` is an invite page. Looking
@@ -281,7 +281,8 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   const next = safeNext(i.form.get("next"));
   if (!preTokenOk(i.req, i.form)) {
     // Also the answer to a cross-site post that got past the Origin rule.
-    return out({ status: 403, html: emailForm(pre(), next, i.theme, "That form expired. Enter your email again.") });
+    const why = "That form expired: its security cookie was missing or didn’t match, which happens when this browser blocks cookies or the page was opened before this one. Enter your email again";
+    return out({ status: 403, html: emailForm(pre(), next, i.theme, refusalText(new Refusal({ status: 403, where: "sign-in form check", why }))) });
   }
 
   if (p === "/signin") {
