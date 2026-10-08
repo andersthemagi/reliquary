@@ -195,13 +195,29 @@ export async function call(
   return { result: rpc.result, sessionId: typeof returnedSession === "string" ? returnedSession : undefined };
 }
 
+// An upstream's description is third-party text that an owner approves a
+// grant by and that mcp/ later puts in front of agents. Stored as one
+// bounded line without control or invisible formatting characters (bidi
+// overrides, zero-width marks), so what the owner read is what is stored.
+// mcp/src/links-tools.ts applies the same limits again at the point of use,
+// for rows stored before this and rows written any other way.
+const DESCRIPTION_MAX = 300;
+function tidyDescription(raw: string): string | null {
+  const one = raw
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, " ")
+    .replace(/\p{Cf}+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return one ? Array.from(one).slice(0, DESCRIPTION_MAX).join("") : null;
+}
+
 function toolOf(raw: unknown): DiscoveredTool | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
   if (typeof t.name !== "string" || t.name.length === 0 || t.name.length > 200) return null;
   const annotations = t.annotations && typeof t.annotations === "object" ? (t.annotations as Record<string, unknown>) : undefined;
   const isWrite = annotations?.readOnlyHint !== true;
-  const description = typeof t.description === "string" ? t.description : null;
+  const description = typeof t.description === "string" ? tidyDescription(t.description) : null;
   return { name: t.name, isWrite, description };
 }
 
