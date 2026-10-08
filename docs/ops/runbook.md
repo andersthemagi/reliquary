@@ -601,8 +601,10 @@ failure ref=7f3a2c9e {"status":504,"what":"POST /v/:id/file <vault id> action=wr
 4. A `57014` or `55P03` is a slow query or a held lock: find the function
    in `functions`, and check Supabase's query performance for it. An `08xxx`
    or `53300` is the database connection: check Supabase's status and the
-   pooler. A `sign-in (Supabase Auth)` failure names the call and its status
-   or network error.
+   pooler. A line whose `what` is `db connection` is a connection the
+   database or pooler dropped while idle or mid-request; the process kept
+   running and the next request connected again. A `sign-in (Supabase
+   Auth)` failure names the call and its status or network error.
 
 Logs never hold a value, a token, a file's text, an email address or a
 failing row's values; if one ever does, that is a bug to fix before
