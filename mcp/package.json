@@ -1,6 +1,6 @@
 {
   "name": "@reliquary-ai/mcp",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "license": "FSL-1.1-ALv2",
   "description": "Reliquary's remote MCP endpoint",
