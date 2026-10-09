@@ -32,7 +32,7 @@ On Windows, `npm`, `npx` and `pnpm` work as they are: the CLI starts `.cmd` shim
 reliquary env pull --vault "My project" --env development
 ```
 
-This writes `.env` (or `--file <path>`) with mode 600, one `NAME="value"` per line. It writes only to a file that git ignores inside a git repository: a file that isn't ignored, is tracked, or is outside any repository is refused, and nothing is written. Add `.env` to `.gitignore` first. Outside a repository, pass `--outside-repo` to say you know.
+This writes `.env` (or `--file <path>`) with mode 600, one `NAME="value"` per line. On Windows, which has no mode 600, the file keeps its folder's permissions, so pull into a folder only you can read. It writes only to a file that git ignores inside a git repository: a file that isn't ignored, is tracked, or is outside any repository is refused, and nothing is written. Add `.env` to `.gitignore` first. Outside a repository, pass `--outside-repo` to say you know.
 
 Prefer `run`: a file on disk is readable by anything running as you, including agents.
 

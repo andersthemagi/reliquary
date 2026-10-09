@@ -104,6 +104,12 @@ export function checkTarget(file: string, outsideRepo: boolean): { abs: string; 
   return { abs, tmp: tmpIgnored ? path.join(dir, tmpBase) : null };
 }
 
+// What to tell a person about who can read the file. Windows has no Unix
+// modes: opening with 0o600 there only sets the read-only attribute, and the
+// file keeps its folder's access list, so "mode 600" would be untrue.
+export const privacyNote = (platform: NodeJS.Platform = process.platform) =>
+  platform === "win32" ? "Windows can't limit it to you: it keeps its folder's permissions" : "mode 600";
+
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 
 // Mode 0600 from the first byte. With a temporary file: write, fsync,

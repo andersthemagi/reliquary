@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { CliError } from "../dist/errors.js";
-import { checkTarget } from "../dist/pull.js";
+import { checkTarget, privacyNote } from "../dist/pull.js";
 
 const tmp = (p) => mkdtempSync(path.join(os.tmpdir(), `pull-${p}-`));
 function repo(gitignore) {
@@ -61,4 +61,11 @@ test("env pull git check: a directory outside any repository is still refused, a
 test("env pull git check: an ignored file in a repository passes", () => {
   const dir = repo(".env\n");
   assert.equal(checkTarget(path.join(dir, ".env"), false).abs, path.join(dir, ".env"));
+});
+
+test("env pull privacy: says mode 600 only where the file really gets it, and on Windows says it keeps the folder's permissions", () => {
+  assert.equal(privacyNote("linux"), "mode 600");
+  assert.equal(privacyNote("darwin"), "mode 600");
+  assert.doesNotMatch(privacyNote("win32"), /600|mode/);
+  assert.match(privacyNote("win32"), /folder's permissions/);
 });

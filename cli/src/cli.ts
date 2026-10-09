@@ -12,7 +12,7 @@ import { login, logout } from "./auth.js";
 import { DEFAULT_SERVER, discover, projectConfig, serverOrigin, type ProjectConfig } from "./config.js";
 import { credentialStore, credentialsFile } from "./credentials.js";
 import { CliError, fsFailure, UsageError } from "./errors.js";
-import { checkTarget, formatDotenv, writePrivate } from "./pull.js";
+import { checkTarget, formatDotenv, privacyNote, writePrivate } from "./pull.js";
 import { readDotenv, waitForDecision } from "./push.js";
 import { runWith } from "./run.js";
 
@@ -25,7 +25,8 @@ Usage:
   reliquary run [--vault V] [--env E] -- <command> [args...]
                                         run a command with the variables in its environment
   reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]
-                                        write them to a file git ignores (mode 600)
+                                        write them to a file git ignores (mode 600;
+                                        on Windows, its folder's permissions)
   reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]
                                         send a .env's values for a person to apply
                                         in the web UI (nothing is set until then)
@@ -191,7 +192,7 @@ async function main(argv: string[]): Promise<number> {
       const where = checkTarget(file, !!opts["outside-repo"]); // again: it may have changed meanwhile
       writePrivate(where, formatDotenv(variables, { server: server.issuer, vaultName: vault.name, vaultId: vault.id, environment, at: new Date() }));
       const names = [...variables.keys()];
-      say(`Wrote ${names.length} variable${names.length === 1 ? "" : "s"} from ${vault.name} (${environment}) to ${file} (mode 600)${names.length ? `: ${names.join(", ")}` : "."}`);
+      say(`Wrote ${names.length} variable${names.length === 1 ? "" : "s"} from ${vault.name} (${environment}) to ${file} (${privacyNote()})${names.length ? `: ${names.join(", ")}` : "."}`);
       return 0;
     }
     default:
