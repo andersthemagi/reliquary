@@ -207,7 +207,7 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   and `web/test/discovery.test.mjs`, wiring in
   `web/test/links_page.test.mjs`): design.md's first open question
   (synchronous or a background job) answered synchronous, in the same
-  request as `create_link` — a slow or unreachable upstream flashes a
+  request as `create_link`: a slow or unreachable upstream flashes a
   warning naming why, with a reference in the server log, and keeps the
   link; there is no rediscovery yet, so retrying today means deleting and
   re-adding the link. The MCP handshake (`initialize`, `initialized`,
@@ -245,7 +245,7 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   (`linkcall.ts`, `discovery.ts`'s own safe-HTTP machinery, re-checking
   the address on every call, not just when the link was added).
   `private.list_callable_link_tools()` is what builds each identity's
-  `<link>.<tool>` entries in `tools/list` — the exact criteria
+  `<link>.<tool>` entries in `tools/list`, the exact criteria
   `begin_link_call` checks, so a tool is only ever listed if calling it
   would succeed; `tools/list` is no longer cached process-wide (it was,
   identity-independent) now that this makes it identity-dependent. An
@@ -280,14 +280,14 @@ re-adding the link).
 
 Not a numbered milestone of its own (design.md's "Path ownership", owner's
 decision 2026-09-28). Built in `20260928130000_path_ownership.sql`, with
-hostile tests (`supabase/tests/path_ownership_test.sql`) — a path's named
+hostile tests (`supabase/tests/path_ownership_test.sql`): a path's named
 owners write, delete and decide on it directly, whatever their vault role (a
 viewer may be named), and only their approvals count toward its quorum; a
 path with no named owner is provably unchanged (the same suite re-runs
 every existing canon/open hostile test, all still passing). This touched
 `policy_for`, `write_file`, `delete_file` and `decide()`, functions every
 other feature depends on, more than the schema-only shape of most
-milestone work — treat any further change to those four with the same
+milestone work, so treat any further change to those four with the same
 care. Deliberately not touched: `propose`, `revise_proposal`,
 `edit_and_approve`, `comment_on_proposal` (a path-owning viewer proposes
 nothing since they write directly, and can still approve or reject with
@@ -316,7 +316,7 @@ the new hostile tests failing, restored (`supabase/tests/path_ownership_test.sql
 Separately, and the bigger half of this fix: the file, editor and proposal
 pages themselves still went by vault role (`canWrite()`) alone, not
 ownership, for *showing* their Edit, Approve/Reject, Edit-and-approve and
-Comment controls — so even after `decide()` was fixed, a named owner who
+Comment controls, so even after `decide()` was fixed, a named owner who
 was a plain viewer saw none of these in the web app, only their agent could
 act, over MCP. The same migration adds `private.writable_path()`, a
 client-callable read of `can_write_path`'s decision (mirroring how
@@ -337,7 +337,7 @@ Web tests: `web/test/path_owner_review_page.test.mjs`.
 Fixed in review before the web UI shipped, before any real traffic used it
 (`20260928170000_path_owner_connection_scope.sql`, F425):
 `can_write_path`/`policy_for`'s owner branch checked only a `path_owners`
-row, never `role_in()`'s token-scope check the way `can_write()` does — so
+row, never `role_in()`'s token-scope check the way `can_write()` does, so
 a named owner's read-only token, or a token scoped only to a different
 vault, could still write their path. `private.connection_write_capable()`
 now gates both; `decide()` was never exposed (`require_human()` refuses
@@ -488,7 +488,7 @@ start the next one.
   (Hackathon, Team, Org) and a control on the Rules page
   (`web/src/claimrulespage.ts`); with no rule, a claim still behaves
   exactly as phase 2 shipped it (48 hour lease, 7 day hold limit, 1
-  claim per connection, 5 per person) --- those were always this phase's
+  claim per connection, 5 per person); those were always this phase's
   defaults, now overridable rather than fixed. Stores five columns phase
   3 will need (place in line, check-again hint, minimum gap, free
   lapses, cooldown cap) that nothing reads yet.
