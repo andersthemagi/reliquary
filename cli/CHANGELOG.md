@@ -4,6 +4,16 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.4.1](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.0...cli-v0.4.1) (2026-10-09)
+
+When a command run through `reliquary run` exits with its own error, Reliquary now adds one line saying the error is the command's, not Reliquary's, so a mistyped script name is no longer mistaken for a Reliquary failure; the exit code is unchanged. The second entry is a web change that touched the CLI's tests: signing in to the CLI shows the same consent page, where someone in several vaults now chooses which vaults it may reach. The CLI program itself is unchanged.
+
+
+### Bug fixes
+
+* **cli:** say a failed command's exit code is the command's, not Reliquary's ([#131](https://github.com/andersthemagi/reliquary/issues/131)) ([cdbd800](https://github.com/andersthemagi/reliquary/commit/cdbd800a1f44346ccf272b0f8bcf4b91b21ae05b))
+* **web:** don't preselect all vaults when connecting an AI ([#138](https://github.com/andersthemagi/reliquary/issues/138)) ([5e589ea](https://github.com/andersthemagi/reliquary/commit/5e589ea7305293b55b1dc2c556a726b9fa7fe736))
+
 ## [0.4.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.3.3...cli-v0.4.0) (2026-10-03)
 
 No command or option changed in this release. The CLI's own code is the same apart from internal test cleanup, and the one entry below is the website's new headline, which release-please counted here.
