@@ -25,7 +25,7 @@
   version: 0.1.0
 
 - title: Proposals and review
-  summary: Approve, request changes, reject or edit then approve, with diffs, threads and snooze.
+  summary: Approve, request changes, reject or edit then approve, with diffs, discussion and snooze.
   status: shipped
   milestone: M1
   docs: concepts/proposals-and-review
@@ -181,7 +181,7 @@
   docs: how-to/take-the-welcome-tour
 
 - title: Discovering a link's tools
-  summary: Adding a link calls the upstream server's own tool list and stores each tool's name, description and whether it writes, ready to grant once the MCP proxy exists.
+  summary: Adding a link calls the upstream server's own tool list and stores each tool's name, description and whether it writes, for an owner to grant.
   status: shipped
   milestone: M3
   docs: concepts/links
@@ -201,13 +201,13 @@
 # In progress --------------------------------------------------------------
 
 - title: A week of real use for the core
-  summary: One vault used from ChatGPT, Claude Code and Hermes for a week, canon approved in the browser.
-  status: in-progress
+  summary: One vault used from ChatGPT, Claude Code and Hermes for a week, canon approved in the browser. Done 2026-09-29.
+  status: shipped
   milestone: M1
 
 - title: A week of real use for variables
-  summary: Projects run with reliquary run and no local .env for a week.
-  status: in-progress
+  summary: Projects run with reliquary run and no local .env for a week. Done 2026-09-29.
+  status: shipped
   milestone: M2
 
 - title: Email from the product domain
@@ -215,7 +215,7 @@
   status: in-progress
 
 - title: Self-hosting (preview)
-  summary: Run Reliquary on your own server with Docker Compose, with no plan limits. The server's license is still being decided.
+  summary: Run Reliquary on your own server with Docker Compose, with no plan limits, under the Functional Source License.
   status: in-progress
   docs: how-to/self-host
 
@@ -253,10 +253,12 @@
 
 - title: Tasks
   summary: A Tasks page for seeing what your agents are working on, with each task's state, and for cancelling or skipping one, plus MCP tools to work through them. Places in line come later.
-  status: planned
+  status: shipped
+  docs: concepts/tasks
+  version: 0.15.0
 
 - title: Publish the CLI to npm
-  summary: "@reliquary-ai/cli on npm, so npx works everywhere without a checkout."
+  summary: "Each @reliquary-ai/cli release on npm. 0.3.3 is there, so npx works; later releases don't publish yet."
   status: planned
 
 - title: Routines

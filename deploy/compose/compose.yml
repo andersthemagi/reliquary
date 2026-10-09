@@ -20,6 +20,10 @@
 #
 # Every value comes from .env (.env.example lists them). Nothing here holds a
 # secret. Images are pinned; upgrading them is a deliberate change.
+#
+# db-init, migrate and owner mount deploy/bin (and deploy/sql), not deploy/:
+# that holds compose/.env, every secret, and a migration is SQL that psql
+# runs (\! is a shell command in the migrate container).
 
 name: reliquary
 
@@ -52,7 +56,8 @@ services:
       <<: *db-env
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?run deploy/setup.sh first}
     volumes:
-      - ..:/deploy:ro,z
+      - ../bin:/deploy/bin:ro,z
+      - ../sql:/deploy/sql:ro,z
     depends_on:
       db:
         condition: service_healthy
@@ -152,7 +157,8 @@ services:
       WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?run deploy/setup.sh first}
       MCP_DB_PASSWORD: ${MCP_DB_PASSWORD:?run deploy/setup.sh first}
     volumes:
-      - ..:/deploy:ro,z
+      - ../bin:/deploy/bin:ro,z
+      - ../sql:/deploy/sql:ro,z
       - ../../supabase/migrations:/migrations:ro,z
     depends_on:
       auth:
@@ -260,7 +266,7 @@ services:
       AUTH_URL: http://auth:9999
       GOTRUE_JWT_KEYS: ${GOTRUE_JWT_KEYS}
     volumes:
-      - ..:/deploy:ro,z
+      - ../bin:/deploy/bin:ro,z
     depends_on:
       auth:
         condition: service_healthy

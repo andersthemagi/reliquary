@@ -21,9 +21,12 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - add, edit or delete a link, or set its tool grants;
 - rename a vault or change its default policy;
 - erase a file, export a vault, or delete one;
+- redact a [thread](threads.md#redacting-a-message) message;
 - snooze a proposal;
 - start or stop watching a path for [flags](flags.md);
 - break someone else's [claim](claims.md), set a claim rule, or cancel or skip a [work plan](claims.md#work-plans) step.
+
+This is the one list. Other pages, the glossary and the repo's own docs say "the ceiling" and link here instead of repeating it.
 
 **Why:** an agent reads text other people wrote. A file, a comment or a web page can carry instructions (prompt injection), and anything the agent may do, the injected text may try. The ceiling keeps the actions that are irreversible, grant trust or reveal secrets behind a person's click.
 
@@ -37,6 +40,9 @@ Within your role and the connection's access:
 - write and delete open files;
 - propose changes to canon files, revise their own proposals, and comment;
 - claim a path to say they're working on it, renew, release and list [claims](claims.md);
+- open, read and post in [threads](threads.md), and resolve or reopen them;
+- list their person's [flags](flags.md) and mark them shown, and list what the person watches;
+- list a vault's [links](links.md) and call the link tools their role is granted, as `<link>.<tool>`;
 - register a plan file as a [work plan](claims.md#work-plans), read its steps, and claim, check in on, complete or give back a step;
 - create a vault for you, with a read-write connection that reaches all your vaults;
 - list environment variable names, and imports from the CLI waiting for you (never values);

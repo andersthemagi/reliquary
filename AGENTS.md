@@ -49,9 +49,10 @@ Everything runs in containers (podman or docker); no Node on the host.
   `log` row, an agent revealing a variable, a routine escaping its
   declaration.
 - **An agent is its person, minus a ceiling.** Agents act with the
-  connecting member's permissions, except approving, revealing variable
-  values, managing members, and deleting or exporting a vault. Those need the
-  person present in the UI.
+  connecting member's permissions, except the actions that are irreversible,
+  grant trust or reveal a secret. Those need the person present in the UI.
+  The one list is [the ceiling](docs/public/concepts/agents.md#the-ceiling);
+  an action that fits goes on it, with a hostile test.
 - **Append-only means append-only.** `log`, `env_access_log` and
   `routine_runs` history are never updated or deleted in place. The one
   sanctioned exception is `delete_vault` (an owner, in person, typed name):
