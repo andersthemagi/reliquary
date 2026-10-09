@@ -6,6 +6,8 @@ release-please from conventional commits that touch `cli/`.
 
 ## [0.4.1](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.0...cli-v0.4.1) (2026-10-09)
 
+When a command run through `reliquary run` exits with its own error, Reliquary now adds one line saying the error is the command's, not Reliquary's, so a mistyped script name is no longer mistaken for a Reliquary failure; the exit code is unchanged. The second entry is a web change that touched the CLI's tests: signing in to the CLI shows the same consent page, where someone in several vaults now chooses which vaults it may reach. The CLI program itself is unchanged.
+
 
 ### Bug fixes
 
