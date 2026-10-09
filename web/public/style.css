@@ -532,6 +532,16 @@ input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: 1; 
 input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, input[type="number"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
 input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible, input[type="number"]:focus-visible,
 textarea:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
+/* The Add a link form's credential is the app's one password input. Its own
+   rules, not the list above, which components_unit.test.mjs pins. */
+input[type="password"] {
+  width: 100%; min-height: var(--control-md);
+  font: 400 var(--text-md)/1.4 var(--font-sans); color: var(--fg);
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  padding: 6px 12px; transition: border-color 120ms ease-out;
+}
+input[type="password"]:hover { border-color: var(--fg-muted); }
+input[type="password"]:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
 /* A locked field (the Rules form's path while changing a rule) must not look editable. */
 input[readonly] { background: var(--bg-subtle); }
 textarea { min-height: 280px; resize: vertical; line-height: 1.6; padding: 10px 12px; }
@@ -544,6 +554,11 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .fields { display: grid; grid-template-columns: minmax(0, 1fr) 10rem 7rem; gap: var(--space-4); align-items: end; }
 .fields label { margin-top: 0; }
 .fields select { width: 100%; }
+/* The Links form's three fields are a name, a URL and a credential, not the
+   Rules form's path, policy and approvals: the URL gets the room. */
+@media (min-width: 641px) {
+  #add-link .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); }
+}
 .inline-field { display: flex; gap: var(--space-3); align-items: stretch; }
 .inline-field input { flex: 1; }
 .result { margin: var(--space-4) 0 0; }
