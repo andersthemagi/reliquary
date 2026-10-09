@@ -11,7 +11,7 @@ import { listVaults, pickVault, pushEnvironment, readEnvironment, type Vault } f
 import { login, logout } from "./auth.js";
 import { DEFAULT_SERVER, discover, projectConfig, serverOrigin, type ProjectConfig } from "./config.js";
 import { credentialStore, credentialsFile } from "./credentials.js";
-import { CliError, UsageError } from "./errors.js";
+import { CliError, fsFailure, UsageError } from "./errors.js";
 import { checkTarget, formatDotenv, writePrivate } from "./pull.js";
 import { readDotenv, waitForDecision } from "./push.js";
 import { runWith } from "./run.js";
@@ -259,10 +259,16 @@ main(process.argv.slice(2)).then(
       say(`reliquary: ${err.message}`);
       process.exit(err.exitCode);
     }
+    const e = err as NodeJS.ErrnoException | undefined;
+    // A file the system refused that nothing wrapped is the computer's
+    // trouble, not a bug in the CLI.
+    if (typeof e?.syscall === "string" && typeof e.path === "string" && typeof e.code === "string") {
+      say(`reliquary: ${fsFailure(e.syscall, e.path, e).message}`);
+      process.exit(1);
+    }
     // A bug in the CLI: which command, the error's kind and code, and where
     // in the CLI it was thrown; never its message, which might carry
     // something from a response or a value.
-    const e = err as NodeJS.ErrnoException | undefined;
     const kind = `${e?.name ?? "Error"}${typeof e?.code === "string" ? ` ${e.code}` : ""}`;
     const at = /\/(dist\/[\w.-]+\.js:\d+)(?::\d+)?\)?$/m.exec(typeof e?.stack === "string" ? e.stack.split("\n").slice(1).join("\n") : "");
     const [first, second] = process.argv.slice(2);

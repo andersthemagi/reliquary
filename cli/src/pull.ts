@@ -11,7 +11,7 @@ import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { closeSync, constants, fchmodSync, fsyncSync, ftruncateSync, lstatSync, openSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
 import path from "node:path";
-import { CliError } from "./errors.js";
+import { CliError, fsFailure } from "./errors.js";
 
 // docs/variables.md: NAME="value", escaping \ " newline and carriage return.
 export function escapeValue(v: string): string {
@@ -46,18 +46,22 @@ export function checkTarget(file: string, outsideRepo: boolean): { abs: string; 
   const abs = path.resolve(file);
   const dir = path.dirname(abs);
   const base = path.basename(abs);
+  let isDirectory = false;
   try {
-    if (!statSync(dir).isDirectory()) throw new Error();
-  } catch {
-    throw new CliError(`${dir} isn't a directory.`);
+    isDirectory = statSync(dir).isDirectory();
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw fsFailure("look at", dir, err);
   }
+  if (!isDirectory) throw new CliError(`${dir} isn't a directory.`);
   try {
     const st = lstatSync(abs);
     if (st.isSymbolicLink()) throw new CliError(`${file} is a symbolic link; pull into a plain file.`);
     if (!st.isFile()) throw new CliError(`${file} isn't a regular file.`);
   } catch (err) {
     if (err instanceof CliError) throw err;
-    // doesn't exist yet: fine
+    // Not there yet is fine; anything else (no permission to look) is not.
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw fsFailure("look at", abs, err);
   }
   const tmpBase = `${base}.reliquary-${randomBytes(4).toString("hex")}.tmp`; // ignored by ".env*" or ".env.*"
 
@@ -90,29 +94,37 @@ const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 // Mode 0600 from the first byte. With a temporary file: write, fsync,
 // rename. Without (its name isn't ignored): truncate the target in place.
 export function writePrivate(target: { abs: string; tmp: string | null }, text: string): void {
-  if (target.tmp) {
-    const fd = openSync(target.tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o600);
-    try {
-      try {
-        writeSync(fd, text);
-        fsyncSync(fd);
-      } finally {
-        closeSync(fd);
-      }
-      renameSync(target.tmp, target.abs);
-    } catch (err) {
-      rmSync(target.tmp, { force: true });
-      throw err;
-    }
-    return;
-  }
-  const fd = openSync(target.abs, constants.O_WRONLY | constants.O_CREAT | NOFOLLOW, 0o600);
   try {
-    if (process.platform !== "win32") fchmodSync(fd, 0o600); // before any value lands
-    ftruncateSync(fd, 0);
-    writeSync(fd, text, 0);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
+    if (target.tmp) {
+      const fd = openSync(target.tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o600);
+      try {
+        try {
+          writeSync(fd, text);
+          fsyncSync(fd);
+        } finally {
+          closeSync(fd);
+        }
+        renameSync(target.tmp, target.abs);
+      } catch (err) {
+        try {
+          rmSync(target.tmp, { force: true });
+        } catch {
+          // the reason it failed is what matters
+        }
+        throw err;
+      }
+      return;
+    }
+    const fd = openSync(target.abs, constants.O_WRONLY | constants.O_CREAT | NOFOLLOW, 0o600);
+    try {
+      if (process.platform !== "win32") fchmodSync(fd, 0o600); // before any value lands
+      ftruncateSync(fd, 0);
+      writeSync(fd, text, 0);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+  } catch (err) {
+    throw fsFailure("write", target.abs, err);
   }
 }

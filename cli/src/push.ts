@@ -9,7 +9,7 @@ import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { pushStatus, type PushStatus } from "./api.js";
 import type { Server } from "./config.js";
 import { DOTENV_MAX_BYTES, dotenvTooBig, parseDotenv, type DotenvResult } from "./dotenv.js";
-import { CliError } from "./errors.js";
+import { CliError, fsFailure } from "./errors.js";
 
 // Reads and parses the file. A directory, a device or anything over the
 // limit is refused before its contents are looked at.
@@ -18,8 +18,8 @@ export function readDotenv(file: string): DotenvResult {
   try {
     fd = openSync(file, constants.O_RDONLY);
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    throw new CliError(code === "ENOENT" ? `There's no ${file}. Name the file with --file.` : `Can't read ${file} (${code ?? "error"}).`);
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") throw new CliError(`There's no ${file}. Name the file with --file.`);
+    throw fsFailure("read", file, err);
   }
   try {
     const st = fstatSync(fd);

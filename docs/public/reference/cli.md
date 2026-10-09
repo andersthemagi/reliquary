@@ -150,4 +150,4 @@ A connection made before the keychain, in `credentials.json`, keeps working. The
 | 3 | `env push --wait` ran out of time |
 | other | `run` passes on its command's exit code |
 
-Common errors: the connection was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this connection; the server has no key for variables. No error prints a value, a token or a server response.
+Common errors: the connection was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this connection; the server has no key for variables; a file or folder the system won't let the CLI use (the message names the path and the reason, such as no permission, a full disk or a read-only folder; for the config directory, `RELIQUARY_CONFIG_DIR` moves it). No error prints a value, a token or a server response.
