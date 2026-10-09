@@ -11,11 +11,22 @@ import { listVaults, pickVault, pushEnvironment, readEnvironment, type Vault } f
 import { login, logout } from "./auth.js";
 import { DEFAULT_SERVER, discover, projectConfig, serverOrigin, type ProjectConfig } from "./config.js";
 import { credentialStore, credentialsFile } from "./credentials.js";
-import { CliError, UsageError } from "./errors.js";
-import { checkTarget, formatDotenv, writePrivate } from "./pull.js";
+import { CliError, fsFailure, UsageError } from "./errors.js";
+import { checkTarget, formatDotenv, privacyNote, writePrivate } from "./pull.js";
 import { readDotenv, waitForDecision } from "./push.js";
 import { runWith } from "./run.js";
 
+// The help text is also data: web/scripts/docs-lib.mjs (cliDefinitions) reads
+// this declaration with a regex, from its opening backtick to the first
+// backtick followed by a semicolon, and builds docs/public/reference/cli.md
+// from it. So the text must stay one plain template literal with no backtick
+// inside; the only interpolations it understands are DEFAULT_SERVER and
+// credentialsFile() (any other fails the docs build until docs-lib.mjs is
+// taught); and every command needs a usage line in this form,
+//   "  reliquary <command> ...",
+// because the docs' command list comes from those lines. Option names come
+// from the --flags listed here and from the parse() specs below, and
+// web/test/docs.test.mjs fails when the docs and either of them disagree.
 const HELP = `reliquary: a vault's environment variables on this computer
 
 Usage:
@@ -25,7 +36,8 @@ Usage:
   reliquary run [--vault V] [--env E] -- <command> [args...]
                                         run a command with the variables in its environment
   reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]
-                                        write them to a file git ignores (mode 600)
+                                        write them to a file git ignores (mode 600;
+                                        on Windows, its folder's permissions)
   reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]
                                         send a .env's values for a person to apply
                                         in the web UI (nothing is set until then)
@@ -191,7 +203,7 @@ async function main(argv: string[]): Promise<number> {
       const where = checkTarget(file, !!opts["outside-repo"]); // again: it may have changed meanwhile
       writePrivate(where, formatDotenv(variables, { server: server.issuer, vaultName: vault.name, vaultId: vault.id, environment, at: new Date() }));
       const names = [...variables.keys()];
-      say(`Wrote ${names.length} variable${names.length === 1 ? "" : "s"} from ${vault.name} (${environment}) to ${file} (mode 600)${names.length ? `: ${names.join(", ")}` : "."}`);
+      say(`Wrote ${names.length} variable${names.length === 1 ? "" : "s"} from ${vault.name} (${environment}) to ${file} (${privacyNote()})${names.length ? `: ${names.join(", ")}` : "."}`);
       return 0;
     }
     default:
@@ -209,7 +221,8 @@ function duration(raw: string): number {
 }
 
 // `reliquary env push`: exit 0 when sent (with --wait: when applied), 1 when
-// refused, rejected or expired, 3 when --wait ran out of time first.
+// refused, rejected or expired, 3 when --wait ran out of time first or
+// couldn't check the push three times running (it may still be pending).
 async function push(args: string[], project: ProjectConfig | null): Promise<number> {
   const { opts, positionals } = parse(args, { values: ["server", "vault", "env", "file", "timeout"], flags: ["wait"] });
   if (opts.help) return help();
@@ -259,10 +272,16 @@ main(process.argv.slice(2)).then(
       say(`reliquary: ${err.message}`);
       process.exit(err.exitCode);
     }
+    const e = err as NodeJS.ErrnoException | undefined;
+    // A file the system refused that nothing wrapped is the computer's
+    // trouble, not a bug in the CLI.
+    if (typeof e?.syscall === "string" && typeof e.path === "string" && typeof e.code === "string") {
+      say(`reliquary: ${fsFailure(e.syscall, e.path, e).message}`);
+      process.exit(1);
+    }
     // A bug in the CLI: which command, the error's kind and code, and where
     // in the CLI it was thrown; never its message, which might carry
     // something from a response or a value.
-    const e = err as NodeJS.ErrnoException | undefined;
     const kind = `${e?.name ?? "Error"}${typeof e?.code === "string" ? ` ${e.code}` : ""}`;
     const at = /\/(dist\/[\w.-]+\.js:\d+)(?::\d+)?\)?$/m.exec(typeof e?.stack === "string" ? e.stack.split("\n").slice(1).join("\n") : "");
     const [first, second] = process.argv.slice(2);

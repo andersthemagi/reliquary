@@ -18,7 +18,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 const URL_ = new URL(process.env.MCP_URL ?? "http://127.0.0.1:8788/mcp");
 const SNAPSHOT = new URL("./contract.snapshot.json", import.meta.url);
 
-// A dotted name is a <link>.<tool> entry (tools.ts's registerLinkTools):
+// A dotted name is a <link>.<tool> entry (links-tools.ts's registerUpstreamLinkTools):
 // identity-dependent (different vaults, different grants -- its own name
 // check constraints forbid a dot in either a link's or a discovered
 // tool's own name, so this can't collide with a fixed tool). The fixed
@@ -68,4 +68,29 @@ test("contract: a read-only token sees the same fixed tools; the database refuse
   const full = (await toolSurface(process.env.ANA_TOKEN)).map((t) => t.name);
   const readOnly = (await toolSurface(process.env.ANA_TEAM_RO)).map((t) => t.name);
   assert.deepEqual(readOnly, full);
+});
+
+// The snapshot records whatever the tools say, so a new tool that says
+// nothing would be approved along with the rest. These two fail it instead.
+// MCP's defaults for a tool with no annotations are destructive and
+// open-world, which makes a host ask before calls that only read or add.
+test("contract: every fixed tool says outright whether it reads or destroys, and that it stays inside Reliquary", async () => {
+  const problems = [];
+  for (const t of await toolSurface(process.env.ANA_TOKEN)) {
+    const a = t.annotations ?? {};
+    if (a.openWorldHint !== false) problems.push(`${t.name}: openWorldHint is not false`);
+    if (a.readOnlyHint !== true && typeof a.destructiveHint !== "boolean") problems.push(`${t.name}: neither readOnlyHint is true nor destructiveHint stated`);
+    if (a.readOnlyHint === true && a.destructiveHint === true) problems.push(`${t.name}: read-only and destructive at once`);
+  }
+  assert.deepEqual(problems, []);
+});
+
+test("contract: every argument of every fixed tool has a description an agent can read", async () => {
+  const problems = [];
+  for (const t of await toolSurface(process.env.ANA_TOKEN)) {
+    for (const [name, schema] of Object.entries(t.inputSchema?.properties ?? {})) {
+      if (!String(schema.description ?? "").trim()) problems.push(`${t.name}.${name}`);
+    }
+  }
+  assert.deepEqual(problems, []);
 });

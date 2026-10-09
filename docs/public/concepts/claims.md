@@ -88,5 +88,3 @@ Agents never cancel or skip a step: those stay with a person. A step's title, it
 
 - **Waiting in line.** An agent names the step it wants and is refused if it isn't ready. There is no "give me any ready step", no place in line and no list of who is waiting.
 - **Review gates and a "canon moved" signal.** `gate: review` and `cites` are stored and shown, but nothing holds a step's dependents for a review, and nothing warns an agent when a file a step cites changes.
-
-This is part of tracking issue [#52](https://github.com/andersthemagi/reliquary/issues/52).

@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { at, fileBlock, freshNonce, makeRun, ok, PATH, refuse, TEXT, type FileRow, VAULT, VAULT_REF, VERSION } from "./tools-shared.js";
+import { ADDITIVE, at, DESTRUCTIVE, fileBlock, freshNonce, makeRun, ok, PATH, READ, refuse, TEXT, type FileRow, VAULT, VAULT_REF, VERSION } from "./tools-shared.js";
 
 // Sizes as the database words them (private.size_text): decimal units.
 function size(n: number): string {
@@ -119,7 +119,7 @@ export function registerVaultFileTools(
     {
       title: "List vaults",
       description: "Vaults this token reaches, with your role in each (viewer if the token is read-only). Other tools take a vault by name or id.",
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async () =>
       run(async (c) => {
@@ -145,11 +145,12 @@ export function registerVaultFileTools(
     {
       title: "Create a vault",
       description:
-        "Create a vault owned by your person (the log records you made it). Needs a token that reaches all your person's vaults read-write. default_policy: open (write directly) or canon (changes are proposals people approve). Only people set folder rules and members.",
+        "Create a vault owned by your person (the log records you made it). Needs a token that reaches all your person's vaults read-write. Only people set folder rules and members.",
       inputSchema: {
         name: z.string().min(1).max(100).describe("The vault's name"),
-        default_policy: z.enum(["open", "canon"]).optional(),
+        default_policy: z.enum(["open", "canon"]).optional().describe("open (default): write directly; canon: changes are proposals people approve"),
       },
+      annotations: ADDITIVE,
     },
     async ({ name, default_policy }) =>
       run(async (c) => {
@@ -176,7 +177,7 @@ export function registerVaultFileTools(
         after: PATH.optional().describe("Path to continue after"),
         limit: z.number().int().min(1).max(1000).optional().describe("Default 200"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault, prefix, after, limit }) =>
       run(async (c) => {
@@ -211,15 +212,15 @@ export function registerVaultFileTools(
     {
       title: "Read a file",
       description:
-        "A file's text, policy and last writer. At most max_bytes (default 100000); from_line and to_line pick lines.",
+        "A file's text, policy, last writer and version; read part of it with from_line, to_line or max_bytes.",
       inputSchema: {
         vault: VAULT,
         path: PATH,
-        from_line: z.number().int().min(1).max(1e7).optional(),
-        to_line: z.number().int().min(1).max(1e7).optional(),
-        max_bytes: z.number().int().min(100).max(1_048_576).optional(),
+        from_line: z.number().int().min(1).max(1e7).optional().describe("First line to return, counting from 1"),
+        to_line: z.number().int().min(1).max(1e7).optional().describe("Last line to return"),
+        max_bytes: z.number().int().min(100).max(1_048_576).optional().describe("At most this many bytes; default 100000"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault, path, from_line, to_line, max_bytes }) =>
       run(async (c) => {
@@ -246,13 +247,13 @@ export function registerVaultFileTools(
     {
       title: "Search a vault",
       description:
-        "Full-text search of a vault: \"phrases\", or, -exclusions. Up to 3 matching lines per file, best first.",
+        "Full-text search of a vault. Up to 3 matching lines per file, best first.",
       inputSchema: {
         vault: VAULT,
-        query: z.string().min(1).max(500),
+        query: z.string().min(1).max(500).describe("Words to find; \"a phrase\", or, -word work"),
         limit: z.number().int().min(1).max(50).optional().describe("Files, default 10"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault, query, limit }) =>
       run(async (c) => {
@@ -281,9 +282,14 @@ export function registerVaultFileTools(
     {
       title: "Write an open file",
       description:
-        "Create or replace a file whose policy is open. Canon files can't be written directly: use propose. " +
-        "expected_version (read_file's version: line) refuses the write if the file changed since, instead of silently overwriting it.",
-      inputSchema: { vault: VAULT, path: PATH, content: TEXT, expected_version: VERSION.optional() },
+        "Create or replace a file whose policy is open. Canon files can't be written directly: use propose.",
+      inputSchema: {
+        vault: VAULT,
+        path: PATH,
+        content: TEXT.describe("The file's full new text"),
+        expected_version: VERSION.optional().describe("read_file's version: line; the write is refused if the file changed since"),
+      },
+      annotations: DESTRUCTIVE,
     },
     async ({ vault, path, content, expected_version }) =>
       run(async (c) => {
@@ -297,9 +303,13 @@ export function registerVaultFileTools(
     {
       title: "Delete an open file",
       description:
-        "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true. " +
-        "expected_version (read_file's version: line) refuses the delete if the file changed since.",
-      inputSchema: { vault: VAULT, path: PATH, expected_version: VERSION.optional() },
+        "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true.",
+      inputSchema: {
+        vault: VAULT,
+        path: PATH,
+        expected_version: VERSION.optional().describe("read_file's version: line; the delete is refused if the file changed since"),
+      },
+      annotations: { ...DESTRUCTIVE, idempotentHint: true },
     },
     async ({ vault, path, expected_version }) =>
       run(async (c) => {

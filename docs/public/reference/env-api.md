@@ -83,7 +83,7 @@ Sends variables for a person to apply (an import from the CLI). Needs a connecti
       "url": "<server>/v/<vault>/variables/imports/<import>" }
 ```
 
-Errors: 400 `invalid_request` (not JSON, a bad or refused name, an empty or oversized value; never echoed), 403 `forbidden` or `push_not_allowed`, 404 `not_found`, 413 `too_large`, 415 `unsupported_media_type`, 429 `rate_limited`, 503 `not_configured`, 507 `storage_limit` (the vault is at its storage limit: [Plans and limits](../concepts/plans-and-limits.md)).
+Errors: 400 `invalid_request` (not JSON, a bad or refused name, an empty or oversized value; never echoed), 403 `forbidden` or `push_not_allowed`, 404 `not_found`, 413 `too_large`, 415 `unsupported_media_type`, 429 `rate_limited` (too many requests or pushes in an hour; wait) or `too_many_pending` (you already have 20 pushes waiting for approval in this vault, with no `Retry-After`: apply or reject some, then push again), 503 `not_configured`, 507 `storage_limit` (the vault is at its storage limit: [Plans and limits](../concepts/plans-and-limits.md)).
 
 ### GET /api/env/imports/`<import id>`
 

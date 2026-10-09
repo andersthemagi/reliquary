@@ -15,6 +15,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes } from "node:crypto";
 import type pg from "pg";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { TokenGone } from "./db.js";
 import { fail, failure, ownRaise, withRequest, type Failure } from "./failure.js";
@@ -31,21 +32,50 @@ export class ToolError extends Error {}
 // Input ceilings. The database enforces the same or looser ones
 // (20260925110000_hardening.sql); these refuse early and tell the agent the
 // limit. Zod's messages name the limit, never the value.
-export const VAULT = z.string().max(200);
-export const PATH = z.string().max(1024);
+//
+// Each carries the words an agent reads for that argument in tools/list
+// (contract.test.mjs fails on an argument with none), so a tool that takes
+// one says what it is without repeating it in its own description.
+export const VAULT = z.string().max(200).describe("Vault name or id");
+export const PATH = z.string().max(1024).describe("Path in the vault");
 export const TEXT = z.string().max(1_000_000);
 export const REASON = z.string().max(4000);
-export const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/);
-export const VERSION = z.string().regex(/^[0-9a-fA-F-]{36}$/);
+export const PROPOSAL = z.string().regex(/^[0-9a-fA-F-]{36}$/).describe("Proposal id");
+export const VERSION = z.string().regex(/^[0-9a-fA-F-]{36}$/).describe("A file version id");
 // What a claim hands back and asks for again: a 32-byte secret in hex, and
 // the fence counter.
-export const SECRET = z.string().regex(/^[0-9a-f]{64}$/);
-export const FENCE = z.number().int().min(1);
+export const SECRET = z.string().regex(/^[0-9a-f]{64}$/).describe("The claim secret");
+export const FENCE = z.number().int().min(1).describe("The claim fence");
 // A caller may ask for a shorter lease and a longer one is clamped by the
 // vault's claim rule in the database, not refused; this is only a sane
 // ceiling on the argument itself, the same spirit as every other
 // input-size check here.
-export const TTL_MINUTES = z.number().int().min(1).max(60 * 24 * 30);
+export const TTL_MINUTES = z
+  .number()
+  .int()
+  .min(1)
+  .max(60 * 24 * 30)
+  .describe("Minutes; default and cap are the vault's claim rule (48 hours unless set)");
+
+// What each tool says about itself to a host. Without annotations MCP's
+// defaults apply: destructive and open-world, so a host asks before a call
+// that changes nothing or only adds, and may stop the one call a flags hint
+// is waiting on. Every tool states one of these outright (contract.test.mjs
+// fails on one that does not). Only what differs from the protocol's own
+// defaults is spelled out, since each tool pays for its annotations in
+// every tools/list: readOnlyHint and idempotentHint are false unless
+// said, destructiveHint is true unless said, and neither of the first two
+// means anything for a tool that reads. openWorldHint is false for all of
+// them: the only calls that leave Reliquary are the <link>.<tool> proxies,
+// which set their own.
+export const READ = { readOnlyHint: true, openWorldHint: false } satisfies ToolAnnotations;
+// Adds a row, or moves one of the caller's own bookkeeping values; nothing
+// that was there is lost. A tool whose repeat, with the same arguments,
+// changes nothing more (a repeated release is refused, with no effect) adds
+// idempotentHint: true beside it.
+export const ADDITIVE = { destructiveHint: false, openWorldHint: false } satisfies ToolAnnotations;
+// Replaces or removes what was there, even where a history is kept.
+export const DESTRUCTIVE = { destructiveHint: true, openWorldHint: false } satisfies ToolAnnotations;
 
 // Turns errors into messages the agent can act on: a first line in words
 // (our own migrations' messages, which don't echo free-form input), then the

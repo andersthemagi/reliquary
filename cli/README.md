@@ -33,9 +33,9 @@ Or install it once: `npm install -g @reliquary-ai/cli`, then `reliquary ...`.
 | `reliquary login [--no-browser]` | Opens the server's consent page (and prints the link, for a browser elsewhere). You choose which vaults the CLI may read; it can't read files or write anything. Waits 5 minutes, then lists the vaults and environments it can read. Running it again revokes the previous connection on this computer |
 | `reliquary logout` | Revokes the connection on the server, then forgets it |
 | `reliquary vaults` | Each vault this connection reaches: id, name, your role, the environments you may read |
-| `reliquary run [--vault V] [--env E] -- <command> [args...]` | Fetches the environment and starts the command directly (no shell) with your environment plus the variables. stdio is inherited, SIGINT, SIGTERM, SIGHUP, SIGQUIT and SIGUSR2 are forwarded, and it exits with the command's code (128 + signal if it was killed; 127 if it wasn't found). Writes nothing to disk. If a variable replaces one you already had, it says so by name |
-| `reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]` | Writes the environment to the file (default `.env`), mode 600, one `NAME="value"` per line in name order (`\`, `"`, newline and carriage return escaped) under a header saying where it came from. Prints the names, never the values |
-| `reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]` | Sends the file's variables to the vault **for approval**: nothing is set until an owner or editor applies it on the vault's Variables page (it expires in 24 hours). Lines it can't take (bad or reserved names, empty values, an unclosed quote) are listed with their reasons and not sent. Prints the names, which are new and which replace a value, and the approval link (stdout); never a value. `--wait` exits 0 once it's applied, 1 if it's rejected or expires, 3 if the timeout comes first |
+| `reliquary run [--vault V] [--env E] -- <command> [args...]` | Fetches the environment and starts the command directly (no shell) with your environment plus the variables. stdio is inherited, SIGTERM, SIGHUP and SIGUSR2 are forwarded (SIGINT and SIGQUIT too, unless stdin is a terminal, where Ctrl-C already reaches the command), and it exits with the command's code (128 + signal if it was killed; 127 if it wasn't found). Writes nothing to disk. If a variable replaces one you already had, it says so by name |
+| `reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]` | Writes the environment to the file (default `.env`), mode 600 (on Windows, its folder's permissions), one `NAME="value"` per line in name order (`\`, `"`, newline and carriage return escaped) under a header saying where it came from. Prints the names, never the values |
+| `reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]` | Sends the file's variables to the vault **for approval**: nothing is set until an owner or editor applies it on the vault's Variables page (it expires in 24 hours). Lines it can't take (bad or reserved names, empty values, an unclosed quote) are listed with their reasons and not sent. Prints the names, which are new and which replace a value, and the approval link (stdout); never a value. `--wait` exits 0 once it's applied, 1 if it's rejected or expires, 3 if the timeout comes first or it couldn't check the push three times in a row (a single failed check is retried) |
 
 Options for every command: `--server <url>`, `-h`/`--help`; and
 `-v`/`--version`.
@@ -66,10 +66,14 @@ decides, so a file that isn't in `.gitignore`, or is tracked (even if
 `.gitignore` now names it), is refused, and nothing is written. The check runs
 before anything is fetched and again just before writing. Outside any
 repository it is refused too, unless you pass `--outside-repo` to say you
-know. A symbolic link is refused.
+know. If git itself refuses to open the repository (another user owns it, as
+in a dev container), the CLI repeats what git said and writes nothing;
+`--outside-repo` doesn't override that. A symbolic link is refused.
 
 The file is created with mode 600 (an existing one is tightened before any
-value lands). If the temporary name `<file>.reliquary-<random>.tmp` is ignored
+value lands). Windows has no such mode: there the file keeps the permissions
+of its folder, the CLI says so instead of printing "mode 600", and you should
+pull into a folder only you can read. If the temporary name `<file>.reliquary-<random>.tmp` is ignored
 as well (a `.gitignore` line like `.env*` or `.env.*`), the file is written
 beside it and renamed into place; otherwise it is rewritten in place, so a
 value never sits in a file git could pick up.

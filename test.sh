@@ -8,7 +8,8 @@
 #
 # Each suite gets its own TEST_SLOT, so containers and ports never collide,
 # and its own log. Failing suites print their full log; passing ones print a
-# one-line count. Exits non-zero if the registry check or any suite fails.
+# one-line count. Exits non-zero if the registry check, the harness check or any
+# suite fails.
 set -uo pipefail
 cd "$(dirname "$0")"
 
@@ -34,6 +35,9 @@ engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 for img in docker.io/library/postgres:17 docker.io/library/node:22-slim docker.io/library/node:22; do
   "$engine" image inspect "$img" >/dev/null 2>&1 || "$engine" pull -q "$img" >/dev/null
 done
+
+echo "== harness"
+./scripts/check-harness.sh || { echo "harness check failed"; exit 1; }
 
 start=$SECONDS
 declare -A pid

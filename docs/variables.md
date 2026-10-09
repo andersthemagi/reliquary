@@ -464,6 +464,7 @@ Values are sealed with the stored-value key and the same additional data
 | `public.apply_env_import(p_import uuid)` | jsonb `{"ok": true, "applied", "names", "environments"}` or `{"ok": false, "error": "unauthorized" \| "forbidden" \| "not_found" \| "expired" \| "applied" \| "rejected"}` | a person in person, within their role in every environment of the import; a draft only its author | Any `act` (the CLI included) or `reliquary_mcp` session: `forbidden`, logged. Each value goes through `private.put_variable` (the path `set_variable` uses): `set` or `rotate`, one access-log row per variable and environment with `detail.import`, and a feed event; the import becomes `applied` and its values are deleted, all in one transaction |
 | `public.reject_env_import(p_import uuid)` | as apply, `{"ok": true}` | the same people, or the import's author | Deletes the values; a push's rejection is logged as `reject` |
 | `public.env_import_precheck(p_vault uuid, p_names text[] default '{}')` | jsonb `{"ok": true}` or `{"ok": false, "error": "unauthorized" \| "rate_limited"}` | a person, or a CLI grant | Called before the web app seals anything (sealing every value for every environment is the costly part), in the same transaction as the create that follows. Refuses only a person over a rate limit, logged exactly as `create_env_import` logs it (with `p_names`, which must be names); a caller `create_env_import` would refuse for who they are or for the vault gets `{"ok": true}`, and create refuses and logs them. Create checks the limit again, under its lock |
+| `public.env_import_limit(p_vault uuid)` | `'pending'`, `'hourly'` or null | any signed-in person, or a CLI grant | Which import limit the caller has reached, for the env API to tell the two `rate_limited` answers apart: `'pending'` is 20 pending (not yet expired) imports of the caller's in the vault (it clears when they are applied or rejected), `'hourly'` is 60 made in the last hour anywhere (it clears with time); `'pending'` wins. Counts only the caller's own imports, so it says nothing about anyone else's. Not logged |
 | `public.env_import_status(p_import uuid)` | jsonb `{"ok": true, "id", "status", "source", "environments", "names", "expires_at", "decided_at"}` or not found | the import's author in person, or through a live CLI grant of theirs that reaches the vault | For `--wait`. Not logged (no values) |
 | `public.create_cli_grant(..., p_push boolean default false)` | as before | a person | Records `env_push` |
 
@@ -500,7 +501,11 @@ Errors: 400 `invalid_request` (not JSON, a bad or refused name, an empty,
 non-string or oversized value, a bad `refused` list; never echoed), 403
 `forbidden` (role) or `push_not_allowed` (the sign-in wasn't allowed to push:
 sign in again and leave the box ticked), 404 `not_found`, 405 (only POST),
-413 `too_large`, 415 `unsupported_media_type`, 429 `rate_limited`, 503
+413 `too_large`, 415 `unsupported_media_type`, 429 `rate_limited` or
+`too_many_pending` (the database answers `rate_limited` for both the 60 an
+hour and the 20 pending in a vault, and only deciding pushes clears the
+second, so the route asks `public.env_import_limit` which it was; the second
+has no `Retry-After`), 503
 `not_configured`.
 
 `GET /api/env/imports/<uuid>`: `200 {"import", "status", "environments",

@@ -18,7 +18,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { at, freshNonce, makeRun, ok, peopleLabeler, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+import { ADDITIVE, at, freshNonce, makeRun, ok, peopleLabeler, READ, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
 
 export function registerFlagsTools(
   server: McpServer,
@@ -34,11 +34,12 @@ export function registerFlagsTools(
       description:
         "Send a bug report, idea or question about Reliquary itself to the people who run it, when your person asks. Summarise in your own words, with any error ref; no large logs. Never include secrets, tokens or variable values. Your person sees its status and any reply on the web UI's Feedback page.",
       inputSchema: {
-        kind: z.enum(["bug", "idea", "question", "other"]),
-        message: z.string().min(1).max(5000),
+        kind: z.enum(["bug", "idea", "question", "other"]).describe("What sort of feedback it is"),
+        message: z.string().min(1).max(5000).describe("What to tell them, in your own words"),
         vault: VAULT.optional().describe("The vault it's about, if any"),
         context: z.string().max(500).optional().describe("What you were doing, e.g. the tool and error ref"),
       },
+      annotations: ADDITIVE,
     },
     async ({ kind, message, vault, context }) =>
       run(async (c) => {
@@ -62,9 +63,9 @@ export function registerFlagsTools(
       description:
         "Feedback your person and their agents sent, newest first, with its status and the operator's reply.",
       inputSchema: {
-        status: z.enum(["new", "seen", "planned", "fixed", "wont_fix"]).optional(),
+        status: z.enum(["new", "seen", "planned", "fixed", "wont_fix"]).optional().describe("Only feedback in this state"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ status }) =>
       run(async (c) => {
@@ -105,7 +106,7 @@ export function registerFlagsTools(
         vault: VAULT,
         limit: z.number().int().min(1).max(200).optional().describe("Flags, default 50"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault, limit }) =>
       run(async (c) => {
@@ -171,11 +172,10 @@ export function registerFlagsTools(
         vault: VAULT,
         through: z.number().int().min(0).max(1e15).describe("The through value list_flags returned"),
       },
-      // Said outright because an unannotated tool is read as destructive and
-      // open-world (MCP's defaults), and a host that asks about those would
-      // stop the one call that clears the flags hint. It moves one
-      // watermark forward, only for this connection, and again is a no-op.
-      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      // It moves one watermark forward, only for this connection, and again
+      // is a no-op. A host that asked about it would stop the one call that
+      // clears the flags hint.
+      annotations: { ...ADDITIVE, idempotentHint: true },
     },
     async ({ vault, through }) =>
       run(async (c) => {
@@ -191,7 +191,7 @@ export function registerFlagsTools(
       description:
         "Paths your person watches in a vault, for flags. Only their own. Watching or unwatching a path needs your person in the web app; no tool here sets one.",
       inputSchema: { vault: VAULT },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault }) =>
       run(async (c) => {

@@ -19,7 +19,7 @@ import { z } from "zod";
 import type { Identity } from "./db.js";
 import { fail, failure, Refusal } from "./failure.js";
 import { callLinkProxy, LinkProxyError } from "./linkproxy.js";
-import { at, explain, freshNonce, makeRun, ok, type ToolResult, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+import { at, explain, freshNonce, makeRun, ok, READ, type ToolResult, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
 
 type LinkToolRow = {
   link_id: string;
@@ -218,9 +218,9 @@ export async function registerLinksTools(
     {
       title: "List links",
       description:
-        "A vault's links to upstream MCP servers: name and url only, never the credential. Discovery and the proxy aren't built yet, so no link has usable tools through Reliquary yet; this only shows what exists.",
+        "A vault's links to upstream MCP servers: name, url and who added each, never the credential. The tools you may call on a link appear in this tool list as <link>.<tool>; this shows every link, including ones with nothing granted to you.",
       inputSchema: { vault: VAULT },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault }) =>
       run(async (c) => {

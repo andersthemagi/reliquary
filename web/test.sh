@@ -45,18 +45,15 @@ fake_key=sb_publishable_fake_$slot
 node=docker.io/library/node:22-slim
 
 cleanup() {
-  "$engine" rm -f "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" "$split" "$rl" >/dev/null 2>&1 || true
+  # -v: the postgres image keeps its data in an anonymous volume that a plain rm leaves behind.
+  "$engine" rm -f -v "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" "$split" "$rl" >/dev/null 2>&1 || true
   rm -f .login-test-$slot .login-test-hosted-$slot .auth-secrets-$slot
 }
 trap cleanup EXIT
 cleanup
+source ../scripts/lib/containers.sh
 
-"$engine" run -d --name "$pg" --network host -e POSTGRES_PASSWORD=test \
-  docker.io/library/postgres:17 -c listen_addresses=127.0.0.1 -c port=$pgport >/dev/null
-# Ask over TCP: the image's init-time server listens on the socket only, so a
-# socket check can pass before the real server is up (a flaky race).
-until "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q 2>/dev/null; do sleep 0.5; done
-sleep 1
+start_postgres "$pg" $pgport
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
@@ -89,7 +86,7 @@ seed=$(psql -A -t < test/seed.sql | grep '=')
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/app/.login-test-$slot \
   -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
-until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
+wait_until "$srv" "the web server to answer /healthz" curl -sf "http://127.0.0.1:$port/healthz"
 # The hosted instance runs a copy of dist/ in /app, so /app/public doesn't
 # exist; node_modules is linked, not copied.
 "$engine" run -d --name "$hosted" --network host -v "$PWD":/src:Z \
@@ -97,16 +94,13 @@ until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/src/.login-test-hosted-$slot \
   -e PUBLIC_URL="$hosted_url" -e RATE_LIMIT_SCALE=1000 -e PORT=$hosted_port "$node" sh -c \
   'mkdir -p /app && cp -r /src/dist /src/docs-build /src/package.json /app/ && ln -s /src/node_modules /app/node_modules && cd /app && exec node dist/server.js' >/dev/null
-until curl -sf "http://127.0.0.1:$hosted_port/healthz" >/dev/null; do
-  [ "$("$engine" inspect -f '{{.State.Running}}' "$hosted")" = true ] || { "$engine" logs "$hosted"; echo "hosted server exited"; exit 1; }
-  sleep 0.3
-done
+wait_until "$hosted" "the hosted web server to answer /healthz" curl -sf "http://127.0.0.1:$hosted_port/healthz"
 
 "$engine" run -d --name "$fake" --network host -v "$PWD":/app:Z -w /app \
   -e FAKE_AUTH_PORT=$fake_port -e FAKE_AUTH_URL=$fake_url -e FAKE_AUTH_APIKEY=$fake_key \
   -e FAKE_AUTH_USERS=ana@example.test=00000000-0000-0000-0000-00000000000a,eve@example.test=00000000-0000-0000-0000-0000000000e1 \
   "$node" node test/fake-auth.mjs >/dev/null
-until curl -sf -H "apikey: $fake_key" "$fake_url/auth/v1/.well-known/jwks.json" >/dev/null; do sleep 0.3; done
+wait_until "$fake" "the fake Supabase Auth to serve its keys" curl -sf -H "apikey: $fake_key" "$fake_url/auth/v1/.well-known/jwks.json"
 # One secret for both instances (as on Vercel), fresh each run, never printed.
 session_secret=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
 for inst in "$auth_a:$auth_a_port" "$auth_b:$auth_b_port"; do
@@ -115,23 +109,15 @@ for inst in "$auth_a:$auth_a_port" "$auth_b:$auth_b_port"; do
     -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
     -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e RATE_LIMIT_SCALE=1000 -e PORT="${inst##*:}" "$node" node dist/server.js >/dev/null
 done
-for p in $auth_a_port $auth_b_port; do
-  until curl -sf "http://127.0.0.1:$p/healthz" >/dev/null; do
-    [ "$("$engine" inspect -f '{{.State.Running}}' "$auth_a")" = true ] && [ "$("$engine" inspect -f '{{.State.Running}}' "$auth_b")" = true ] \
-      || { "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; echo "supabase-mode server exited"; exit 1; }
-    sleep 0.3
-  done
-done
+wait_until "$auth_a" "supabase-mode server A to answer /healthz" curl -sf "http://127.0.0.1:$auth_a_port/healthz"
+wait_until "$auth_b" "supabase-mode server B to answer /healthz" curl -sf "http://127.0.0.1:$auth_b_port/healthz"
 "$engine" run -d --name "$split" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
   -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$split_app_url" -e SITE_URL="$split_site_url" \
   -e RATE_LIMIT_SCALE=1000 -e PORT=$split_port "$node" node dist/server.js >/dev/null
 # Asked as the app host: on the site host /healthz is a redirect.
-until curl -sf -H "Host: ${split_app_url#https://}" "http://127.0.0.1:$split_port/healthz" >/dev/null; do
-  [ "$("$engine" inspect -f '{{.State.Running}}' "$split")" = true ] || { "$engine" logs "$split"; echo "split server exited"; exit 1; }
-  sleep 0.3
-done
+wait_until "$split" "the split-host server to answer /healthz" curl -sf -H "Host: ${split_app_url#https://}" "http://127.0.0.1:$split_port/healthz"
 
 # The rate-limit instance: small limits (test/rate_limits.test.mjs), the
 # same fake Auth and session secret, client addresses from x-real-ip.
@@ -144,10 +130,7 @@ rl_limits="$rl_limits,env_grant_minute=2/60,web_write_minute=3/60"
   -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
   -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e CIMD_ALLOW_LOOPBACK=1 \
   -e TRUST_PROXY_IP=1 -e RATE_LIMITS="$rl_limits" -e PORT=$rl_port "$node" node dist/server.js >/dev/null
-until curl -sf "http://127.0.0.1:$rl_port/healthz" >/dev/null; do
-  [ "$("$engine" inspect -f '{{.State.Running}}' "$rl")" = true ] || { "$engine" logs "$rl"; echo "rate-limit server exited"; exit 1; }
-  sleep 0.3
-done
+wait_until "$rl" "the rate-limit server to answer /healthz" curl -sf "http://127.0.0.1:$rl_port/healthz"
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
