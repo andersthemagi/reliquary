@@ -24,8 +24,7 @@
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 file=${1:-$here/compose/.env}
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker || true)}
-[ -n "$engine" ] || { echo "setup: needs podman or docker to generate the secrets; install one and run this again" >&2; exit 1; }
+source "$here/../scripts/lib/engine.sh"
 node_image=${NODE_IMAGE:-docker.io/library/node:22-slim}
 umask 077
 

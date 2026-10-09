@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 source scripts/lib/supabase-env.sh
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
+source scripts/lib/engine.sh
 dir=${RELIQUARY_BACKUP_DIR:-$HOME/reliquary-backups}
 [[ -s supabase/.db-password ]] || { echo "Missing supabase/.db-password."; exit 1; }
 
