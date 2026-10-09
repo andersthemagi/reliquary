@@ -1778,7 +1778,7 @@ label.choice-card input:focus-visible { outline: none; }
 .member-list .role-form { flex-wrap: nowrap; }
 td.row-actions { width: 1%; white-space: nowrap; }
 /* A cell's second line (the only owner, a tier's source, a connection's kind). */
-:is(.member-list, .usage-table, .plan-vaults) .token-client { display: block; color: var(--fg-muted); font-size: var(--text-sm); }
+:is(.member-list, .usage-table, .plan-vaults, .connection-list) .token-client { display: block; color: var(--fg-muted); font-size: var(--text-sm); }
 .connection-list .conn-name { font-weight: 500; overflow-wrap: anywhere; }
 .invite-list td:first-child { overflow-wrap: anywhere; }
 .invite-form input[type="text"] { max-width: 28rem; }
