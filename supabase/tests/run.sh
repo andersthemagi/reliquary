@@ -11,7 +11,8 @@ engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 slot=${TEST_SLOT:-0}
 name=reliquary-migrations-test-$slot
 
-cleanup() { "$engine" rm -f "$name" >/dev/null 2>&1 || true; }
+# -v: the postgres image keeps its data in an anonymous volume that a plain rm leaves behind.
+cleanup() { "$engine" rm -f -v "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 cleanup
 

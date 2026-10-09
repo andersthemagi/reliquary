@@ -45,7 +45,8 @@ fake_key=sb_publishable_fake_$slot
 node=docker.io/library/node:22-slim
 
 cleanup() {
-  "$engine" rm -f "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" "$split" "$rl" >/dev/null 2>&1 || true
+  # -v: the postgres image keeps its data in an anonymous volume that a plain rm leaves behind.
+  "$engine" rm -f -v "$pg" "$srv" "$hosted" "$auth_a" "$auth_b" "$fake" "$split" "$rl" >/dev/null 2>&1 || true
   rm -f .login-test-$slot .login-test-hosted-$slot .auth-secrets-$slot
 }
 trap cleanup EXIT

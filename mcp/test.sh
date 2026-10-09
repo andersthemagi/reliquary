@@ -26,7 +26,8 @@ webport=$((port + 1))
 rlport=$((18788 + 10 * slot))
 node=docker.io/library/node:22-slim
 
-cleanup() { "$engine" rm -f "$pg" "$srv" "$web" "$rl" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot" ".error-refs-$slot"; }
+# -v: the postgres image keeps its data in an anonymous volume that a plain rm leaves behind.
+cleanup() { "$engine" rm -f -v "$pg" "$srv" "$web" "$rl" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot" ".error-refs-$slot"; }
 trap cleanup EXIT
 cleanup
 

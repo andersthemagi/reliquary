@@ -28,7 +28,8 @@ work=.test-$slot
 cara=00000000-0000-0000-0000-0000000000c1
 
 cleanup() {
-  "$engine" rm -f "$pg" "$web" "$mcp" >/dev/null 2>&1 || true
+  # -v: the postgres image keeps its data in an anonymous volume that a plain rm leaves behind.
+  "$engine" rm -f -v "$pg" "$web" "$mcp" >/dev/null 2>&1 || true
   # Files the containers wrote may be root's (docker): remove them from one.
   rm -rf "$work" 2>/dev/null || "$engine" run --rm -v "$PWD":/cli:z "$node" rm -rf "/cli/$work"
 }
