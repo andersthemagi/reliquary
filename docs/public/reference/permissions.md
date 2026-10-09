@@ -14,12 +14,12 @@ What people and their agents can each do, where, and who may: every rule here is
 | Write or delete an open file | the file's **Edit** page; the file's **More**, **Delete file** | `write_file`, `delete_file` | both, owners and editors |
 | Propose a write or a delete | the file's **Propose a change**, or **More**, **Propose deleting**; **New file** in a canon folder | `propose` | both, owners and editors |
 | Propose a stale proposal again | **Propose again** | `propose` with the same text | both |
-| List proposals, read one and its thread | **Inbox**, a vault's **Proposals** | `list_proposals`, `read_proposal` | both |
+| List proposals, read one and its comments | **Inbox**, a vault's **Proposals** | `list_proposals`, `read_proposal` | both |
 | Revise your own proposal | **Revise** | `revise_proposal` | both, the proposer |
 | Comment on a proposal | the proposal's page | `comment_on_proposal` | both, owners and editors |
-| Open a [thread](../concepts/threads.md), post in one, resolve or reopen it | none yet | `open_thread`, `post_message` | both, owners and editors |
-| List a vault's threads and read one | none yet | `list_threads`, `read_thread` | both |
-| Redact a thread message | none yet | none | person, owners |
+| Open a [thread](../concepts/threads.md), post in one, resolve or reopen it | **Threads**, **New thread**; in a thread, **Post message** and **Resolve thread** or **Reopen thread** | `open_thread`, `post_message` | both, owners and editors |
+| List a vault's threads and read one | **Threads** | `list_threads`, `read_thread` | both |
+| Redact a thread message | a message's **Redact…** in its thread | none | person, owners |
 | Approve, request changes, reject | the proposal's page | none | person, owners and editors |
 | Edit, then approve | the proposal's page | none | person, owners and editors |
 | Snooze or unsnooze in the Inbox | the proposal's page or row | none | person |
@@ -27,10 +27,26 @@ What people and their agents can each do, where, and who may: every rule here is
 | Claim a path, renew or release your own [claim](../concepts/claims.md) | none | `claim_path`, `renew_claim`, `release_claim` | agent, owners and editors (whoever could write the path) |
 | See a vault's active claims | **Settings**, **Diagnostics**, **Claims** | `list_claims` | both |
 | Break someone else's claim | **Diagnostics**, **Claims**, **Break** | none | person, owners and editors |
-| Register a plan file as a [work plan](../concepts/claims.md#work-plans) | none yet | `register_work_plan` | agent, owners and editors (whoever could write the path) |
-| See a work plan's steps | none yet | `work_plan_status` | agent, any member |
+| Register a plan file as a [work plan](../concepts/claims.md#work-plans) | none (agents register plans) | `register_work_plan` | agent, owners and editors (whoever could write the path) |
+| See a work plan's steps | **Tasks** | `work_plan_status` | both, any member |
 | Claim a step, check in on it, complete it or give it back | none | `claim_step`, `checkin_step`, `complete_step`, `release_step` | agent; claiming: whoever could write the path; the rest: the step's holder |
-| Cancel or skip a step | none yet | none | person, owners and editors |
+| Cancel or skip a step | **Tasks**, a task's **Cancel** or **Skip** | none | person, owners and editors (whoever could write the path) |
+
+## Links
+
+| Action | Web app | MCP tool | Who may |
+|---|---|---|---|
+| Add, edit or delete a [link](../concepts/links.md) | a vault's **Links**, **Add link**; a row's **Edit** or **Delete** | none | person, owners |
+| Grant a link's tools to roles | a link's **Grants** | none | person, owners |
+| List a vault's links (name and url, never the credential) | **Links** | `list_links` | both, read-only connections too |
+| Call a granted link tool | none | `<link>.<tool>`, listed in `tools/list` | agent, with a role the tool is granted to; a write tool also needs a write-capable connection |
+
+## Flags
+
+| Action | Web app | MCP tool | Who may |
+|---|---|---|---|
+| See what is [flagged](../concepts/flags.md) for you | **Settings**, **Diagnostics**, **Flags** | `list_flags` | both, your own only |
+| Mark flags shown | opening the **Flags** page | `advance_flags` | both, your own only; you and each connection keep separate places |
 
 ## Vault settings, members and access
 
