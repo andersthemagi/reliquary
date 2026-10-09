@@ -140,6 +140,46 @@ it there.
   or option left out or invented, a link or anchor that doesn't resolve, a page
   missing from the sidebar, an invalid roadmap.
 
+## Issues
+
+If it isn't logged, log it; if it's logged, keep it true. Open work lives in
+GitHub issues, what the public sees in
+[docs/public/roadmap.yml](docs/public/roadmap.yml), what was built and why in
+[docs/progress.md](docs/progress.md). Keep no to-do list anywhere else.
+Issues went stale once because every close was by hand and no PR named its
+issue; these rules make the PR carry that, and CI checks what it can.
+
+- **Before you start,** find the issue (`gh issue list --search "<words>"`).
+  A feature with none gets one first, with the job it does and what done
+  looks like. Add `status: in progress` when you take one up.
+- **Every PR's description has one line saying which issue it is for:**
+  `Closes #N` when merging finishes the issue, `Part of #N` when it is one
+  step of it, `No issue: <why>` for a dependency bump, a docs fix or a bug
+  found on the way (never for a `feat` PR). The `issue-line` job in
+  `.github/workflows/pr-title.yml` fails a PR without one. Only `Closes`,
+  `Fixes` and `Resolves` close anything, and GitHub does it when the PR
+  merges, so never close an issue by hand to match a merge.
+- **A PR that ships part of an issue says what is left,** in the PR and in
+  a comment on the issue: the PR numbers shipped, what remains, anything now
+  unblocked. The next agent reads the issue, not your diff. Don't write
+  `Closes` on a partial one to be tidy, and don't leave a finished one open.
+  If the scope changed or you stopped halfway, say so on the issue before
+  you end the session.
+- **A tracking issue's children are sub-issues,** not a checklist someone
+  ticks by hand; attach each child to its parent when you open it
+  (Relationships in the issue's sidebar), and GitHub keeps the count.
+- **Out of scope but real? File it:** one problem per issue, how to see it,
+  a `bug` or `type:` label, linked from your PR. Not a line in a PR
+  description or `docs/progress.md` that nobody will reopen.
+- **Every `in-progress` or `planned` roadmap item names its issue**
+  (`issue:` in `roadmap.yml`); the docs build fails without it. The PR that
+  ships the item moves it to `shipped` and closes the issue.
+  `scripts/tracker-drift.sh`, run every Monday by `tracker-drift.yml`, opens
+  one issue when a roadmap item and its issue disagree (shipped but open,
+  or not shipped but closed). Fix the disagreement it names, at its source.
+- `owner` marks what needs the owner: an account, money or a decision. Don't
+  guess at those; comment on the issue.
+
 ## Conventions
 
 - Conventional commits (`feat(feed): ...`, `fix(rls): ...`). Trailers

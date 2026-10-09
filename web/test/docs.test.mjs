@@ -359,6 +359,22 @@ test("roadmap: the validator refuses a bad status, an unknown page, a duplicate,
   assert.deepEqual(parseRoadmap('# c\n- title: "a: b" # note\n  status: planned\n'), [{ title: "a: b", status: "planned" }]);
 });
 
+test("roadmap: the validator asks an in-progress or planned item for its issue, and a shipped or considering one for none", () => {
+  const problems = roadmapProblems(
+    [
+      { title: "A", summary: "s", status: "in-progress" },
+      { title: "B", summary: "s", status: "planned" },
+      { title: "C", summary: "s", status: "shipped" },
+      { title: "D", summary: "s", status: "considering" },
+      { title: "E", summary: "s", status: "planned", issue: "12" },
+    ],
+    slugs,
+  );
+  assert.deepEqual(problems.map((p) => p.split(":")[0]), ['"A"', '"B"']);
+  assert.match(problems[0], /an in-progress item needs its issue/);
+  assert.match(problems[1], /a planned item needs its issue/);
+});
+
 test("roadmap: /roadmap shows four columns with every item, public and indexable, with a way to suggest a feature", async () => {
   const r = await get("/roadmap");
   assert.equal(r.status, 200);

@@ -4,7 +4,9 @@
 # in-progress, planned or considering), and optionally milestone (M1 to M7,
 # docs/design.md's build order), issue (a number), docs (a docs page's slug,
 # like concepts/variables) and version (the release it shipped in).
-# Shipping a feature moves its item to shipped in the same change.
+# An in-progress or planned item must name its issue: that issue is where its
+# work is tracked, and the PR that ships it closes it. Shipping a feature
+# moves its item to shipped in the same change.
 # Quote a value that holds ": " or starts with a symbol. The build
 # (web/scripts/gen-docs.mjs) and web/test/docs.test.mjs check this file.
 
@@ -210,13 +212,21 @@
   status: shipped
   milestone: M2
 
+- title: A week of real use for links
+  summary: One upstream MCP, such as Linear, used from all three clients through Reliquary for a week, with the credential never leaving it.
+  status: in-progress
+  milestone: M3
+  issue: 9
+
 - title: Email from the product domain
   summary: Sign-in codes and invites sent by email from Reliquary's own domain.
   status: in-progress
+  issue: 199
 
 - title: Self-hosting (preview)
   summary: Run Reliquary on your own server with Docker Compose, with no plan limits, under the Functional Source License.
   status: in-progress
+  issue: 198
   docs: how-to/self-host
 
 - title: Path ownership
@@ -227,11 +237,13 @@
 - title: Flags
   summary: Telling you and each agent what changed since you were last told, thread messages included. Live over MCP, with a Flags page and Watch/Unwatch in the web app; addressed notes aren't built yet.
   status: in-progress
+  issue: 196
   docs: concepts/flags
 
 - title: Threads
   summary: Conversations inside a vault between its members and their agents, never private; a side thread is addressed to some members. People use a Threads page, agents use MCP.
   status: in-progress
+  issue: 197
   docs: concepts/threads
 
 - title: Compare-and-swap writes
@@ -247,6 +259,7 @@
 - title: Work plans
   summary: Steps with dependencies in a plan file, so no agent gets a step before its blockers are done. Agents work plans over MCP, people see them on the Tasks page. Waiting in line isn't built.
   status: in-progress
+  issue: 52
   docs: concepts/claims
 
 # Planned ------------------------------------------------------------------
@@ -260,51 +273,61 @@
 - title: Publish the CLI to npm
   summary: "Each @reliquary-ai/cli release on npm. 0.3.3 is there, so npx works; later releases don't publish yet."
   status: planned
+  issue: 5
 
 - title: Routines
   summary: Declarative automations on a schedule or a change, running with nobody's machine on.
   status: planned
   milestone: M4
+  issue: 187
 
 - title: Routine watchdog
   summary: Missed, failed and timed-out runs are recorded and their owner is told.
   status: planned
   milestone: M4
+  issue: 188
 
 - title: Per-member variable grants
   summary: Choose which members may use which environments, beyond their role.
   status: planned
   milestone: M5
+  issue: 189
 
 - title: Credential requests
   summary: Ask a client for named credentials; they fill a form instead of emailing them.
   status: planned
   milestone: M5
+  issue: 190
 
 - title: Emergency access
   summary: A trusted member can request owner access, granted after a waiting period unless declined.
   status: planned
   milestone: M5
+  issue: 191
 
 - title: Git mirror
   summary: Every canon change committed to a git remote you choose, one way by default.
   status: planned
   milestone: M6
+  issue: 192
 
 - title: Version history and restore
   summary: Browse a file's earlier versions and restore one.
   status: planned
   milestone: M6
+  issue: 193
 
 - title: Fuller export
   summary: Exports with the log, earlier versions and proposals, and reliquary export from the CLI.
   status: planned
   milestone: M6
+  issue: 194
 
 - title: Chat surfaces
   summary: Use a vault from a group chat, starting with Telegram, showing only what everyone present may see.
   status: planned
   milestone: M7
+  issue: 195
 
 # Considering --------------------------------------------------------------
 
