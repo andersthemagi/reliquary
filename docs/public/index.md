@@ -4,7 +4,7 @@ Reliquary is a shared vault of context and environment variables for people and 
 
 Your agents read the same approved files from Claude Code, Claude.ai, ChatGPT, Cursor or any MCP client. They propose changes; people approve them in the web app. Environment variables reach your programs through the `reliquary` CLI and never reach a model. The database enforces every rule, including what an agent can't do.
 
-Reliquary is pre-alpha: things change and may break; data is backed up daily. See the [roadmap](roadmap.md).
+Reliquary is pre-alpha: things change and may break; data is backed up daily. See the [roadmap](https://github.com/users/andersthemagi/projects/3), which is a GitHub project board, and the [changelog](changelog.md) for what changed in each release.
 
 ## Start here
 
@@ -22,7 +22,7 @@ Reliquary is pre-alpha: things change and may break; data is backed up daily. Se
 ## Where things are
 
 - The web app: `https://app.reliquary.redmage.cc`. Sign in with your email; invites are how people join. Its OAuth sign-in for agents and the CLI lives there too.
-- The website and these docs: `https://reliquary.redmage.cc`, with the docs at `/docs` and the roadmap at `/roadmap`. **Sign in** there takes you to the web app.
+- The website and these docs: `https://reliquary.redmage.cc`, with the docs at `/docs`; `/roadmap` goes to the roadmap board. **Sign in** there takes you to the web app.
 - The MCP URL: `https://mcp.reliquary.redmage.cc/mcp`. Your Connect page in the web app always shows the one to use.
 - The CLI: `npx @reliquary-ai/cli`, or install it with `npm install -g @reliquary-ai/cli` and run `reliquary`.
 - In the web app: what needs you in the **Inbox**, search across your vaults, and your display name, theme and tokens in the account menu, all in the top bar. See [The top bar, inbox and account](concepts/inbox-and-account.md).

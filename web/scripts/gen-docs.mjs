@@ -10,11 +10,9 @@
 //                                 docs/public/reference/mcp-access.json
 //   <!-- generated:cli-help -->   the help text in cli/src/cli.ts
 //   <!-- generated:changelog -->  CHANGELOG.md at the repo root, if any
-//   <!-- generated:roadmap -->    docs/public/roadmap.yml (also written as
-//                                 roadmap.json for the /roadmap page)
 // Fails (exit 1) on a page missing from the sidebar, a sidebar entry with no
 // page, a page without a title or summary, an MCP tool with no entry in
-// mcp-access.json, or a roadmap item that doesn't validate. Output is
+// mcp-access.json. Output is
 // deterministic: no dates, no absolute paths.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -23,11 +21,8 @@ import { fileURLToPath } from "node:url";
 import {
   cliDefinitions,
   mcpToolsMarkdown,
-  parseRoadmap,
   parseSummary,
   readJson,
-  roadmapMarkdown,
-  roadmapProblems,
   titleAndSummary,
 } from "./docs-lib.mjs";
 
@@ -71,15 +66,11 @@ function changelog() {
 const cli = () =>
   cliDefinitions(readFileSync(join(ROOT, "cli/src/cli.ts"), "utf8"), readFileSync(join(ROOT, "cli/src/config.ts"), "utf8"));
 
-let roadmap = [];
-
 const GENERATED = {
   "mcp-tools": () =>
     mcpToolsMarkdown(readJson(join(ROOT, "mcp/test/contract.snapshot.json")), readJson(join(SRC, "reference/mcp-access.json"))),
   "cli-help": () => ["```text", cli().help, "```"].join("\n"),
   changelog,
-  // Links from docs/public/roadmap.md, which sits at the top level.
-  roadmap: () => roadmapMarkdown(roadmap, (slug) => `${slug}.md`),
 };
 
 let sections;
@@ -98,14 +89,6 @@ for (const p of inSummary) {
   seen.add(p.slug);
 }
 if (!seen.has("index")) fail("SUMMARY.md must list index.md (the docs home)");
-
-try {
-  roadmap = parseRoadmap(readFileSync(join(SRC, "roadmap.yml"), "utf8"));
-} catch (err) {
-  fail(err.message);
-}
-const problems = roadmapProblems(roadmap, [...seen]);
-if (problems.length) fail(`docs/public/roadmap.yml:\n  ${problems.join("\n  ")}`);
 
 rmSync(OUT, { recursive: true, force: true });
 const manifest = { sections: [] };
@@ -132,5 +115,4 @@ for (const s of sections) {
   manifest.sections.push({ title: s.title, pages });
 }
 writeFileSync(join(OUT, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-writeFileSync(join(OUT, "roadmap.json"), `${JSON.stringify(roadmap, null, 2)}\n`);
-console.info(`gen-docs: ${inSummary.length} pages and ${roadmap.length} roadmap items in ${relative(ROOT, OUT)}`);
+console.info(`gen-docs: ${inSummary.length} pages in ${relative(ROOT, OUT)}`);

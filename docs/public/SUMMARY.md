@@ -64,5 +64,4 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 
 ## Project
 
-- [Roadmap](roadmap.md)
 - [Changelog](changelog.md)

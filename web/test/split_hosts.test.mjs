@@ -139,7 +139,7 @@ test("split site: a POST to a public path on the site host is refused, not serve
 
 test("split app: public paths on the app host are a 308 to the site host, path and query kept", async () => {
   const paths = ["/docs", "/docs/concepts/agents?x=1&y=a%20b", "/docs/concepts/agents.md", "/terms", "/privacy", "/dpa",
-    "/subprocessors", "/security", "/roadmap", "/roadmap.md", "/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt",
+    "/subprocessors", "/security", "/roadmap", "/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt",
     "/.well-known/security.txt"];
   for (const p of paths) {
     const r = await app(p, { headers: { cookie: ana.header } });
@@ -219,7 +219,7 @@ test("split both: docs, the roadmap and llms.txt answer only on the site host", 
   const md = await site("/docs/concepts/agents.md");
   assert.equal(md.status, 200);
   assert.match(md.headers["content-type"], /text\/markdown/);
-  assert.equal((await site("/roadmap")).status, 200);
+  assert.equal((await site("/roadmap")).status, 302);
   const llms = await site("/llms.txt");
   assert.equal(llms.status, 200);
   assert.match(llms.body, new RegExp(`\\(${SITE.replaceAll(".", "\\.")}/docs/`));

@@ -377,7 +377,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
       const pub = url.pathname === "/"
         ? { status: 200, type: "text/html; charset=utf-8", body: landing(theme) }
         : publicRoute(url.pathname, theme);
-      if (pub) res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type }).end(pub.body);
+      if (pub) res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type, ...(pub.location ? { location: pub.location } : {}) }).end(pub.body);
       else {
         const f = failure({ status: 404, where: "web app (public site)", why: `There’s no page at ${url.pathname}` });
         res.writeHead(404, { ...SECURITY_HEADERS, "content-type": "text/plain; charset=utf-8" }).end(`Not found: ${f.why} (ref ${f.ref})\n`);
@@ -415,7 +415,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     // The public site's legal pages, robots.txt, sitemap.xml, docs (legal.ts).
     const pub = req.method === "GET" ? publicRoute(url.pathname, theme) : undefined;
     if (pub) {
-      res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type }).end(pub.body);
+      res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type, ...(pub.location ? { location: pub.location } : {}) }).end(pub.body);
       return;
     }
     // OAuth endpoints a client calls without a session (oauth.ts).

@@ -4,7 +4,7 @@
 //   PUBLIC_URL  the app's origin: sign-in, Home and every signed-in page, the
 //               OAuth issuer, the env API. Cookies, the POST Origin rule and
 //               the issuer all use it.
-//   SITE_URL    optional: the public site's origin (landing, docs, roadmap,
+//   SITE_URL    optional: the public site's origin (landing, docs, roadmap redirect,
 //               legal pages, robots.txt, sitemap.xml, security.txt).
 //
 // Split (SITE_URL set and a different origin from PUBLIC_URL):
@@ -89,7 +89,6 @@ const SITE_EXACT = new Set([
   "/sitemap.xml",
   "/.well-known/security.txt",
   "/roadmap",
-  "/roadmap.md",
   "/llms.txt",
   "/llms-full.txt",
   "/docs",
