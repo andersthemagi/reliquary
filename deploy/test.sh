@@ -29,8 +29,7 @@ base=$((30000 + 10 * slot))
 # shellcheck disable=SC2034 # all written to the settings file by name, below
 T_PG=$base T_AUTH=$((base + 1)) T_WEB=$((base + 2)) T_MCP=$((base + 3)) T_SMTP=$((base + 4)) T_MAILAPI=$((base + 5))
 email=owner@example.com
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker || true)}
-[ -n "$engine" ] || { echo "deploy test: needs podman or docker" >&2; exit 1; }
+source "$repo/scripts/lib/engine.sh"
 node_image=docker.io/library/node:22-slim
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/rlq-deploy-$slot-XXXXXX")

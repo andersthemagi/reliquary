@@ -12,6 +12,7 @@
 # suite fails.
 set -uo pipefail
 cd "$(dirname "$0")"
+source scripts/lib/engine.sh
 
 base=${TEST_SLOT:-0}
 suites=("$@")
@@ -30,7 +31,6 @@ echo "== registry"
 ./scripts/check-registry.sh || { echo "registry check failed"; exit 1; }
 
 # Pull images once, so parallel suites don't race to fetch the same layers.
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
 # node:22 (it has git) runs the CLI's tests.
 for img in docker.io/library/postgres:17 docker.io/library/node:22-slim docker.io/library/node:22; do
   "$engine" image inspect "$img" >/dev/null 2>&1 || "$engine" pull -q "$img" >/dev/null

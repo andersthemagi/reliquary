@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 source scripts/lib/supabase-env.sh
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
+source scripts/lib/engine.sh
 source scripts/lib/psql-helpers.sh
 
 usage() { sed -n '7,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }

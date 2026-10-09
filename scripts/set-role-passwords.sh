@@ -28,7 +28,7 @@ case ${1:-} in
 esac
 
 source scripts/lib/supabase-env.sh
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
+source scripts/lib/engine.sh
 [[ -s supabase/.db-password ]] || { echo "Missing supabase/.db-password."; exit 1; }
 
 if [[ ${1:-} == ops-off ]]; then

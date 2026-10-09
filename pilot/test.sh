@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-engine=$(command -v podman || command -v docker)
+source ../scripts/lib/engine.sh
 name=reliquary-pilot-test
 image=docker.io/library/postgres:17
 

@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 source scripts/lib/supabase-env.sh
 pwfile=supabase/.db-password
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
+source scripts/lib/engine.sh
 
 [[ -s $pwfile ]] || { echo "Missing $pwfile (the project's database password, mode 600)."; exit 1; }
 [[ $(stat -c %a "$pwfile") == 600 ]] || { echo "$pwfile must be mode 600."; exit 1; }

@@ -18,7 +18,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-engine=$(command -v podman || command -v docker)
+source ../scripts/lib/engine.sh
 pg=reliquary-dev-pg
 srv=reliquary-dev-mcp
 web=reliquary-dev-web

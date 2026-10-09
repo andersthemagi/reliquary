@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
+source scripts/lib/engine.sh
 dir=${RELIQUARY_BACKUP_DIR:-$HOME/reliquary-backups}
 file=${1:-$(ls -1t "$dir"/reliquary-*.dump 2>/dev/null | head -1)}
 [[ -n $file && -s $file ]] || { echo "No backup found (run scripts/backup.sh)."; exit 1; }

@@ -54,7 +54,7 @@ if ! tr -d '[:space:]' < "$ops" | grep -qE '^[A-Za-z0-9_-]{16,}$'; then
   exit 2
 fi
 
-engine=${CONTAINER_ENGINE:-$(command -v podman || command -v docker)}
+source scripts/lib/engine.sh
 node=docker.io/library/node:22-slim
 root=$PWD
 
