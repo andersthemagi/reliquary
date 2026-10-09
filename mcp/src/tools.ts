@@ -30,7 +30,7 @@
 // ceilings), live in tools-shared.ts.
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type pg from "pg";
 import { registerClaimsTools } from "./claims-tools.js";
 import { asIdentity, type Identity } from "./db.js";
@@ -38,7 +38,7 @@ import { registerFlagsTools } from "./flags-tools.js";
 import { registerLinksTools } from "./links-tools.js";
 import { registerProposalsTools } from "./proposals-tools.js";
 import { registerThreadTools } from "./thread-tools.js";
-import { wrapRegisterTool } from "./tools-shared.js";
+import { refuseInput, wrapRegisterTool } from "./tools-shared.js";
 import { registerVariablesTools } from "./variables-tools.js";
 import { registerVaultFileTools } from "./vaultfiles-tools.js";
 import { registerWorkPlanTools } from "./workplan-tools.js";
@@ -81,6 +81,7 @@ export async function registerTools(
   await registerLinksTools(server, id, runAs, linkTools);
 
   trimToolList(server);
+  explainInputRefusals(server);
 }
 
 // tools/list, through the SDK's own handler with one post-process step:
@@ -96,13 +97,33 @@ export async function registerTools(
 // optimization for correctness. If the SDK's internals change shape, this
 // does nothing and the SDK's own list is served, $schema included.
 type Handler = (req: unknown, extra: unknown) => Promise<unknown>;
+const sdkHandler = (server: McpServer, method: string): Handler | undefined =>
+  (server.server as unknown as { _requestHandlers?: Map<string, Handler> })._requestHandlers?.get(method);
+
 function trimToolList(server: McpServer): void {
-  const handlers = (server.server as unknown as { _requestHandlers?: Map<string, Handler> })._requestHandlers;
-  const original = handlers?.get(ListToolsRequestSchema.shape.method.value);
+  const original = sdkHandler(server, ListToolsRequestSchema.shape.method.value);
   if (typeof original !== "function") return;
   server.server.setRequestHandler(ListToolsRequestSchema, async (req, extra) => {
     const list = (await original(req, extra)) as { tools?: { inputSchema?: Record<string, unknown> }[] };
     for (const t of list.tools ?? []) delete t.inputSchema?.$schema;
     return list as { tools: [] };
+  });
+}
+
+// tools/call, through the SDK's own handler with one post-process step: the
+// SDK answers arguments that fail a tool's schema with a plain tool error,
+// before any handler (and so before wrapRegisterTool) runs; this gives it a
+// reference and a log line like every other failure. If the SDK's internals
+// change shape, this does nothing and the SDK's own answer is served;
+// mcp/test/errors.test.mjs fails then.
+const SDK_INPUT_REFUSAL = /^(?:MCP error -?\d+: )?Input validation error: ([\s\S]*)$/;
+function explainInputRefusals(server: McpServer): void {
+  const original = sdkHandler(server, CallToolRequestSchema.shape.method.value);
+  if (typeof original !== "function") return;
+  server.server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
+    const result = (await original(req, extra)) as { isError?: boolean; content?: { text?: unknown }[] };
+    const text = result.content?.[0]?.text;
+    const said = result.isError && typeof text === "string" ? SDK_INPUT_REFUSAL.exec(text) : null;
+    return (said ? refuseInput(req.params.name, said[1]) : result) as never;
   });
 }

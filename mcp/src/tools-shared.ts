@@ -180,8 +180,23 @@ export function explain(err: unknown): ToolResult {
         lead = `${f.what} failed: ${f.why}`;
     }
   }
+  return shown(lead, f);
+}
+
+// The two lines of a refused call: the words, then what, where, why (unless
+// the words already said it) and the reference.
+function shown(lead: string, f: Failure): ToolResult {
   const said = lead.toLowerCase().includes(f.why.replace(/\.$/, "").toLowerCase());
   return refuse(`${lead}\n(what: ${f.what}; where: ${f.where}${said ? "" : `; why: ${f.why.replace(/\.$/, "")}`}; ref ${f.ref})`);
+}
+
+// The SDK checks a call's arguments before any handler runs, so a refusal
+// for arguments that do not fit the tool's schema never passed through
+// wrapRegisterTool: it had no reference and left no line in the server log.
+// `why` is the SDK's own sentence, which names the argument and the limit,
+// never the value sent (zod's messages do not carry it).
+export function refuseInput(name: string, why: string): ToolResult {
+  return withRequest(callWhat(name), `mcp tool ${name}`, () => shown(why, failure({ status: 400, where: `MCP tool ${name}: input check`, why })));
 }
 
 // The tool a call is running, for its errors.

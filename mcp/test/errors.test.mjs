@@ -122,3 +122,13 @@ test("errors: a request the server refuses before any tool runs says why, with a
   assert.match(body.ref, /^[0-9a-f]{8}$/);
   if (MCP_ERROR_REFS_FILE) appendFileSync(MCP_ERROR_REFS_FILE, `${body.ref}\n`);
 });
+
+test("errors: arguments that do not fit the tool's schema say which one, where and a reference, without the value sent", async () => {
+  const r = await call(EVE_HOME_RW, "comment_on_proposal", { proposal_id: MARK, comment: "x" });
+  assert.equal(r.isError, true);
+  const e = parsed(r.text);
+  assert.match(e.lead, /^Invalid arguments for tool comment_on_proposal: .+ at proposal_id$/);
+  assert.equal(e.tool, "comment_on_proposal");
+  assert.equal(e.where, "MCP tool comment_on_proposal: input check");
+  assert.equal(r.text.includes(MARK), false, "the value sent is not echoed");
+});
