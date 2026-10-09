@@ -17,18 +17,33 @@
 //
 //   POST /internal/link-call   Authorization: Bearer <LINK_PROXY_SECRET>
 //     {vault_id, url, key_id, nonce, ciphertext, tool_name, args}
-//     -> {ok: true, result} | {ok: false, error, message?, where?, ref?}
+//     -> {ok: true, result: {content, isError}}
+//      | {ok: false, error, message, why, where, ref}   every refusal and failure past the secret check
+//      | {ok: false, error}                              401 and 405: nothing was attempted, so no reference
+//
+// The second shape is read by mcp/src/linkproxy.ts, a separate deployable
+// with its own copy of this contract: mcp/test/link_proxy.test.mjs fails
+// if the two stop agreeing. `error` is the endpoint's own code, `why` the
+// reason written for people (`message` is "what failed: why"), `where` the
+// component and `ref` the reference that finds the detail in this app's log.
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import type http from "node:http";
 import { callUpstreamTool, UpstreamError } from "./linkcall.js";
 import { discoveryAllowsLoopback } from "./discovery.js";
 import { openLink, SecretsError, type Sealed } from "./secrets.js";
-import { apiBody, fail, failure } from "./failure.js";
+import { apiBody, doing, fail, failure, type Failure } from "./failure.js";
 import { BadRequest, readJson } from "./jsonbody.js";
 
 const MAX_BODY = 256 * 1024;
 const PATH = "/internal/link-call";
+
+// A BadRequest carries only a code; the reasons are fixed text, never the
+// request's.
+const REQUEST_REASONS: Record<string, string> = {
+  invalid_request: "The call’s body wasn’t JSON holding a vault id, a url, a tool name and a sealed credential",
+  too_large: `The call’s body is over ${MAX_BODY / 1024} KiB, so the arguments are too large to send`,
+};
 
 let SECRET = "";
 export function configureLinkProxy(env: NodeJS.ProcessEnv = process.env): void {
@@ -39,6 +54,10 @@ export function configureLinkProxy(env: NodeJS.ProcessEnv = process.env): void {
 
 function send(res: http.ServerResponse, status: number, body: object): void {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify(body));
+}
+
+function sendFailure(res: http.ServerResponse, f: Failure, code: string): void {
+  send(res, f.status, { ok: false, ...apiBody(f, code), why: f.why });
 }
 
 function authorized(header: string | string[] | undefined): boolean {
@@ -92,6 +111,7 @@ export async function linkProxyApi(req: http.IncomingMessage, res: http.ServerRe
   }
 
   let outcome = "ok";
+  doing("Calling a link’s tool");
   try {
     const body = (await readJson(req, MAX_BODY)) as Body;
     if (!isNonEmptyString(body.vault_id) || !isNonEmptyString(body.url) || !isNonEmptyString(body.tool_name)) {
@@ -103,7 +123,7 @@ export async function linkProxyApi(req: http.IncomingMessage, res: http.ServerRe
       credential = openLink(sealed, body.vault_id);
     } catch (err) {
       const f = failure({ status: 502, where: "link proxy (credential)", why: err instanceof SecretsError ? err.message : "The credential couldn’t be decrypted." });
-      send(res, f.status, { ok: false, ...apiBody(f, "decrypt_failed") });
+      sendFailure(res, f, "decrypt_failed");
       outcome = "decrypt_failed";
       return true;
     }
@@ -111,15 +131,16 @@ export async function linkProxyApi(req: http.IncomingMessage, res: http.ServerRe
     send(res, 200, { ok: true, result });
   } catch (err) {
     if (err instanceof BadRequest) {
-      send(res, err.status, { ok: false, error: err.code });
+      const f = failure({ status: err.status, where: "link proxy (request)", why: REQUEST_REASONS[err.code] ?? err.code, code: err.code });
+      sendFailure(res, f, err.code);
       outcome = err.code;
     } else if (err instanceof UpstreamError) {
       const f = failure({ status: 502, where: "link proxy (upstream)", why: err.message });
-      send(res, f.status, { ok: false, ...apiBody(f, "upstream_failed") });
+      sendFailure(res, f, "upstream_failed");
       outcome = "upstream_failed";
     } else {
       const f = fail(err, { where: "link proxy" });
-      if (!res.headersSent) send(res, f.status, { ok: false, ...apiBody(f, "server_error") });
+      if (!res.headersSent) sendFailure(res, f, "server_error");
       outcome = `server_error ref=${f.ref}`;
     }
   }

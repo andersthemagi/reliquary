@@ -1,7 +1,8 @@
 // A server a test file starts for itself: dist/server.js on a free port, with
 // a preload (node --import) that makes something observable or fail, which the
-// shared test server must never do. Used by register_failure.test.mjs and
-// link_lookup.test.mjs.
+// shared test server must never do, or with settings the shared one must not
+// have. Used by register_failure.test.mjs, link_lookup.test.mjs and
+// link_proxy.test.mjs.
 
 import { spawn } from "node:child_process";
 import net from "node:net";
@@ -20,7 +21,8 @@ function freePort() {
 // Resolves once /healthz answers. `log()` is everything the server has printed.
 export async function startServer(preload, env = {}) {
   const port = await freePort();
-  const child = spawn(process.execPath, ["--import", fileURLToPath(new URL(preload, import.meta.url)), "dist/server.js"], {
+  const imports = preload ? ["--import", fileURLToPath(new URL(preload, import.meta.url))] : [];
+  const child = spawn(process.execPath, [...imports, "dist/server.js"], {
     env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL, HOST: "127.0.0.1", PORT: String(port), ...env },
     stdio: ["ignore", "pipe", "pipe"],
   });

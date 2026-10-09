@@ -24,6 +24,8 @@ A vault is named by the first 8 characters of its id. The web app shows a path y
 | `rate limit` | Too many requests in a short time. The answer says when to try again |
 | `MCP tool <name>` | A tool call. After a colon, the part inside it that failed, such as `database (function private.vault_ref)` |
 | `MCP server` | The MCP endpoint itself, before or around a tool call |
+| `link proxy (...)` | A call to a tool of a [link](../concepts/links.md): `(upstream)` the linked server refused it, `(request)` the arguments were too large to send, `(credential)` the stored credential didn't decrypt, `(network)` the web app couldn't be reached, `(settings)` this server has no `LINK_PROXY_SECRET`. A tool call carries two references, the web app's (`web app ref`) and its own |
+| `link discovery` | Reading a link's tools when it is added |
 | `env API` | The API the CLI uses for variable values |
 | `OAuth` | Connecting an app or the CLI: the token endpoint, or the consent page |
 | `network` | A call to another service got no answer: DNS, TLS, a refused or reset connection, a timeout |

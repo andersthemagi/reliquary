@@ -17,9 +17,9 @@ import { createHash } from "node:crypto";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { failure } from "./failure.js";
+import { fail, failure, Refusal } from "./failure.js";
 import { callLinkProxy, LinkProxyError } from "./linkproxy.js";
-import { at, explain, freshNonce, makeRun, ok, refuse, type ToolResult, VAULT, VAULT_REF } from "./tools-shared.js";
+import { at, explain, freshNonce, makeRun, ok, type ToolResult, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
 
 type LinkToolRow = {
   link_id: string;
@@ -90,8 +90,10 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
     // The link id breaks the tie, so the same one is offered on every
     // request instead of whichever row the database returned first.
     rows = await runAs(async (c) => (await c.query(`select * from private.list_callable_link_tools() order by link_name, tool_name, link_id`)).rows);
-  } catch {
-    // Best effort: the fixed tools above still register either way.
+  } catch (err) {
+    // Best effort: the fixed tools above still register either way. Logged,
+    // or every link tool would vanish from the list without a trace.
+    fail(err, { where: "MCP link tools", what: "Looking up the link tools you can call" });
     return;
   }
   const offered = new Set<string>();
@@ -148,10 +150,12 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
             return rows[0].r as { ok: boolean; error?: string; vault_id?: string; url?: string; key_id?: string; nonce?: string; ciphertext?: string };
           });
           if (!begin.ok) {
-            return refuse(
-              begin.error === "not_found"
-                ? `${toolName} isn’t available any more: the link or tool may have been removed.`
-                : `${toolName} isn’t granted to you right now.`,
+            return explain(
+              new ToolError(
+                begin.error === "not_found"
+                  ? `${toolName} isn’t available any more: the link or tool may have been removed.`
+                  : `${toolName} isn’t granted to you right now.`,
+              ),
             );
           }
           const upstreamArgs = named ? toolArgs : ((toolArgs.args as Record<string, unknown> | undefined) ?? {});
@@ -174,16 +178,23 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
             result = { content: [{ type: "text", text: upstreamBlock(toolName, called.content, called.isError) }], isError: called.isError };
           } catch (err) {
             outcome = "error";
-            const why = err instanceof LinkProxyError ? err.message : "The call to the upstream server failed.";
-            resultHash = hash(why);
-            result = refuse(`${toolName} failed: ${why}`);
+            // The web app's own reference rides in the reason, so the log
+            // line of this call's reference leads to it.
+            const refused =
+              err instanceof LinkProxyError
+                ? new Refusal({ status: err.status, where: err.where, why: err.ref ? `${err.message} (web app ref ${err.ref})` : err.message, code: err.code })
+                : err;
+            resultHash = hash(err instanceof LinkProxyError ? err.message : "failed");
+            result = explain(refused);
           }
           try {
             await runAs((c) => c.query(`select public.record_link_call($1, $2, $3, $4, $5)`, [row.link_id, row.tool_name, outcome, argHash, resultHash]));
-          } catch {
+          } catch (err) {
             // Best effort (the migration's own reasoning): the upstream
             // call already happened either way, and the agent is
-            // waiting on its result, not on this bookkeeping.
+            // waiting on its result, not on this bookkeeping. Logged, so
+            // a call missing from the call log can be explained.
+            fail(err, { where: `MCP tool ${toolName}: call log`, what: `Recording the call to ${toolName}` });
           }
           return result;
         } catch (err) {
