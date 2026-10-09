@@ -193,12 +193,27 @@ const httpServer = http.createServer((req, res) =>
   ),
 );
 
+// A request target is not always a path: "//" is a network-path reference
+// with no host, and the URL parser throws on it.
+function parseTarget(target: string | undefined): URL | null {
+  try {
+    return new URL(target ?? "/", "http://localhost");
+  } catch {
+    return null;
+  }
+}
+
 async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-  const path = new URL(req.url ?? "/", "http://localhost").pathname;
+  const url = parseTarget(req.url);
+  if (!url) {
+    refuseHttp(res, 400, "bad_request", "The request target isn’t a path this server can read; the MCP endpoint is /mcp");
+    return;
+  }
+  const path = url.pathname;
 
   if (path === "/healthz") {
     const plain = { "content-type": "text/plain", "cache-control": "no-store" };
-    if (new URL(req.url ?? "/", "http://localhost").searchParams.get("db") !== "1") {
+    if (url.searchParams.get("db") !== "1") {
       res.writeHead(200, plain).end("ok");
       return;
     }
