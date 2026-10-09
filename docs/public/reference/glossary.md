@@ -12,7 +12,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Canon.** A file policy: the file changes only through a proposal approved by enough people. See [Canon, open and rules](../concepts/canon-and-rules.md).
 
-**Ceiling.** The actions no agent can do, however its person connected it: approving, rules, path owners, members, grants, secret values, links, export, deletion and erasure. See [Agents and the ceiling](../concepts/agents.md#the-ceiling).
+**Ceiling.** The actions no agent can do, however its person connected it: the ones that are irreversible, grant trust or reveal a secret. The list is on [Agents and the ceiling](../concepts/agents.md#the-ceiling).
 
 **Changes.** A vault's plain-language list of what people and their agents changed: files written, deleted and erased, and proposals opened and decided. Newest first, by day. See [Changes and the log](../concepts/activity.md#changes).
 
