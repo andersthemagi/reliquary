@@ -16,6 +16,17 @@ import { checkTarget, formatDotenv, privacyNote, writePrivate } from "./pull.js"
 import { readDotenv, waitForDecision } from "./push.js";
 import { runWith } from "./run.js";
 
+// The help text is also data: web/scripts/docs-lib.mjs (cliDefinitions) reads
+// this declaration with a regex, from its opening backtick to the first
+// backtick followed by a semicolon, and builds docs/public/reference/cli.md
+// from it. So the text must stay one plain template literal with no backtick
+// inside; the only interpolations it understands are DEFAULT_SERVER and
+// credentialsFile() (any other fails the docs build until docs-lib.mjs is
+// taught); and every command needs a usage line in this form,
+//   "  reliquary <command> ...",
+// because the docs' command list comes from those lines. Option names come
+// from the --flags listed here and from the parse() specs below, and
+// web/test/docs.test.mjs fails when the docs and either of them disagree.
 const HELP = `reliquary: a vault's environment variables on this computer
 
 Usage:
