@@ -8,7 +8,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { at, makeRun, ok, refuse, VAULT, vaultRef } from "./tools-shared.js";
+import { at, makeRun, ok, READ, refuse, VAULT, vaultRef } from "./tools-shared.js";
 
 export function registerVariablesTools(
   server: McpServer,
@@ -27,7 +27,7 @@ export function registerVariablesTools(
         vault: VAULT,
         environment: z.string().min(1).max(100).optional().describe("e.g. development"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault, environment }) =>
       run(async (c) => {

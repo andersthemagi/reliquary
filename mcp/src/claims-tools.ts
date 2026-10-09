@@ -17,7 +17,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { at, FENCE, freshNonce, makeRun, ok, PATH, peopleLabeler, refuse, SECRET, ToolError, TTL_MINUTES, VAULT, VAULT_REF } from "./tools-shared.js";
+import { ADDITIVE, at, FENCE, freshNonce, makeRun, ok, PATH, peopleLabeler, READ, refuse, SECRET, ToolError, TTL_MINUTES, VAULT, VAULT_REF } from "./tools-shared.js";
 
 export function registerClaimsTools(
   server: McpServer,
@@ -36,8 +36,9 @@ export function registerClaimsTools(
         vault: VAULT,
         path: PATH,
         label: z.string().max(200).optional().describe("Shown to people on the Claims page, e.g. what you're doing. Self-reported, never trusted for identity"),
-        ttl_minutes: TTL_MINUTES.optional().describe("Default (and today's maximum) 48 hours"),
+        ttl_minutes: TTL_MINUTES.optional(),
       },
+      annotations: ADDITIVE,
     },
     async ({ vault, path, label, ttl_minutes }) =>
       run(async (c) => {
@@ -95,8 +96,9 @@ export function registerClaimsTools(
         path: PATH,
         fence: FENCE,
         secret: SECRET,
-        ttl_minutes: TTL_MINUTES.optional().describe("Default (and today's maximum) 48 hours"),
+        ttl_minutes: TTL_MINUTES.optional(),
       },
+      annotations: ADDITIVE,
     },
     async ({ vault, path, fence, secret, ttl_minutes }) =>
       run(async (c) => {
@@ -118,6 +120,7 @@ export function registerClaimsTools(
       description:
         "Give up a claim before it expires, freeing the path for anyone. Needs the exact fence and secret claim_path returned, from this same connection and person.",
       inputSchema: { vault: VAULT, path: PATH, fence: FENCE, secret: SECRET },
+      annotations: { ...ADDITIVE, idempotentHint: true },
     },
     async ({ vault, path, fence, secret }) =>
       run(async (c) => {
@@ -132,7 +135,7 @@ export function registerClaimsTools(
       title: "List claims",
       description: "Active claims in a vault: path, holder, label, when granted and when the lease ends.",
       inputSchema: { vault: VAULT },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault }) =>
       run(async (c) => {

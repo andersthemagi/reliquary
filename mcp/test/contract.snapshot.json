@@ -8,7 +8,8 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "through": {
           "type": "integer",
@@ -37,9 +38,11 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "cursor": {
+          "description": "The next cursor the last call returned; leave out to start at the beginning",
           "type": "integer",
           "minimum": 0,
           "maximum": 1000000000000000
@@ -56,7 +59,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -68,11 +72,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "The plan file's path"
         },
         "key": {
           "type": "string",
@@ -83,17 +89,19 @@
         "fence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "The claim fence"
         },
         "secret": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The claim secret"
         },
         "ttl_minutes": {
-          "description": "Default is the claim rule's lease, and its maximum",
           "type": "integer",
           "minimum": 1,
-          "maximum": 43200
+          "maximum": 43200,
+          "description": "Minutes; default and cap are the vault's claim rule (48 hours unless set)"
         }
       },
       "required": [
@@ -104,7 +112,10 @@
         "secret"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "claim_path",
@@ -115,11 +126,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "Path in the vault"
         },
         "label": {
           "description": "Shown to people on the Claims page, e.g. what you're doing. Self-reported, never trusted for identity",
@@ -127,10 +140,10 @@
           "maxLength": 200
         },
         "ttl_minutes": {
-          "description": "Default (and today's maximum) 48 hours",
           "type": "integer",
           "minimum": 1,
-          "maximum": 43200
+          "maximum": 43200,
+          "description": "Minutes; default and cap are the vault's claim rule (48 hours unless set)"
         }
       },
       "required": [
@@ -138,7 +151,10 @@
         "path"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "claim_step",
@@ -149,11 +165,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "The plan file's path"
         },
         "key": {
           "type": "string",
@@ -167,10 +185,10 @@
           "maxLength": 200
         },
         "ttl_minutes": {
-          "description": "Default is the claim rule's lease, and its maximum",
           "type": "integer",
           "minimum": 1,
-          "maximum": 43200
+          "maximum": 43200,
+          "description": "Minutes; default and cap are the vault's claim rule (48 hours unless set)"
         }
       },
       "required": [
@@ -179,7 +197,10 @@
         "key"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "comment_on_proposal",
@@ -190,12 +211,14 @@
       "properties": {
         "proposal_id": {
           "type": "string",
-          "pattern": "^[0-9a-fA-F-]{36}$"
+          "pattern": "^[0-9a-fA-F-]{36}$",
+          "description": "Proposal id"
         },
         "comment": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 4000
+          "maxLength": 4000,
+          "description": "Your comment, plain text"
         }
       },
       "required": [
@@ -203,7 +226,10 @@
         "comment"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "complete_step",
@@ -214,11 +240,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "The plan file's path"
         },
         "key": {
           "type": "string",
@@ -229,11 +257,13 @@
         "fence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "The claim fence"
         },
         "secret": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The claim secret"
         }
       },
       "required": [
@@ -244,12 +274,15 @@
         "secret"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "create_vault",
     "title": "Create a vault",
-    "description": "Create a vault owned by your person (the log records you made it). Needs a token that reaches all your person's vaults read-write. default_policy: open (write directly) or canon (changes are proposals people approve). Only people set folder rules and members.",
+    "description": "Create a vault owned by your person (the log records you made it). Needs a token that reaches all your person's vaults read-write. Only people set folder rules and members.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -260,6 +293,7 @@
           "description": "The vault's name"
         },
         "default_policy": {
+          "description": "open (default): write directly; canon: changes are proposals people approve",
           "type": "string",
           "enum": [
             "open",
@@ -271,24 +305,30 @@
         "name"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "delete_file",
     "title": "Delete an open file",
-    "description": "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true. expected_version (read_file's version: line) refuses the delete if the file changed since.",
+    "description": "Delete an open file; its versions are kept and the deletion is logged. For a canon file, propose with delete: true.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "Path in the vault"
         },
         "expected_version": {
+          "description": "read_file's version: line; the delete is refused if the file changed since",
           "type": "string",
           "pattern": "^[0-9a-fA-F-]{36}$"
         }
@@ -298,7 +338,11 @@
         "path"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
   },
   {
     "name": "list_claims",
@@ -309,7 +353,8 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         }
       },
       "required": [
@@ -317,7 +362,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -329,7 +375,8 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "prefix": {
           "description": "Folder, e.g. 'clients/'",
@@ -353,7 +400,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -365,7 +413,8 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "limit": {
           "description": "Flags, default 50",
@@ -379,7 +428,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -391,7 +441,8 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         }
       },
       "required": [
@@ -399,7 +450,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -410,6 +462,7 @@
       "type": "object",
       "properties": {
         "status": {
+          "description": "Only feedback in this state",
           "type": "string",
           "enum": [
             "new",
@@ -422,21 +475,24 @@
       }
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
     "name": "list_proposals",
     "title": "List proposals",
-    "description": "A vault's proposals (open by default), newest first, with reviewers' notes. changes_requested: those waiting for you to revise.",
+    "description": "A vault's proposals, newest first, with reviewers' notes.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "status": {
+          "description": "Default open; changes_requested: waiting for you to revise",
           "type": "string",
           "enum": [
             "open",
@@ -452,7 +508,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -464,7 +521,8 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         }
       },
       "required": [
@@ -472,7 +530,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -484,9 +543,11 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "all": {
+          "description": "true adds the side threads addressed to others",
           "type": "boolean"
         },
         "state": {
@@ -499,6 +560,7 @@
           ]
         },
         "before": {
+          "description": "The before value the last page named, for older threads",
           "type": "integer",
           "minimum": 1,
           "maximum": 1000000000000000
@@ -515,7 +577,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -527,7 +590,8 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "environment": {
           "description": "e.g. development",
@@ -541,7 +605,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -553,7 +618,8 @@
       "properties": {}
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -565,19 +631,23 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "title": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "The thread's title"
         },
         "message": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 4000
+          "maxLength": 4000,
+          "description": "The first message"
         },
         "to": {
+          "description": "Member ids as printed on people: lines; up to 20",
           "maxItems": 20,
           "type": "array",
           "items": {
@@ -598,7 +668,10 @@
         "message"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "post_message",
@@ -609,7 +682,8 @@
       "properties": {
         "thread_id": {
           "type": "string",
-          "pattern": "^[0-9a-fA-F-]{36}$"
+          "pattern": "^[0-9a-fA-F-]{36}$",
+          "description": "Thread id, from list_threads or a flag"
         },
         "message": {
           "description": "Cite as task:<plan path>#<step key>, file:<path>, proposal:<id>",
@@ -630,7 +704,10 @@
         "thread_id"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "propose",
@@ -641,11 +718,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "Path in the vault"
         },
         "content": {
           "description": "Full new text; omit to delete",
@@ -658,6 +737,7 @@
           "description": "For the reviewers"
         },
         "delete": {
+          "description": "true to propose deleting the file; leave content out",
           "type": "boolean"
         }
       },
@@ -667,34 +747,42 @@
         "reason"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "read_file",
     "title": "Read a file",
-    "description": "A file's text, policy and last writer. At most max_bytes (default 100000); from_line and to_line pick lines.",
+    "description": "A file's text, policy, last writer and version; read part of it with from_line, to_line or max_bytes.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "Path in the vault"
         },
         "from_line": {
+          "description": "First line to return, counting from 1",
           "type": "integer",
           "minimum": 1,
           "maximum": 10000000
         },
         "to_line": {
+          "description": "Last line to return",
           "type": "integer",
           "minimum": 1,
           "maximum": 10000000
         },
         "max_bytes": {
+          "description": "At most this many bytes; default 100000",
           "type": "integer",
           "minimum": 100,
           "maximum": 1048576
@@ -706,7 +794,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -718,7 +807,8 @@
       "properties": {
         "proposal_id": {
           "type": "string",
-          "pattern": "^[0-9a-fA-F-]{36}$"
+          "pattern": "^[0-9a-fA-F-]{36}$",
+          "description": "Proposal id"
         }
       },
       "required": [
@@ -726,7 +816,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -738,7 +829,8 @@
       "properties": {
         "thread_id": {
           "type": "string",
-          "pattern": "^[0-9a-fA-F-]{36}$"
+          "pattern": "^[0-9a-fA-F-]{36}$",
+          "description": "Thread id, from list_threads or a flag"
         },
         "after": {
           "description": "Last message id read",
@@ -758,7 +850,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -770,11 +863,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "The plan file's path"
         }
       },
       "required": [
@@ -782,7 +877,10 @@
         "path"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "release_claim",
@@ -793,20 +891,24 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "Path in the vault"
         },
         "fence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "The claim fence"
         },
         "secret": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The claim secret"
         }
       },
       "required": [
@@ -816,7 +918,11 @@
         "secret"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
   },
   {
     "name": "release_step",
@@ -827,11 +933,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "The plan file's path"
         },
         "key": {
           "type": "string",
@@ -842,11 +950,13 @@
         "fence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "The claim fence"
         },
         "secret": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The claim secret"
         }
       },
       "required": [
@@ -857,7 +967,11 @@
         "secret"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
   },
   {
     "name": "renew_claim",
@@ -868,26 +982,30 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "Path in the vault"
         },
         "fence": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "The claim fence"
         },
         "secret": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The claim secret"
         },
         "ttl_minutes": {
-          "description": "Default (and today's maximum) 48 hours",
           "type": "integer",
           "minimum": 1,
-          "maximum": 43200
+          "maximum": 43200,
+          "description": "Minutes; default and cap are the vault's claim rule (48 hours unless set)"
         }
       },
       "required": [
@@ -897,7 +1015,10 @@
         "secret"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "revise_proposal",
@@ -908,11 +1029,13 @@
       "properties": {
         "proposal_id": {
           "type": "string",
-          "pattern": "^[0-9a-fA-F-]{36}$"
+          "pattern": "^[0-9a-fA-F-]{36}$",
+          "description": "Proposal id"
         },
         "content": {
           "type": "string",
-          "maxLength": 1000000
+          "maxLength": 1000000,
+          "description": "The proposal's full new text"
         },
         "reason": {
           "description": "What changed",
@@ -925,23 +1048,28 @@
         "content"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
   },
   {
     "name": "search",
     "title": "Search a vault",
-    "description": "Full-text search of a vault: \"phrases\", or, -exclusions. Up to 3 matching lines per file, best first.",
+    "description": "Full-text search of a vault. Up to 3 matching lines per file, best first.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "query": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 500
+          "maxLength": 500,
+          "description": "Words to find; \"a phrase\", or, -word work"
         },
         "limit": {
           "description": "Files, default 10",
@@ -956,7 +1084,8 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -973,12 +1102,14 @@
             "idea",
             "question",
             "other"
-          ]
+          ],
+          "description": "What sort of feedback it is"
         },
         "message": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 5000
+          "maxLength": 5000,
+          "description": "What to tell them, in your own words"
         },
         "vault": {
           "description": "The vault it's about, if any",
@@ -996,7 +1127,10 @@
         "message"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   },
   {
     "name": "work_plan_status",
@@ -1007,11 +1141,13 @@
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "The plan file's path"
         }
       },
       "required": [
@@ -1020,29 +1156,34 @@
       ]
     },
     "annotations": {
-      "readOnlyHint": true
+      "readOnlyHint": true,
+      "openWorldHint": false
     }
   },
   {
     "name": "write_file",
     "title": "Write an open file",
-    "description": "Create or replace a file whose policy is open. Canon files can't be written directly: use propose. expected_version (read_file's version: line) refuses the write if the file changed since, instead of silently overwriting it.",
+    "description": "Create or replace a file whose policy is open. Canon files can't be written directly: use propose.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "vault": {
           "type": "string",
-          "maxLength": 200
+          "maxLength": 200,
+          "description": "Vault name or id"
         },
         "path": {
           "type": "string",
-          "maxLength": 1024
+          "maxLength": 1024,
+          "description": "Path in the vault"
         },
         "content": {
           "type": "string",
-          "maxLength": 1000000
+          "maxLength": 1000000,
+          "description": "The file's full new text"
         },
         "expected_version": {
+          "description": "read_file's version: line; the write is refused if the file changed since",
           "type": "string",
           "pattern": "^[0-9a-fA-F-]{36}$"
         }
@@ -1053,6 +1194,9 @@
         "content"
       ]
     },
-    "annotations": null
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
   }
 ]

@@ -80,30 +80,6 @@ function limits(p) {
 
 const cell = (s) => String(s ?? "").replaceAll("|", "\\|").replaceAll("\n", " ");
 
-// Words for arguments the contract leaves undescribed. A new undescribed
-// argument shows an empty cell until it gets words here or in the schema.
-const ARGUMENT_WORDS = {
-  vault: "The vault's name or id, as `list_vaults` gives them",
-  path: "A file's path in the vault, like `notes/standup.md`",
-  proposal_id: "The proposal's id, from `list_proposals`",
-  content: "The file's full new text",
-  cursor: "The `next cursor` the last call returned; omit it to start from the beginning",
-  query: "Words to find; `\"a phrase\"`, `or` and `-word` work",
-  comment: "Your comment, as plain text",
-  status: "Which proposals; `open` when omitted",
-  delete: "`true` to propose deleting the file (then leave out `content`)",
-  default_policy: "`open` or `canon` for files without a rule; `open` when omitted",
-  from_line: "First line to return, counting from 1",
-  to_line: "Last line to return",
-  max_bytes: "At most this many bytes of text (default 100000)",
-  thread_id: "The thread's id, from `list_threads` or a flag",
-  title: "The thread's title, on one line",
-  message: "The text, as plain text",
-  to: "Member ids to address a side thread to; leave it out for the whole vault",
-  all: "`true` to add the side threads addressed to others",
-  before: "The `before` value the last page named, for older threads",
-};
-
 // The MCP tools reference, from mcp/test/contract.snapshot.json (what the
 // server offers, byte for byte, checked by mcp/test/contract.test.mjs) and
 // docs/public/reference/mcp-access.json (who may call each tool).
@@ -130,7 +106,7 @@ export function mcpToolsMarkdown(tools, access) {
     }
     out.push("| Argument | Type | Required | Limits | Description |", "|---|---|---|---|---|");
     for (const [name, p] of props) {
-      out.push(`| \`${name}\` | ${p.type ?? ""} | ${required.has(name) ? "yes" : "no"} | ${cell(limits(p))} | ${cell(p.description ?? ARGUMENT_WORDS[name] ?? "")} |`);
+      out.push(`| \`${name}\` | ${p.type ?? ""} | ${required.has(name) ? "yes" : "no"} | ${cell(limits(p))} | ${cell(p.description ?? "")} |`);
     }
   }
   return out.join("\n");
