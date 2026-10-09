@@ -276,7 +276,9 @@ test("delete: the confirm page names the file, what goes and what stays, and a G
 
 test("delete: confirming deletes the file and says so as a success", async () => {
   const { action, fields } = formFields(await page(file(V.main, "notes/gone.md", "&confirm=delete")), "Delete gone.md");
-  assert.deepEqual({ ...fields, csrf: "" }, { csrf: "", path: "notes/gone.md", action: "delete" });
+  const { expected_version: version, ...rest } = fields;
+  assert.match(version, /^[0-9a-f-]{36}$/);
+  assert.deepEqual({ ...rest, csrf: "" }, { csrf: "", path: "notes/gone.md", action: "delete" });
   const r = await post(action, fields);
   assert.equal(r.status, 303);
   assert.equal(r.headers.get("location"), `/v/${V.main}`);

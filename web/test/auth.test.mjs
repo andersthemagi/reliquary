@@ -181,6 +181,14 @@ test("sign-in: forms need the pre-sign-in token and the site's Origin", async ()
   assert.equal((await stats()).otp, otp, "no email may be sent");
 });
 
+test("sign-in: a form refused for its token says why and ends with a reference", async () => {
+  const r = await post(A, "/signin", { email: "ana@example.test" }, new Jar());
+  assert.equal(r.status, 403);
+  const h = await r.text();
+  assert.match(h, /<p class="callout danger" role="alert" id="email-error">That form expired: its security cookie was missing or didn’t match, which happens when this browser blocks cookies/);
+  assert.match(h, /Enter your email again\. \(ref [0-9a-f]{8}\)<\/p>/);
+});
+
 test("sign-in: next never leaves the site", async () => {
   for (const next of ["//evil.example/x", "https://evil.example", "/\\evil.example", "javascript:alert(1)"]) {
     const page = await (await get(A, `/signin?next=${encodeURIComponent(next)}`, new Jar())).text();
@@ -361,6 +369,72 @@ test("session: a failed refresh signs out and clears both cookies", async () => 
   // Reuse revoked the whole session (as Supabase does): the rotated token is dead too.
   jar.c.delete(AT);
   assert.equal((await get(A, "/", jar)).status, 303);
+});
+
+// Every refresh answered with `status` (the fake rotates nothing), for one call.
+async function whileRefreshAnswers(status, call) {
+  const set = (s) => fake("/_fail_refresh", { method: "POST", body: JSON.stringify({ status: s }) });
+  await set(status);
+  try {
+    return await call();
+  } finally {
+    await set(0);
+  }
+}
+const clearsBoth = (r) => {
+  const set = r.headers.getSetCookie();
+  return set.some((c) => c.startsWith(`${AT}=;`) && /Max-Age=0/.test(c)) && set.some((c) => c.startsWith(`${RT}=;`) && /Max-Age=0/.test(c));
+};
+
+test("session: a refresh Auth answers 429 keeps the cookies, says why, and the same session works once Auth recovers", async () => {
+  const { jar } = await signInByCode(A);
+  const rt = jar.c.get(RT);
+  jar.c.delete(AT);
+  const r = await whileRefreshAnswers(429, () => get(A, "/", jar));
+  assert.equal(r.status, 503);
+  assert.equal(r.headers.getSetCookie().length, 0, "no cookie set or cleared");
+  assert.match(await r.text(), /answered 429/);
+  assert.equal(jar.c.get(RT), rt);
+  assert.equal((await get(A, "/", jar)).status, 200, "the refresh token was never spent");
+});
+
+test("session: a refresh Auth answers 503 keeps the cookies", async () => {
+  const { jar } = await signInByCode(A);
+  jar.c.delete(AT);
+  const r = await whileRefreshAnswers(503, () => get(A, "/", jar));
+  assert.equal(r.status, 503);
+  assert.equal(r.headers.getSetCookie().length, 0, "no cookie set or cleared");
+  assert.equal((await get(A, "/", jar)).status, 200);
+});
+
+test("session: a refresh Auth refuses with 401 or 403 signs out and clears both cookies", async () => {
+  for (const status of [401, 403]) {
+    const { jar } = await signInByCode(A);
+    jar.c.delete(AT);
+    const r = await whileRefreshAnswers(status, () => get(A, "/", jar));
+    assert.equal(r.status, 303, `${status}`);
+    assert.ok(clearsBoth(r), `${status} clears both cookies`);
+  }
+});
+
+test("session: a renewed session whose new access token names a key not yet published keeps the new refresh token", async () => {
+  const { jar } = await signInByCode(A);
+  const spent = jar.c.get(RT);
+  jar.c.delete(AT);
+  const set = (on) => fake("/_refresh_key_unknown", { method: "POST", body: JSON.stringify({ on }) });
+  await set(true);
+  let r;
+  try {
+    r = await get(A, "/", jar);
+  } finally {
+    await set(false);
+  }
+  assert.equal(r.status, 503);
+  assert.ok(!clearsBoth(r), "not signed out");
+  assert.notEqual(jar.c.get(RT), spent, "the browser holds the rotated refresh token");
+  assert.ok(!jar.c.has(AT), "and no access token it could not check");
+  // The next request renews again from the new token: the spent one would have revoked the session.
+  assert.equal((await get(A, "/", jar)).status, 200);
 });
 
 test("session: sign out ends the Supabase session and clears the cookies", async () => {

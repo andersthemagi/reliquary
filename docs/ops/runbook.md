@@ -519,7 +519,7 @@ tokens in a URL fragment the server never sees.
 | `reliquary_web` / `reliquary_mcp` DB passwords | `supabase/.web-db-password`, `.mcp-db-password`; Vercel `DATABASE_URL` | delete the file, run `scripts/set-role-passwords.sh`, run `scripts/vercel-env.sh <app> ...`, paste the new `DATABASE_URL` into that Vercel project, redeploy | that app can't reach the database until redeployed |
 | `reliquary_ops` DB password (the operator's role, key rotation only) | `supabase/.ops-db-password`; nowhere else (not Vercel) | `scripts/set-role-passwords.sh ops-off` (nologin, file removed), then `scripts/set-role-passwords.sh ops` when next needed | only `rotate-variables-key.sh` uses it; nologin between rotations is fine |
 | `SESSION_SECRET` (web) | `supabase/.web-session-secret`; Vercel | delete the file, run `vercel-env.sh web ...`, update Vercel, redeploy | everyone is signed out of the web UI once; CLI and connectors unaffected |
-| `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Vercel; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values are re-encrypted loses them |
+| `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Vercel; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values and link credentials are re-encrypted loses them |
 | `LINK_PROXY_SECRET` (web and mcp, the same value on both) | `supabase/.link-proxy-secret`; Vercel (both projects) | rewrite the file, `scripts/vercel-env.sh web ...` and `scripts/vercel-env.sh mcp ...`, redeploy both at once (a mismatch refuses every proxied link call with 401 until both are live) | proxied `<link>.<tool>` calls fail (401) between the two deploys; nothing else |
 | `postgres` password | `supabase/.db-password`; GitHub secret `SUPABASE_DB_PASSWORD` | reset in the dashboard, rewrite the file, `tr -d '[:space:]' < supabase/.db-password \| gh secret set SUPABASE_DB_PASSWORD` | migrations and backups need the new one |
 | A person's agent token or connection | database | Tokens page, Revoke | stops within one request |
@@ -527,12 +527,15 @@ tokens in a URL fragment the server never sees.
 ### Rotating VARIABLES_KEY
 
 Values stay readable throughout: the web app holds the old and the new key
-while every ciphertext moves (docs/variables.md, "Key rotation"). Every
+while every ciphertext moves (docs/variables.md, "Key rotation"). Link
+credentials are sealed with the same keys and move with the values. Every
 script here prints key ids and counts, never a key, so they are safe to run
 from a chat; still, never open the key files in one. Do it at a quiet time,
 from a checkout of the deployed commit (the migrations
-`20260925170000_variables_keys.sql` and `20260925190000_final_sweep.sql`
-must be applied).
+`20260925170000_variables_keys.sql`, `20260925190000_final_sweep.sql` and
+`20261009120040_link_secrets_rotation.sql` must be applied; without the
+last, link credentials stay on the old key and step 4 breaks every link
+call).
 
 0. **The operator's role.** Re-encryption runs as `reliquary_ops`, which the
    web app's role is not (it may not read stored ciphertext). Once, or after
@@ -550,13 +553,14 @@ must be applied).
 3. **Re-encrypt.** `scripts/rotate-variables-key.sh`. It uses the database
    and keys in `supabase/.vercel-web.env`, logs in as `reliquary_ops` with
    `supabase/.ops-db-password` (it stops with exit 2 and says so if that file
-   is missing: step 0), moves every value and pending
-   import value to `k2`, and prints counts. Exit 0 ("Everything is on k2")
+   is missing: step 0), moves every value, pending import value and link
+   credential to `k2`, and prints counts. Exit 0 ("Everything is on k2")
    means done. Exit 1: run it again (a deployment still writing `k1` during
    step 2's rollout); if it still says values can't be decrypted, those
    values were already unreadable: set them again in the web UI, or delete
-   them, then run it again. Owners and editors see one "Re-encrypted (key
-   rotation)" row per vault in its access log.
+   them (a link: delete it and add it again), then run it again. Owners and
+   editors see one "Re-encrypted (key rotation)" row per vault in its
+   access log.
 4. **Drop the old key.** Only after step 3 exits 0:
    `scripts/vercel-env.sh drop-variables-key k1`, then `scripts/vercel-env.sh
    web ...`, set `VARIABLES_KEYS` in Vercel again, redeploy.
@@ -601,8 +605,10 @@ failure ref=7f3a2c9e {"status":504,"what":"POST /v/:id/file <vault id> action=wr
 4. A `57014` or `55P03` is a slow query or a held lock: find the function
    in `functions`, and check Supabase's query performance for it. An `08xxx`
    or `53300` is the database connection: check Supabase's status and the
-   pooler. A `sign-in (Supabase Auth)` failure names the call and its status
-   or network error.
+   pooler. A line whose `what` is `db connection` is a connection the
+   database or pooler dropped while idle or mid-request; the process kept
+   running and the next request connected again. A `sign-in (Supabase
+   Auth)` failure names the call and its status or network error.
 5. A failed `<link>.<tool>` call has two refs: the MCP project's own, and
    `web app ref ...` in its reason. Search the web app project for the second.
    When the linked server answered with an error of its own, that project also

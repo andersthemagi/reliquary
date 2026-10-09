@@ -23,7 +23,7 @@ Each rule has a test that tries to break it: a session for one vault reading ano
 
 ## Connections and sign-in
 
-- Sign-in to the web app is by an emailed code or link. Sessions are HttpOnly, Secure, `__Host-` cookies, bound to the app's own host (`app.reliquary.redmage.cc`). The public site and docs (`reliquary.redmage.cc`) set no cookies at all.
+- Sign-in to the web app is by an emailed code or link. Sessions are HttpOnly, Secure, `__Host-` cookies, bound to the app's own host (`app.reliquary.redmage.cc`). The public site and docs (`reliquary.redmage.cc`) set no cookies at all. A session renews itself through Supabase Auth about every hour. If Auth is busy or down when that happens, you stay signed in and the page says why and to try again; only Auth refusing the session itself signs you out.
 - The OAuth sign-in for MCP clients and the CLI runs on the app host: its issuer is `https://app.reliquary.redmage.cc`.
 - MCP clients and the CLI use OAuth 2.1 with PKCE (S256 only), and tokens bound to the one service they are for: an MCP token is refused by the env API and a CLI token by the MCP endpoint. Refresh tokens rotate, and a reused one revokes the whole grant.
 - Clients are identified by a metadata document at an https URL, fetched with guards against reaching private networks.
@@ -42,7 +42,7 @@ Each rule has a test that tries to break it: a session for one vault reading ano
 - Values are encrypted by the web app with AES-256-GCM, a fresh nonce each, under a key kept outside the database. The database holds only ciphertext, and no role that serves requests can read it directly.
 - Ciphertext leaves the database only through functions that check the caller's grant and write the access log in the same transaction.
 - The MCP server refuses to start if it is given the key: it can't decrypt anything.
-- The key can be rotated without downtime; re-encryption runs as a separate operator role that serves no requests.
+- The key can be rotated without downtime; re-encryption runs as a separate operator role that serves no requests. Link credentials are encrypted with the same key and re-encrypted with the values.
 - Server logs never carry a token, a sign-in code, file text or a value; the test suite checks the logs.
 
 ## Hosting

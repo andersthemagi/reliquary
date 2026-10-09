@@ -554,9 +554,12 @@ async function allActivity(ctx: Ctx): Promise<Reply> {
 // A GET page runs in one transaction (db.ts, readOnlyRequest): the top
 // bar's summary below and every query the page makes. Not the OAuth
 // consent page: it fetches the client's metadata over the network, and a
-// transaction mustn't stay open across that.
+// transaction mustn't stay open across that. Not the invite page either: it
+// asks the rate limit and the invite's state through the pool itself, so
+// holding a connection while it waits for a second one would let a few
+// invite links opened together exhaust a pool of 3.
 export async function routes(ctx: Ctx): Promise<Reply> {
-  const shared = ctx.method === "GET" && ctx.url.pathname !== "/oauth/authorize";
+  const shared = ctx.method === "GET" && ctx.url.pathname !== "/oauth/authorize" && ctx.url.pathname !== "/invite";
   // The people a page names, by email where the reader may see it, in one
   // lookup (people.ts), inside the page's own transaction on a GET.
   const run = async (): Promise<Reply> => {

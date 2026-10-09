@@ -8,7 +8,7 @@
 // test.sh checks none reached the server logs.
 
 import assert from "node:assert/strict";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { appendFileSync } from "node:fs";
 import { before, test } from "node:test";
 import pg from "pg";
@@ -187,6 +187,46 @@ test("rate limits: session refreshes per session: the third in an hour is refuse
   assert.equal(jar.c.get(RT), rt);
 });
 
+// What a counter holds for one value, as the app keyed it (src/ratelimit.ts).
+async function counted(bucket, kind, value) {
+  const [{ s }] = await sql("select private.rate_limit_salt() as s");
+  const key = createHmac("sha256", s).update(`${kind}\0${value}`).digest("hex");
+  const [{ n }] = await sql("select coalesce(sum(hits), 0)::int as n from private.rate_limits where bucket = $1 and key = $2", [bucket, key]);
+  return n;
+}
+const authRefreshes = async () => (await fake("/_stats")).refresh;
+
+test("rate limits: session refreshes: a cookie that can't be a refresh token is cleared, with no counter written and no call to Auth", async () => {
+  const from = addr();
+  const junk = "x".repeat(600);
+  const jar = new Jar();
+  jar.c.set(RT, junk);
+  const asked = await authRefreshes();
+  const r = await get("/", jar, from);
+  assert.equal(r.status, 303);
+  assert.ok(r.headers.getSetCookie().some((c) => c.startsWith(`${RT}=;`) && /Max-Age=0/.test(c)), "cleared");
+  assert.equal(await authRefreshes(), asked);
+  assert.equal(await counted("signin_refresh_ip", "ip", from), 0);
+  assert.equal(await counted("signin_refresh_session", "session", `refresh:${junk}`), 0);
+});
+
+test("rate limits: session refreshes per IP: the fourth in an hour from one address is refused whatever the cookie, and nothing is cleared or sent on", async () => {
+  const from = addr();
+  const guess = (i) => {
+    const jar = new Jar();
+    jar.c.set(RT, `guess${RUN}${i}`);
+    return jar;
+  };
+  for (let i = 0; i < 3; i++) assert.equal((await get("/", guess(i), from)).status, 303, "Auth refuses a made-up token");
+  const asked = await authRefreshes();
+  const jar = guess(3);
+  const r = await get("/", jar, from);
+  await isTooMany(r, 3600);
+  assert.equal(r.headers.getSetCookie().length, 0, "cookies kept");
+  assert.equal(await authRefreshes(), asked, "Auth was not asked");
+  assert.equal(await counted("signin_refresh_session", "session", `refresh:guess${RUN}3`), 0, "no row for a value the caller chose");
+});
+
 // OAuth ----------------------------------------------------------------------
 
 const oauth = (path, fields, from) =>
@@ -302,6 +342,22 @@ test("rate limits: form posts per session: the fourth in a minute is refused wit
   await isTooMany(await post("/theme", { csrf, theme: "dark", back: "/" }, jar, addr()), 60);
   // Pages still load.
   assert.equal((await get("/", jar, addr())).status, 200);
+});
+
+// Invites ----------------------------------------------------------------------
+
+test("rate limits: sign-in from an invite link whose lookup is over its limit is a 429 and asks for no code", async () => {
+  const from = addr();
+  const next = `/invite?token=rli_${"0".repeat(64)}`;
+  const email = `rl-invite-${RUN}@example.test`;
+  const jar = new Jar();
+  // Two lookups an hour: the email page counts one, the first post another.
+  const csrf = csrfOf(await (await get(`/signin?next=${encodeURIComponent(next)}`, jar, from)).text());
+  assert.equal((await post("/signin", { csrf, email, next }, jar, from)).status, 200);
+  const asked = (await fake("/_stats")).otp;
+  const r = await post("/signin", { csrf, email, next }, jar, from);
+  await isTooMany(r, 3600);
+  assert.equal((await fake("/_stats")).otp, asked, "Auth was not asked");
 });
 
 // When the counter fails -----------------------------------------------------

@@ -150,6 +150,43 @@ test("fetch: redirects are refused, not followed", async () => {
   }
 });
 
+// Headers at once, then a byte every 20 ms and never an end. Resolves when
+// the server sees the connection close.
+function drip(path, status, headers) {
+  return new Promise((closed) => {
+    routes.set(path, (_req, res) => {
+      res.writeHead(status, headers);
+      const timer = setInterval(() => res.write("x"), 20);
+      res.on("close", () => {
+        clearInterval(timer);
+        closed();
+      });
+    });
+  });
+}
+
+test("fetch: a refused answer whose body never ends has its connection dropped, not drained", async () => {
+  const cases = [
+    ["a redirect", 302, { location: `${base}/target.json` }],
+    ["a wrong status", 404, { "content-type": "application/json" }],
+    ["a wrong content type", 200, { "content-type": "text/html" }],
+  ];
+  for (const [name, status, headers] of cases) {
+    const path = `/drip-${status}.json`;
+    const closed = drip(path, status, headers);
+    await assert.rejects(fetchClientMetadata(`${base}${path}`, { ...loopbackOk, timeoutMs: 10_000 }), CimdError, name);
+    let timer;
+    const held = new Promise((_, no) => {
+      timer = setTimeout(() => no(new Error(`${name}: the connection was still open 2 s after the refusal`)), 2000);
+    });
+    try {
+      await Promise.race([closed, held]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+});
+
 test("fetch: a document over 5 KB is refused, declared or streamed", async () => {
   const idBig = `${base}/big.json`;
   const big = doc(idBig, { padding: "x".repeat(MAX_BYTES) });

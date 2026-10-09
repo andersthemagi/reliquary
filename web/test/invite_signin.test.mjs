@@ -114,7 +114,9 @@ before(async () => {
   [{ t: T.two }] = await as(ANA, "select public.create_invite($1, 'newbie@example.test', 'viewer') as t", [V.two]);
   [{ id: V.open }] = await as(ANA, "select public.create_vault('Invite Signin Open') as id");
   [{ t: T.open }] = await as(ANA, "select public.create_invite($1, null, 'viewer', 2) as t", [V.open]);
+  [{ t: T.accent }] = await as(ANA, "select public.create_invite($1, $2, 'viewer') as t", [V.two, "jos\u00e9@example.test"]);
   remember(T.newbie, T.two, T.open);
+  remember(T.accent);
   await signups(false);
 });
 
@@ -162,6 +164,34 @@ test("invite sign-in: with sign-ups off, the invited address is told plainly it 
   assert.match(h, /Ask the person who invited you to have an account made for that address, then open the invite link again\./);
   assert.equal((await stats()).lastCreateUser, true);
   assert.equal(await fake("/_user?email=newbie%40example.test"), null);
+});
+
+test("invite sign-in: the invited address matches however its accent is typed, composed or decomposed", async () => {
+  // The database keeps the address in Unicode NFC; some keyboards and pastes give e + a combining accent.
+  const r = await askForCode(new Jar(), T.accent, "JOSE\u0301@Example.test");
+  assert.equal((await stats()).lastCreateUser, true, "sign-in may make this address's account");
+  assert.equal(r.status, 403);
+  assert.match(await r.text(), /<h1>No account yet<\/h1>/);
+});
+
+test("invite sign-in: when the invite can't be looked up, no code is asked for and the page says so instead of 'check your email'", async () => {
+  await sql("revoke execute on function private.invite_peek(text) from reliquary_web");
+  try {
+    const sent = (await stats()).otp;
+    const jar = new Jar();
+    const page = await (await get(`/signin?next=${encodeURIComponent(next(T.newbie))}`, jar)).text();
+    const r = await post("/signin", { csrf: csrfOf(page), email: "newbie@example.test", next: next(T.newbie) }, jar);
+    assert.equal(r.status, 503);
+    const h = await r.text();
+    assert.match(h, /<h1>Sign-in is unavailable<\/h1>/);
+    assert.match(h, /<dt>Where<\/dt><dd>invite lookup \(database\)<\/dd>/);
+    assert.match(h, /so no sign-in code was sent/);
+    assert.match(h, /<dt>Reference<\/dt><dd><code>ref [0-9a-f]{8}<\/code><\/dd>/);
+    assert.doesNotMatch(h, /Check your email/);
+    assert.equal((await stats()).otp, sent, "Auth was not asked");
+  } finally {
+    await sql("grant execute on function private.invite_peek(text) to reliquary_web");
+  }
 });
 
 test("invite sign-in: with sign-ups on, the invited address gets an account, signs in and joins", async () => {

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { fail, withRequest } from "./failure.js";
 
 export type Identity = {
   userId: string;
@@ -24,8 +25,9 @@ export type Identity = {
 // request that calls a tool holds one pooled connection for its Session
 // (docs/research/server-load.md, "Second pass"), and one that also passes
 // the rate limit checks out a second, parallel connection to count it
-// ("Third pass": "one more checkout; DB_POOL_MAX is 5") — the web app never
-// holds more than one connection per request. Below this point, through the
+// ("Third pass": "one more checkout; DB_POOL_MAX is 5"). A web request is
+// meant to hold one connection at a time (web/src/db.ts, readOnlyRequest).
+// Below this point, through the
 // end of poolConfig(), this file and web/src/db.ts are kept byte-identical;
 // web/test/db_tls.test.mjs pins that.
 const DEFAULT_POOL_MAX = 5;
@@ -94,6 +96,24 @@ export function poolConfig(env: NodeJS.ProcessEnv = process.env, appDir = APP_DI
 }
 
 export const pool = new pg.Pool(poolConfig());
+
+// A connection that drops (a pooler reset, a database restart, the network)
+// makes pg emit 'error' on its client, and an 'error' nobody listens for is an
+// uncaught exception: the process ends, and every request on it. pg-pool
+// listens only while a client is idle; this listens for the client's whole
+// life, so one a request is holding is covered too. The pool discards the dead
+// client by itself. pg can emit twice for one drop (the server's FATAL, then
+// "Connection terminated"); the first is the cause, so only it is logged.
+pool.on("connect", (client) => {
+  let logged = false;
+  client.on("error", (err) => {
+    if (logged) return;
+    logged = true;
+    withRequest("Keeping a database connection open", "db connection", () => fail(err, { where: "database" }));
+  });
+});
+// pg-pool re-emits an idle client's error here, after the listener above.
+pool.on("error", () => {});
 
 const TOKEN_SHAPE = /^rlq_[0-9a-f]{64}$/;
 
