@@ -38,14 +38,7 @@ cleanup
 mkdir -p "$work/state"
 source ../scripts/lib/containers.sh
 
-# Data on tmpfs: nothing in a test needs it to survive, and a tmpfs leaves no
-# volume behind even when a cleanup is skipped.
-"$engine" run -d --name "$pg" --network host --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=test \
-  docker.io/library/postgres:17 -c listen_addresses=127.0.0.1 -c port=$pgport >/dev/null
-# Ask over TCP: the image's init-time server listens on the socket only, so a
-# socket check can pass before the real server is up (a flaky race).
-wait_until "$pg" "Postgres to accept connections on 127.0.0.1:$pgport" "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q
-sleep 1
+start_postgres "$pg" $pgport
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
 # Many test files, the same few people: room past Free's limits (plans are
