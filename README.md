@@ -19,8 +19,9 @@ see a variable's value.
 MCP and UI) and 2 (environment variables) are built; milestone 3 (links, an
 MCP proxy to upstream tools like Linear) is built and in its first week of
 real use. See [docs/design.md](docs/design.md) for the full design and
-build order, and [the public roadmap](https://reliquary.redmage.cc/roadmap)
-for what's shipped and what's next.
+build order, [the public roadmap](https://reliquary.redmage.cc/roadmap)
+for what's being built and what's next, and the [changelog](CHANGELOG.md) for
+what shipped.
 
 ## What it does
 

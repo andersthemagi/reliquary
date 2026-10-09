@@ -1,6 +1,6 @@
 # Contributing
 
-Reliquary is pre-alpha and single-maintainer. The design and roadmap are
+Reliquary is pre-alpha and single-maintainer. The design and [roadmap](https://reliquary.redmage.cc/roadmap) are
 still moving fast, so for anything beyond a small, obvious fix, please
 [open an issue](https://github.com/andersthemagi/reliquary/issues/new/choose)
 to discuss it before writing a pull request. It saves both of us the work

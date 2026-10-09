@@ -118,15 +118,16 @@ Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-st
 The public docs are `docs/public/` (Markdown, Diátaxis: tutorials, concepts,
 how-to guides, reference; the sidebar is `docs/public/SUMMARY.md`), served by
 the web app at `/docs` (`web/src/docs.ts`), each page also as Markdown at
-`/docs/<page>.md`, with `/llms.txt`, `/llms-full.txt` and `/roadmap`. The rest
+`/docs/<page>.md`, with `/llms.txt` and `/llms-full.txt`. The rest
 of `docs/` is internal: never publish it, link it from `docs/public` or copy
 it there.
 
 - **Every feature lands with its docs updated in the same change:** the page
   that explains it, and the Docs column of its row in
   [tests/features.md](tests/features.md) (`scripts/check-registry.sh` fails on
-  a row without an existing page). Shipping a feature also moves its item in
-  `docs/public/roadmap.yml` to `shipped`, with its docs page.
+  a row without an existing page). There is no second list to update when a
+  feature ships: its issue closes (Issues, below) and the PR title writes the
+  changelog entry.
 - **The docs are for people and agents.** Write plainly: short pages, sentence
   case, no em dashes, the exact commands and button names. Never put a secret,
   a token or real client data in them, not even as an example.
@@ -135,17 +136,19 @@ it there.
   `mcp/test/contract.snapshot.json` and `docs/public/reference/mcp-access.json`
   (who may call each tool: a new tool needs an entry there or the build
   fails), the CLI's help from `cli/src/cli.ts`, the changelog from
-  `CHANGELOG.md` and the roadmap from `docs/public/roadmap.yml`.
+  and `CHANGELOG.md`.
 - `web/test/docs.test.mjs` fails when the docs drift: an MCP tool, CLI command
   or option left out or invented, a link or anchor that doesn't resolve, a page
-  missing from the sidebar, an invalid roadmap.
+  missing from the sidebar.
 
 ## Issues
 
 If it isn't logged, log it; if it's logged, keep it true. Open work lives in
-GitHub issues, what the public sees in
-[docs/public/roadmap.yml](docs/public/roadmap.yml), what was built and why in
-[docs/progress.md](docs/progress.md). Keep no to-do list anywhere else.
+GitHub issues, and the roadmap is [the project board](https://github.com/users/andersthemagi/projects/3) over them
+(`reliquary.redmage.cc/roadmap` goes there); what shipped is
+[CHANGELOG.md](CHANGELOG.md); what was built and why is
+[docs/progress.md](docs/progress.md). Keep no to-do list and no roadmap
+anywhere else, the site included.
 Issues went stale once because every close was by hand and no PR named its
 issue; these rules make the PR carry that, and CI checks what it can.
 
@@ -171,12 +174,12 @@ issue; these rules make the PR carry that, and CI checks what it can.
 - **Out of scope but real? File it:** one problem per issue, how to see it,
   a `bug` or `type:` label, linked from your PR. Not a line in a PR
   description or `docs/progress.md` that nobody will reopen.
-- **Every `in-progress` or `planned` roadmap item names its issue**
-  (`issue:` in `roadmap.yml`); the docs build fails without it. The PR that
-  ships the item moves it to `shipped` and closes the issue.
-  `scripts/tracker-drift.sh`, run every Monday by `tracker-drift.yml`, opens
-  one issue when a roadmap item and its issue disagree (shipped but open,
-  or not shipped but closed). Fix the disagreement it names, at its source.
+- **The roadmap is the board, so a real issue is on it,** with a Status
+  (Considering, Planned, In progress, Shipped) that says what is true. The
+  board adds new issues and sets a closed one to Shipped; you set it when you
+  take an issue up or when its state changes otherwise. A tracking issue's
+  sub-issues stay off the roadmap view on purpose. The commands and the
+  settings that must stay on: `docs/ops/runbook.md`, "The roadmap board".
 - `owner` marks what needs the owner: an account, money or a decision. Don't
   guess at those; comment on the issue.
 
