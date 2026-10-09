@@ -471,6 +471,11 @@
             "fixed",
             "wont_fix"
           ]
+        },
+        "before": {
+          "description": "The before id the last page named, for older feedback",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{36}$"
         }
       }
     },
@@ -501,6 +506,11 @@
             "rejected",
             "stale"
           ]
+        },
+        "before": {
+          "description": "The before id the last page named, for older proposals",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{36}$"
         }
       },
       "required": [
@@ -598,6 +608,11 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 100
+        },
+        "after": {
+          "description": "The after name the last page named, to continue",
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
         }
       },
       "required": [

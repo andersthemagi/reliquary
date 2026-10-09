@@ -20,6 +20,9 @@ import { z } from "zod";
 import type { Identity } from "./db.js";
 import { ADDITIVE, at, fenced, freshNonce, makeRun, oneLine, ok, peopleLabeler, READ, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
 
+// list_my_feedback's page; one more is fetched to know whether there is another.
+const FEEDBACK_PAGE = 20;
+
 export function registerFlagsTools(
   server: McpServer,
   id: Identity,
@@ -64,20 +67,24 @@ export function registerFlagsTools(
         "Feedback your person and their agents sent, newest first, with its status and the operator's reply.",
       inputSchema: {
         status: z.enum(["new", "seen", "planned", "fixed", "wont_fix"]).optional().describe("Only feedback in this state"),
+        before: z.string().regex(/^[0-9a-fA-F-]{36}$/).optional().describe("The before id the last page named, for older feedback"),
       },
       annotations: READ,
     },
-    async ({ status }) =>
+    async ({ status, before }) =>
       run(async (c) => {
         // RLS: the person's own rows only.
         const { rows } = await c.query(
           `select f.id, f.kind, f.message, f.source, f.agent, f.created_at, f.status, f.reply, f.replied_at, v.name as vault
              from public.feedback f left join public.vaults v on v.id = f.vault_id
-            where $1::text is null or f.status = $1
-            order by f.created_at desc limit 20`,
-          [status ?? null],
+            where ($1::text is null or f.status = $1)
+              and ($2::uuid is null or (f.created_at, f.id) < (select b.created_at, b.id from public.feedback b where b.id = $2))
+            order by f.created_at desc, f.id desc limit ${FEEDBACK_PAGE + 1}`,
+          [status ?? null, before ?? null],
         );
-        if (rows.length === 0) return ok(status ? `No feedback with status ${status}.` : "No feedback sent yet.");
+        if (rows.length === 0) return ok(before ? "No older feedback." : status ? `No feedback with status ${status}.` : "No feedback sent yet.");
+        const more = rows.length > FEEDBACK_PAGE;
+        if (more) rows.length = FEEDBACK_PAGE;
         const nonce = freshNonce(rows.flatMap((r) => [r.source === "agent" ? r.message : null, r.reply]));
         const label = (s: string) => (s === "wont_fix" ? "won't fix" : s);
         const out = [
@@ -92,6 +99,7 @@ export function registerFlagsTools(
           if (r.source === "agent") out.push(`NOTE-${nonce}`, r.message, `END-${nonce}`);
           if (r.reply) out.push(`operator's reply, ${at(new Date(r.replied_at))}:`, `NOTE-${nonce}`, r.reply, `END-${nonce}`);
         }
+        if (more) out.push(`more: the newest ${FEEDBACK_PAGE} are shown; pass before=${rows[FEEDBACK_PAGE - 1].id} for older ones.`);
         return ok(out.join("\n"));
       }),
   );
