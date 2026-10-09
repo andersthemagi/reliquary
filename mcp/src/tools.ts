@@ -43,13 +43,26 @@ import { registerVariablesTools } from "./variables-tools.js";
 import { registerVaultFileTools } from "./vaultfiles-tools.js";
 import { registerWorkPlanTools } from "./workplan-tools.js";
 
+// Whether a request's messages can reach a <link>.<tool>: tools/list shows
+// them, and a tools/call of a name with a dot is one. Nothing else does, and
+// finding them costs a query (links-tools.ts) that, on a tools/call, would
+// take the transaction the Session opened for the call itself.
+export function needsLinkTools(messages: unknown[]): boolean {
+  return messages.some((m) => {
+    const r = m as { method?: unknown; params?: { name?: unknown } } | null;
+    return r?.method === "tools/list" || (r?.method === "tools/call" && typeof r.params?.name === "string" && r.params.name.includes("."));
+  });
+}
+
 // `runAs` runs one tool call's queries in a transaction as the identity:
 // the request's Session (one connection for the request, the token
 // resolved inside the transaction), or by default a transaction of its own.
+// `linkTools: false` leaves the <link>.<tool> ones out (needsLinkTools).
 export async function registerTools(
   server: McpServer,
   id: Identity,
   runAs: <T>(fn: (c: pg.PoolClient) => Promise<T>) => Promise<T> = (fn) => asIdentity(id, fn),
+  linkTools = true,
 ): Promise<void> {
   // Each tool call is its own request for the error model (failure.ts): a
   // reference of its own, and what it is doing (the log: the tool's name).
@@ -65,7 +78,7 @@ export async function registerTools(
   registerThreadTools(server, id, runAs);
   registerVariablesTools(server, id, runAs);
   registerFlagsTools(server, id, runAs);
-  await registerLinksTools(server, id, runAs);
+  await registerLinksTools(server, id, runAs, linkTools);
 
   trimToolList(server);
 }
@@ -78,9 +91,10 @@ export async function registerTools(
 // now only compares the fixed tools, and a dedicated test proves a granted
 // and an ungranted identity see different <link>.<tool> entries), so one
 // answer cached for everyone would be wrong. tools/list isn't the hot path
-// (tools/call is), so this trades a minor optimization for correctness. If
-// the SDK's internals change shape, this does nothing and the SDK's own
-// list is served, $schema included.
+// (tools/call is), and a tools/call of a fixed tool doesn't look the
+// <link>.<tool> ones up at all (needsLinkTools), so this trades a minor
+// optimization for correctness. If the SDK's internals change shape, this
+// does nothing and the SDK's own list is served, $schema included.
 type Handler = (req: unknown, extra: unknown) => Promise<unknown>;
 function trimToolList(server: McpServer): void {
   const handlers = (server.server as unknown as { _requestHandlers?: Map<string, Handler> })._requestHandlers;
