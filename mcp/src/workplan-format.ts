@@ -12,9 +12,7 @@
 // list of other steps' keys; cites is a comma-separated list of
 // "path@version" (version a file version id, matching tools-shared.ts's
 // VERSION); gate, if given, is "review" (docs/design.md item 7). No
-// nesting, no quoting: a strict, small syntax over a flexible one, the
-// same choice web/scripts/docs-lib.mjs's parseRoadmap already made for
-// roadmap.yml.
+// nesting, no quoting: a strict, small syntax over a flexible one.
 
 const FENCE_OPEN = "```work_plan";
 const FENCE_CLOSE = "```";

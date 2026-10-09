@@ -9,7 +9,7 @@
 #
 # Merging one makes release-please tag it (vX.Y.Z or cli-vX.Y.Z) and publish
 # its GitHub Release (a prerelease while the version is 0.x: pre-alpha). Then:
-#   - a product release gets its migrations, roadmap items and a deploy note
+#   - a product release gets its migrations and a deploy note
 #     appended to its notes (scripts/release-notes.sh), and deploy.yml
 #     deploys exactly that tag;
 #   - a CLI release runs publish-cli.yml for that tag.
@@ -82,7 +82,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - name: Release notes (pre-alpha, migrations, roadmap, deploy)
+      - name: Release notes (pre-alpha, migrations, deploy)
         if: steps.rp.outputs.release_created == 'true'
         env:
           GH_TOKEN: ${{ github.token }}

@@ -25,7 +25,7 @@ Everything runs in containers (podman or docker); no Node on the host.
 - `./test.sh` runs every suite in parallel and `scripts/check-registry.sh` first; `./test.sh mcp web` runs only those (`sql`, `mcp`, `web`, `cli`).
 - `TEST_SLOT=8 ./test.sh`: the run takes slots 8 to 11, so two sessions need bases 4 or more apart.
 - One MCP test file: `MCP_TESTS=test/links.test.mjs ./mcp/test.sh`. The other suites have no per-file switch.
-- There is no linter or formatter. `tsc` is the only static check, inside each suite's build.
+- There is no formatter, and no linter for TypeScript: `tsc`, inside each suite's build, is its only static check. The `lint` workflow runs actionlint on the workflows and shellcheck on the scripts (settings in `.shellcheckrc`); errors block, warnings are listed.
 - `./scripts/test-guard.sh origin/main` is CI's `guard` job; `./test.sh` does not run it, and it reads commit messages, so commit first.
 - Docs build without host Node, from the repo root: `podman run --rm --network none -v "$PWD":/repo:z -w /repo/web docker.io/library/node:22-slim node scripts/gen-docs.mjs` (writes `web/docs-build/`); `./test.sh web` checks them.
 - Run the app: `./mcp/dev.sh up` (web UI on `http://127.0.0.1:8790`, MCP on `http://127.0.0.1:8787/mcp`), `./mcp/dev.sh ui`, `./mcp/dev.sh down`.
@@ -118,15 +118,16 @@ Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-st
 The public docs are `docs/public/` (Markdown, Diátaxis: tutorials, concepts,
 how-to guides, reference; the sidebar is `docs/public/SUMMARY.md`), served by
 the web app at `/docs` (`web/src/docs.ts`), each page also as Markdown at
-`/docs/<page>.md`, with `/llms.txt`, `/llms-full.txt` and `/roadmap`. The rest
+`/docs/<page>.md`, with `/llms.txt` and `/llms-full.txt`. The rest
 of `docs/` is internal: never publish it, link it from `docs/public` or copy
 it there.
 
 - **Every feature lands with its docs updated in the same change:** the page
   that explains it, and the Docs column of its row in
   [tests/features.md](tests/features.md) (`scripts/check-registry.sh` fails on
-  a row without an existing page). Shipping a feature also moves its item in
-  `docs/public/roadmap.yml` to `shipped`, with its docs page.
+  a row without an existing page). There is no second list to update when a
+  feature ships: its issue closes (Issues, below) and the PR title writes the
+  changelog entry.
 - **The docs are for people and agents.** Write plainly: short pages, sentence
   case, no em dashes, the exact commands and button names. Never put a secret,
   a token or real client data in them, not even as an example.
@@ -135,10 +136,69 @@ it there.
   `mcp/test/contract.snapshot.json` and `docs/public/reference/mcp-access.json`
   (who may call each tool: a new tool needs an entry there or the build
   fails), the CLI's help from `cli/src/cli.ts`, the changelog from
-  `CHANGELOG.md` and the roadmap from `docs/public/roadmap.yml`.
+  and `CHANGELOG.md`.
 - `web/test/docs.test.mjs` fails when the docs drift: an MCP tool, CLI command
   or option left out or invented, a link or anchor that doesn't resolve, a page
-  missing from the sidebar, an invalid roadmap.
+  missing from the sidebar.
+
+## Issues
+
+If it isn't logged, log it; if it's logged, keep it true. Open work lives in
+GitHub issues, and the roadmap is [the project board](https://github.com/users/andersthemagi/projects/3) over them
+(`reliquary.redmage.cc/roadmap` goes there); what shipped is
+[CHANGELOG.md](CHANGELOG.md); what was built and why is
+[docs/progress.md](docs/progress.md). Keep no to-do list and no roadmap
+anywhere else, the site included.
+Issues went stale once because every close was by hand and no PR named its
+issue; these rules make the PR carry that, and CI checks what it can.
+
+- **Before you start,** find the issue (`gh issue list --search "<words>"`).
+  A feature with none gets one first, with the job it does and what done
+  looks like; it lands on the board as Considering, which commits nothing.
+  Don't build a Considering item: only the owner moves one to Planned, so
+  comment and ask, unless the owner has already told you to build it (say so
+  on the issue and set it Planned). Set In progress when you take up a Planned
+  one, and if you stop without finishing, put it back to what is true.
+- **Every PR's description has one line saying which issue it is for:**
+  `Closes #N` when merging finishes the issue, `Part of #N` when it is one
+  step of it, `No issue: <why>` for a dependency bump, a docs fix or a bug
+  found on the way (never for a `feat` PR). The `issue-line` job in
+  `.github/workflows/pr-title.yml` fails a PR without one. Only `Closes`,
+  `Fixes` and `Resolves` close anything, and GitHub does it when the PR
+  merges, so never close an issue by hand to match a merge.
+- **A PR that ships part of an issue says what is left,** in the PR and in
+  a comment on the issue: the PR numbers shipped, what remains, anything now
+  unblocked. The next agent reads the issue, not your diff. Don't write
+  `Closes` on a partial one to be tidy, and don't leave a finished one open.
+  If the scope changed or you stopped halfway, say so on the issue before
+  you end the session.
+- **A tracking issue's children are sub-issues,** not a checklist someone
+  ticks by hand; attach each child to its parent when you open it
+  (Relationships in the issue's sidebar), and GitHub keeps the count.
+- **Out of scope but real? File it:** one problem per issue, how to see it,
+  a `bug` or `type:` label, linked from your PR. Not a line in a PR
+  description or `docs/progress.md` that nobody will reopen.
+- **Could someone new do it? Say so.** When an issue you file or find is
+  small and self-contained, label it `good first issue` and `help wanted`,
+  and write it so a stranger can take it: the file or page to start from,
+  what done looks like, and the command that checks it (`./test.sh web`).
+  Never one that touches an access rule, the schema, auth or secrets, or that
+  needs a decision from the owner. Contributors arrive in bursts (October is
+  Hacktoberfest), and an issue with no trail in it costs more to explain than
+  to do. Don't stretch the label to fill a quota.
+- **The roadmap is the board, so a real issue is on it,** with a Status
+  (Considering, Planned, In progress) that says what is true, and the matching
+  label: `status: considering` (the issue template's default, and the status of
+  anything not definitively being worked), `status: planned` (the owner
+  committed to it), `status: in progress` (someone is working on it now). Set
+  the Status and the label together; the board adds a new issue as Considering.
+  A tracking issue's sub-issues carry neither, their parent does. Closing takes an issue off the roadmap: done is
+  `Closes #N`; closing as not planned is the owner's decision, never a way to
+  tidy up. A tracking issue's sub-issues stay off the roadmap view on purpose.
+  The commands and the settings that must stay on: `docs/ops/runbook.md`,
+  "The roadmap board".
+- `owner` marks what needs the owner: an account, money or a decision. Don't
+  guess at those; comment on the issue.
 
 ## Conventions
 

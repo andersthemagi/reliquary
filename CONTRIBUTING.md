@@ -1,10 +1,14 @@
 # Contributing
 
-Reliquary is pre-alpha and single-maintainer. The design and roadmap are
+Reliquary is pre-alpha and single-maintainer. The design and [roadmap](https://reliquary.redmage.cc/roadmap) are
 still moving fast, so for anything beyond a small, obvious fix, please
 [open an issue](https://github.com/andersthemagi/reliquary/issues/new/choose)
 to discuss it before writing a pull request. It saves both of us the work
 of a PR that doesn't fit where the project is headed.
+
+Looking for somewhere to start? Issues labelled
+[good first issue](https://github.com/andersthemagi/reliquary/labels/good%20first%20issue)
+are small and self-contained, each saying where to start and how to check it.
 
 Bug reports, feature suggestions and feedback are always welcome, whether
 or not you plan to write code yourself. One issue, one problem: if a
@@ -67,6 +71,9 @@ for working on the code.
 - Follow [conventional commits](https://www.conventionalcommits.org/)
   (`feat(web): ...`, `fix(mcp): ...`) for your **PR title**, the line that
   becomes the changelog entry. CI checks it on open and on edit.
+- Say which issue the PR is for, on a line of its own in the description:
+  `Closes #N` (merging finishes it), `Part of #N`, or `No issue: <why>` for
+  a small fix nobody filed. CI checks that too; the PR template has the spot.
 - Keep each commit (and ideally the whole PR) to one thing: about 100
   changed lines is a normal size, 1000 is a sign to split it. If a change
   needs a refactor and a feature, that's two commits, so a reviewer can

@@ -188,7 +188,7 @@ Report a vulnerability: [reliquary.redmage.cc/security](https://reliquary.redmag
 
 The package is `@reliquary-ai/cli`, published from `cli/` by
 `.github/workflows/publish-cli.yml` for a tag `cli-v<version>` (the version
-must match `package.json`; the CLI's tests run first; no npm provenance while the repository is private). Licence: MIT (`LICENSE`).
+must match `package.json`; the CLI's tests run first; each publish carries npm provenance, signed through the workflow's OIDC token). Licence: MIT (`LICENSE`).
 Tags come from release-please: commits touching `cli/` collect in a
 "Release cli vX.Y.Z" pull request (version bump and `CHANGELOG.md`), and
 merging it tags the release and starts the publish. It needs the repository secret `NPM_TOKEN`; without it the

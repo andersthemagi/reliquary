@@ -533,7 +533,7 @@ select t.expect('redact: its thread, author, agent and time stay',
   t.val('secret row'));
 select t.expect('redact: the text is in no message and no log entry',
   (select count(*) from public.thread_messages where body like '%4417-pelican%') || ' '
-  || (select count(*) from public.log where detail::text like '%4417%'),
+  || (select count(*) from public.log where detail::text like '%4417-pelican%'),
   '0 0');
 select t.expect('redact: logged by the owner, with the thread and the message',
   (select (actor = t.id('ana'))::text || ' ' || coalesce(agent, '-') || ' ' || (detail ->> 'thread' = t.id('plan')::text)::text

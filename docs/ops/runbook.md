@@ -11,7 +11,7 @@ Three hostnames, two Vercel projects:
 
 | Host | Project | Serves |
 |---|---|---|
-| `reliquary.redmage.cc` | `reliquary-web` | the public site: landing, `/docs` (and `.md`, `/llms.txt`, `/llms-full.txt`), `/roadmap`, the legal and trust pages, `robots.txt`, `sitemap.xml`, `/.well-known/security.txt`, static files |
+| `reliquary.redmage.cc` | `reliquary-web` | the public site: landing, `/docs` (and `.md`, `/llms.txt`, `/llms-full.txt`), `/roadmap` (a redirect to the roadmap board), the legal and trust pages, `robots.txt`, `sitemap.xml`, `/.well-known/security.txt`, static files |
 | `app.reliquary.redmage.cc` | `reliquary-web` | the app: sign-in, Home and every signed-in page, the OAuth authorization server (issuer), the env API, `/cli/oauth-client.json`, `/version`, `/healthz`, static files |
 | `mcp.reliquary.redmage.cc` | `reliquary-mcp` | the MCP endpoint `/mcp` |
 
@@ -118,8 +118,7 @@ change only bumps the minor while below 1.0).
 3. **Cut the release: merge that pull request** when you want what it lists
    live. release-please tags the merge `vX.Y.Z` and publishes the GitHub
    Release; the `release` workflow adds the pre-alpha line, the database
-   migrations in this release, roadmap items for this version
-   (`docs/public/roadmap.yml`) and a deploy note to it.
+   migrations in this release and a deploy note to it.
 4. **The deploy** (`deploy` workflow, for that tag): migrations (dry run,
    then `supabase db push` to the session pooler), then a production
    deployment of exactly the tagged commit in both Vercel projects through
@@ -338,6 +337,53 @@ names and counts only). The model and the numbers are in
 - Try the script against a local database first: set
   `PLAN_DB_CONTAINER=<a local postgres container with the migrations>`
   (and `PLAN_DB_NAME`).
+
+## The roadmap board
+
+The roadmap is one thing: the public GitHub project
+[Reliquary roadmap](https://github.com/users/andersthemagi/projects/3).
+`/roadmap` on the site redirects there (`ROADMAP_URL` in `web/src/docs.ts`;
+change it there if the board moves). No doc, page or file keeps a second copy:
+what shipped is `CHANGELOG.md`, and what was built and why is
+`docs/progress.md`.
+
+- **The default view, "Roadmap",** is a board by Status with the filter
+  `is:issue is:open no:parent-issue`. Closed issues, pull requests and a
+  tracking issue's sub-issues are hidden, so a visitor sees what is being
+  built, planned and considered. Edit it from the view's menu, or with the
+  `updateProjectV2View` GraphQL mutation.
+- **Status** is Considering, Planned or In progress, and the issue carries the
+  matching label (`status: considering`, `status: planned`,
+  `status: in progress`); set both together. **Being on the board commits
+  nothing:** every new issue lands as Considering (the issue template adds the
+  label), and only the owner moves one to Planned, because that is the
+  decision to build it. In progress means someone is definitively working on
+  it now; when that stops, it goes back to what is true.
+- **Closing takes an issue off the roadmap, and the reason is the record.**
+  Done is closed as completed (a merged PR's `Closes #N` does that); a
+  decision against it is closed as not planned, by the owner. Nothing sets a
+  Status on close, deliberately: the built-in "Item closed" workflow would set
+  one status for both, and "Shipped" would then mean "declined" too. The
+  older Shipped status is unused.
+- **Settings that must stay on,** under the project's Workflows. The API can
+  read them (`workflows { nodes { name enabled } }` on the project) and cannot
+  turn them on, so this is a person's click: Auto-add to project, Auto-add
+  sub-issues to project, and **Item added to project** set to Status
+  Considering. **Item closed** stays off. Auto-add has a filter in its own
+  settings; on 2026-10-09 an issue labelled `type: feature` landed on the
+  board by itself and one labelled only `documentation` did not, so label a
+  new issue and look.
+- **When a status is wrong,** set it by hand. `item-add` is safe to repeat and
+  prints the item id with `--format json --jq .id`:
+
+  ```bash
+  gh project item-add 3 --owner andersthemagi --url https://github.com/andersthemagi/reliquary/issues/N
+  gh project item-edit --id ITEM_ID --project-id PVT_kwHOAbfDDM4BlHL6 \
+    --field-id PVTSSF_lAHOAbfDDM4BlHL6zhj1Rhw --single-select-option-id OPTION
+  ```
+
+  OPTION is `4065f07e` (Considering), `fd624e83` (Planned) or `cf4d72d0` (In
+  progress).
 
 ## Feedback
 

@@ -295,7 +295,7 @@ function security(theme: Theme): string {
 // Dispatch ---------------------------------------------------------------------
 
 // status: 200 unless given (a docs page that doesn't exist is 404).
-export type PublicReply = { status?: number; type: string; body: string };
+export type PublicReply = { status?: number; type: string; body: string; location?: string };
 
 const PAGES: Record<string, (t: Theme) => string> = {
   "/terms": terms,
@@ -311,6 +311,6 @@ export function publicRoute(path: string, theme: Theme): PublicReply | undefined
   if (path === "/robots.txt") return { type: "text/plain; charset=utf-8", body: robotsTxt() };
   if (path === "/sitemap.xml") return { type: "application/xml; charset=utf-8", body: sitemapXml(docsPaths()) };
   if (path === "/.well-known/security.txt") return { type: "text/plain; charset=utf-8", body: securityTxt() };
-  // The docs, the roadmap and llms.txt (docs.ts).
+  // The docs, llms.txt and the /roadmap redirect (docs.ts).
   return docsRoute(path, theme);
 }

@@ -22,7 +22,7 @@ A path's owner list goes with vault membership. If a named owner leaves the vaul
 
 ## No vault-wide override
 
-The vault `owner` role's own powers (rename, delete, export, members) are a fixed, enumerated list; they don't extend to someone else's owned path. A vault owner who isn't named as a path's owner proposes on it like anyone else. There is no break-glass path today; if one is ever built, it reuses Emergency access (still on the [roadmap](../roadmap.md), not yet built), not a new mechanism.
+The vault `owner` role's own powers (rename, delete, export, members) are a fixed, enumerated list; they don't extend to someone else's owned path. A vault owner who isn't named as a path's owner proposes on it like anyone else. There is no break-glass path today; if one is ever built, it reuses Emergency access (planned, [not yet built](https://github.com/andersthemagi/reliquary/issues/191)), not a new mechanism.
 
 ## See a path's owners
 

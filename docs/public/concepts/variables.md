@@ -62,4 +62,4 @@ Values are encrypted by the web app with AES-256-GCM before the database sees th
 ## Stated plainly
 
 - **Agents can read what reaches them.** An agent that can run commands in a process holding a variable can read it. `reliquary run` limits exposure to one process; it doesn't stop that process. Prefer scoped, short-lived credentials where your provider offers them.
-- **The operator can decrypt.** Someone with both the database and the web app's key, which means Reliquary's operator, could technically decrypt values. Client-side encryption, where only your members hold keys, is on the [roadmap](../roadmap.md) as considered.
+- **The operator can decrypt.** Someone with both the database and the web app's key, which means Reliquary's operator, could technically decrypt values. Client-side encryption, where only your members hold keys, is [being considered](https://github.com/andersthemagi/reliquary/issues/206).

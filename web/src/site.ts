@@ -147,7 +147,7 @@ ${o.alternate ? html`<link rel="alternate" type="text/markdown" href="${o.altern
     <a href="/security"${o.path === "/security" ? raw(' aria-current="page"') : ""}>Security</a>
     <a href="/#faq">FAQ</a>
     <a href="/docs"${o.path === "/docs" || o.path.startsWith("/docs/") ? raw(' aria-current="page"') : ""}>Docs</a>
-    <a href="/roadmap"${o.path === "/roadmap" ? raw(' aria-current="page"') : ""}>Roadmap</a>
+    <a href="/roadmap">Roadmap</a>
   </nav>
   <a class="button site-signin" href="${appHref("/signin")}">Sign in</a>
   </div>

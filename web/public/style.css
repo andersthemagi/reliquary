@@ -1500,18 +1500,6 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   .docs-next { grid-column: 1; }
 }
 
-/* Roadmap (/roadmap, docs.ts): four columns, stacked on a phone. */
-.roadmap-page > h1 { margin-bottom: var(--space-4); }
-.roadmap-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-7); }
-.roadmap { display: grid; gap: var(--space-6); }
-.roadmap-col > h2 { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-4); }
-.roadmap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-.roadmap-item { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--bg); }
-.roadmap-item h3 { font-size: var(--text-md); line-height: var(--lh-md); font-weight: 600; margin: 0 0 var(--space-2); }
-.roadmap-item p { margin: 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
-.roadmap-item .roadmap-meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin-top: var(--space-3); }
-@media (min-width: 700px) { .roadmap { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1100px) { .roadmap { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 /* New vault: a template's folders and suggested variables, under its name. */
 .template-detail { display: block; margin: 2px 0 var(--space-2); color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
