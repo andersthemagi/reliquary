@@ -2,7 +2,11 @@
 
 ## What and why
 
-<!-- The job this does, not just what changed. Link the issue it was discussed in, if there was one. -->
+<!-- The job this does, not just what changed. -->
+
+## Issue
+
+<!-- One line. "Closes #N" if merging finishes the issue; "Part of #N" if it is one step (then say here what is left); "No issue: <why>" for a dependency bump, a docs fix or a bug found on the way. CI fails the PR without one. -->
 
 ## Testing
 

@@ -9,6 +9,10 @@
 # an unrecognised type, refuse to parse). AGENTS.md's Conventions section
 # has the full policy and the incident this replaced
 # (docs/ops/runbook.md, "Rules that came from incidents").
+#
+# The second job, issue-line, fails a PR whose description doesn't say which
+# issue it is for (AGENTS.md, "Issues"): issues stayed open after the work
+# shipped because nothing in a PR ever named them.
 name: pr-title
 
 on:
@@ -52,3 +56,27 @@ jobs:
           # check) can tell from the subject line alone.
           wip: false
           validateSingleCommit: false
+
+  issue-line:
+    # Same exemption as the title lint, plus Dependabot, whose PRs have no issue.
+    if: (github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-please--')) && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: The description names an issue
+        env:
+          # Through the environment, never interpolated into the script: a PR
+          # title and description are untrusted text.
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if printf '%s\n' "$BODY" | grep -qiE '^[[:space:]]*(closes|fixes|resolves|part of|refs?) #[0-9]+'; then
+            exit 0
+          fi
+          # A feature is logged work: it says which issue, never "No issue".
+          if ! printf '%s\n' "$TITLE" | grep -qE '^feat' &&
+             printf '%s\n' "$BODY" | grep -qiE '^[[:space:]]*no issue: *[^[:space:]]'; then
+            exit 0
+          fi
+          echo '::error::Say which issue this PR is for, on a line of its own in the description: "Closes #N", "Part of #N", or (not for a feat PR) "No issue: <why>". A feature without an issue: open one first. AGENTS.md, "Issues".'
+          exit 1
