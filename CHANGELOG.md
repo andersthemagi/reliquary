@@ -6,6 +6,21 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.16.2](https://github.com/andersthemagi/reliquary/compare/v0.16.1...v0.16.2) (2026-10-09)
+
+Phone layouts stop hiding tabs off-screen and use fingertip-sized controls, and agents get more from the MCP server: every tool says whether it reads, adds or destroys, every argument is described, bad arguments and cut-off lists say what to do, and names people choose are fenced as data. The three `cli:` entries are the CLI's own changes, to be released separately as 0.4.2, and are listed here because they touched shared files; one adds a database function, so a push refused at 20 waiting says to apply or reject some, not to wait.
+
+
+### Bug fixes
+
+* **cli:** a push refused because 20 are already waiting says to apply or reject some, not to wait ([#184](https://github.com/andersthemagi/reliquary/issues/184)) ([ef4e7ac](https://github.com/andersthemagi/reliquary/commit/ef4e7ace1acd8b7117901b84efe5e532e9c91fc7))
+* **cli:** a slow token refresh keeps its lock, and a lock is only removed by the process that owns it ([#178](https://github.com/andersthemagi/reliquary/issues/178)) ([ddacbea](https://github.com/andersthemagi/reliquary/commit/ddacbeabb28f11a45786dcadbc3513a7afee893d))
+* **cli:** Ctrl-C reaches the command once, and file and git problems are explained instead of reported as bugs in the CLI ([#175](https://github.com/andersthemagi/reliquary/issues/175)) ([6f819ba](https://github.com/andersthemagi/reliquary/commit/6f819ba05dd9969ffb5095c36d0d8d61c9f091da))
+* **mcp:** bad arguments get a reference, names people chose are fenced as data, and cut-off lists say how to go on ([#180](https://github.com/andersthemagi/reliquary/issues/180)) ([0ef8fb6](https://github.com/andersthemagi/reliquary/commit/0ef8fb6359108f1b6f521c9f5f45773fb6d3a2db))
+* **mcp:** every tool says whether it reads, adds or destroys, and every argument says what it is ([#173](https://github.com/andersthemagi/reliquary/issues/173)) ([b5087a2](https://github.com/andersthemagi/reliquary/commit/b5087a23eea323dd9ec5981b78593b126af052b1))
+* **mcp:** list_claims names each holder in its people line, so an agent can tell which claim is its person's ([#182](https://github.com/andersthemagi/reliquary/issues/182)) ([33e3a2c](https://github.com/andersthemagi/reliquary/commit/33e3a2c860ed4634b322342f1291eb74fcff5986))
+* **web:** on phones, tabs wrap instead of scrolling out of sight, the Pre-alpha badge has room, and controls are 44px ([#179](https://github.com/andersthemagi/reliquary/issues/179)) ([72e7d53](https://github.com/andersthemagi/reliquary/commit/72e7d53f4ee6fe4c93ff5d8b9d9641416423995f))
+
 ## [0.16.1](https://github.com/andersthemagi/reliquary/compare/v0.16.0...v0.16.1) (2026-10-09)
 
 Adds a Connect an agent button beside New file on every vault's front page, so you can connect an agent from any vault at any time; before, the way in was the first-run step of a vault's first 14 days, or the inside of an empty vault. No database changes.
