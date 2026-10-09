@@ -386,7 +386,7 @@ strong { font-weight: 600; }
     width: calc(100% + 2 * var(--space-5)); margin: 0 calc(-1 * var(--space-5));
     padding: 0 var(--space-2); overflow: visible; flex-wrap: wrap;
   }
-  .app-top .app-nav a, .vault-switch > summary { padding: 0 10px; }
+  .app-top .app-nav a, .vault-switch > summary { padding: 0 10px; min-height: 44px; }
   .app-top .top-inner { column-gap: var(--space-3); }
   .app-top .top-inner > .stage { margin-left: 0; }
   .top-tools { gap: 0; flex: none; }
@@ -407,11 +407,18 @@ strong { font-weight: 600; }
 }
 /* Narrow phones: the badge, the wordmark and three buttons are 296px wide
    with their gaps, and a 320px screen has 288px, so each gives up a little
-   rather than the buttons dropping to a second line. */
+   rather than the buttons dropping to a second line. The main links do the
+   same so "Docs" doesn't sit alone on a second line (a long vault name
+   still wraps them, and a wrapped link is still 44px tall). */
+@media (max-width: 374px) {
+  .app-top .app-nav a, .vault-switch > summary { padding: 0 8px; }
+}
 @media (max-width: 359px) {
   .top-tools .icon-button { padding: 0 8px; }
   .app-top .top-inner > .stage { padding: 0 6px; }
   .app-top .wordmark { gap: 8px; }
+  .app-top .app-nav { gap: 0; }
+  .app-top .app-nav a, .vault-switch > summary { padding: 0 6px; }
 }
 
 /* Layout ------------------------------------------------------------------- */
