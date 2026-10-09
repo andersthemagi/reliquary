@@ -8,6 +8,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.16.2](https://github.com/andersthemagi/reliquary/compare/v0.16.1...v0.16.2) (2026-10-09)
 
+Phone layouts stop hiding tabs off-screen and use fingertip-sized controls, and agents get more from the MCP server: every tool says whether it reads, adds or destroys, every argument is described, bad arguments and cut-off lists say what to do, and names people choose are fenced as data. The three `cli:` entries are the CLI's own changes, to be released separately as 0.4.2, and are listed here because they touched shared files; one adds a database function, so a push refused at 20 waiting says to apply or reject some, not to wait.
+
 
 ### Bug fixes
 
