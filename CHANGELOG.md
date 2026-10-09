@@ -8,6 +8,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.16.1](https://github.com/andersthemagi/reliquary/compare/v0.16.0...v0.16.1) (2026-10-09)
 
+Adds a Connect an agent button beside New file on every vault's front page, so you can connect an agent from any vault at any time; before, the way in was the first-run step of a vault's first 14 days, or the inside of an empty vault. No database changes.
+
 
 ### Bug fixes
 
