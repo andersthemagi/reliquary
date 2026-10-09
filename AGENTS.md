@@ -25,7 +25,7 @@ Everything runs in containers (podman or docker); no Node on the host.
 - `./test.sh` runs every suite in parallel and `scripts/check-registry.sh` first; `./test.sh mcp web` runs only those (`sql`, `mcp`, `web`, `cli`).
 - `TEST_SLOT=8 ./test.sh`: the run takes slots 8 to 11, so two sessions need bases 4 or more apart.
 - One MCP test file: `MCP_TESTS=test/links.test.mjs ./mcp/test.sh`. The other suites have no per-file switch.
-- There is no linter or formatter. `tsc` is the only static check, inside each suite's build.
+- There is no formatter, and no linter for TypeScript: `tsc`, inside each suite's build, is its only static check. The `lint` workflow runs actionlint on the workflows and shellcheck on the scripts (settings in `.shellcheckrc`); errors block, warnings are listed.
 - `./scripts/test-guard.sh origin/main` is CI's `guard` job; `./test.sh` does not run it, and it reads commit messages, so commit first.
 - Docs build without host Node, from the repo root: `podman run --rm --network none -v "$PWD":/repo:z -w /repo/web docker.io/library/node:22-slim node scripts/gen-docs.mjs` (writes `web/docs-build/`); `./test.sh web` checks them.
 - Run the app: `./mcp/dev.sh up` (web UI on `http://127.0.0.1:8790`, MCP on `http://127.0.0.1:8787/mcp`), `./mcp/dev.sh ui`, `./mcp/dev.sh down`.
