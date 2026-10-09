@@ -124,18 +124,18 @@ test("search: returns up to three numbered matching lines per file, fenced, not 
   const r = await call("search", { vault: V, query: "needle" });
   assert.equal(r.isError, false, r.text);
   const nonce = fenced(r.text);
-  assert.match(r.text, new RegExp(`find\\.md  open  last written by \\S+ at \\S+\\nNOTE-${nonce}\\n2: the needle is here\\n4: another needle\\n6: third needle\\nEND-${nonce}`));
+  assert.match(r.text, new RegExp(`NOTE-${nonce}\\nfind\\.md  open  last written by \\S+ at \\S+\\n2: the needle is here\\n4: another needle\\n6: third needle\\nEND-${nonce}`));
   assert.doesNotMatch(r.text, /fourth needle|more filler/);
 });
 
 test("list_files: one line per file, paged with after", async () => {
   const first = await call("list_files", { vault: V, prefix: "pages/", limit: 5 });
-  assert.equal(first.text.split("\n").length, 6);
+  assert.equal(first.text.split("\n").filter((l) => l.startsWith("pages/")).length, 5);
   assert.match(first.text, /^pages\/p01\.md {2}\S+Z$/m);
   const after = /more: pass after="([^"]+)"/.exec(first.text)[1];
   assert.equal(after, "pages/p05.md");
   const next = await call("list_files", { vault: V, prefix: "pages/", limit: 5, after });
-  assert.match(next.text, /^pages\/p06\.md/);
+  assert.match(next.text, /^pages\/p06\.md/m);
   const last = await call("list_files", { vault: V, prefix: "pages/", after: "pages/p12.md" });
   assert.equal(last.text, "No more files.");
 });

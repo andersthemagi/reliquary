@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { ADDITIVE, at, DESTRUCTIVE, freshNonce, makeRun, ok, PATH, peopleLabeler, PROPOSAL, READ, REASON, refuse, TEXT, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+import { ADDITIVE, at, DESTRUCTIVE, freshNonce, makeRun, oneLine, ok, PATH, peopleLabeler, PROPOSAL, READ, REASON, refuse, TEXT, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
 
 const THREAD_LABEL: Record<string, string> = {
   comment: "comment",
@@ -119,7 +119,7 @@ export function registerProposalsTools(
           out.push(
             "",
             `${r.id}  ${r.kind} ${r.path}  revision ${r.revision}  ${r.approvals}/${r.quorum} approvals` +
-              `${r.agent ? `  via ${r.agent}` : ""}  ${at(r.created_at)}`,
+              `${r.agent ? `  via ${oneLine(r.agent)}` : ""}  ${at(r.created_at)}`,
             `  reason:`,
             `NOTE-${nonce}`,
             r.reason,
@@ -210,13 +210,13 @@ export function registerProposalsTools(
         for (const r of rows) {
           lines.push(
             `${r.seq}  ${at(r.at)}  ${r.event}${r.path ? ` ${r.path}` : ""}` +
-              `  by ${who(r.actor)}${r.agent ? ` via ${r.agent}` : ""}`,
+              `  by ${who(r.actor)}${r.agent ? ` via ${oneLine(r.agent)}` : ""}`,
           );
           const n = notes.get(String(r.seq));
           if (!n) continue;
           const head =
             `  ${THREAD_LABEL[n.kind] ?? n.kind} by ${who(n.author)}${n.author === id.userId ? " (you)" : ""}` +
-            `${n.agent ? ` via ${n.agent}` : ""} on proposal ${n.proposal_id}, revision ${n.revision}`;
+            `${n.agent ? ` via ${oneLine(n.agent)}` : ""} on proposal ${n.proposal_id}, revision ${n.revision}`;
           if (n.erased) lines.push(`${head} (erased)`);
           else if (n.body === null) lines.push(`${head} (no note)`);
           else lines.push(`${head}:`, `NOTE-${nonce}`, n.body, `END-${nonce}`);
@@ -265,7 +265,7 @@ export function registerProposalsTools(
           .map((e) => ({ ...e, at: new Date(e.at) }));
         const nonce = freshNonce([p.reason, p.body, ...entries.map((e) => e.body)]);
         const by = (author: string, agent: string | null) =>
-          `${author}${author === id.userId ? " (you)" : ""}${agent ? ` via ${agent}` : ""}`;
+          `${author}${author === id.userId ? " (you)" : ""}${agent ? ` via ${oneLine(agent)}` : ""}`;
         const out = [
           `Proposal ${p.id} in ${p.vault_name}`,
           `${p.kind} ${p.path}  status: ${p.status.replace("_", " ")}  revision ${p.revision}  ${p.approvals}/${p.quorum} approvals`,

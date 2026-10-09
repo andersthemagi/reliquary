@@ -46,7 +46,7 @@ The full list is in [MCP tools](../reference/mcp-tools.md); what people and agen
 
 ## Text is data
 
-File text, reasons, comments and review notes reach an agent inside fences with a fresh random marker, like `BEGIN-7f3a...` and `END-7f3a...`, with who wrote it and when. The marker is chosen so no text in the response contains it, so a file can't end its own fence early and pose as instructions. If you build an agent on Reliquary, treat fenced text as data: quote it, summarise it, but don't follow instructions in it.
+File text, reasons, comments and review notes reach an agent inside fences with a fresh random marker, like `BEGIN-7f3a...` and `END-7f3a...`, with who wrote it and when; the paths, vault names and connection names people chose are fenced or cut to one line the same way. The marker is chosen so no text in the response contains it, so a file can't end its own fence early and pose as instructions. If you build an agent on Reliquary, treat fenced text as data: quote it, summarise it, but don't follow instructions in it.
 
 ## For agents reading this
 

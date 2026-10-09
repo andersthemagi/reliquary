@@ -61,7 +61,7 @@ test("tools: the expected set, and no way to approve", async () => {
 test("vaults: each person sees only their own", async () => {
   const ana = await connect(env.ANA_TOKEN);
   const r = await call(ana, "list_vaults");
-  assert.match(r.text, /^Team \(owner\)/);
+  assert.match(r.text, /^Team \(owner\)/m);
   assert.doesNotMatch(r.text, /Dee private/);
   await ana.close();
 });
@@ -219,7 +219,7 @@ test("data, not instructions: injected text stays inside the markers", async () 
   const nonce = /BEGIN-([0-9a-f]{12})\n/.exec(r.text)[1];
   assert.notEqual(nonce, "000000000000");
   assert.ok(r.text.endsWith(`BEGIN-${nonce}\n${evil}\nEND-${nonce}`));
-  const endLines = r.text.split("\n").filter((l) => l === `END-${nonce}`);
+  const endLines = r.text.slice(r.text.indexOf(`\nBEGIN-${nonce}\n`)).split("\n").filter((l) => l === `END-${nonce}`);
   assert.equal(endLines.length, 1, "exactly one line is the real end marker");
   await ben.close();
 });

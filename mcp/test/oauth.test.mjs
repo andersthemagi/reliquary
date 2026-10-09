@@ -208,7 +208,7 @@ test("scope: a read-only grant for Team sees Team only, as a viewer, and writes 
   const t = await connectWithOAuth([["reach", "some"], ["vault", team], ["access", "read"]]);
   const c = await connect(t.access_token);
   const vaults = await call(c, "list_vaults");
-  assert.match(vaults.text, /^Team \(viewer\) id=/);
+  assert.match(vaults.text, /^Team \(viewer\) id=/m);
   assert.doesNotMatch(vaults.text, /Threads|Tidings/);
   const w = await call(c, "write_file", { vault: "Team", path: "notes/oauth-ro.md", content: "x" });
   assert.equal(w.isError, true);
@@ -221,7 +221,7 @@ test("scope: a read-write grant writes as Ben's agent, named after the client", 
   const team = await teamId(probe.html);
   const t = await connectWithOAuth([["reach", "some"], ["vault", team], ["access", "write"]]);
   const c = await connect(t.access_token);
-  assert.match((await call(c, "list_vaults")).text, /^Team \(editor\) id=/);
+  assert.match((await call(c, "list_vaults")).text, /^Team \(editor\) id=/m);
   const w = await call(c, "write_file", { vault: "Team", path: "notes/oauth-rw.md", content: "Written over OAuth." });
   assert.equal(w.isError, false, w.text);
   const log = await call(c, "changes_since", { vault: "Team" });

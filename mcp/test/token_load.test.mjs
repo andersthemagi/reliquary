@@ -46,11 +46,14 @@ const BUDGET = {
   // argument, which contract.test.mjs now requires: about 4 KB, one
   // sentence-sized word list per shared argument (vault, path, fence).
   "tools/list": 25800,
-  list_vaults: 200,
+  // Raised for the sentence and markers that fence the names a listing starts
+  // its lines with (list_vaults, list_files), and the path and writer in a
+  // file's header (read_file): about 100 bytes a call.
+  list_vaults: 260,
   list_files: 1800,
   "list_files prefix=canon/": 400,
   "read_file notes/n01.md": 2000,
-  "read_file max_bytes=400": 800,
+  "read_file max_bytes=400": 900,
   "read_file lines 1-5": 700,
   "search workshop": 4000,
   "search retainer": 1300,

@@ -26,6 +26,7 @@ const { TEST_SUPER_URL: SUPER, TEST_DATABASE_URL } = process.env;
 const QUIN = "00000000-0000-0000-0000-0000f1a90001";
 const RAE = "00000000-0000-0000-0000-0000f1a90002";
 const HINT = /^Reliquary: (1 flag is|\d+ flags are|more than 20 flags are) waiting for you in this vault\. Call list_flags\.$/;
+const sameMarker = (blocks) => blocks.map((b) => b.replace(/\b(NOTE|END)-[0-9a-f]{12}\b/g, "$1"));
 const hint = (n) => `Reliquary: ${n === 1 ? "1 flag is" : `${n} flags are`} waiting for you in this vault. Call list_flags.`;
 
 async function sql(q, params = [], who = null) {
@@ -169,10 +170,10 @@ test("flags hint: a read-only connection is told too", async () => {
 
 test("flags hint: reading it uses nothing up: list_flags and the watermark are as they were", async () => {
   const mark = () => sql("select last_seq from public.flag_watermarks where token_id = (select id from public.access_tokens where name = 'Quin rw')");
-  const before = { listed: (await rw("list_flags", { vault: busy.name })).blocks, mark: await mark() };
+  const before = { listed: sameMarker((await rw("list_flags", { vault: busy.name })).blocks), mark: await mark() };
   assert.equal((await rw("search", { vault: busy.name, query: "anything" })).blocks.length, 2);
   assert.equal((await rw("list_proposals", { vault: busy.name })).blocks.length, 2);
-  assert.deepEqual({ listed: (await rw("list_flags", { vault: busy.name })).blocks, mark: await mark() }, before);
+  assert.deepEqual({ listed: sameMarker((await rw("list_flags", { vault: busy.name })).blocks), mark: await mark() }, before);
 });
 
 test("flags hint: none on list_flags or advance_flags, though flags still wait", async () => {
@@ -210,7 +211,7 @@ const FAULTS = [
 
 test("flags hint: a count that fails leaves the call's own result as it was, and its write committed", async () => {
   for (const f of FAULTS) {
-    const [own, told] = (await rw("list_files", { vault: fault.name })).blocks;
+    const [own, told] = sameMarker((await rw("list_files", { vault: fault.name })).blocks);
     assert.equal(told, hint(3), "flags wait, so the call is told, until the count fails");
     const db = new pg.Client({ connectionString: SUPER });
     await db.connect();
@@ -223,7 +224,7 @@ test("flags hint: a count that fails leaves the call's own result as it was, and
       await f.free(db).catch(() => {});
       await db.end();
     }
-    assert.deepEqual(listed, { blocks: [own], isError: false }, f.name);
+    assert.deepEqual({ ...listed, blocks: sameMarker(listed.blocks) }, { blocks: [own], isError: false }, f.name);
     assert.equal(wrote.isError, false, `${f.name}: ${wrote.blocks[0]}`);
     assert.equal(wrote.blocks.length, 1, f.name);
     const read = await rw("read_file", { vault: fault.name, path: `notes/${f.name.replace(" ", "-")}.md` });
@@ -232,7 +233,7 @@ test("flags hint: a count that fails leaves the call's own result as it was, and
 });
 
 test("flags hint: a count that fails is in the server's log with a reference", async () => {
-  const [own] = (await rw("list_files", { vault: fault.name })).blocks;
+  const [own] = sameMarker((await rw("list_files", { vault: fault.name })).blocks);
   const t = await token("Quin in process");
   const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL, max: 1 });
   const session = new Session(tokenRef(t, "http://127.0.0.1/mcp"), pool);
@@ -263,7 +264,7 @@ test("flags hint: a count that fails is in the server's log with a reference", a
     await session.close();
     await pool.end();
   }
-  assert.deepEqual(r.content.map((b) => b.text), [own]);
+  assert.deepEqual(sameMarker(r.content.map((b) => b.text)), [own]);
   const logged = lines.filter((l) => /^failure ref=[0-9a-f]{8} /.test(l));
   assert.equal(logged.length, 1, lines.join("\n"));
   const detail = JSON.parse(logged[0].replace(/^failure ref=[0-9a-f]{8} /, ""));
