@@ -178,6 +178,14 @@ issue; these rules make the PR carry that, and CI checks what it can.
 - **Out of scope but real? File it:** one problem per issue, how to see it,
   a `bug` or `type:` label, linked from your PR. Not a line in a PR
   description or `docs/progress.md` that nobody will reopen.
+- **Could someone new do it? Say so.** When an issue you file or find is
+  small and self-contained, label it `good first issue` and `help wanted`,
+  and write it so a stranger can take it: the file or page to start from,
+  what done looks like, and the command that checks it (`./test.sh web`).
+  Never one that touches an access rule, the schema, auth or secrets, or that
+  needs a decision from the owner. Contributors arrive in bursts (October is
+  Hacktoberfest), and an issue with no trail in it costs more to explain than
+  to do. Don't stretch the label to fill a quota.
 - **The roadmap is the board, so a real issue is on it,** with a Status
   (Considering, Planned, In progress) that says what is true; the board's
   Status is the only status, not a `status:` label. The board adds a new
