@@ -190,13 +190,12 @@ When Andrés's Claude Code calls Reliquary, the session carries two
 identities: the agent and the person it acts for (an RFC 8693 `act` claim).
 RLS checks both.
 
-The agent gets the person's permissions **except** these, which need the
-person present in the web UI:
-
-- approving or rejecting proposals;
-- revealing a variable's value;
-- managing members, grants or emergency access;
-- deleting a vault or exporting it.
+The agent gets the person's permissions **except** the actions that are
+irreversible, grant trust or reveal a secret, which need the person present in
+the web UI. The list is kept in one place, [Agents and the
+ceiling](public/concepts/agents.md#the-ceiling). The first four were
+approving or rejecting proposals, revealing a variable's value, managing
+members, grants or emergency access, and deleting a vault or exporting it.
 
 **Why the ceiling:** an agent reads text other people wrote. Prompt
 injection turns any permission the agent holds into a permission the
