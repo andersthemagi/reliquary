@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.16.1](https://github.com/andersthemagi/reliquary/compare/v0.16.0...v0.16.1) (2026-10-09)
+
+
+### Bug fixes
+
+* **web:** every vault's front page has a Connect an agent button beside New file, so connecting an agent no longer depends on the first-run step ([#169](https://github.com/andersthemagi/reliquary/issues/169)) ([79dbd6d](https://github.com/andersthemagi/reliquary/commit/79dbd6d6836d4b1d449b7ede94343ea9b3c61db8))
+
 ## [0.16.0](https://github.com/andersthemagi/reliquary/compare/v0.15.0...v0.16.0) (2026-10-09)
 
 Adds a guided path from a new vault to its first connected agent, claim rules for a whole vault, and setting a variable in several environments at once; the rest hardens what exists: link credentials follow key rotation and a link's URL can no longer carry a key, approvals apply only the revision the reviewer read, a stale save can't bring back a deleted file, a cancelled export or dropped database connection no longer stops the server, and token and consent screens no longer preselect all vaults for someone in several vaults. Five database migrations apply before the new code goes live.
