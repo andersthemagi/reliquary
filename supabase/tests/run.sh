@@ -16,7 +16,10 @@ cleanup() { "$engine" rm -f -v "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 cleanup
 
-"$engine" run -d --network none --name "$name" -e POSTGRES_PASSWORD=test \
+# Data on tmpfs: this suite builds 49 databases from every migration, 90 s of
+# fsyncs on disk and 32 s in memory (900 MB at peak), and a tmpfs leaves no
+# volume behind even when a cleanup is skipped. Nothing here needs durability.
+"$engine" run -d --network none --tmpfs /var/lib/postgresql/data --name "$name" -e POSTGRES_PASSWORD=test \
   docker.io/library/postgres:17 >/dev/null
 # Ask over TCP: the image's init-time server listens on the socket only, so a
 # socket check can pass before the real server is up (a flaky race).

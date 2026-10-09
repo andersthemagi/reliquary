@@ -37,7 +37,9 @@ trap cleanup EXIT
 cleanup
 mkdir -p "$work/state"
 
-"$engine" run -d --name "$pg" --network host -e POSTGRES_PASSWORD=test \
+# Data on tmpfs: nothing in a test needs it to survive, and a tmpfs leaves no
+# volume behind even when a cleanup is skipped.
+"$engine" run -d --name "$pg" --network host --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=test \
   docker.io/library/postgres:17 -c listen_addresses=127.0.0.1 -c port=$pgport >/dev/null
 # Ask over TCP: the image's init-time server listens on the socket only, so a
 # socket check can pass before the real server is up (a flaky race).
