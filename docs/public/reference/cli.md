@@ -71,7 +71,7 @@ Also takes `--vault`, `--env` and `--server`.
 reliquary env push [--vault V] [--env E] [--file .env] [--wait [--timeout 15m]]
 ```
 
-Sends a `.env` file's variables to the vault for approval. Nothing is set until an owner or editor applies it in the web app, within 24 hours. Lines it can't take are listed with their reasons and not sent. Prints the names (new, or replacing a value) on stderr and the approval link on stdout, never a value. The connection must have been allowed to send `.env` files; an editor can't push to an owners-only environment.
+Sends a `.env` file's variables to the vault for approval. Nothing is set until an owner or editor applies it in the web app, within 24 hours. Lines it can't take are listed with their reasons and not sent. Prints the names (new, or replacing a value) on stderr and the approval link on stdout, never a value. The connection must have been allowed to send `.env` files; an editor can't push to an owners-only environment. You can have at most 20 pushes waiting in a vault; past that the CLI says to apply or reject some on the Variables page, because waiting doesn't clear it.
 
 | Option | Does |
 |---|---|
