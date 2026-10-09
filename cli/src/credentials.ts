@@ -35,7 +35,7 @@ import { randomBytes } from "node:crypto";
 import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { CliError, UsageError } from "./errors.js";
+import { CliError, fsFailure, UsageError } from "./errors.js";
 
 export type Credential = {
   refreshToken: string;
@@ -70,10 +70,18 @@ export function configDir(): string {
 export const credentialsFile = () => path.join(configDir(), "credentials.json");
 export const dpapiFile = () => path.join(configDir(), "credentials.dpapi");
 
+// The advice for any failure in the config directory: it is the one place a
+// person can move.
+const CONFIG_HINT = "Set RELIQUARY_CONFIG_DIR to a folder you can write to, or fix that folder's permissions.";
+
 function ensureDir(): string {
   const dir = configDir();
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  if (process.platform !== "win32") chmodSync(dir, 0o700);
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    if (process.platform !== "win32") chmodSync(dir, 0o700);
+  } catch (err) {
+    throw fsFailure("create", dir, err, CONFIG_HINT);
+  }
   return dir;
 }
 
@@ -99,20 +107,24 @@ function parseStore(raw: string, what: string): Store {
 function writeAtomic(file: string, text: string): void {
   const dir = ensureDir();
   const tmp = path.join(dir, `.${path.basename(file)}-${randomBytes(6).toString("hex")}.tmp`);
-  const fd = openSync(tmp, "wx", 0o600);
   try {
-    writeSync(fd, text);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  try {
+    const fd = openSync(tmp, "wx", 0o600);
+    try {
+      writeSync(fd, text);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
     renameSync(tmp, file);
+    if (process.platform !== "win32") chmodSync(file, 0o600);
   } catch (err) {
-    rmSync(tmp, { force: true });
-    throw err;
+    try {
+      rmSync(tmp, { force: true });
+    } catch {
+      // the reason it failed is what matters
+    }
+    throw fsFailure("save your connection in", file, err, CONFIG_HINT);
   }
-  if (process.platform !== "win32") chmodSync(file, 0o600);
 }
 
 // One sign-in as a single line of [a-z0-9_:], so no keychain tool has to
@@ -136,7 +148,7 @@ export function fileStore(): CredentialStore & { has(server: string): boolean } 
       raw = readFileSync(credentialsFile(), "utf8");
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, servers: {} };
-      throw new CliError(`Couldn't read ${credentialsFile()} (${(err as NodeJS.ErrnoException).code ?? "error"}).`);
+      throw fsFailure("read", credentialsFile(), err, CONFIG_HINT);
     }
     return parseStore(raw, credentialsFile());
   };
@@ -282,7 +294,7 @@ export function windowsDpapi(exec: Exec = realExec, bin = windowsPowershell(), f
       data = readFileSync(file(), "utf8").trim();
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, servers: {} };
-      throw new CliError(`Couldn't read ${file()} (${(err as NodeJS.ErrnoException).code ?? "error"}).`);
+      throw fsFailure("read", file(), err, CONFIG_HINT);
     }
     if (!B64.test(data)) throw new CliError(`${file()} is damaged. Delete it and run \`reliquary login\` again.`);
     const r = exec(bin, powershellArgs(PS_UNPROTECT), { input: data });
@@ -375,7 +387,7 @@ export async function withLock<T>(fn: () => Promise<T>): Promise<T> {
       closeSync(openSync(lock, "wx", 0o600));
       break;
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw fsFailure("create the lock file", lock, err, CONFIG_HINT);
       try {
         if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
           unlinkSync(lock);

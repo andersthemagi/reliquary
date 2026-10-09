@@ -35,7 +35,7 @@ Prints each vault the connection reaches, one per line: its id, name, your role,
 reliquary run [--vault V] [--env E] -- <command> [args...]
 ```
 
-Fetches one environment's variables and starts the command directly (no shell), with your environment plus the variables. Nothing is written to disk. Standard input, output and error are the command's; SIGINT, SIGTERM, SIGHUP, SIGQUIT and SIGUSR2 are passed on. A variable that replaces one already in your environment is named on stderr. Takes `--vault`, `--env` and `--server`.
+Fetches one environment's variables and starts the command directly (no shell), with your environment plus the variables. Nothing is written to disk. Standard input, output and error are the command's; SIGTERM, SIGHUP and SIGUSR2 are passed on, and so are SIGINT and SIGQUIT unless standard input is a terminal. At a terminal, Ctrl-C and Ctrl-\ already reach the command, so the CLI doesn't send them a second time and just waits for it to finish. A variable that replaces one already in your environment is named on stderr. Takes `--vault`, `--env` and `--server`.
 
 Exit code: the command's own; 128 plus the signal number if a signal ended it; 127 if the command wasn't found.
 
@@ -54,9 +54,9 @@ On Windows:
 reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]
 ```
 
-Writes one environment to a file (default `.env`), mode 600, one `NAME="value"` per line in name order, under a header saying where it came from. Backslash, double quote, newline and carriage return are escaped. Prints the names, never the values.
+Writes one environment to a file (default `.env`), mode 600, one `NAME="value"` per line in name order, under a header saying where it came from. Backslash, double quote, newline and carriage return are escaped. Prints the names, never the values. Windows has no mode 600: the file keeps the permissions of its folder, so the CLI doesn't claim otherwise, and you should pull into a folder only you can read.
 
-The file must be inside a git work tree and ignored by git; a file that isn't ignored, is tracked, or is a symbolic link is refused and nothing is written. The check runs before fetching and again before writing.
+The file must be inside a git work tree and ignored by git; a file that isn't ignored, is tracked, or is a symbolic link is refused and nothing is written. The check runs before fetching and again before writing. If git refuses to open the repository (for example because another user owns it, as in a dev container), the CLI repeats what git said, which includes git's own fix, and writes nothing; `--outside-repo` doesn't override that. On Windows, git is found on `PATH` only, never in the current directory, so a `git.exe` inside a repository doesn't run.
 
 | Option | Does |
 |---|---|
@@ -81,7 +81,7 @@ Sends a `.env` file's variables to the vault for approval. Nothing is set until 
 
 Also takes `--vault`, `--env` and `--server`.
 
-Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected or expired; 3 when `--wait` ran out of time first (the push stays pending).
+Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected or expired; 3 when `--wait` ran out of time first, or couldn't check the push three times in a row (the push stays pending, or may; one failed check is retried, not reported). Don't push again on a 3: open the approval link to see what became of it.
 
 ## Options for every command
 
@@ -147,7 +147,7 @@ A connection made before the keychain, in `credentials.json`, keeps working. The
 | 0 | done |
 | 1 | an error, in a plain sentence on stderr starting `reliquary:` |
 | 2 | a usage error (an unknown command or option, a missing value, an argument `run` can't pass to a `.cmd` on Windows) |
-| 3 | `env push --wait` ran out of time |
+| 3 | `env push --wait` ran out of time, or couldn't check the push three times in a row |
 | other | `run` passes on its command's exit code |
 
-Common errors: the connection was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this connection; the server has no key for variables. No error prints a value, a token or a server response.
+Common errors: the connection was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this connection; the server has no key for variables; a file or folder the system won't let the CLI use (the message names the path and the reason, such as no permission, a full disk or a read-only folder; for the config directory, `RELIQUARY_CONFIG_DIR` moves it). No error prints a value, a token or a server response.

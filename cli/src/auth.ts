@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import path from "node:path";
 import { type Server, getJson } from "./config.js";
 import { type Credential, getCredential, setCredential, withLock } from "./credentials.js";
 import { CliError, NotSignedIn, serverSays } from "./errors.js";
@@ -45,13 +46,16 @@ async function tokenRequest(server: Server, fields: Record<string, string>): Pro
 
 export type LoginOptions = { openBrowser: boolean; print: (line: string) => void };
 
+// Windows looks a bare name up in the working directory before PATH, so
+// rundll32 is named by its full path, as the other Windows helpers are.
+export function openCommand(url: string, platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): [string, string[]] {
+  if (platform === "darwin") return ["open", [url]];
+  if (platform === "win32") return [path.win32.join(env.SystemRoot ?? env.windir ?? "C:\\Windows", "System32", "rundll32.exe"), ["url.dll,FileProtocolHandler", url]];
+  return ["xdg-open", [url]];
+}
+
 function openUrl(url: string): void {
-  const [cmd, args] =
-    process.platform === "darwin"
-      ? ["open", [url]]
-      : process.platform === "win32"
-        ? ["rundll32", ["url.dll,FileProtocolHandler", url]]
-        : ["xdg-open", [url]];
+  const [cmd, args] = openCommand(url);
   try {
     const child = spawn(cmd, args, { stdio: "ignore", detached: true });
     child.on("error", () => {}); // no opener: the printed link is enough
