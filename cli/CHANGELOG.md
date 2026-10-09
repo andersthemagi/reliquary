@@ -4,6 +4,15 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.4.2](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.1...cli-v0.4.2) (2026-10-09)
+
+
+### Bug fixes
+
+* **cli:** a push refused because 20 are already waiting says to apply or reject some, not to wait ([#184](https://github.com/andersthemagi/reliquary/issues/184)) ([ef4e7ac](https://github.com/andersthemagi/reliquary/commit/ef4e7ace1acd8b7117901b84efe5e532e9c91fc7))
+* **cli:** a slow token refresh keeps its lock, and a lock is only removed by the process that owns it ([#178](https://github.com/andersthemagi/reliquary/issues/178)) ([ddacbea](https://github.com/andersthemagi/reliquary/commit/ddacbeabb28f11a45786dcadbc3513a7afee893d))
+* **cli:** Ctrl-C reaches the command once, and file and git problems are explained instead of reported as bugs in the CLI ([#175](https://github.com/andersthemagi/reliquary/issues/175)) ([6f819ba](https://github.com/andersthemagi/reliquary/commit/6f819ba05dd9969ffb5095c36d0d8d61c9f091da))
+
 ## [0.4.1](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.0...cli-v0.4.1) (2026-10-09)
 
 When a command run through `reliquary run` exits with its own error, Reliquary now adds one line saying the error is the command's, not Reliquary's, so a mistyped script name is no longer mistaken for a Reliquary failure; the exit code is unchanged. The second entry is a web change that touched the CLI's tests: signing in to the CLI shows the same consent page, where someone in several vaults now chooses which vaults it may reach. The CLI program itself is unchanged.
