@@ -1365,6 +1365,15 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   }
   .site-top nav::-webkit-scrollbar { display: none; }
 }
+/* On a phone the six site links (446px) scrolled sideways under a header
+   with no scrollbar: Roadmap sat off screen, and the current page's link
+   could too. Three to a row shows every one at 320px. */
+@media (max-width: 479px) {
+  .site-top nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; padding: 0 var(--space-2); }
+  .site-top nav a { min-height: 44px; border-radius: var(--radius-md); }
+  .site-top nav a[aria-current="page"] { background: var(--bg-muted); }
+  .site-top nav a[aria-current="page"]::after { content: none; }
+}
 
 /* Docs (web/src/docs.ts): sidebar, article, on-page contents. No script:
    the phone menu is a <details>, like the vault sidebar. ------------------- */
