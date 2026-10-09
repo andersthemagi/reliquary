@@ -184,6 +184,7 @@ export function roadmapProblems(items, slugs) {
     if (!ROADMAP_STATUSES.includes(it.status)) problems.push(`${name}: status must be one of ${ROADMAP_STATUSES.join(", ")}`);
     if (it.milestone !== undefined && !/^M[1-7]$/.test(it.milestone)) problems.push(`${name}: milestone must be M1 to M7`);
     if (it.issue !== undefined && !/^[1-9][0-9]*$/.test(it.issue)) problems.push(`${name}: issue must be a number`);
+    if (it.issue === undefined && (it.status === "in-progress" || it.status === "planned")) problems.push(`${name}: ${it.status === "planned" ? "a planned" : "an in-progress"} item needs its issue (issue: N); open one if there is none (AGENTS.md, "Issues")`);
     if (it.docs !== undefined && !slugs.includes(it.docs)) problems.push(`${name}: docs page ${it.docs} doesn't exist`);
     if (it.version !== undefined && !/^\d+\.\d+\.\d+$/.test(it.version)) problems.push(`${name}: version must look like 0.1.0`);
     if (it.version !== undefined && it.status !== "shipped") problems.push(`${name}: only a shipped item has a version`);

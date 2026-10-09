@@ -572,8 +572,9 @@ plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.
 Not a numbered milestone of its own, on the owner's call of 2026-10-02: a
 deliberate, logged exception to "work on the current milestone only", the
 same kind as path ownership and flags (2026-09-28) and compare-and-swap
-writes, claims and work plans (2026-09-30, tracking issue #52). It has no
-tracking issue of its own yet. Three parts, each its own set of small pull
+writes, claims and work plans (2026-09-30, tracking issue #52). Tracked in
+#197 (Threads, what is left of it) and under #52 (the Tasks view and step
+tools: #75, #76). Three parts, each its own set of small pull
 requests. Each pull request that builds a part adds its own line here.
 
 - **The audience split in the web UI.** What a person reads or acts on
