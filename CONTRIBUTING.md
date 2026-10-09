@@ -6,6 +6,10 @@ still moving fast, so for anything beyond a small, obvious fix, please
 to discuss it before writing a pull request. It saves both of us the work
 of a PR that doesn't fit where the project is headed.
 
+Looking for somewhere to start? Issues labelled
+[good first issue](https://github.com/andersthemagi/reliquary/labels/good%20first%20issue)
+are small and self-contained, each saying where to start and how to check it.
+
 Bug reports, feature suggestions and feedback are always welcome, whether
 or not you plan to write code yourself. One issue, one problem: if a
 report bundles three things you've noticed, it'll get split into three,

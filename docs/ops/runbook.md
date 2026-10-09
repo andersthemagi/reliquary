@@ -352,10 +352,13 @@ what shipped is `CHANGELOG.md`, and what was built and why is
   tracking issue's sub-issues are hidden, so a visitor sees what is being
   built, planned and considered. Edit it from the view's menu, or with the
   `updateProjectV2View` GraphQL mutation.
-- **Status** is Considering, Planned or In progress. **Being on the board
-  commits nothing:** every new issue lands as Considering, and only the owner
-  moves one to Planned, because that is the decision to build it. In progress
-  is set when someone takes up a Planned item.
+- **Status** is Considering, Planned or In progress, and the issue carries the
+  matching label (`status: considering`, `status: planned`,
+  `status: in progress`); set both together. **Being on the board commits
+  nothing:** every new issue lands as Considering (the issue template adds the
+  label), and only the owner moves one to Planned, because that is the
+  decision to build it. In progress means someone is definitively working on
+  it now; when that stops, it goes back to what is true.
 - **Closing takes an issue off the roadmap, and the reason is the record.**
   Done is closed as completed (a merged PR's `Closes #N` does that); a
   decision against it is closed as not planned, by the owner. Nothing sets a

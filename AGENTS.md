@@ -158,7 +158,7 @@ issue; these rules make the PR carry that, and CI checks what it can.
   Don't build a Considering item: only the owner moves one to Planned, so
   comment and ask, unless the owner has already told you to build it (say so
   on the issue and set it Planned). Set In progress when you take up a Planned
-  one.
+  one, and if you stop without finishing, put it back to what is true.
 - **Every PR's description has one line saying which issue it is for:**
   `Closes #N` when merging finishes the issue, `Part of #N` when it is one
   step of it, `No issue: <why>` for a dependency bump, a docs fix or a bug
@@ -178,10 +178,21 @@ issue; these rules make the PR carry that, and CI checks what it can.
 - **Out of scope but real? File it:** one problem per issue, how to see it,
   a `bug` or `type:` label, linked from your PR. Not a line in a PR
   description or `docs/progress.md` that nobody will reopen.
+- **Could someone new do it? Say so.** When an issue you file or find is
+  small and self-contained, label it `good first issue` and `help wanted`,
+  and write it so a stranger can take it: the file or page to start from,
+  what done looks like, and the command that checks it (`./test.sh web`).
+  Never one that touches an access rule, the schema, auth or secrets, or that
+  needs a decision from the owner. Contributors arrive in bursts (October is
+  Hacktoberfest), and an issue with no trail in it costs more to explain than
+  to do. Don't stretch the label to fill a quota.
 - **The roadmap is the board, so a real issue is on it,** with a Status
-  (Considering, Planned, In progress) that says what is true; the board's
-  Status is the only status, not a `status:` label. The board adds a new
-  issue as Considering. Closing takes an issue off the roadmap: done is
+  (Considering, Planned, In progress) that says what is true, and the matching
+  label: `status: considering` (the issue template's default, and the status of
+  anything not definitively being worked), `status: planned` (the owner
+  committed to it), `status: in progress` (someone is working on it now). Set
+  the Status and the label together; the board adds a new issue as Considering.
+  A tracking issue's sub-issues carry neither, their parent does. Closing takes an issue off the roadmap: done is
   `Closes #N`; closing as not planned is the owner's decision, never a way to
   tidy up. A tracking issue's sub-issues stay off the roadmap view on purpose.
   The commands and the settings that must stay on: `docs/ops/runbook.md`,
