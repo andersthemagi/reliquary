@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { at, freshNonce, makeRun, ok, PATH, peopleLabeler, PROPOSAL, REASON, refuse, TEXT, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+import { ADDITIVE, at, DESTRUCTIVE, freshNonce, makeRun, ok, PATH, peopleLabeler, PROPOSAL, READ, REASON, refuse, TEXT, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
 
 const THREAD_LABEL: Record<string, string> = {
   comment: "comment",
@@ -50,8 +50,9 @@ export function registerProposalsTools(
         path: PATH,
         content: TEXT.optional().describe("Full new text; omit to delete"),
         reason: REASON.describe("For the reviewers"),
-        delete: z.boolean().optional(),
+        delete: z.boolean().optional().describe("true to propose deleting the file; leave content out"),
       },
+      annotations: ADDITIVE,
     },
     async ({ vault, path, content, reason, delete: del }) =>
       run(async (c) => {
@@ -72,12 +73,12 @@ export function registerProposalsTools(
     {
       title: "List proposals",
       description:
-        "A vault's proposals (open by default), newest first, with reviewers' notes. changes_requested: those waiting for you to revise.",
+        "A vault's proposals, newest first, with reviewers' notes.",
       inputSchema: {
         vault: VAULT,
-        status: z.enum(["open", "changes_requested", "applied", "rejected", "stale"]).optional(),
+        status: z.enum(["open", "changes_requested", "applied", "rejected", "stale"]).optional().describe("Default open; changes_requested: waiting for you to revise"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault, status }) =>
       run(async (c) => {
@@ -141,9 +142,10 @@ export function registerProposalsTools(
         "Replace your own proposal's text as a new revision; approvals of earlier revisions stop counting.",
       inputSchema: {
         proposal_id: PROPOSAL,
-        content: TEXT,
+        content: TEXT.describe("The proposal's full new text"),
         reason: REASON.optional().describe("What changed"),
       },
+      annotations: DESTRUCTIVE,
     },
     async ({ proposal_id, content, reason }) =>
       run(async (c) => {
@@ -164,10 +166,10 @@ export function registerProposalsTools(
         "A vault's events after a cursor, oldest first, with the text of proposal comments and review notes. Pass back the next cursor it returns.",
       inputSchema: {
         vault: VAULT,
-        cursor: z.number().int().min(0).max(1e15).optional(),
+        cursor: z.number().int().min(0).max(1e15).optional().describe("The next cursor the last call returned; leave out to start at the beginning"),
         limit: z.number().int().min(1).max(500).optional().describe("Events, default 100"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ vault, cursor, limit }) =>
       run(async (c) => {
@@ -238,7 +240,7 @@ export function registerProposalsTools(
       description:
         "One proposal: reason, proposed text, and its thread (comments, review notes, approvals), oldest first.",
       inputSchema: { proposal_id: PROPOSAL },
-      annotations: { readOnlyHint: true },
+      annotations: READ,
     },
     async ({ proposal_id }) =>
       run(async (c) => {
@@ -306,8 +308,9 @@ export function registerProposalsTools(
         "Comment on a proposal's thread as your person. Words only: a comment can't approve, reject or change it (revise_proposal changes your own).",
       inputSchema: {
         proposal_id: PROPOSAL,
-        comment: z.string().min(1).max(4000),
+        comment: z.string().min(1).max(4000).describe("Your comment, plain text"),
       },
+      annotations: ADDITIVE,
     },
     async ({ proposal_id, comment }) =>
       run(async (c) => {

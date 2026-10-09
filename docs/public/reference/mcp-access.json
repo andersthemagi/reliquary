@@ -4,10 +4,10 @@
   "checkin_step": "The step's own holder, from the same connection, with its secret and fence; nobody else",
   "claim_path": "Whoever could write the path: an owner's or editor's agent with read-write access, or a path's named owner, canon or open; a read-only connection can't claim",
   "claim_step": "Whoever could write the plan's path: an owner's or editor's agent with read-write access, or a path's named owner. A read-only connection or a viewer can't claim",
-  "comment_on_proposal": "An owner's or editor's agent with read-write access; viewers and read-only connections can't comment",
+  "comment_on_proposal": "An owner's or editor's agent with read-write access, or a named owner of the proposal's path; other viewers and read-only connections can't comment",
   "complete_step": "The step's own holder, from the same connection, with its secret and fence; nobody else",
   "create_vault": "An agent whose connection reaches all its person's vaults with read-write access; the person owns the new vault",
-  "delete_file": "An owner's or editor's agent with read-write access, for open files only",
+  "delete_file": "An owner's or editor's agent with read-write access, or a path's named owner; for open files only (a named owner's own path is open to them)",
   "list_claims": "Any member's agent, within its connection's vaults (read-only is enough)",
   "list_files": "Any member's agent, within its connection's vaults (read-only is enough)",
   "list_flags": "Any member's agent, within its connection's vaults, read-only ones included; never marks anything shown",
@@ -32,5 +32,5 @@
   "search": "Any member's agent, within its connection's vaults (read-only is enough)",
   "send_feedback": "Any connection, read-only ones included: it sends feedback to the people who run this Reliquary and writes nothing to a vault. A vault it names must be within the connection",
   "work_plan_status": "Any member's agent, within its connection's vaults (read-only is enough)",
-  "write_file": "An owner's or editor's agent with read-write access, for open files only"
+  "write_file": "An owner's or editor's agent with read-write access, or a path's named owner; for open files only (a named owner's own path is open to them)"
 }
