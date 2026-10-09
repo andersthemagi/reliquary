@@ -283,10 +283,16 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         ? emptyState({
             title: "No files yet",
             body: "Create the first file, or connect an agent and ask it to write one.",
-            action: html`<a class="button" href="${vaultPath(id, "/new")}">New file</a>${nudge ? "" : html` <a class="button ghost" href="/connect">Connect an agent</a>`}`,
+            action: html`<a class="button" href="${vaultPath(id, "/new")}">New file</a>`,
           })
         : emptyState({ title: "No files yet", body: "Nothing has been shared here yet. Files appear here once a member writes one." });
     };
+    // The way to connect an agent that doesn't expire. The first-run step
+    // below is for a writer of a young vault with nothing connected; an older
+    // vault, a vault you were invited to, a viewer, or someone connecting a
+    // second agent had no way in from here. While that step shows, its own
+    // button is right under the header, so this one would be a second.
+    const connect = !dir && !nudge ? html` <a class="button" href="/connect">Connect an agent</a>` : "";
     const body = html`
       ${pageHeader({
         crumb: dir ? crumbs(id, v, dir, true) : undefined,
@@ -296,7 +302,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         actions: watch?.action ?? "",
         meta: rule ? ruleLine(ctx, id, rule) : info ? rootRuleLine(id, info.default_policy, info.rules) : undefined,
         // On phones the sidebar's search box is hidden: the header offers it.
-        secondary: !dir ? html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a>` : "",
+        secondary: !dir ? html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a>${connect}` : "",
         primary: writer ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : "",
       })}
       ${nudge}

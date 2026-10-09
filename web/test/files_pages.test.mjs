@@ -121,6 +121,10 @@ before(async () => {
   [{ id: V.waiting }] = await as(BREE, "select public.create_vault('Files waiting', 'canon') as id");
   await as(BREE, "select public.propose($1, 'first.md', 'Hello', 'the first file')", [V.waiting]);
   [{ id: V.blank }] = await as(BREE, "select public.create_vault('Files blank') as id");
+  // Old enough that the first-run step (a young vault's) no longer shows.
+  [{ id: V.old }] = await as(BREE, "select public.create_vault('Files old', 'open') as id");
+  await as(BREE, "select public.write_file($1, 'docs/x.md', 'x')", [V.old]);
+  await sql("update public.vaults set created_at = now() - interval '30 days' where id = $1", [V.old]);
 
   [{ id: V.cal }] = await as(CAL, "select public.create_vault('Files cal', 'open') as id");
   await as(CAL, "select public.write_file($1, 'cal.md', 'Cal text')", [V.cal]);
@@ -194,12 +198,26 @@ test("folder: the README is boxed under the list with its name as the header bar
   assert.ok(h.indexOf("</table>") < h.indexOf('class="readme"'), "after the list");
 });
 
-test("folder: the root's header offers Search and New file, not Connect an agent; times are relative with the UTC time in the title", async () => {
+test("folder: the root's header offers Search and New file, and no second Connect an agent while the first-run step shows its own; times are relative with the UTC time in the title", async () => {
   const h = await page(`/v/${V.main}`);
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>/.exec(h)[1];
   assert.match(actions, new RegExp(`<a class="button vault-search-link" href="/v/${V.main}/search">Search</a>\\s*<a class="button primary" href="/v/${V.main}/new">New file</a>`));
   assert.doesNotMatch(actions, /Connect an agent/);
   assert.match(h, /<td class="num small muted hide-sm"><time datetime="[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/td>/);
+});
+
+test("folder: once the first-run step is gone, the root's header puts Connect an agent beside New file; a viewer gets it without New file; a subfolder has neither", async () => {
+  const actionsOf = async (path) => /<div class="page-actions">([\s\S]*?)<\/div>/.exec(await page(path))?.[1] ?? "";
+  const owner = await actionsOf(`/v/${V.old}`);
+  assert.match(owner, new RegExp(`<a class="button" href="/connect">Connect an agent</a>\\s*<a class="button primary" href="/v/${V.old}/new">New file</a>`));
+  assert.equal(owner.match(/Connect an agent/g).length, 1);
+  assert.doesNotMatch(await page(`/v/${V.old}`), /Next: connect an agent/, "an older vault has no first-run step");
+  const viewer = await actionsOf(`/v/${V.dora}`);
+  assert.match(viewer, /<a class="button" href="\/connect">Connect an agent<\/a>/);
+  assert.doesNotMatch(viewer, /New file/);
+  const sub = await actionsOf(`/v/${V.old}/tree?path=docs%2F`);
+  assert.doesNotMatch(sub, /Connect an agent/);
+  assert.match(sub, /New file here/);
 });
 
 test("folder: an empty vault with a proposal waiting says so and links to it", async () => {
