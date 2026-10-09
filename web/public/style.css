@@ -638,7 +638,10 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .results .snippet { display: block; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin-top: var(--space-2); max-width: var(--measure); }
 .results .badge { margin-left: var(--space-2); }
 
-.table-wrap { overflow-x: auto; }
+/* Positioned, so the visually hidden "Actions" header (position: absolute) is
+   clipped here: left to the page it would sit at the table's far edge and
+   make the whole page scroll sideways, where the table itself scrolls. */
+.table-wrap { overflow-x: auto; position: relative; }
 table {
   width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); line-height: var(--lh-sm);
   border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden;
