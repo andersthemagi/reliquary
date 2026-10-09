@@ -35,7 +35,7 @@ Prints each vault the connection reaches, one per line: its id, name, your role,
 reliquary run [--vault V] [--env E] -- <command> [args...]
 ```
 
-Fetches one environment's variables and starts the command directly (no shell), with your environment plus the variables. Nothing is written to disk. Standard input, output and error are the command's; SIGINT, SIGTERM, SIGHUP, SIGQUIT and SIGUSR2 are passed on. A variable that replaces one already in your environment is named on stderr. Takes `--vault`, `--env` and `--server`.
+Fetches one environment's variables and starts the command directly (no shell), with your environment plus the variables. Nothing is written to disk. Standard input, output and error are the command's; SIGTERM, SIGHUP and SIGUSR2 are passed on, and so are SIGINT and SIGQUIT unless standard input is a terminal. At a terminal, Ctrl-C and Ctrl-\ already reach the command, so the CLI doesn't send them a second time and just waits for it to finish. A variable that replaces one already in your environment is named on stderr. Takes `--vault`, `--env` and `--server`.
 
 Exit code: the command's own; 128 plus the signal number if a signal ended it; 127 if the command wasn't found.
 
