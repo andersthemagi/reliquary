@@ -316,9 +316,10 @@ What follows from it:
   is itself a logged event.
 - **Moving an open file into canon** (for example, promoting a chat remark)
   is a proposal.
-- **Every change is logged with its content diff.** That is enough to
-  rebuild any past version. A version-history view and restore are a
-  stretch goal on top of the log, not new storage.
+- **Every version is kept, and every change is logged.** `file_versions`
+  stores each version's full text; the log records the change and the version
+  it made, and a diff is computed when it is shown. A restore action is
+  not built.
 - **The feed** has one call, `changes_since(vault, cursor)`, over MCP; the web
   app's Changes and Log read the same events. A REST feed and a CLI `feed`
   command are not built. Deletions and retractions appear as events, never
@@ -1422,51 +1423,78 @@ meantime inherit the sub-processors' own SOC 2 reports.
 
 ## Architecture
 
-- **Supabase:**
-  - Postgres with RLS for every rule;
-  - Auth for accounts;
-  - the web app encrypts variables (docs/variables.md);
-  - `pg_cron`, `pgmq` and `pg_net` for routines and notifications;
-  - Edge Functions as the routine runtime.
-- **Next.js:** web UI, the remote MCP endpoint, REST, and OAuth
-  authorization-server duties (unless Supabase Auth covers the MCP spec's
-  needs; decide in milestone 1).
-- **CLI:** a small binary (`reliquary`), for env and feed.
-- **No customer-side infrastructure.** Self-hosting is the same stack on a
-  customer's own Supabase.
-- **Multi-tenant** hosted instance: vaults are the tenancy boundary, and RLS
-  enforces it.
+As built, 2026-10-09. Two small TypeScript servers over one Postgres; no
+framework.
+
+- **Postgres 17** holds every rule as RLS or a trigger, and every mutation
+  as a `security definer` function with a pinned `search_path`. The web
+  app, the MCP server and the operator connect as separate roles
+  (`reliquary_web`, `reliquary_mcp`, `reliquary_ops`). `pg_cron` runs
+  housekeeping where it is installed (pruning, expired imports, a storage
+  drift check). Hosted on Supabase; self-hosted as plain Postgres in
+  `deploy/compose`.
+- **Auth** is Supabase Auth (email sign-in codes; the web app verifies its
+  JWTs against the project's JWKS). The web app is also the OAuth
+  authorization server for MCP clients and the CLI (`web/src/oauth.ts`):
+  Supabase's OAuth server can't bind tokens to the MCP resource
+  (docs/research/hosting.md).
+- **`web/`** is a Node `http` server: the server-rendered UI with no
+  client-side script, the OAuth server, the environment API
+  (`web/src/envapi.ts`) and an internal endpoint for link calls. It alone
+  holds `VARIABLES_KEYS` and encrypts variable values and link credentials
+  (AES-256-GCM, `web/src/secrets.ts`; docs/variables.md).
+- **`mcp/`** is a separate Node `http` server using the MCP SDK: the
+  stateless remote endpoint at `/mcp`. It refuses to start with the
+  variables key, so it can never decrypt anything; link calls go through
+  the web app's internal endpoint with a shared secret.
+- **`cli/`** is the `reliquary` binary (Node, no runtime dependencies).
+- **Hosting:** two Vercel projects (`web`, `mcp`) and a Supabase project, or
+  `deploy/compose` for self-hosting. No customer-side infrastructure.
+- **Multi-tenant:** vaults are the tenancy boundary, and RLS enforces it.
+- **Not built, and not in use anywhere:** `pgmq`, `pg_net`, Edge Functions
+  and Supabase Vault. They belonged to the routines design (Routines,
+  above) and to the first secret-store recommendation; routines are
+  unbuilt, and variables use the web app's own keys instead.
 
 ## Data model
 
-Carried from the spike and CommonThread, renamed where needed:
+As built, 2026-10-09; the migrations in `supabase/migrations/` are the
+schema. Names in `public` are readable through RLS; `private` holds
+ciphertext, counters and operator-only state, and is closed to the signed-in
+API role.
 
-- `accounts`, `vaults`, `vault_members(role)`, `emergency_access`.
-- `agent_connections` (OAuth clients a member authorised: client name,
-  scopes, revoked_at).
-- `service_agents`, `service_agent_grants`.
-- `sessions` (minted: vault, acting member or service agent, agent identity,
-  audience, expiry).
-- `files(path, body_encrypted, key_id, tags, audience, author,
-  updated_at)`, `folder_policies(prefix, policy, quorum, expires_after)`,
-  `proposals`, `approvals`.
-- `links(name, url, credential_secret_id, tool_allowlist)`,
-  `link_grants(role or member, tools)`, `link_calls` (append-only
-  log).
-- `log(seq bigint identity, vault_id, event, actor, agent, origin, at)`:
-  append-only, the feed.
-- `routines(config jsonb, enabled, owner)`, `routine_runs` (append-only
-  history).
-- `environments`, `variables(name, vault_secret_id, environments[])`,
-  `variable_grants`, `env_access_log` (append-only).
-- `git_mirrors(remote, direction, last_pushed_seq)`.
-- Plans and limits (built, `20260925230000_plans.sql`): `plans` (vaults per
-  account, people and storage per vault), `vault_tiers` (a per-vault
-  override, `standard` meaning the plan's), `account_plans`,
-  `vault_tier_overrides`, and `vault_storage` (bytes per vault, kept by
-  triggers: every file version, variable ciphertext and waiting import).
-  Only the operator changes them; a smaller plan never deletes, it makes an
-  over-limit vault read-mostly.
+- **Vaults and people.** `vaults`, `vault_members(role)`, `profiles`,
+  `access_tokens` (personal tokens, OAuth grants and CLI grants, one row per
+  connection), `private.vault_invites`, `private.admissions`,
+  `private.deleted_accounts`, `private.vault_deletions` (the record
+  `delete_vault` leaves).
+- **Files and review.** `files`, `file_versions` (the full text of every
+  version), `path_policies(path, policy, quorum)`, `path_owners`,
+  `proposals`, `approvals`, `proposal_notes`, `review_snoozes`, and
+  `log(seq, vault_id, at, actor, agent, event, path, version_id,
+  proposal_id, detail)`: append-only, the feed.
+- **Coordination.** `path_claims`, `claim_rules`, `work_plans`,
+  `work_plan_steps`, `work_plan_step_blockers`, `work_plan_step_cites`,
+  `threads`, `thread_addressees`, `thread_messages`, `subscriptions`,
+  `flag_watermarks`.
+- **Variables.** `environments`, `variables`, `variable_values`,
+  `private.variable_secrets` (ciphertext), `env_imports`,
+  `private.env_import_secrets`, `env_access_log` (append-only).
+- **Links.** `links`, `link_tools`, `link_grants`, `private.link_secrets`
+  (ciphertext), `link_calls` (append-only, outlives a deleted link).
+- **Plans and limits** (`20260925230000_plans.sql`): `private.plans`,
+  `private.vault_tiers`, `private.account_plans`,
+  `private.vault_tier_overrides` and `private.vault_storage` (bytes per
+  vault, kept by triggers: every file version, variable ciphertext and
+  waiting import). Only the operator changes them; a smaller plan never
+  deletes, it makes an over-limit vault read-mostly.
+- **Operations.** `feedback`, `welcome_seen`, `private.rate_limits` (counters
+  under a keyed hash), `private.vault_exports`, `private.oauth_codes`,
+  `private.oauth_tokens`, `private.session_cutoffs`, `private.settings`.
+- **Designed, not built:** `routines` and `routine_runs`, service agents and
+  their grants, `emergency_access`, `git_mirrors`, per-member
+  `variable_grants`, and sessions minted for headless agents
+  (`spikes/gate/`).
 
 ## Hostile tests
 
@@ -1556,8 +1584,8 @@ for](#who-each-surface-is-for)) and the Tasks view with its MCP step tools
 aren't a numbered milestone either. They start now, on the owner's
 decision of 2026-10-02: a deliberate, logged exception to working on one
 milestone at a time ([AGENTS.md](../AGENTS.md#build-order),
-[progress.md](progress.md)). The design for Threads is written before any
-of it is built, as the claims section was.
+[progress.md](progress.md#decisions)). Their designs were written before
+they were built, as the claims section was.
 
 ## Open decisions
 
@@ -1567,12 +1595,14 @@ of it is built, as the claims section was.
    encryption layer is the **secret store**, and a **link** is an
    upstream MCP (renamed 2026-09-28 from "connection", which the Connections
    page already meant).
-3. **OAuth authorization server:** Supabase Auth, if it meets the MCP spec
-   (resource indicators, client ID metadata documents); otherwise a small
-   one in Next.js. Decide in milestone 1.
-4. **Variable storage:** Supabase Vault (simplest, operator can decrypt) or
-   Infisical as a backend (more mature, another service).
-   *Recommendation:* Supabase Vault for milestone 3, behind an interface.
+3. ~~OAuth authorization server.~~ Decided in milestone 1: a small one in the
+   web app (`web/src/oauth.ts`), because Supabase's OAuth server can't bind
+   tokens to the MCP resource (docs/research/hosting.md). Supabase Auth signs
+   people in.
+4. ~~Variable storage.~~ Decided in milestone 2: the web app encrypts values
+   with AES-256-GCM under its own keys (`VARIABLES_KEYS`) and Postgres holds
+   only ciphertext; neither Supabase Vault nor Infisical is used. The operator
+   can still decrypt, as docs/variables.md says.
 5. **Hosting model:** multi-tenant, or an instance per customer? v2 left
    this to later. v3 assumes multi-tenant with a self-host path.
 6. **Name**, checked 2026-09-24, and to finish before any client material:
@@ -1599,8 +1629,8 @@ says it's time:
 | Routines | One model call, Edge Function time limits | Multi-step agent work, long runs | A worker queue, or Managed Agents, per vault |
 | Links | Shared credentials, remote MCP only | People want their own Gmail or calendar, or local tools | Per-member upstream OAuth; a small local relay for stdio servers |
 | Link proxy | Synchronous pass-through | Long or streaming tool calls | Streaming proxy with its own timeouts |
-| Secret store | Supabase Vault, operator can decrypt | A client needs zero-knowledge | Client-side encryption with per-member keys |
-| Version history | Rebuilt from the log's diffs | History views get slow | Periodic snapshots |
+| Secret store | App-held keys (AES-256-GCM), operator can decrypt | A client needs zero-knowledge | Client-side encryption with per-member keys |
+| Version history | Every version stored in full | Storage per vault gets large | Compress or snapshot old versions |
 | Multi-tenant | One Supabase project | Noisy neighbours, data residency asks | Per-region or per-customer projects |
 | Compliance | Designed-in controls, no audit | A client requires a SOC 2 report | Compliance platform plus auditor |
 
