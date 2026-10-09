@@ -267,3 +267,10 @@ issue; these rules make the PR carry that, and CI checks what it can.
 - Migrations are numbered SQL files in `supabase/migrations/`, never edited
   after they ship; fix forward.
 - No real client data in fixtures, seeds or tests.
+- **Exploratory research stays out of the repo.** Market and user research,
+  interview scripts, survey drafts, legal notes and spike output go in
+  `private/`, which is gitignored; never commit them, and never move one into
+  `docs/research/` to keep it. That folder holds only rationale that code, a
+  migration, a test or CI cites. Before moving or deleting a file there, run
+  `git grep` for its name: migrations are never edited, so a citation in one
+  can't be fixed afterwards.
