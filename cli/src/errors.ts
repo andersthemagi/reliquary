@@ -76,7 +76,7 @@ export function fsFailure(doing: string, file: string, err: unknown, hint?: stri
 // Arabic letter mark, LRM and RLM, line and paragraph separators, bidi
 // embeddings and isolates), as code point ranges.
 const UNSAFE: [number, number][] = [[0x00, 0x1f], [0x7f, 0x9f], [0x61c, 0x61c], [0x200e, 0x200f], [0x2028, 0x202e], [0x2066, 0x2069]];
-const plain = (s: string) =>
+export const plain = (s: string) =>
   [...s].map((ch) => (UNSAFE.some(([a, b]) => ch.codePointAt(0)! >= a && ch.codePointAt(0)! <= b) ? String.fromCodePoint(0xfffd) : ch)).join("");
 export function serverSays(body: unknown): string {
   const b = (body ?? {}) as { message?: unknown; where?: unknown; ref?: unknown; error_description?: unknown };

@@ -66,7 +66,9 @@ decides, so a file that isn't in `.gitignore`, or is tracked (even if
 `.gitignore` now names it), is refused, and nothing is written. The check runs
 before anything is fetched and again just before writing. Outside any
 repository it is refused too, unless you pass `--outside-repo` to say you
-know. A symbolic link is refused.
+know. If git itself refuses to open the repository (another user owns it, as
+in a dev container), the CLI repeats what git said and writes nothing;
+`--outside-repo` doesn't override that. A symbolic link is refused.
 
 The file is created with mode 600 (an existing one is tightened before any
 value lands). If the temporary name `<file>.reliquary-<random>.tmp` is ignored

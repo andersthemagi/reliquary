@@ -56,7 +56,7 @@ reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]
 
 Writes one environment to a file (default `.env`), mode 600, one `NAME="value"` per line in name order, under a header saying where it came from. Backslash, double quote, newline and carriage return are escaped. Prints the names, never the values.
 
-The file must be inside a git work tree and ignored by git; a file that isn't ignored, is tracked, or is a symbolic link is refused and nothing is written. The check runs before fetching and again before writing.
+The file must be inside a git work tree and ignored by git; a file that isn't ignored, is tracked, or is a symbolic link is refused and nothing is written. The check runs before fetching and again before writing. If git refuses to open the repository (for example because another user owns it, as in a dev container), the CLI repeats what git said, which includes git's own fix, and writes nothing; `--outside-repo` doesn't override that.
 
 | Option | Does |
 |---|---|
