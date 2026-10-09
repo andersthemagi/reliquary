@@ -99,7 +99,7 @@ export function registerThreadTools(
     {
       title: "Open a thread",
       description:
-        "Start a thread in a vault, with its first message, as your person. Every member reads every thread. to (member ids) makes a side thread: it flags them, and its replies only them, you and whoever posts. Delivery is by flags, never instant: others see it on their next list_flags. Secrets belong in variables, never here. A message can't approve or decide anything.",
+        "Start a thread in a vault with its first message, as your person. Every member reads every thread. Leave `to` out to flag the whole vault; give member ids for a side thread, which flags only them and whose replies reach only them, you and whoever posts. Others see it on their next list_flags, not at once. Secrets belong in variables, never here. A message can't approve or decide anything.",
       inputSchema: {
         vault: VAULT,
         title: z.string().min(1).max(200).describe("The thread's title"),

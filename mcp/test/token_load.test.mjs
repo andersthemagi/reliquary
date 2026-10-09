@@ -45,7 +45,7 @@ const BUDGET = {
   // Raised again for annotations on every tool and a description on every
   // argument, which contract.test.mjs now requires: about 4 KB, one
   // sentence-sized word list per shared argument (vault, path, fence).
-  "tools/list": 26100,
+  "tools/list": 25800,
   list_vaults: 200,
   list_files: 1800,
   "list_files prefix=canon/": 400,

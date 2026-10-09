@@ -188,7 +188,7 @@ export function registerWorkPlanTools(
     {
       title: "Claim a step",
       description:
-        "Claim one named step of a registered plan, to say you're working on it. Take a step work_plan_status shows as ready. Whoever could write the plan's path may; a read-only connection can't. Refused while the step is blocked, held by someone else (naming them and when it frees up), done or cancelled. The lease is the vault's claim rule for the path (48 hours by default); a longer ttl_minutes is clamped, not refused. Returns a secret, once: keep it and the fence, from this connection. checkin_step, complete_step and release_step need both.",
+        "Say you are working on one ready step of a plan (see work_plan_status). Lease, refusals and the one-time secret and fence work as in claim_path; also refused if the step is blocked, done or cancelled. checkin_step, complete_step and release_step need the fence and secret.",
       inputSchema: {
         vault: VAULT,
         path: PLAN_PATH,

@@ -31,7 +31,7 @@ export function registerClaimsTools(
     {
       title: "Claim a path",
       description:
-        "Lease a path to say you're working on it: a courtesy and a coordination signal, not an access gate (write_file's own expected_version still guards the write). Whoever could write the path may claim it; a read-only connection can't. Default and maximum lease 48 hours; a request past that is clamped, not refused. Refused if someone already holds it, naming them and when it frees up. Returns a secret, once: keep it and the fence this returns, from this connection -- renew_claim and release_claim need both, and nothing else can prove the claim is yours.",
+        "Say you are working on a path, so others can see it. A signal only: it never blocks a write (write_file's expected_version does). The lease is the vault's claim rule for the path, 48 hours unless the vault sets another; a longer ttl_minutes is clamped, not refused. Refused, naming the holder and when it frees up, if someone holds it. Returns a secret, once, and a fence: renew_claim and release_claim need both, from this same connection.",
       inputSchema: {
         vault: VAULT,
         path: PATH,
