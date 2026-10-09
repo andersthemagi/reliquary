@@ -59,7 +59,7 @@ test("read-only: lists only its vault, as a viewer", async () => {
   const c = await connect(env.ANA_TEAM_RO);
   const r = await call(c, "list_vaults");
   assert.equal(r.isError, false, r.text);
-  assert.match(r.text, /^Team \(viewer\) id=/);
+  assert.match(r.text, /^Team \(viewer\) id=/m);
   assert.doesNotMatch(r.text, /Workshop/);
   await c.close();
 });
@@ -91,7 +91,7 @@ test("read-only: cannot write, propose, delete or revise", async () => {
 test("scoped: a token for Workshop cannot see Team at all", async () => {
   const c = await connect(env.ANA_WS_RW);
   const vaults = await call(c, "list_vaults");
-  assert.match(vaults.text, /^Workshop \(owner\) id=/);
+  assert.match(vaults.text, /^Workshop \(owner\) id=/m);
   assert.doesNotMatch(vaults.text, /Team/);
   const missing = await call(c, "read_file", { vault: "00000000-0000-0000-0000-000000000000", path: "x" });
   for (const vault of ["Team", env.TEAM_VAULT]) {

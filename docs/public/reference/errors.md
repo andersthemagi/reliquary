@@ -22,7 +22,7 @@ A vault is named by the first 8 characters of its id. The web app shows a path y
 | `sign-in (Supabase Auth)` | The sign-in service didn't answer, or answered with an error |
 | `encryption` | Variable values: the server has no key, or a value didn't decrypt |
 | `rate limit` | Too many requests in a short time. The answer says when to try again |
-| `MCP tool <name>` | A tool call. After a colon, the part inside it that failed, such as `database (function private.vault_ref)` |
+| `MCP tool <name>` | A tool call. After a colon, the part inside it that failed, such as `database (function private.vault_ref)`, or `input check` when the arguments didn't fit the tool's schema |
 | `MCP server` | The MCP endpoint itself, before or around a tool call |
 | `link proxy (...)` | A call to a tool of a [link](../concepts/links.md): `(upstream)` the linked server refused it, `(request)` the arguments were too large to send, `(credential)` the stored credential didn't decrypt, `(network)` the web app couldn't be reached, `(settings)` this server has no `LINK_PROXY_SECRET`. A tool call carries two references, the web app's (`web app ref`) and its own |
 | `link discovery` | Reading a link's tools when it is added |

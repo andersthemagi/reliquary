@@ -18,7 +18,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { ADDITIVE, at, freshNonce, makeRun, ok, peopleLabeler, READ, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+import { ADDITIVE, at, fenced, freshNonce, makeRun, oneLine, ok, peopleLabeler, READ, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+
+// list_my_feedback's page; one more is fetched to know whether there is another.
+const FEEDBACK_PAGE = 20;
 
 export function registerFlagsTools(
   server: McpServer,
@@ -64,20 +67,24 @@ export function registerFlagsTools(
         "Feedback your person and their agents sent, newest first, with its status and the operator's reply.",
       inputSchema: {
         status: z.enum(["new", "seen", "planned", "fixed", "wont_fix"]).optional().describe("Only feedback in this state"),
+        before: z.string().regex(/^[0-9a-fA-F-]{36}$/).optional().describe("The before id the last page named, for older feedback"),
       },
       annotations: READ,
     },
-    async ({ status }) =>
+    async ({ status, before }) =>
       run(async (c) => {
         // RLS: the person's own rows only.
         const { rows } = await c.query(
           `select f.id, f.kind, f.message, f.source, f.agent, f.created_at, f.status, f.reply, f.replied_at, v.name as vault
              from public.feedback f left join public.vaults v on v.id = f.vault_id
-            where $1::text is null or f.status = $1
-            order by f.created_at desc limit 20`,
-          [status ?? null],
+            where ($1::text is null or f.status = $1)
+              and ($2::uuid is null or (f.created_at, f.id) < (select b.created_at, b.id from public.feedback b where b.id = $2))
+            order by f.created_at desc, f.id desc limit ${FEEDBACK_PAGE + 1}`,
+          [status ?? null, before ?? null],
         );
-        if (rows.length === 0) return ok(status ? `No feedback with status ${status}.` : "No feedback sent yet.");
+        if (rows.length === 0) return ok(before ? "No older feedback." : status ? `No feedback with status ${status}.` : "No feedback sent yet.");
+        const more = rows.length > FEEDBACK_PAGE;
+        if (more) rows.length = FEEDBACK_PAGE;
         const nonce = freshNonce(rows.flatMap((r) => [r.source === "agent" ? r.message : null, r.reply]));
         const label = (s: string) => (s === "wont_fix" ? "won't fix" : s);
         const out = [
@@ -87,11 +94,12 @@ export function registerFlagsTools(
         for (const r of rows) {
           out.push(
             `${r.id}  ${r.kind}  status: ${label(r.status)}  sent ${at(new Date(r.created_at))} ${
-              r.source === "web" ? "in the web UI" : `by ${r.agent}`}${r.vault ? `  vault: ${r.vault}` : ""}`,
+              r.source === "web" ? "in the web UI" : `by ${oneLine(r.agent)}`}${r.vault ? `  vault: ${r.vault}` : ""}`,
           );
           if (r.source === "agent") out.push(`NOTE-${nonce}`, r.message, `END-${nonce}`);
           if (r.reply) out.push(`operator's reply, ${at(new Date(r.replied_at))}:`, `NOTE-${nonce}`, r.reply, `END-${nonce}`);
         }
+        if (more) out.push(`more: the newest ${FEEDBACK_PAGE} are shown; pass before=${rows[FEEDBACK_PAGE - 1].id} for older ones.`);
         return ok(out.join("\n"));
       }),
   );
@@ -139,7 +147,7 @@ export function registerFlagsTools(
         const lines = r.flags.map((f) => {
           const bits = [
             `${f.seq}  ${f.category}/${f.reason}  ${f.event}${f.path ? ` ${f.path}` : ""}`,
-            `by ${who(f.actor)}${f.agent ? ` via ${f.agent}` : ""}`,
+            `by ${who(f.actor)}${f.agent ? ` via ${oneLine(f.agent)}` : ""}`,
             at(new Date(f.at)),
           ];
           if (f.proposal_id) bits.push(`proposal ${f.proposal_id}`);
@@ -153,7 +161,7 @@ export function registerFlagsTools(
           `watermark was ${r.watermark}; ${r.flags.length} flag${r.flags.length === 1 ? "" : "s"}` +
             `${r.more ? " (more waiting; call again after advancing)" : ""}:`,
           summary(),
-          ...lines,
+          ...fenced("Flag lines", lines),
           ...(r.flags.some((f) => f.thread_id) ? ["read_thread shows a thread's messages, quoted as data."] : []),
           `through: ${r.through}`,
           "Call advance_flags(vault, through) once these are shown to your person.",
@@ -205,7 +213,7 @@ export function registerFlagsTools(
         const out = (rows as { target: string; created_at: string }[]).map(
           (s) => `${s.target}  since ${at(new Date(s.created_at))}`,
         );
-        return ok(out.join("\n"));
+        return ok(fenced("Watched paths", out).join("\n"));
       }),
   );
 }

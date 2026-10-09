@@ -8,6 +8,7 @@
 
 import assert from "node:assert/strict";
 import { appendFileSync } from "node:fs";
+import http from "node:http";
 import { after, before, test } from "node:test";
 import { randomBytes } from "node:crypto";
 import pg from "pg";
@@ -119,6 +120,39 @@ test("errors: a request the server refuses before any tool runs says why, with a
   assert.equal(body.error, "invalid JSON");
   assert.equal(body.where, "MCP server (request check)");
   assert.match(body.message, /failed: The request body isn’t valid JSON\.$/);
+  assert.match(body.ref, /^[0-9a-f]{8}$/);
+  if (MCP_ERROR_REFS_FILE) appendFileSync(MCP_ERROR_REFS_FILE, `${body.ref}\n`);
+});
+
+test("errors: arguments that do not fit the tool's schema say which one, where and a reference, without the value sent", async () => {
+  const r = await call(EVE_HOME_RW, "comment_on_proposal", { proposal_id: MARK, comment: "x" });
+  assert.equal(r.isError, true);
+  const e = parsed(r.text);
+  assert.match(e.lead, /^Invalid arguments for tool comment_on_proposal: .+ at proposal_id$/);
+  assert.equal(e.tool, "comment_on_proposal");
+  assert.equal(e.where, "MCP tool comment_on_proposal: input check");
+  assert.equal(r.text.includes(MARK), false, "the value sent is not echoed");
+});
+
+// fetch() would not send a bare "//" as the request target.
+const rawGet = (target) =>
+  new Promise((resolve, reject) => {
+    http
+      .get({ host: URL_.hostname, port: URL_.port, path: target }, (res) => {
+        let body = "";
+        res.on("data", (d) => (body += d));
+        res.on("end", () => resolve({ status: res.statusCode, body }));
+      })
+      .on("error", reject);
+  });
+
+test("errors: a request target the server cannot read is a 400 with a reference, not a failure of the server", async () => {
+  const r = await rawGet("//");
+  assert.equal(r.status, 400, r.body);
+  const body = JSON.parse(r.body);
+  assert.equal(body.error, "bad_request");
+  assert.equal(body.where, "MCP server (request check)");
+  assert.match(body.message, /failed: The request target isn’t a path this server can read/);
   assert.match(body.ref, /^[0-9a-f]{8}$/);
   if (MCP_ERROR_REFS_FILE) appendFileSync(MCP_ERROR_REFS_FILE, `${body.ref}\n`);
 });

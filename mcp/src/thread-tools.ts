@@ -23,7 +23,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { ADDITIVE, at, freshNonce, makeRun, ok, peopleLabeler, READ, ToolError, VAULT } from "./tools-shared.js";
+import { ADDITIVE, at, freshNonce, makeRun, oneLine, ok, peopleLabeler, READ, ToolError, VAULT } from "./tools-shared.js";
 
 const UUID = z.string().regex(/^[0-9a-fA-F-]{36}$/);
 const THREAD = UUID.describe("Thread id, from list_threads or a flag");
@@ -31,7 +31,7 @@ const MESSAGE = z.string().min(1).max(4000);
 const ABOUT = z
   .string()
   .max(1100)
-  .regex(/^(file|task|proposal):\S+$/)
+  .regex(/^(file|task|proposal):.+$/)
   .describe("One of file:<path>, task:<plan path>#<step key>, proposal:<id>");
 
 // A thread as public.thread_summaries returns it (20261004120000_thread_reads.sql).
@@ -88,7 +88,7 @@ export function registerThreadTools(
 ): void {
   const run = makeRun(runAs);
   const by = (who: (u: string | null) => string, person: string, agent: string | null) =>
-    `${who(person)}${agent ? ` via ${agent}` : ""}`;
+    `${who(person)}${agent ? ` via ${oneLine(agent)}` : ""}`;
   const scopeLine = (who: (u: string | null) => string, s: Summary) =>
     s.scope === "vault" ? "for the whole vault" : `side thread, addressed to ${s.addressees.map((u) => who(u)).join(", ")}`;
   const stateLine = (who: (u: string | null) => string, s: Summary) =>

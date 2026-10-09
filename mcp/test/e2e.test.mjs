@@ -61,7 +61,7 @@ test("tools: the expected set, and no way to approve", async () => {
 test("vaults: each person sees only their own", async () => {
   const ana = await connect(env.ANA_TOKEN);
   const r = await call(ana, "list_vaults");
-  assert.match(r.text, /^Team \(owner\)/);
+  assert.match(r.text, /^Team \(owner\)/m);
   assert.doesNotMatch(r.text, /Dee private/);
   await ana.close();
 });
@@ -106,6 +106,23 @@ test("write: the current expected_version succeeds", async () => {
   const current = /version: ([0-9a-f-]{36})\n/.exec((await call(ben, "read_file", { vault: "Team", path: "notes/swap2.md" })).text)[1];
   const r = await call(ben, "write_file", { vault: "Team", path: "notes/swap2.md", content: "two", expected_version: current });
   assert.equal(r.isError, false, r.text);
+  await ben.close();
+});
+
+test("write: the answer carries the new version, which the next write can expect without a read in between", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  const first = await call(ben, "write_file", { vault: "Team", path: "notes/chain.md", content: "one" });
+  assert.equal(first.isError, false, first.text);
+  const v1 = /\nversion: ([0-9a-f-]{36})$/.exec(first.text)?.[1];
+  assert.ok(v1, first.text);
+  assert.match((await call(ben, "read_file", { vault: "Team", path: "notes/chain.md" })).text, new RegExp(`^version: ${v1}$`, "m"));
+  const second = await call(ben, "write_file", { vault: "Team", path: "notes/chain.md", content: "two", expected_version: v1 });
+  assert.equal(second.isError, false, second.text);
+  const v2 = /\nversion: ([0-9a-f-]{36})$/.exec(second.text)[1];
+  assert.notEqual(v2, v1);
+  const stale = await call(ben, "write_file", { vault: "Team", path: "notes/chain.md", content: "three", expected_version: v1 });
+  assert.equal(stale.isError, true);
+  assert.match(stale.text, /^Conflict: /);
   await ben.close();
 });
 
@@ -202,7 +219,7 @@ test("data, not instructions: injected text stays inside the markers", async () 
   const nonce = /BEGIN-([0-9a-f]{12})\n/.exec(r.text)[1];
   assert.notEqual(nonce, "000000000000");
   assert.ok(r.text.endsWith(`BEGIN-${nonce}\n${evil}\nEND-${nonce}`));
-  const endLines = r.text.split("\n").filter((l) => l === `END-${nonce}`);
+  const endLines = r.text.slice(r.text.indexOf(`\nBEGIN-${nonce}\n`)).split("\n").filter((l) => l === `END-${nonce}`);
   assert.equal(endLines.length, 1, "exactly one line is the real end marker");
   await ben.close();
 });

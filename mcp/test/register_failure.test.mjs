@@ -6,7 +6,6 @@
 // registration throw in a server this file starts for itself.
 
 import assert from "node:assert/strict";
-import http from "node:http";
 import { after, before, test } from "node:test";
 import pg from "pg";
 import { post, startServer } from "./own-server.mjs";
@@ -17,7 +16,8 @@ before(async () => {
 });
 after(() => server?.stop());
 
-const call = (id) => post(server.origin, { jsonrpc: "2.0", id, method: "tools/call", params: { name: "list_vaults", arguments: {} } });
+const callOn = (s, id) => post(s.origin, { jsonrpc: "2.0", id, method: "tools/call", params: { name: "list_vaults", arguments: {} } });
+const call = (id) => callOn(server, id);
 
 async function openTransactions() {
   const db = new pg.Client({ connectionString: process.env.TEST_DATABASE_URL });
@@ -57,17 +57,17 @@ test("registration failure: the request's database connection is not left inside
 
 // Last: before the fix this request ended the server process.
 test("unhandled failure: a request that throws before any tool is registered is answered with a failure and its reference", async () => {
-  // serve() parses the request target first, and `//` has no host: new URL throws.
-  const { status, body } = await new Promise((resolve, reject) => {
-    const req = http.get({ host: "127.0.0.1", port: server.port, path: "//", timeout: 8000 }, (res) => {
-      let text = "";
-      res.on("data", (d) => (text += d));
-      res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(text) }));
-    });
-    req.on("timeout", () => req.destroy(new Error("no answer in 8 s")));
-    req.on("error", reject);
-  });
-  assert.ok(status >= 400, `status ${status}`);
-  assert.match(body.error.data.ref, /^[0-9a-f]{8}$/);
-  assert.match(body.error.data.where, /^MCP server/);
+  // Building the request's MCP server happens in serve() outside its try;
+  // fault-construct.mjs makes it throw. (A request target of `//` used to,
+  // through new URL; that is a 400 now, errors.test.mjs.)
+  const broken = await startServer("./fault-construct.mjs");
+  try {
+    const r = await callOn(broken, 9);
+    assert.ok(r.status >= 400, `status ${r.status}`);
+    const body = await r.json();
+    assert.match(body.error.data.ref, /^[0-9a-f]{8}$/);
+    assert.match(body.error.data.where, /^MCP server/);
+  } finally {
+    broken.stop();
+  }
 });

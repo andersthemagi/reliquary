@@ -9,7 +9,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { ADDITIVE, at, DESTRUCTIVE, freshNonce, makeRun, ok, PATH, peopleLabeler, PROPOSAL, READ, REASON, refuse, TEXT, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+import { ADDITIVE, at, DESTRUCTIVE, freshNonce, makeRun, oneLine, ok, PATH, peopleLabeler, PROPOSAL, READ, REASON, refuse, TEXT, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
+
+// list_proposals' page; one more is fetched to know whether there is another.
+const PROPOSALS_PAGE = 100;
 
 const THREAD_LABEL: Record<string, string> = {
   comment: "comment",
@@ -77,10 +80,11 @@ export function registerProposalsTools(
       inputSchema: {
         vault: VAULT,
         status: z.enum(["open", "changes_requested", "applied", "rejected", "stale"]).optional().describe("Default open; changes_requested: waiting for you to revise"),
+        before: PROPOSAL.optional().describe("The before id the last page named, for older proposals"),
       },
       annotations: READ,
     },
-    async ({ vault, status }) =>
+    async ({ vault, status, before }) =>
       run(async (c) => {
         // Each proposal's quorum from one set-based rules_for() for the
         // page, not rule_for() per row (100 rows: 20 ms -> 1 ms).
@@ -88,11 +92,12 @@ export function registerProposalsTools(
           `select x.* from ${VAULT_REF} cross join lateral (
            with page as (
              select p.id, p.kind, p.path, p.reason, p.agent, p.created_at, p.revision,
-                    row_number() over (order by p.created_at desc) as ord
+                    row_number() over (order by p.created_at desc, p.id desc) as ord
                from public.proposals p
               where p.vault_id = v.id and p.status = $2
-              order by p.created_at desc
-              limit 100)
+                and ($3::uuid is null or (p.created_at, p.id) < (select b.created_at, b.id from public.proposals b where b.id = $3 and b.vault_id = v.id))
+              order by p.created_at desc, p.id desc
+              limit ${PROPOSALS_PAGE + 1})
            select p.*,
                   (select count(*) from public.approvals a
                     where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision) as approvals,
@@ -107,9 +112,11 @@ export function registerProposalsTools(
              join private.rules_for(v.id, array(select distinct path from page)) r on r.path = p.path
             offset 0) x
             order by x.ord`,
-          [vault, status ?? "open"],
+          [vault, status ?? "open", before ?? null],
         );
-        if (rows.length === 0) return ok(`No ${status ?? "open"} proposals.`);
+        if (rows.length === 0) return ok(before ? "No older proposals." : `No ${status ?? "open"} proposals.`);
+        const more = rows.length > PROPOSALS_PAGE;
+        if (more) rows.length = PROPOSALS_PAGE;
         type Note = { kind: string; body: string; revision: number };
         // Reasons and reviewers' notes are people's or agents' words, so they
         // are fenced as data too.
@@ -119,7 +126,7 @@ export function registerProposalsTools(
           out.push(
             "",
             `${r.id}  ${r.kind} ${r.path}  revision ${r.revision}  ${r.approvals}/${r.quorum} approvals` +
-              `${r.agent ? `  via ${r.agent}` : ""}  ${at(r.created_at)}`,
+              `${r.agent ? `  via ${oneLine(r.agent)}` : ""}  ${at(r.created_at)}`,
             `  reason:`,
             `NOTE-${nonce}`,
             r.reason,
@@ -130,6 +137,7 @@ export function registerProposalsTools(
           }
           if (r.comments) out.push(`  thread: ${r.comments} comment${r.comments === 1 ? "" : "s"}; read them with read_proposal`);
         }
+        if (more) out.push("", `more: the newest ${PROPOSALS_PAGE} are shown; pass before=${rows[PROPOSALS_PAGE - 1].id} for older ones.`);
         return ok(out.join("\n"));
       }),
   );
@@ -210,13 +218,13 @@ export function registerProposalsTools(
         for (const r of rows) {
           lines.push(
             `${r.seq}  ${at(r.at)}  ${r.event}${r.path ? ` ${r.path}` : ""}` +
-              `  by ${who(r.actor)}${r.agent ? ` via ${r.agent}` : ""}`,
+              `  by ${who(r.actor)}${r.agent ? ` via ${oneLine(r.agent)}` : ""}`,
           );
           const n = notes.get(String(r.seq));
           if (!n) continue;
           const head =
             `  ${THREAD_LABEL[n.kind] ?? n.kind} by ${who(n.author)}${n.author === id.userId ? " (you)" : ""}` +
-            `${n.agent ? ` via ${n.agent}` : ""} on proposal ${n.proposal_id}, revision ${n.revision}`;
+            `${n.agent ? ` via ${oneLine(n.agent)}` : ""} on proposal ${n.proposal_id}, revision ${n.revision}`;
           if (n.erased) lines.push(`${head} (erased)`);
           else if (n.body === null) lines.push(`${head} (no note)`);
           else lines.push(`${head}:`, `NOTE-${nonce}`, n.body, `END-${nonce}`);
@@ -265,7 +273,7 @@ export function registerProposalsTools(
           .map((e) => ({ ...e, at: new Date(e.at) }));
         const nonce = freshNonce([p.reason, p.body, ...entries.map((e) => e.body)]);
         const by = (author: string, agent: string | null) =>
-          `${author}${author === id.userId ? " (you)" : ""}${agent ? ` via ${agent}` : ""}`;
+          `${author}${author === id.userId ? " (you)" : ""}${agent ? ` via ${oneLine(agent)}` : ""}`;
         const out = [
           `Proposal ${p.id} in ${p.vault_name}`,
           `${p.kind} ${p.path}  status: ${p.status.replace("_", " ")}  revision ${p.revision}  ${p.approvals}/${p.quorum} approvals`,
