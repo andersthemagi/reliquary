@@ -722,6 +722,9 @@ a.dir { font-weight: 600; }
   .tabs a[aria-current="page"] { background: var(--bg-muted); }
   .tabs a[aria-current="page"]::after { content: none; }
 }
+@media (max-width: 640px) {
+  .tabs a { min-height: var(--control-md); }
+}
 
 /* Sidebar --------------------------------------------------------------------- */
 
@@ -1786,6 +1789,7 @@ label.choice-card input:focus-visible { outline: none; }
 .diag-tabs > .tabs a { min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); }
 .diag-tabs > .tabs a[aria-current="page"] { background: var(--bg-muted); }
 .diag-tabs > .tabs a[aria-current="page"]::after { content: none; }
+@media (max-width: 640px) { .diag-tabs > .tabs a { min-height: var(--control-md); } }
 .diag-tabs + h2 { margin-top: 0; }
 /* A section heading with a quiet line at its right: "People · 3 of 10 places". */
 .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-5); margin: var(--space-8) 0 var(--space-4); }
