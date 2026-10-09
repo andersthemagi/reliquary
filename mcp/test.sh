@@ -30,6 +30,7 @@ node=docker.io/library/node:22-slim
 cleanup() { "$engine" rm -f -v "$pg" "$srv" "$web" "$rl" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot" ".error-refs-$slot"; }
 trap cleanup EXIT
 cleanup
+source ../scripts/lib/containers.sh
 
 # Data on tmpfs: nothing in a test needs it to survive, and a tmpfs leaves no
 # volume behind even when a cleanup is skipped.
@@ -37,7 +38,7 @@ cleanup
   docker.io/library/postgres:17 -c listen_addresses=127.0.0.1 -c port=$pgport >/dev/null
 # Ask over TCP: the image's init-time server listens on the socket only, so a
 # socket check can pass before the real server is up (a flaky race).
-until "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q 2>/dev/null; do sleep 0.5; done
+wait_until "$pg" "Postgres to accept connections on 127.0.0.1:$pgport" "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q
 sleep 1
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 
@@ -78,7 +79,7 @@ link_proxy_secret=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
   -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
   -e LINK_PROXY_SECRET="$link_proxy_secret" \
   -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
-until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
+wait_until "$srv" "the MCP server to answer /healthz" curl -sf "http://127.0.0.1:$port/healthz"
 # Tool calls: 3 per 2-second window (so a test can wait one out) and 5 a
 # day per token, 1 of them a thread write; 3 401s a minute per address.
 "$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
@@ -86,14 +87,8 @@ until curl -sf "http://127.0.0.1:$port/healthz" >/dev/null; do sleep 0.3; done
   -e MCP_RESOURCE="http://127.0.0.1:$rlport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
   -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2" \
   -e PORT=$rlport "$node" node dist/server.js >/dev/null
-until curl -sf "http://127.0.0.1:$rlport/healthz" >/dev/null; do
-  [ "$("$engine" inspect -f '{{.State.Running}}' "$rl")" = true ] || { "$engine" logs "$rl"; echo "rate-limit server exited"; exit 1; }
-  sleep 0.3
-done
-until curl -sf "http://127.0.0.1:$webport/healthz" >/dev/null; do
-  [ "$("$engine" inspect -f '{{.State.Running}}' "$web")" = true ] || { "$engine" logs "$web"; echo "web (authorization server) exited"; exit 1; }
-  sleep 0.5
-done
+wait_until "$rl" "the rate-limit MCP server to answer /healthz" curl -sf "http://127.0.0.1:$rlport/healthz"
+wait_until "$web" "the web app (authorization server) to answer /healthz" curl -sf "http://127.0.0.1:$webport/healthz"
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"

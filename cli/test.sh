@@ -36,6 +36,7 @@ cleanup() {
 trap cleanup EXIT
 cleanup
 mkdir -p "$work/state"
+source ../scripts/lib/containers.sh
 
 # Data on tmpfs: nothing in a test needs it to survive, and a tmpfs leaves no
 # volume behind even when a cleanup is skipped.
@@ -43,7 +44,7 @@ mkdir -p "$work/state"
   docker.io/library/postgres:17 -c listen_addresses=127.0.0.1 -c port=$pgport >/dev/null
 # Ask over TCP: the image's init-time server listens on the socket only, so a
 # socket check can pass before the real server is up (a flaky race).
-until "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q 2>/dev/null; do sleep 0.5; done
+wait_until "$pg" "Postgres to accept connections on 127.0.0.1:$pgport" "$engine" exec "$pg" pg_isready -h 127.0.0.1 -U postgres -p $pgport -q
 sleep 1
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
@@ -83,10 +84,7 @@ key=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
   -e MCP_RESOURCE="http://127.0.0.1:$mcpport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
   -e PORT=$mcpport "$node" node dist/server.js >/dev/null
 for c in "$web:$webport" "$mcp:$mcpport"; do
-  until curl -sf "http://127.0.0.1:${c##*:}/healthz" >/dev/null; do
-    [ "$("$engine" inspect -f '{{.State.Running}}' "${c%%:*}")" = true ] || { "$engine" logs "${c%%:*}"; echo "${c%%:*} exited"; exit 1; }
-    sleep 0.3
-  done
+  wait_until "${c%%:*}" "${c%%:*} to answer /healthz" curl -sf "http://127.0.0.1:${c##*:}/healthz"
 done
 
 # The tests record every value, token and code they see in state/secrets.

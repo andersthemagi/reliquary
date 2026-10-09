@@ -15,6 +15,7 @@ name=reliquary-migrations-test-$slot
 cleanup() { "$engine" rm -f -v "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 cleanup
+source ../scripts/lib/containers.sh
 
 # Data on tmpfs: this suite builds 49 databases from every migration, 90 s of
 # fsyncs on disk and 32 s in memory (900 MB at peak), and a tmpfs leaves no
@@ -23,7 +24,7 @@ cleanup
   docker.io/library/postgres:17 >/dev/null
 # Ask over TCP: the image's init-time server listens on the socket only, so a
 # socket check can pass before the real server is up (a flaky race).
-until "$engine" exec "$name" pg_isready -h 127.0.0.1 -U postgres -q 2>/dev/null; do sleep 0.5; done
+wait_until "$name" "Postgres to accept connections" "$engine" exec "$name" pg_isready -h 127.0.0.1 -U postgres -q
 sleep 1
 
 psql() { "$engine" exec -i "$name" psql -U postgres -v ON_ERROR_STOP=1 -q "$@"; }
