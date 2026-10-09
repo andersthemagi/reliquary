@@ -12,6 +12,7 @@ import { randomBytes } from "node:crypto";
 import { closeSync, constants, fchmodSync, fsyncSync, ftruncateSync, lstatSync, openSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
 import path from "node:path";
 import { CliError, fsFailure, plain } from "./errors.js";
+import { resolveWindowsCommand } from "./run.js";
 
 // docs/variables.md: NAME="value", escaping \ " newline and carriage return.
 export function escapeValue(v: string): string {
@@ -33,12 +34,27 @@ export function formatDotenv(
   return lines.join("\n") + "\n";
 }
 
+// Windows looks a bare name up in the working directory before PATH, and git
+// is run with the repository about to be inspected as its working directory:
+// a git.exe committed there would run. So on Windows it is found on PATH
+// only, as `run` finds its command; null if it isn't there.
+export function gitCommand(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  cwd = process.cwd(),
+  exists?: (p: string) => boolean,
+): string | null {
+  return platform === "win32" ? resolveWindowsCommand("git", env, cwd, exists) : "git";
+}
+
 type Git = { status: number | null; stdout: string; stderr: string; missing: boolean; error: string | null };
 function git(cwd: string, args: string[]): Git {
+  const bin = gitCommand();
+  if (!bin) return { status: null, stdout: "", stderr: "", missing: true, error: "ENOENT" };
   // English, so "not a git repository" can be told from the other reasons git
   // exits 128 (a repository owned by someone else, a corrupt one).
   const env = { ...process.env, LC_ALL: "C", LANGUAGE: "C" };
-  const r = spawnSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const r = spawnSync(bin, args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const code = (r.error as NodeJS.ErrnoException | undefined)?.code;
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "", missing: code === "ENOENT", error: r.error ? (code ?? "error") : null };
 }
