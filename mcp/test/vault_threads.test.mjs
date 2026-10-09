@@ -271,3 +271,10 @@ test("threads: list_flags names a thread flag's thread and points at read_thread
   assert.match(f.text, new RegExp(`thread/vault  thread\\.open  by p\\d+ via Jun agent  \\S+  thread ${thread}  message \\d+$`, "m"));
   assert.match(f.text, /^read_thread shows a thread's messages, quoted as data\.$/m);
 });
+
+test("threads: a thread can be anchored to a file whose path has spaces in it", async () => {
+  const o = await call("ivy", "open_thread", { vault: "Studio", title: "Plan review", message: "Read it.", about: "file:notes/Q3 plan.md" });
+  assert.equal(o.isError, false, o.text);
+  const l = await call("ivy", "list_threads", { vault: "Studio" });
+  assert.match(l.text, /, about file:notes\/Q3 plan\.md$/m);
+});

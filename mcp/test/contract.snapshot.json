@@ -658,7 +658,7 @@
         "about": {
           "type": "string",
           "maxLength": 1100,
-          "pattern": "^(file|task|proposal):\\S+$",
+          "pattern": "^(file|task|proposal):.+$",
           "description": "One of file:<path>, task:<plan path>#<step key>, proposal:<id>"
         }
       },

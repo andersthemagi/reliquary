@@ -31,7 +31,7 @@ const MESSAGE = z.string().min(1).max(4000);
 const ABOUT = z
   .string()
   .max(1100)
-  .regex(/^(file|task|proposal):\S+$/)
+  .regex(/^(file|task|proposal):.+$/)
   .describe("One of file:<path>, task:<plan path>#<step key>, proposal:<id>");
 
 // A thread as public.thread_summaries returns it (20261004120000_thread_reads.sql).
