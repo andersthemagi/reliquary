@@ -14,7 +14,7 @@ A vault's owner adds, edits and deletes links from its **Links** page in the web
 
 ## Calling a tool
 
-A granted tool shows up in `tools/list` as `<link>.<tool>` (a link named `stripe` with a granted `create_invoice` tool becomes `stripe.create_invoice`) -- see [MCP tools](../reference/mcp-tools.md#link-tools). Which ones appear depends on the connection: a role's grant, and for a write tool, a write-capable connection too (a read-only token never reaches one, whatever its role is granted). Reliquary makes the call server-side and attaches the credential itself; it's never sent to, or held by, the agent. The result comes back fenced as data from the upstream server, the same as any other text an agent reads through Reliquary -- never as instructions.
+A granted tool shows up in `tools/list` as `<link>.<tool>` (a link named `stripe` with a granted `create_invoice` tool becomes `stripe.create_invoice`; see [MCP tools](../reference/mcp-tools.md#link-tools). Which ones appear depends on the connection: a role's grant, and for a write tool, a write-capable connection too (a read-only token never reaches one, whatever its role is granted). Reliquary makes the call server-side and attaches the credential itself; it's never sent to, or held by, the agent. The result comes back fenced as data from the upstream server, the same as any other text an agent reads through Reliquary, never as instructions.
 
 The upstream server's description of a tool is its own text, not Reliquary's, so `tools/list` shows it last, in quotes, after a sentence saying it is data and not instructions, as one line of at most 300 characters. A tool whose name isn't made of letters, digits, underscores, dots and hyphens (up to 128) isn't listed.
 

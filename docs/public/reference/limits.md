@@ -27,6 +27,33 @@ What your plan and a vault's tier allow. How they count, and what happens at a l
 | Paths you watch for [flags](../concepts/flags.md) | 100 per vault; a path up to 1024 characters |
 | A web form | 2 MB; forms carrying a file's text 3 MiB + 64 KiB, so 1 MiB of any text fits. A form over its limit is answered 413 with the limit and a reference, sign-in forms too |
 
+## Threads
+
+| What | Limit |
+|---|---|
+| A thread's title | 1 to 200 characters, on one line |
+| A message | 1 to 4000 characters; line breaks and tabs, but no other control characters |
+| The path a thread is about | up to 1024 characters |
+| Members a thread is addressed to | 20 |
+| Threads in a vault | 1000, open and resolved together |
+| Messages in a vault | 10000, redacted ones included |
+
+Threads and messages are never deleted, so a vault at a limit stays at it. The rate an agent can post at is under [Rate limits](#rate-limits).
+
+## Claims and work plans
+
+| What | Limit |
+|---|---|
+| A claim's or a held step's label | 200 characters |
+| How long a claim or a held step lasts | 48 hours by default, then whatever the vault's [claim rules](../concepts/claims.md#claim-rules) say; asking for longer is capped, not refused |
+| The longest one claim can be kept, however often it checks in | 7 days by default; a claim rule can set up to 365 days |
+| Claims one connection holds in a vault | 1 by default |
+| Claims one person's agents hold together in a vault | 5 by default |
+| Steps in a [work plan](../concepts/claims.md#work-plans) | 500 |
+| Steps one step waits on | 50 |
+| A step's title | 1 to 200 characters |
+| A step's key | lower case letters and digits, with single hyphens between them |
+
 ## MCP
 
 | What | Limit |

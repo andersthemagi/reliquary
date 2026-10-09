@@ -1,0 +1,43 @@
+# The workflows and the shell scripts, checked by tools instead of by hand.
+# actionlint also shellchecks every `run:` step; shellcheck covers the
+# scripts (the ones that run as root against production and the test
+# harness). Settings for shellcheck: .shellcheckrc.
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      # The image, not the install script: a tag plus the digest it had when
+      # this was written, so the linter can't change under a pull request.
+      # Bump both together.
+      - name: Workflows
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
+  shellcheck:
+    # The runner's own shellcheck. Errors block; warnings are listed without
+    # blocking until the ones in the test scripts are cleaned up, then the
+    # second step loses continue-on-error and the first one goes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Errors
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=error
+      - name: Warnings (not blocking yet)
+        continue-on-error: true
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning

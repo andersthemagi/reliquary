@@ -75,6 +75,14 @@ web=${web%/}; mcp=${mcp%/}
 pw() { tr -d '[:space:]' < "supabase/.$1-db-password"; }
 enc() { jq -rn --arg v "$(cat)" '$v|@uri'; }
 
+# The password is read inside a here-document below, where a failing command
+# substitution doesn't stop the script: without this, a missing file writes
+# a DATABASE_URL with an empty password for pasting into Vercel.
+if [[ $app == web || $app == mcp ]] && [[ -z $(pw "$app" 2>/dev/null) ]]; then
+  echo "supabase/.$app-db-password is missing or empty. Run scripts/set-role-passwords.sh first: it makes the database passwords of reliquary_web and reliquary_mcp (docs/ops/runbook.md, \"Rotating secrets\")." >&2
+  exit 1
+fi
+
 # Shared by both projects (mcp/'s own calls to the web app's internal
 # link-call endpoint, linkproxy.ts): made once, the same value goes in
 # both, from the same file, whichever runs first.
