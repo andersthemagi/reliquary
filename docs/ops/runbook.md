@@ -242,8 +242,8 @@ stops matching a release (the next deploy's `/version` check says so).
 - **By hand:**
 
   ```bash
-  curl -s https://rq-mcp.vercel.app/healthz?db=1
-  curl -s https://rq-mcp.vercel.app/version     # which release is live
+  curl -s https://mcp.reliquary.redmage.cc/healthz?db=1
+  curl -s https://mcp.reliquary.redmage.cc/version     # which release is live
   ```
 
 - **Logs:** Vercel project, Logs; or the Vercel connector's runtime logs.
@@ -522,7 +522,18 @@ tokens in a URL fragment the server never sees.
 | `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Vercel; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values and link credentials are re-encrypted loses them |
 | `LINK_PROXY_SECRET` (web and mcp, the same value on both) | `supabase/.link-proxy-secret`; Vercel (both projects) | rewrite the file, `scripts/vercel-env.sh web ...` and `scripts/vercel-env.sh mcp ...`, redeploy both at once (a mismatch refuses every proxied link call with 401 until both are live) | proxied `<link>.<tool>` calls fail (401) between the two deploys; nothing else |
 | `postgres` password | `supabase/.db-password`; GitHub secret `SUPABASE_DB_PASSWORD` | reset in the dashboard, rewrite the file, `tr -d '[:space:]' < supabase/.db-password \| gh secret set SUPABASE_DB_PASSWORD` | migrations and backups need the new one |
-| A person's agent token or connection | database | Tokens page, Revoke | stops within one request |
+| A person's agent token or connection | database | Connections page, Revoke | stops within one request |
+
+### Setting VARIABLES_KEYS the first time
+
+Keys come from `scripts/variables-keys.sh`, through `scripts/vercel-env.sh
+web ...`, and are never pasted into a chat. Set `VARIABLES_KEYS` in the
+**web** Vercel project only, marked Sensitive: the mcp project refuses to
+start with it. Keep a copy of every key somewhere safe outside Vercel (a
+password manager): Vercel can't show a Sensitive value again, and without a
+key every value sealed with it is lost. Apply a migration with
+`scripts/db-push.sh --apply` (after the dry run) before deploying the web app
+that needs it.
 
 ### Rotating VARIABLES_KEY
 

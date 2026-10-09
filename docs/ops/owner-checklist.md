@@ -1,7 +1,7 @@
 # Owner checklist
 
-What's left needs the owner (accounts, money, decisions). Everything a model
-could build or harden is done as of 2026-09-25; the loop stopped here.
+What's left needs the owner (accounts, money, decisions). Items are removed
+when the repo shows them done; the rest are the owner's to confirm.
 
 ## Do next
 
@@ -25,8 +25,7 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
    - Connectors (Claude Code, Claude.ai, ChatGPT) and the CLI sign in again
      once. The CLI's default server is now `https://app.reliquary.redmage.cc`;
      a `.reliquary.json` naming `https://reliquary.redmage.cc` must change to
-     it. Until the switch, the CLI needs
-     `--server https://reliquary-context.vercel.app`.
+     it.
 2. **Releases** (only a published release deploys; `docs/ops/runbook.md`,
    "Deploy"):
    - GitHub, Settings > Actions > General > Workflow permissions: turn on
@@ -45,7 +44,6 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
      write on this repository only. With it, the release pull request gets
      its `test` checks and releases trigger `deploy` and `publish-cli`
      directly; without it the `release` workflow starts them itself.
-   - Cut v0.1.0 once, by hand (runbook, "The first release").
 3. **Email templates**: paste Reliquary's 13 templates into Supabase
    (Authentication > Emails: the Templates tab and Security notifications,
    turning those on). `scripts/email-templates.sh` lists them and copies
@@ -55,13 +53,14 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
 
 ## Decide
 
-5. **Publish the CLI**: the licence is decided (MIT, `236c7db`,
-   2026-09-25), the package is publish-ready (`npm pack --dry-run` from
-   `cli/` is clean) and three `cli-vX.Y.Z` tags already exist
-   (0.1.0-0.3.0), each with a `publish-cli` run that skipped for want of
-   auth. `publish-cli.yml` now authenticates by npm trusted publishing
-   (OIDC) with a one-time token fallback for the bootstrap publish only
-   (its own header comment has the exact npm-side fields):
+5. **Publish the CLI**: `publish-cli` published 0.3.1 to 0.3.3 on
+   2026-09-29, and 0.3.3 is still what npm serves. Every run since (0.3.3
+   again, `cli-v0.4.0`, `cli-v0.4.1`) failed with E403, "OIDC permission
+   denied": trusted publishing on npmjs.com is missing, or doesn't match this
+   workflow (step 4), so `npx @reliquary-ai/cli` still gives 0.3.3.
+   `publish-cli.yml` authenticates by npm trusted publishing (OIDC), with a
+   one-time token fallback for the bootstrap publish only (its own header
+   comment has the exact npm-side fields):
    1. Create the `@reliquary-ai` npm organisation (done, 2026-09-29).
    2. Mint a granular access token scoped to `@reliquary-ai/cli` only
       (there's nothing to scope it to more narrowly until it exists) and
@@ -69,16 +68,14 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
       "use trusted publishing instead" nudge here: that page only exists
       once the package does, so this one token is unavoidable for the
       very first publish.
-   3. Actions > publish-cli > Run workflow from tag `cli-v0.3.0` (the
-      current version; earlier tags are superseded, not worth publishing
-      separately).
+   3. Actions > publish-cli > Run workflow from the current version's tag
+      (earlier tags are superseded, not worth publishing separately).
    4. Once it exists: npmjs.com > `@reliquary-ai/cli` > Settings >
       Trusted publishing > GitHub Actions, then delete the `NPM_TOKEN`
       secret and revoke the npm token. Every publish after that
       authenticates by OIDC, no secret in this repository at all.
    Later versions publish on their own when their "Release cli vX.Y.Z"
-   pull request is merged. If the repo stays private, npm provenance
-   stays off regardless of trusted publishing (see `cli/README.md`).
+   pull request is merged, once step 4 is done.
 6. **Pricing**: keep "free for 1 to 10 people" or set new numbers. The
    landing page reads its numbers from `PRICING` in `web/src/site.ts`.
 7. **Sign-ups**: on (anyone can make an account; invites work by link) or
@@ -104,9 +101,6 @@ could build or harden is done as of 2026-09-25; the loop stopped here.
    - Check: sign in by code, and invite an address you own.
 9. **Legal placeholders** in `OPERATOR` in `web/src/site.ts`, and a legal
    review before the "Draft" labels come off.
-10. **Milestone 3 (shared connections)**: starts after milestone 2's week of
-   real use (no local `.env` files; `reliquary run` instead), per
-   `AGENTS.md`.
 
 ## Before the next key rotation
 

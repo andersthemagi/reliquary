@@ -1,7 +1,7 @@
 # Environment variables: the interface
 
-2026-09-25. Milestone 2, phase 1 (the core). This is the contract phase 2
-builds on: the web Variables page and the CLI (`npx @reliquary-ai/cli`).
+2026-09-25, revised 2026-10-09. Milestone 2, done 2026-09-29. This is the contract
+the web Variables page and the CLI (`npx @reliquary-ai/cli`) are built on.
 Design: [design.md, Environment variables](design.md#environment-variables).
 Guardrails: AGENTS.md ("Secrets never reach a model", "The database
 enforces access", "Append-only means append-only").
@@ -330,7 +330,7 @@ Flow:
 6. Sign out: `POST <issuer>/oauth/revoke` with `token` (access or refresh)
    and `client_id`: revokes the grant; always 200.
 
-The grant is on the person's Tokens page as "Reliquary CLI", access
+The grant is on the person's Connections page as "Reliquary CLI", access
 "Environment variables", with its vaults and last use. Revoking it there,
 or through step 6, refuses the next request.
 
@@ -407,7 +407,7 @@ import** that a person applies in the web UI; nothing else sets a value.
   sets a value. The CLI parses the file with the same code, sends names and
   values over TLS to the env API, which seals them on receipt and makes a
   **pending import** (24 hours). An owner or editor applies or rejects it on
-  the vault's Variables page (a notice lists pending pushes) or from Review.
+  the vault's Variables page (a notice lists pending pushes) or from the Inbox.
   The agent only runs a command; the values go from disk to the server, never
   through a model.
 
@@ -452,7 +452,7 @@ In `20260925100000_env_imports.sql`.
 |---|---|---|---|
 | `public.env_imports` | `id`, `vault_id`, `environments text[]`, `names text[]` (1 to 200), `refused jsonb` (`[{"line", "name" or null, "reason"}]`), `source` (`web` draft or `cli` push), `created_by`, `agent`, `token_id`, `client_id`, `created_at`, `expires_at`, `status` (`pending`, `applied`, `rejected`, `expired`), `decided_by`, `decided_at` | owners and editors (and their agents within scope) see pushes; a draft only its author, in person; not a CLI grant (it asks `env_import_status`) | the functions below only |
 | `private.env_import_secrets` | `import_id`, `name`, `environment`, `key_id`, `nonce`, `ciphertext` (as `variable_secrets`) | nobody; no function returns them | the functions below; deleted when the import is applied, rejected or found expired |
-| `public.access_tokens.env_push` | whether a `cli` grant may push (only a `cli` grant can carry it) | the person, on the Tokens page | consent |
+| `public.access_tokens.env_push` | whether a `cli` grant may push (only a `cli` grant can carry it) | the person, on the Connections page | consent |
 
 Values are sealed with the stored-value key and the same additional data
 (vault, environment, name), so applying copies the ciphertext into
@@ -523,9 +523,9 @@ The log line is the route's shape (`POST /api/env/:vault/:environment/imports
 | `GET /v/:v/variables/imports/:id` | The preview of a draft or a push: names by environment, new or `Replaces vN`, lines not taken, Apply and Discard (Reject for a push) when the role allows; a push warns that an agent may have sent it |
 | `POST /v/:v/variables/imports/:id/apply`, `.../reject` | CSRF and same-origin as every POST; redirect with a flash |
 
-The Variables page lists pending pushes (owners and editors), and Review
+The Variables page lists pending pushes (owners and editors), and the Inbox
 lists the ones the person may apply. The consent page for the CLI has a box
-(ticked) "Also let it send .env files here"; the Tokens page shows a grant
+(ticked) "Also let it send .env files here"; the Connections page shows a grant
 that may push as "Environment variables (reads; sends for approval)".
 
 ### The CLI
@@ -546,104 +546,36 @@ pushes waiting for a person (environments, names, who, when, expiry), and its
 description tells an agent to run `env push` rather than read a `.env`'s
 values into the conversation.
 
-## What phase 2 builds
+## The Variables page and the CLI, as built
+
+Both are built. Users' view of them is in
+[Environment variables](public/concepts/variables.md) and
+[Use the CLI](public/how-to/use-the-cli.md); this is what a change to either
+must keep true.
 
 ### Web: the Variables page
 
-Server-rendered like the rest (no script), in `web/src/pages.ts` or a new
-module mounted with a line or two, using `web/src/variables.ts` only.
+The code is `web/src/variablespage.ts`, which holds the frame and the four tabs
+(Values, Environments, Access log, Imports), with one file per tab; each file's
+header says what it does. Keep these true:
 
-- `GET /v/:v/variables`: a table, one row per variable, one column per
-  environment (development, preview, production, then others). A cell says
-  whether it has a value, its version, when and by whom it was set. Never a
-  value, masked or not. A tab in the vault's navigation.
-- Owners and editors get a form to set a value: name, environment, value
-  (a `<textarea>` with `autocomplete="off"`, `spellcheck="false"`), and per
-  cell Rotate (the same form, name fixed) and Delete (with a confirm step).
-  Production cells are read-only for editors, with a line saying only
-  owners set them. Viewers see names only. The database refuses whatever
-  the page wrongly offers; show its message (`message()` in pages.ts).
-- Every POST is form-encoded with the CSRF token (the existing rule), then
-  redirects (303) with a flash naming the variable and environment. The
-  value never goes into a URL, a flash, a redirect, an error page or a log
-  line. Refused sets re-render the form without the value.
-- Reveal: a POST (never a GET, so the value is never in a URL, history or
-  a referrer) to e.g. `/v/:v/variables/reveal` with name and environment,
-  answered with a page showing that one value (no redirect), `no-store`.
-  Say on the page that the reveal is logged. `decrypt_failed` says the value
-  can't be decrypted and to set it again.
-- Rotation help (design): next to each value, who read or revealed it since
-  it was last set (from `accessLog`: `read`/`reveal` rows naming it after
-  `updatedAt`), with a link to the Tokens page to revoke.
-- Access log: `GET /v/:v/variables/log` for owners and editors (others get
-  an empty list from RLS; say so), newest first, paged with `before`,
-  filterable by action and name. Refusals are shown with their reason.
-- Without `VARIABLES_KEY` (`variablesConfigured()` false), the page lists
-  names and says values can't be set or revealed on this server.
-- The Connect page gains a CLI section: `npx @reliquary-ai/cli login`, then
-  `run` and `env pull`.
-- Tests: `web/test/*.test.mjs` with a new registry row, including a check
-  that a value set or revealed never appears in the server log.
+- A value is never in a URL, a flash, a redirect, an error page or a log line,
+  and a refused set shows its form again without the value.
+- Reveal is a POST, answered with a page that is `no-store` and says the
+  reveal is logged (`web/src/values.ts`), never a GET or a redirect.
+- Every POST carries the CSRF token and redirects with a flash that names the
+  variable and the environment, not the value.
+- The database decides who may set, reveal or read the log; the page only
+  chooses what to offer, and shows the database's message when it refuses.
+- Without a key (`variablesConfigured()` is false) the page lists names and
+  says values can't be set or revealed on this server.
+- `web/test/variables_page.test.mjs` checks that a set or revealed value never
+  reaches the server log.
 
-### CLI: `npx @reliquary-ai/cli` (binary `reliquary`)
+### CLI
 
-Built in `cli/` (see [cli/README.md](../cli/README.md)); credentials are in
-the OS keychain (macOS Keychain, Secret Service via `secret-tool`, Windows
-DPAPI) where one answers, else the file.
-
-A small Node package, no native dependencies. It talks to exactly the
-endpoints above.
-
-- **Server**: `--server <url>` or `RELIQUARY_URL`, default the hosted web
-  app (`https://reliquary.redmage.cc`). Discover the authorization server metadata; `client_id` and
-  `resource` derive from its `issuer` as above.
-- **Credentials**: the refresh token (and the current access token and its
-  expiry) per server, in the OS keychain when available, else
-  `~/.config/reliquary/credentials.json` (directory 0700, file 0600, written
-  atomically). Take a lock while refreshing: two processes rotating the same
-  refresh token revoke the grant. Never print a token; never put one in a
-  child's environment, a URL, an argument or a log.
-- **`reliquary login`**: the flow above. Prints the URL too (for a browser
-  on another screen), waits up to 5 minutes, checks `state` and `iss`, and
-  says which vaults it can reach (`GET /api/env/vaults`).
-- **`reliquary logout`**: revoke (`/oauth/revoke` with the refresh token),
-  then delete the stored credentials.
-- **Choosing a vault and environment**: `--vault <name or id>` (resolved
-  through `/api/env/vaults`; ambiguous names are an error listing ids),
-  `--env <name>` (default `development`). A project may commit
-  `.reliquary.json` with `{"server": ..., "vault": "<id>", "environment":
-  ...}`: ids and names only, never values.
-- **`reliquary run [--vault V] [--env E] -- <command> [args...]`**: fetches
-  the environment, then spawns the command directly (no shell) with the
-  current environment plus the variables, `stdio` inherited, signals
-  forwarded, and exits with the child's code (or 128 + signal). Writes
-  nothing to disk. When a variable overrides an inherited one, say so on
-  stderr by name. Never prints values.
-- **`reliquary env pull [--vault V] [--env E] [--file .env]`**: refuses
-  unless the target file is inside a git work tree and ignored by it (`git
-  check-ignore -q <file>` exits 0); outside a repository, refuse too (the
-  guardrail is "only into a gitignored `.env`") unless the person passes
-  `--outside-repo`, an explicit escape for a directory that is no project. Writes atomically with mode
-  0600, one `NAME="value"` per line in name order, escaping `\` as `\\`,
-  `"` as `\"`, newline as `\n` and carriage return as `\r`, with a header
-  comment saying where it came from and when. Prints the file name and the
-  names written, never values.
-- **Errors**: map the API's statuses to plain messages (401: run `reliquary
-  login`; 403: your role can't read that environment; 404: no such vault or
-  environment for this sign-in; 503: the server has no key). Exit non-zero.
-- **Tests**: against the web app from `web/test.sh`'s database, in a new
-  suite wired into `./test.sh`, with registry rows; include `env pull`
-  refusing a tracked or unignored `.env`, `run` leaving no file behind, and
-  no value in any output.
-
-## For the owner
-
-- Keys come from `scripts/variables-keys.sh` (through `scripts/vercel-env.sh
-  web`), never pasted into a chat. Set `VARIABLES_KEYS` in the **web** Vercel
-  project only, marked Sensitive. Never in the mcp project (it refuses to
-  start with it). To rotate: the [runbook](ops/runbook.md#rotating-variables_key).
-- Keep a copy somewhere safe outside Vercel (a password manager). Sensitive
-  variables can't be read back from Vercel, and without the key every
-  stored value is lost.
-- Apply the migration (`scripts/db-push.sh`) before deploying the web app
-  that uses it.
+Built in `cli/` (see [cli/README.md](../cli/README.md)); credentials are in the
+OS keychain (macOS Keychain, Secret Service via `secret-tool`, Windows DPAPI)
+where one answers, else the file. Its commands and options are in
+`cli/src/cli.ts`, which `docs/public/reference/cli.md` is checked against. The
+default server is `https://app.reliquary.redmage.cc` (`cli/src/config.ts`).

@@ -1,43 +1,49 @@
 # Reliquary v3: design
 
-2026-09-24 · Status: DRAFT, replaces v2 (commit `4b11c25`)
+2026-09-24, revised 2026-10-09 · Status: built through milestone 3 and the
+work started beside it; routines and everything after are still design. The
+Contents table says which is which. Replaces v2 (commit `4b11c25`).
 
 A shared vault of context, automations and credentials that people and any
 agent can use, with no machine of anyone's that has to stay on.
 
-The research behind this draft is in `docs/research/`
-([landscape-swot](research/landscape-swot.md),
-[org-chatbot-gate](research/org-chatbot-gate.md),
-[pricing](research/pricing.md)). The gate it relies on is proven in
-`spikes/gate/`; `pilot/` is a working Telegram surface on the same gate.
+The gate it relies on is proven in `spikes/gate/`; `pilot/` is a working
+Telegram surface on the same gate. Research behind the design is in
+`docs/research/`. What is built, file by file, is in [progress.md](progress.md);
+the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 
 ## Contents
 
-1. [What changed from v2](#what-changed-from-v2)
-2. [What it is](#what-it-is)
-3. [Principles](#principles)
-4. [Concepts](#concepts)
-5. [Identity and permissions](#identity-and-permissions)
-6. [Access surfaces](#access-surfaces)
-7. [Context](#context)
-8. [Path ownership](#path-ownership)
-9. [Notifications](#notifications)
-10. [Claims and work plans](#claims-and-work-plans)
-11. [Threads](#threads)
-12. [Links](#links)
-13. [Routines](#routines)
-14. [Environment variables](#environment-variables)
-15. [Continuity](#continuity)
-16. [Client engagements](#client-engagements)
-17. [Git mirror and export](#git-mirror-and-export)
-18. [Privacy, erasure and compliance](#privacy-erasure-and-compliance)
-19. [Architecture](#architecture)
-20. [Data model](#data-model)
-21. [Hostile tests](#hostile-tests)
-22. [Build order](#build-order)
-23. [Open decisions](#open-decisions)
-24. [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later)
-25. [Out of scope](#out-of-scope)
+| # | Section | Status |
+|---|---|---|
+| 1 | [What changed from v2](#what-changed-from-v2) | History |
+| 2 | [What it is](#what-it-is) | Overview |
+| 3 | [Principles](#principles) | Overview |
+| 4 | [Concepts](#concepts) | Built |
+| 5 | [Identity and permissions](#identity-and-permissions) | Built |
+| 6 | [Access surfaces](#access-surfaces) | Built, except service agent tokens |
+| 7 | [Context](#context) | Built |
+| 8 | [Path ownership](#path-ownership) | Built |
+| 9 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
+| 10 | [Claims and work plans](#claims-and-work-plans) | Built, except waiting in line |
+| 11 | [Threads](#threads) | Built, except export |
+| 12 | [Links](#links) | Built |
+| 13 | [Routines](#routines) | Designed, not built |
+| 14 | [Environment variables](#environment-variables) | Built |
+| 15 | [Continuity](#continuity) | Designed, not built |
+| 16 | [Client engagements](#client-engagements) | Designed, not built |
+| 17 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
+| 18 | [Privacy, erasure and compliance](#privacy-erasure-and-compliance) | Erasure and deletion built; the rest designed |
+| 19 | [Architecture](#architecture) | As built |
+| 20 | [Data model](#data-model) | As built |
+| 21 | [Hostile tests](#hostile-tests) | Built for what exists; the rest is the list to write |
+| 22 | [Build order](#build-order) | Current |
+| 23 | [Open decisions](#open-decisions) | Decided: 1 to 4; open: 5 and 6 |
+| 24 | [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later) | Reference |
+| 25 | [Out of scope](#out-of-scope) | Reference |
+
+Status is as of 2026-10-09. "Built" means shipped and tested; a section marked
+so can still carry a "what this doesn't settle" list.
 
 ## What changed from v2
 
@@ -184,13 +190,12 @@ When Andrés's Claude Code calls Reliquary, the session carries two
 identities: the agent and the person it acts for (an RFC 8693 `act` claim).
 RLS checks both.
 
-The agent gets the person's permissions **except** these, which need the
-person present in the web UI:
-
-- approving or rejecting proposals;
-- revealing a variable's value;
-- managing members, grants or emergency access;
-- deleting a vault or exporting it.
+The agent gets the person's permissions **except** the actions that are
+irreversible, grant trust or reveal a secret, which need the person present in
+the web UI. The list is kept in one place, [Agents and the
+ceiling](public/concepts/agents.md#the-ceiling). The first four were
+approving or rejecting proposals, revealing a variable's value, managing
+members, grants or emergency access, and deleting a vault or exporting it.
 
 **Why the ceiling:** an agent reads text other people wrote. Prompt
 injection turns any permission the agent holds into a permission the
@@ -222,7 +227,8 @@ under 6 ms at 200k rows.
 
 ## Access surfaces
 
-- **Remote MCP.** One URL per vault, with OAuth 2.1 as the MCP authorization
+- **Remote MCP.** One URL for every vault (`/mcp`, with the vault an argument
+  to each tool), with OAuth 2.1 as the MCP authorization
   spec (2026-07-28) requires: protected resource metadata, audience-bound
   tokens, no token passthrough. It works with ChatGPT connectors, Claude
   (Code, desktop, web), Cursor, Hermes and anything else that speaks remote
@@ -253,14 +259,20 @@ under 6 ms at 200k rows.
 | `list_variables` | Variable names and which environments they are in. **Never values** |
 | `<link>.<tool>` | Each granted link's tools, proxied (see [Links](#links)) |
 
+This table is the original sketch. The tools that exist are the contract in
+`mcp/test/contract.snapshot.json`, published as
+`docs/public/reference/mcp-tools.md`; `list_routines` and `routine_runs`
+are not built.
+
 No MCP tool returns a variable's value or a link's credential, on any
 scope.
 
 ### Who each surface is for
 
-Settled 2026-10-02 (owner's decision); the web UI does not do it yet. On
-that date a vault's sidebar lists Activity, Flags and Claims right after
-Proposals.
+Settled 2026-10-02 (owner's decision), built 2026-10-03 (#120 to #125): a
+vault's sidebar leads with what a person reads or acts on, and Flags and
+Claims sit under Diagnostics. Until then it listed Activity, Flags and
+Claims right after Proposals.
 
 A vault has two audiences, and the web UI keeps them apart:
 
@@ -298,16 +310,19 @@ What follows from it:
 - **Files** are markdown at a path, with optional tags. Folders exist as
   path prefixes, with a policy record where one is set.
 - **Policy is inherited:** a file's own setting wins, then the nearest
-  folder's, then the vault default (`open` for a one-person vault, `canon`
-  for a shared one). Changing a policy is itself a logged event.
+  folder's, then the vault default (`open` unless the person chose
+  `canon` when making the vault or later in Settings). Changing a policy
+  is itself a logged event.
 - **Moving an open file into canon** (for example, promoting a chat remark)
   is a proposal.
-- **Every change is logged with its content diff.** That is enough to
-  rebuild any past version. A version-history view and restore are a
-  stretch goal on top of the log, not new storage.
-- **The feed** has one call, `changes_since(vault, cursor)`, the same over
-  MCP, REST and CLI. Deletions and retractions appear as events, never as
-  gaps.
+- **Every version is kept, and every change is logged.** `file_versions`
+  stores each version's full text; the log records the change and the version
+  it made, and a diff is computed when it is shown. A restore action is
+  not built.
+- **The feed** has one call, `changes_since(vault, cursor)`, over MCP; the web
+  app's Changes and Log read the same events. A REST feed and a CLI `feed`
+  command are not built. Deletions and retractions appear as events, never
+  as gaps.
 - **File text is data.** Every surface wraps it as quoted content with its
   policy, author and date. Proposals that address an AI system are flagged in
   review.
@@ -315,8 +330,9 @@ What follows from it:
 ## Path ownership
 
 Written 2026-09-28, an addendum settled the way [Links](#links)'s was,
-before any of it is built. A folder or file can name specific people as
-its owners, narrowing `policy_for` from a fixed per-path setting to one
+before it was built, and built the same day
+(`20260928130000_path_ownership.sql`, [progress.md](progress.md)). A folder
+or file can name specific people as its owners, narrowing `policy_for` from a fixed per-path setting to one
 that depends on who's asking:
 
 - **For a path's named owners**, the path is **open**: they, and their
@@ -365,31 +381,29 @@ approval still counts only as a UI click; agents never count.
   waiting period unless declined, and it is logged, per
   [Continuity](#continuity). No dedicated override path exists yet.
 
-### Data model sketch
+### Data model, as built
 
-Not yet built; nothing below is schema or code:
-
-- `public.path_owners(path_policy_id, user_id, added_by, added_at)`, one
-  row per (path rule, owner), referencing `public.path_policies`.
-- `policy_for` grows an `actor` parameter (today it takes only vault and
-  path) and an `is_owner` output, alongside the existing policy and
-  quorum: called from `write_file`, `propose`, and everywhere else a
-  caller needs to know whether *this* actor may write directly.
+- `public.path_owners(vault_id, path, user_id, added_by, added_at)`, one row
+  per (path rule, owner), keyed on the first three and referencing
+  `public.path_policies (vault_id, path)`: a path needs a rule before it
+  can have an owner.
+- `private.policy_for(vault, path)` keeps its signature (policy and quorum)
+  and reads the caller: a named owner gets `open`, everyone else the rule.
+  `private.can_write_path(vault, path)` is `can_write(vault)` plus the
+  path's named owners, and replaces `can_write` in `write_file`,
+  `delete_file` and `decide`.
 - `decide()`'s quorum count is filtered to the owner list only when a
-  path has one: `and (no owners set for this path or approver is one of
-  them)`.
-- Granting and revoking ownership: an owner-only function
-  (`set_path_owner` / `remove_path_owner`), in person
-  (`require_human`), confirmed in the UI as above, logged.
+  path has one.
+- Granting and revoking ownership: `set_path_owner` and
+  `remove_path_owner`, owners only, in person (`require_human`), logged as
+  `path_owner.add` and `path_owner.remove`.
 
 ### Open questions this doesn't resolve
 
-- Whether an owner list attaches to a `path_policies` row (ownership
-  always implies a rule exists) or can exist with an implied default
-  policy.
-- Whether removing someone from a path's owner list is itself
-  owner-list-gated (only existing owners remove each other) or
-  vault-owner-only, matching who sets the rule today.
+- ~~Whether an owner list attaches to a `path_policies` row.~~ It does:
+  naming an owner needs a rule on the path first.
+- ~~Whether removing someone from a path's owner list is itself
+  owner-list-gated.~~ It is vault-owner-only, matching who sets the rule.
 - How the web UI surfaces "you're an owner of this path" distinctly from
   "you're a vault editor", so nobody mistakes narrower-than-they-think
   access for broader, or the reverse.
@@ -397,8 +411,9 @@ Not yet built; nothing below is schema or code:
 ## Notifications
 
 Written 2026-09-28, alongside [Path ownership](#path-ownership) above,
-same status: settled shape, nothing built. Agents connect over MCP, which
-is request/response with no push, so "notified" means **flagged on the
+settled the same way. Built since: watching, flags and the MCP hint (below);
+not built: addressed notes, working-set staleness and nudges. Agents connect
+over MCP, which is request/response with no push, so "notified" means **flagged on the
 agent's next tool call**, whatever call that happens to be. The web app
 already computes most of this for people, in `shell_summary` (the
 Inbox's data source): proposals waiting on your review, your own
@@ -471,7 +486,7 @@ you"). Not settled if a better word turns up before this is built.
   distinguishes a connection from the person, and a deleted connection
   takes its watermark with it (`unique nulls not distinct (user_id,
   vault_id, token_id)`) rather than leaving an orphaned `identity_id`.
-- `public.list_flags(vault, limit)` (SQL-callable, not yet an MCP tool)
+- `public.list_flags(vault, limit)` (also the `list_flags` MCP tool)
   returns categories 2 (your own proposals, and one whose base file
   changed under it), 3 (`shell_summary`'s review set, reused rather than
   redefined) and 4 (watched paths), oldest first, and never moves the
@@ -527,12 +542,10 @@ an idle agent: MCP has no push, so an agent learns on its next call.
 
 Written 2026-09-30, settling CL-0.2 of the claims, waiting and work
 plans effort (tracking issue #52; the exception is logged in
-[AGENTS.md](../AGENTS.md#build-order) and [progress.md](progress.md)).
-Settled shape, nothing built: phase 1 (compare-and-swap writes) already
-shipped ahead of this section; phases 2 (claims) and 3 (work plans)
-start when the maintainer decides to, informed by real use, not a
-calendar. Validated first in a throwaway PostgreSQL 16 model, not
-Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
+[progress.md](progress.md#decisions)). Built as of 2026-10-09: phase 1 (compare-and-swap writes), phase 2 (claims)
+and phase 3 (work plans), apart from waiting in line (item 11, CL-3.9, #74);
+[progress.md](progress.md) has what shipped. Validated first in a throwaway
+PostgreSQL 16 model, not Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
 Twelve points, each with the reason it was decided that way.
 
 ### 1. Names
@@ -791,18 +804,16 @@ agents and across 5,000 simulated vaults.
 - **Busywork that looks like progress.** A check-in can't be told apart
   from real work; `max_hold` bounds how long that can go on, but nothing
   here detects it.
-- **Item 8's unset limits**, until the maintainer settles them.
 
-**Accept:** every item above has a decision and a reason, except item
-8's remaining limit categories, marked open with an owner (the
-maintainer, via a comment on #58) rather than guessed.
+**Accept:** every item above has a decision and a reason. Item 8's limits
+were confirmed on 2026-10-02.
 
 ## Threads
 
-Written 2026-10-02 (owner's decision). Settled shape. The database side is
-written in #126 and the points below follow it; the MCP tools and the web
-page are not built. A thread is where people and their agents talk about
-the work. A vault had no such place: a proposal's comments exist only on that proposal,
+Written 2026-10-02 (owner's decision), built 2026-10-03: the database (#126),
+flags for messages (#127), the web page (#128) and the MCP tools (#129).
+Not built: threads in a vault's export. A thread is where people and their
+agents talk about the work. A vault had no such place: a proposal's comments exist only on that proposal,
 and notes addressed `to:` someone are not built
 ([Notifications](#notifications)). Ten points, each with the reason it was
 decided that way. "Task" below is a work plan's step as people see it
@@ -1052,8 +1063,8 @@ reaching Reliquary.)
 
 ### Implementation plan (schema and discovery)
 
-Written 2026-09-28, before milestone 3 starts (build order still applies:
-milestone 2 needs its week of real use first). Renamed the entity to
+Written 2026-09-28, before milestone 3 started (milestone 2's week of real
+use had not finished); built since. Renamed the entity to
 **link** on 2026-09-28, before any of this was built: "connection" was
 already taken (the Connections page, [agent connection](#concepts) above),
 and the two meant opposite directions (a client reaching Reliquary, versus
@@ -1108,12 +1119,13 @@ proxied calls in `mcp/` at call time.
 
 Open questions this doesn't resolve:
 
-- Whether discovery runs synchronously in the "add link" request (the
-  upstream might be slow or unreachable) or as a background job with a
-  `pending` state in the UI meanwhile.
-- Whether an upstream's own `readOnlyHint: true` is trustworthy enough to
-  default that tool on, or whether every newly discovered tool starts
-  disabled regardless of what the upstream claims about itself.
+- ~~Whether discovery runs synchronously or as a background job.~~
+  Synchronous, in the "add link" request; a slow or unreachable upstream
+  warns and keeps the link ([progress.md](progress.md), Milestone 3).
+- ~~Whether an upstream's own `readOnlyHint: true` is trustworthy enough to
+  default a tool on.~~ `is_write` comes from `readOnlyHint` alone, and
+  anything but an explicit yes is a write tool; read tools default on for
+  editors and owners, write tools stay off until an owner turns them on.
 - Key rotation for `link_secrets`: answered (2026-10-09), it reuses
   `VARIABLES_KEYS`'s rotation as it stands
   (`20261009120040_link_secrets_rotation.sql`: `rotate-variables-key.sh`
@@ -1410,51 +1422,78 @@ meantime inherit the sub-processors' own SOC 2 reports.
 
 ## Architecture
 
-- **Supabase:**
-  - Postgres with RLS for every rule;
-  - Auth for accounts;
-  - the web app encrypts variables (docs/variables.md);
-  - `pg_cron`, `pgmq` and `pg_net` for routines and notifications;
-  - Edge Functions as the routine runtime.
-- **Next.js:** web UI, the remote MCP endpoint, REST, and OAuth
-  authorization-server duties (unless Supabase Auth covers the MCP spec's
-  needs; decide in milestone 1).
-- **CLI:** a small binary (`reliquary`), for env and feed.
-- **No customer-side infrastructure.** Self-hosting is the same stack on a
-  customer's own Supabase.
-- **Multi-tenant** hosted instance: vaults are the tenancy boundary, and RLS
-  enforces it.
+As built, 2026-10-09. Two small TypeScript servers over one Postgres; no
+framework.
+
+- **Postgres 17** holds every rule as RLS or a trigger, and every mutation
+  as a `security definer` function with a pinned `search_path`. The web
+  app, the MCP server and the operator connect as separate roles
+  (`reliquary_web`, `reliquary_mcp`, `reliquary_ops`). `pg_cron` runs
+  housekeeping where it is installed (pruning, expired imports, a storage
+  drift check). Hosted on Supabase; self-hosted as plain Postgres in
+  `deploy/compose`.
+- **Auth** is Supabase Auth (email sign-in codes; the web app verifies its
+  JWTs against the project's JWKS). The web app is also the OAuth
+  authorization server for MCP clients and the CLI (`web/src/oauth.ts`):
+  Supabase's OAuth server can't bind tokens to the MCP resource
+  (docs/research/hosting.md).
+- **`web/`** is a Node `http` server: the server-rendered UI with no
+  client-side script, the OAuth server, the environment API
+  (`web/src/envapi.ts`) and an internal endpoint for link calls. It alone
+  holds `VARIABLES_KEYS` and encrypts variable values and link credentials
+  (AES-256-GCM, `web/src/secrets.ts`; docs/variables.md).
+- **`mcp/`** is a separate Node `http` server using the MCP SDK: the
+  stateless remote endpoint at `/mcp`. It refuses to start with the
+  variables key, so it can never decrypt anything; link calls go through
+  the web app's internal endpoint with a shared secret.
+- **`cli/`** is the `reliquary` binary (Node, no runtime dependencies).
+- **Hosting:** two Vercel projects (`web`, `mcp`) and a Supabase project, or
+  `deploy/compose` for self-hosting. No customer-side infrastructure.
+- **Multi-tenant:** vaults are the tenancy boundary, and RLS enforces it.
+- **Not built, and not in use anywhere:** `pgmq`, `pg_net`, Edge Functions
+  and Supabase Vault. They belonged to the routines design (Routines,
+  above) and to the first secret-store recommendation; routines are
+  unbuilt, and variables use the web app's own keys instead.
 
 ## Data model
 
-Carried from the spike and CommonThread, renamed where needed:
+As built, 2026-10-09; the migrations in `supabase/migrations/` are the
+schema. Names in `public` are readable through RLS; `private` holds
+ciphertext, counters and operator-only state, and is closed to the signed-in
+API role.
 
-- `accounts`, `vaults`, `vault_members(role)`, `emergency_access`.
-- `agent_connections` (OAuth clients a member authorised: client name,
-  scopes, revoked_at).
-- `service_agents`, `service_agent_grants`.
-- `sessions` (minted: vault, acting member or service agent, agent identity,
-  audience, expiry).
-- `files(path, body_encrypted, key_id, tags, audience, author,
-  updated_at)`, `folder_policies(prefix, policy, quorum, expires_after)`,
-  `proposals`, `approvals`.
-- `links(name, url, credential_secret_id, tool_allowlist)`,
-  `link_grants(role or member, tools)`, `link_calls` (append-only
-  log).
-- `log(seq bigint identity, vault_id, event, actor, agent, origin, at)`:
-  append-only, the feed.
-- `routines(config jsonb, enabled, owner)`, `routine_runs` (append-only
-  history).
-- `environments`, `variables(name, vault_secret_id, environments[])`,
-  `variable_grants`, `env_access_log` (append-only).
-- `git_mirrors(remote, direction, last_pushed_seq)`.
-- Plans and limits (built, `20260925230000_plans.sql`): `plans` (vaults per
-  account, people and storage per vault), `vault_tiers` (a per-vault
-  override, `standard` meaning the plan's), `account_plans`,
-  `vault_tier_overrides`, and `vault_storage` (bytes per vault, kept by
-  triggers: every file version, variable ciphertext and waiting import).
-  Only the operator changes them; a smaller plan never deletes, it makes an
-  over-limit vault read-mostly.
+- **Vaults and people.** `vaults`, `vault_members(role)`, `profiles`,
+  `access_tokens` (personal tokens, OAuth grants and CLI grants, one row per
+  connection), `private.vault_invites`, `private.admissions`,
+  `private.deleted_accounts`, `private.vault_deletions` (the record
+  `delete_vault` leaves).
+- **Files and review.** `files`, `file_versions` (the full text of every
+  version), `path_policies(path, policy, quorum)`, `path_owners`,
+  `proposals`, `approvals`, `proposal_notes`, `review_snoozes`, and
+  `log(seq, vault_id, at, actor, agent, event, path, version_id,
+  proposal_id, detail)`: append-only, the feed.
+- **Coordination.** `path_claims`, `claim_rules`, `work_plans`,
+  `work_plan_steps`, `work_plan_step_blockers`, `work_plan_step_cites`,
+  `threads`, `thread_addressees`, `thread_messages`, `subscriptions`,
+  `flag_watermarks`.
+- **Variables.** `environments`, `variables`, `variable_values`,
+  `private.variable_secrets` (ciphertext), `env_imports`,
+  `private.env_import_secrets`, `env_access_log` (append-only).
+- **Links.** `links`, `link_tools`, `link_grants`, `private.link_secrets`
+  (ciphertext), `link_calls` (append-only, outlives a deleted link).
+- **Plans and limits** (`20260925230000_plans.sql`): `private.plans`,
+  `private.vault_tiers`, `private.account_plans`,
+  `private.vault_tier_overrides` and `private.vault_storage` (bytes per
+  vault, kept by triggers: every file version, variable ciphertext and
+  waiting import). Only the operator changes them; a smaller plan never
+  deletes, it makes an over-limit vault read-mostly.
+- **Operations.** `feedback`, `welcome_seen`, `private.rate_limits` (counters
+  under a keyed hash), `private.vault_exports`, `private.oauth_codes`,
+  `private.oauth_tokens`, `private.session_cutoffs`, `private.settings`.
+- **Designed, not built:** `routines` and `routine_runs`, service agents and
+  their grants, `emergency_access`, `git_mirrors`, per-member
+  `variable_grants`, and sessions minted for headless agents
+  (`spikes/gate/`).
 
 ## Hostile tests
 
@@ -1544,8 +1583,8 @@ for](#who-each-surface-is-for)) and the Tasks view with its MCP step tools
 aren't a numbered milestone either. They start now, on the owner's
 decision of 2026-10-02: a deliberate, logged exception to working on one
 milestone at a time ([AGENTS.md](../AGENTS.md#build-order),
-[progress.md](progress.md)). The design for Threads is written before any
-of it is built, as the claims section was.
+[progress.md](progress.md#decisions)). Their designs were written before
+they were built, as the claims section was.
 
 ## Open decisions
 
@@ -1555,12 +1594,14 @@ of it is built, as the claims section was.
    encryption layer is the **secret store**, and a **link** is an
    upstream MCP (renamed 2026-09-28 from "connection", which the Connections
    page already meant).
-3. **OAuth authorization server:** Supabase Auth, if it meets the MCP spec
-   (resource indicators, client ID metadata documents); otherwise a small
-   one in Next.js. Decide in milestone 1.
-4. **Variable storage:** Supabase Vault (simplest, operator can decrypt) or
-   Infisical as a backend (more mature, another service).
-   *Recommendation:* Supabase Vault for milestone 3, behind an interface.
+3. ~~OAuth authorization server.~~ Decided in milestone 1: a small one in the
+   web app (`web/src/oauth.ts`), because Supabase's OAuth server can't bind
+   tokens to the MCP resource (docs/research/hosting.md). Supabase Auth signs
+   people in.
+4. ~~Variable storage.~~ Decided in milestone 2: the web app encrypts values
+   with AES-256-GCM under its own keys (`VARIABLES_KEYS`) and Postgres holds
+   only ciphertext; neither Supabase Vault nor Infisical is used. The operator
+   can still decrypt, as docs/variables.md says.
 5. **Hosting model:** multi-tenant, or an instance per customer? v2 left
    this to later. v3 assumes multi-tenant with a self-host path.
 6. **Name**, checked 2026-09-24, and to finish before any client material:
@@ -1587,8 +1628,8 @@ says it's time:
 | Routines | One model call, Edge Function time limits | Multi-step agent work, long runs | A worker queue, or Managed Agents, per vault |
 | Links | Shared credentials, remote MCP only | People want their own Gmail or calendar, or local tools | Per-member upstream OAuth; a small local relay for stdio servers |
 | Link proxy | Synchronous pass-through | Long or streaming tool calls | Streaming proxy with its own timeouts |
-| Secret store | Supabase Vault, operator can decrypt | A client needs zero-knowledge | Client-side encryption with per-member keys |
-| Version history | Rebuilt from the log's diffs | History views get slow | Periodic snapshots |
+| Secret store | App-held keys (AES-256-GCM), operator can decrypt | A client needs zero-knowledge | Client-side encryption with per-member keys |
+| Version history | Every version stored in full | Storage per vault gets large | Compress or snapshot old versions |
 | Multi-tenant | One Supabase project | Noisy neighbours, data residency asks | Per-region or per-customer projects |
 | Compliance | Designed-in controls, no audit | A client requires a SOC 2 report | Compliance platform plus auditor |
 

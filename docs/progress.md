@@ -9,6 +9,18 @@ page is the "done so far" detail behind whichever milestone
 Written as work lands. Read the section for the milestone you're touching,
 not the whole file top to bottom.
 
+## Contents
+
+- [Decisions](#decisions): the owner's calls on building ahead of the current milestone.
+- [Milestone 1: core, MCP and UI](#milestone-1-core-mcp-and-ui): done 2026-09-29, frozen.
+- [Milestone 2: environment variables](#milestone-2-environment-variables): done 2026-09-29, frozen.
+- [Milestone 3: links](#milestone-3-links): current.
+- [Path ownership](#alongside-milestone-3-path-ownership), alongside milestone 3: built.
+- [Flags](#alongside-milestone-3-flags), alongside milestone 3: built, except addressed notes.
+- [Docs, plans, limits, admission, concurrency](#also-alongside-docs-plans-limits-admission-concurrency): built.
+- [Compare-and-swap writes, claims and work plans](#alongside-milestone-3-compare-and-swap-writes-claims-and-work-plans): built, except waiting in line.
+- [Threads, the audience split and the Tasks view](#alongside-milestone-3-threads-the-audience-split-and-the-tasks-view): built, except threads in the export.
+
 ## Decisions
 
 The owner's calls on building ahead of the current milestone, newest last.
@@ -195,7 +207,7 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   and `web/test/discovery.test.mjs`, wiring in
   `web/test/links_page.test.mjs`): design.md's first open question
   (synchronous or a background job) answered synchronous, in the same
-  request as `create_link` — a slow or unreachable upstream flashes a
+  request as `create_link`: a slow or unreachable upstream flashes a
   warning naming why, with a reference in the server log, and keeps the
   link; there is no rediscovery yet, so retrying today means deleting and
   re-adding the link. The MCP handshake (`initialize`, `initialized`,
@@ -233,7 +245,7 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   (`linkcall.ts`, `discovery.ts`'s own safe-HTTP machinery, re-checking
   the address on every call, not just when the link was added).
   `private.list_callable_link_tools()` is what builds each identity's
-  `<link>.<tool>` entries in `tools/list` — the exact criteria
+  `<link>.<tool>` entries in `tools/list`, the exact criteria
   `begin_link_call` checks, so a tool is only ever listed if calling it
   would succeed; `tools/list` is no longer cached process-wide (it was,
   identity-independent) now that this makes it identity-dependent. An
@@ -268,14 +280,14 @@ re-adding the link).
 
 Not a numbered milestone of its own (design.md's "Path ownership", owner's
 decision 2026-09-28). Built in `20260928130000_path_ownership.sql`, with
-hostile tests (`supabase/tests/path_ownership_test.sql`) — a path's named
+hostile tests (`supabase/tests/path_ownership_test.sql`): a path's named
 owners write, delete and decide on it directly, whatever their vault role (a
 viewer may be named), and only their approvals count toward its quorum; a
 path with no named owner is provably unchanged (the same suite re-runs
 every existing canon/open hostile test, all still passing). This touched
 `policy_for`, `write_file`, `delete_file` and `decide()`, functions every
 other feature depends on, more than the schema-only shape of most
-milestone work — treat any further change to those four with the same
+milestone work, so treat any further change to those four with the same
 care. Deliberately not touched: `propose`, `revise_proposal`,
 `edit_and_approve`, `comment_on_proposal` (a path-owning viewer proposes
 nothing since they write directly, and can still approve or reject with
@@ -304,7 +316,7 @@ the new hostile tests failing, restored (`supabase/tests/path_ownership_test.sql
 Separately, and the bigger half of this fix: the file, editor and proposal
 pages themselves still went by vault role (`canWrite()`) alone, not
 ownership, for *showing* their Edit, Approve/Reject, Edit-and-approve and
-Comment controls — so even after `decide()` was fixed, a named owner who
+Comment controls, so even after `decide()` was fixed, a named owner who
 was a plain viewer saw none of these in the web app, only their agent could
 act, over MCP. The same migration adds `private.writable_path()`, a
 client-callable read of `can_write_path`'s decision (mirroring how
@@ -325,7 +337,7 @@ Web tests: `web/test/path_owner_review_page.test.mjs`.
 Fixed in review before the web UI shipped, before any real traffic used it
 (`20260928170000_path_owner_connection_scope.sql`, F425):
 `can_write_path`/`policy_for`'s owner branch checked only a `path_owners`
-row, never `role_in()`'s token-scope check the way `can_write()` does — so
+row, never `role_in()`'s token-scope check the way `can_write()` does, so
 a named owner's read-only token, or a token scoped only to a different
 vault, could still write their path. `private.connection_write_capable()`
 now gates both; `decide()` was never exposed (`require_human()` refuses
@@ -354,7 +366,8 @@ and isn't part of its exit either. Done so far:
   (2026-09-28, `mcp/src/tools.ts`, hostile tests in
   `mcp/test/flags.test.mjs`): design.md's open question (ride in every
   response, or a tool of their own) answered in favour of a tool of their
-  own, `list_flags`, called on request rather than automatically. No tool
+  own, `list_flags`, called on request. (On 2026-10-03 a one-line hint was
+  added so an agent learns it has flags; see below.) No tool
   creates or removes a watch: that's still the person, in the web app,
   same as variables and rules;
 - watching in the web app (2026-09-28, `web/src/watching.ts`,
@@ -364,11 +377,17 @@ and isn't part of its exit either. Done so far:
   (`/v/:id/config/watching`), listing the person's own watches with a
   form to watch a typed path. Any member, a viewer too; not owner-gated.
 - a Flags page for the person (2026-09-29, `web/src/flagspage.ts`,
-  `/v/:id/flags`, its own nav section; `web/test/flags_page.test.mjs`):
+  `/v/:id/flags`, since 2026-10-03 under Diagnostics; `web/test/flags_page.test.mjs`):
   `list_flags`, oldest first, badged by category, each linked to its
   proposal or file; opening the page calls `advance_flags` for the
   person's own watermark only, same contract as an MCP client's ("shown
   in a response, not on request"), never a connection's.
+- the hint (2026-10-03, #130, `20261009100000_flags_waiting.sql`,
+  `mcp/src/tools-shared.ts`): a successful call that names a vault ends with
+  one fixed line giving the count when flags wait for that connection, and
+  the server's instructions tell the agent to call `list_flags`, show its
+  person and call `advance_flags`. Thread messages are flagged too (#127,
+  `20261005100000_thread_flags.sql`).
 
 Not built: category 1, notes addressed `to:` someone (design.md doesn't say
 how `to:` is stored); staleness for files you've read (nothing logs a read);
@@ -469,7 +488,7 @@ start the next one.
   (Hackathon, Team, Org) and a control on the Rules page
   (`web/src/claimrulespage.ts`); with no rule, a claim still behaves
   exactly as phase 2 shipped it (48 hour lease, 7 day hold limit, 1
-  claim per connection, 5 per person) --- those were always this phase's
+  claim per connection, 5 per person); those were always this phase's
   defaults, now overridable rather than fixed. Stores five columns phase
   3 will need (place in line, check-again hint, minimum gap, free
   lapses, cooldown cap) that nothing reads yet.
@@ -570,22 +589,26 @@ requests. Each pull request that builds a part adds its own line here.
   never who can read, messages are data under the same ceiling, delivery
   to agents by flags only (no push, no real time), redaction by an owner in
   person, limits, and a place in the export. Settled in docs/design.md
-  ("Threads"), with what it leaves open listed there. The database side
-  is #126; the MCP tools and the web page come after it.
+  ("Threads"), with what it leaves open listed there. Built 2026-10-03: the
+  database (#126, `20261004100000_threads.sql` to
+  `20261005100000_thread_flags.sql`), flags for messages (#127), the web page
+  (#128, `web/src/threadspage.ts` with `threadnew.ts`, `threadview.ts` and
+  `threadredact.ts`) and the MCP tools (#129, `mcp/src/thread-tools.ts`).
+  Not built: threads in a vault's export.
 - **The Tasks view and the MCP step tools.** A page where a person sees and
   steers the steps agents are working, shown as tasks, and MCP tools over
   the step functions the database already has (`register_work_plan`,
   `work_plan_status`, `claim_step`, `checkin_step`, `complete_step` and
   `release_step`; `cancel_step` and `skip_step` stay a person's). The
-  database has no reopen, though #76's text lists one.
+  database has no reopen, though #76's text lists one. Built 2026-10-03: the
+  Tasks page (#122, `web/src/tasks.ts`), the MCP tools (#124,
+  `mcp/src/workplan-tools.ts`, with `checkin_step`, #115) and the audience
+  split (Diagnostics #121, the Changes feed #123 and its filter #125, the
+  claim banner on a file's page #120: `web/src/diagnostics.ts`,
+  `changes.ts`, `claimbanner.ts`).
 
-Proposed, not yet confirmed by the owner (the owner confirmed Tasks and
-Threads on 2026-10-02, not this re-sequencing): the Tasks view and the
-step tools start ahead of CL-3.9 (#74, waiting and places in line). Issues
-#75 (CL-3.4, MCP tools) and #76 (CL-3.5, web page) list #74 as a blocker,
-and the phase 3 entry above says the same of CL-3.4, so this reverses the
-order they state, on purpose: a person needs to see and steer tasks
-before the queueing machinery matters. Anything that needs CL-3.9 is left
-out of both until it lands: `request_work`, `leave_queue`, places in line
-and who is waiting. Keep this paragraph, or strike it, when the pull
-request that carries it is reviewed.
+The Tasks view and the step tools shipped ahead of CL-3.9 (#74, waiting and
+places in line), which issues #75 and #76 list as a blocker. The decision
+log recorded that re-sequencing as proposed, and no later confirmation is
+recorded. Anything that needs CL-3.9 (`request_work`, `leave_queue`,
+places in line, who is waiting) is still left out of both.
