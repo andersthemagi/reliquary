@@ -11,8 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: test-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push cancels the older run of the same branch or pull request,
+  # except on main: the guard job compares only the commits of its own push,
+  # so a run cancelled there leaves its commits unchecked for good. The
+  # run id gives every push to main a group of its own.
+  group: test-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   guard:

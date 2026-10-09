@@ -12,8 +12,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: security-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push cancels the older run of the same branch or pull request,
+  # except on main: the secret scan covers only the commits of its own push,
+  # so a run cancelled there leaves its commits unchecked for good. The
+  # run id gives every push to main a group of its own.
+  group: security-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   secrets:
