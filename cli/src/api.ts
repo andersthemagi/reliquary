@@ -152,7 +152,11 @@ function pushFail(status: number, body: unknown, what: string): never {
   }
   if (status === 403) throw new CliError(`Your role can't set values in ${what}.${serverSays(body)}`);
   if (status === 413) throw new CliError(`That's too much to send at once (the limit is 1 MiB). Split the file.${serverSays(body)}`);
-  if (status === 429) throw new CliError(`Too many pushes are waiting for approval in this vault. Apply or reject some on the Variables page; the limit counts the last hour.${serverSays(body)}`);
+  // Not the rate limit (that one is told in request(): wait). Waiting doesn't
+  // clear this; deciding the pushes does.
+  if (status === 429 && code === "too_many_pending") {
+    throw new CliError(`You already have as many pushes waiting for approval in this vault as it allows. Waiting won't clear that: apply or reject some on the vault's Variables page, then push again.${serverSays(body)}`);
+  }
   if (status === 400) throw new CliError(`The server refused the file's contents (a name or a value it doesn't take). Nothing was sent for approval.${serverSays(body)}`);
   fail(status, body, what, "Sending values to");
 }

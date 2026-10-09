@@ -317,6 +317,36 @@ select t.expect('rate: a pending import past its time no longer counts, even bef
   || ',' || t.q($s$select status from public.env_imports where vault_id = t.id('rate') and names = '{P_1}'$s$),
   'moved,ok,pending');
 
+-- Which limit it was (20260925130000's two limits behind one rate_limited).
+create function t.limit(p_vault text) returns text language sql as
+$$ select format($q$select coalesce(public.env_import_limit(%L), 'none')$q$, t.id(p_vault)) $$;
+select t.expect('limit: at 19 pending in a vault there is no limit, and the precheck agrees',
+  t.run('ana', t.limit('rate')) || ',' || t.err(t.run('ana', t.precheck('rate'))),
+  'none,ok');
+insert into public.env_imports (vault_id, environments, names, source, created_by, expires_at)
+values (t.id('rate'), '{development}', '{LIM_1}', 'web', t.id('ana'), now() + interval '1 hour');
+select t.expect('limit: at 20 pending in a vault it is the pending cap, and the precheck agrees',
+  t.run('ana', t.limit('rate')) || ',' || t.err(t.run('ana', t.precheck('rate'))),
+  'pending,rate_limited');
+select t.expect('limit: only the caller''s own imports count, and another vault of theirs has none',
+  t.run('ben', t.limit('rate')) || ',' || t.run('ana', t.limit('side')),
+  'none,none');
+insert into public.env_imports (vault_id, environments, names, source, created_by, expires_at, status, decided_by, decided_at)
+select t.id('side'), '{development}', array['LIM_H' || g], 'web', t.id('ben'), now() + interval '1 hour', 'rejected', t.id('ben'), now()
+  from generate_series(1, 59) g;
+select t.expect('limit: at 59 imports in an hour there is no limit, at 60 it is the hourly count, and the precheck agrees',
+  t.run('ben', t.limit('rate')) || ',' || t.err(t.run('ben', t.precheck('rate')))
+  || ',' || t.q($s$insert into public.env_imports (vault_id, environments, names, source, created_by, expires_at, status, decided_by, decided_at)
+                   values (t.id('side'), '{development}', '{LIM_H60}', 'web', t.id('ben'), now() + interval '1 hour', 'rejected', t.id('ben'), now())
+                   returning 'sixty'$s$)
+  || ',' || t.run('ben', t.limit('rate')) || ',' || t.err(t.run('ben', t.precheck('rate'))),
+  'none,ok,sixty,hourly,rate_limited');
+select t.expect('limit: the pending cap is named before the hourly count, and neither is visible to anonymous or to a request with no person',
+  t.run('ana', t.limit('rate')) || ',' || t.run(null, t.limit('rate'))
+  || ',' || t.run_claims('{"role": "authenticated"}', t.limit('rate')),
+  'pending,ERR 42501,none');
+delete from public.env_imports where names::text like '{LIM%';
+
 -- Cleanup
 create function t.secret_for(p_import uuid) returns void language sql as $$
   insert into private.env_import_secrets (import_id, name, environment, key_id, nonce, ciphertext)

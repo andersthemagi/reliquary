@@ -198,6 +198,45 @@ test("push: an editor can't send production values; the CLI says so and sends no
   assert.equal((await as(null, "select count(*)::int as n from public.env_imports where vault_id = $1", [dans]))[0].n, before);
 });
 
+test("push: at 20 pushes waiting in a vault the next is refused as too_many_pending, told as 'apply or reject some' not 'wait', and deciding one frees a slot", async () => {
+  const [{ id: cap }] = await as(CARA, "select public.create_vault('Push Cap') as id");
+  // Its own sign-in: 45 requests in under a minute are most of the env API's 60 a minute per sign-in.
+  const capper = tmp("capper");
+  assert.equal((await login(capper, { push: true })).code, 0);
+  const urls = [];
+  for (let i = 0; i < 20; i++) {
+    const { file } = envFile([`CAP_${i}=${value(`cap${i}`)}`]);
+    const r = await cli(["env", "push", "--vault", cap, "--file", file], { config: capper });
+    assert.equal(r.code, 0, `push ${i + 1}: ${r.stderr}`);
+    urls.push(urlOf(r.stdout).url);
+  }
+  // The env API's own answer: not the rate limit, so no Retry-After.
+  const { accessToken } = JSON.parse(readFileSync(path.join(capper, "credentials.json"), "utf8")).servers[WEB];
+  const raw = await fetch(`${WEB}/api/env/${cap}/development/imports`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ variables: { OVER: value("over") } }),
+  });
+  assert.equal(raw.status, 429);
+  assert.equal(raw.headers.get("retry-after"), null, "waiting doesn't clear it");
+  const body = await raw.json();
+  assert.equal(body.error, "too_many_pending");
+  assert.match(body.message, /failed: You already have as many pushes waiting for approval in this vault as it allows\. Apply or reject some/);
+
+  const { file } = envFile([`OVER=${value("over2")}`]);
+  const refused = await cli(["env", "push", "--vault", cap, "--file", file], { config: capper });
+  assert.equal(refused.code, 1);
+  assert.match(refused.stderr, /You already have as many pushes waiting for approval in this vault as it allows\. Waiting won't clear that: apply or reject some on the vault's Variables page, then push again\./);
+  assert.match(refused.stderr, /The server says: .*You already have as many pushes waiting for approval in this vault as it allows\./);
+  assert.doesNotMatch(refused.stderr, /Too many requests|try again later/);
+  assert.equal(refused.stdout, "");
+  assertClean(refused.stdout, refused.stderr);
+
+  await decide(urls[0], "reject");
+  const again = await cli(["env", "push", "--vault", cap, "--file", file], { config: capper });
+  assert.equal(again.code, 0, again.stderr);
+});
+
 test("push: lines it can't take are named with their reasons and not sent; a file with nothing to send sends nothing", async () => {
   const { file } = envFile([`PATH=${value("path")}`, "just words", `GOOD=${value("good")}`, `B="never closed ${value("unclosed")}`]);
   const r = await cli(["env", "push", "--vault", team, "--file", file], { config: pusher });
