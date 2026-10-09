@@ -6,6 +6,49 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.16.0](https://github.com/andersthemagi/reliquary/compare/v0.15.0...v0.16.0) (2026-10-09)
+
+
+### Features
+
+* **web:** guide a new vault to its first connected agent ([#157](https://github.com/andersthemagi/reliquary/issues/157)) ([caf4408](https://github.com/andersthemagi/reliquary/commit/caf44081ad2c112da3cf3b3aac4756a3a39a19ae))
+* **web:** set a claim rule for the whole vault, on a claim rules page that explains itself ([#140](https://github.com/andersthemagi/reliquary/issues/140)) ([e07cae9](https://github.com/andersthemagi/reliquary/commit/e07cae951f6a7be445d77097bb8e073e28cff059))
+* **web:** set a variable in several environments at once ([#132](https://github.com/andersthemagi/reliquary/issues/132)) ([2126370](https://github.com/andersthemagi/reliquary/commit/2126370fc00d25cc0ab3c0b01b62df718a73d34a))
+
+
+### Bug fixes
+
+* **cli:** say a failed command's exit code is the command's, not Reliquary's ([#131](https://github.com/andersthemagi/reliquary/issues/131)) ([cdbd800](https://github.com/andersthemagi/reliquary/commit/cdbd800a1f44346ccf272b0f8bcf4b91b21ae05b))
+* **db:** a save made after someone deleted the file no longer brings it back ([#167](https://github.com/andersthemagi/reliquary/issues/167)) ([c6b9846](https://github.com/andersthemagi/reliquary/commit/c6b9846192e1fdda6e35e965d524d7f5fa3da036))
+* **mcp:** a failed link call tells the agent where it broke, with a reference, and never what the upstream said ([#166](https://github.com/andersthemagi/reliquary/issues/166)) ([cbea61e](https://github.com/andersthemagi/reliquary/commit/cbea61e6131a84374d8cbb0d997ae0e9200fbd1f))
+* **mcp:** annotate advance_flags as non-destructive and idempotent ([#134](https://github.com/andersthemagi/reliquary/issues/134)) ([9bf2e0a](https://github.com/andersthemagi/reliquary/commit/9bf2e0ac7692b258e7bbe77d3b833b3270f3ae2c))
+* **mcp:** tell agents an approved proposal can't be revised ([#133](https://github.com/andersthemagi/reliquary/issues/133)) ([47e32c1](https://github.com/andersthemagi/reliquary/commit/47e32c140140b1fc01657559ba3b1859aca09111))
+* **mcp:** two vaults' same-named link tools no longer hang every request, and upstream tool text is quoted ([#165](https://github.com/andersthemagi/reliquary/issues/165)) ([11e12cc](https://github.com/andersthemagi/reliquary/commit/11e12cce2690c2da5a99d02039822beaff6e4217))
+* **review:** an approval applies only the revision its reviewer read, and two at once can't both apply or deadlock ([#160](https://github.com/andersthemagi/reliquary/issues/160)) ([ed30a58](https://github.com/andersthemagi/reliquary/commit/ed30a58c0324977eedcb128bad9647a028093dff))
+* **variables:** key rotation re-encrypts link credentials too ([d695a27](https://github.com/andersthemagi/reliquary/commit/d695a27e88ba97c3b79311088059ffd58adbdf6f))
+* **web,mcp:** a cancelled export download or a dropped database connection no longer stops the server ([19fa99a](https://github.com/andersthemagi/reliquary/commit/19fa99a7b8e2e36d411006756c70e04c9938b72a))
+* **web,mcp:** an oversize request body is answered with its limit, and invite links opened together no longer stall ([c57dae1](https://github.com/andersthemagi/reliquary/commit/c57dae1eb53d64af951527989301720ce35ee527))
+* **web:** a refused save keeps you in the form you were in, on Links, Environments, Watching, tokens, vaults and account ([#146](https://github.com/andersthemagi/reliquary/issues/146)) ([7ed8f40](https://github.com/andersthemagi/reliquary/commit/7ed8f40a6a98bbab723a3d0e540cef1555c4df1e))
+* **web:** an applied proposal shows what it changed; warn before approving one whose file moved ([#148](https://github.com/andersthemagi/reliquary/issues/148)) ([aa665ab](https://github.com/andersthemagi/reliquary/commit/aa665abbe7a72c008a582003ea917323e05430d2))
+* **web:** don't preselect all vaults when connecting an AI ([#138](https://github.com/andersthemagi/reliquary/issues/138)) ([5e589ea](https://github.com/andersthemagi/reliquary/commit/5e589ea7305293b55b1dc2c556a726b9fa7fe736))
+* **web:** invite sign-in recognises an accented address however it is typed and says so when it can't look an invite up ([#164](https://github.com/andersthemagi/reliquary/issues/164)) ([f7908ff](https://github.com/andersthemagi/reliquary/commit/f7908ff444671eeac7fc4dcc75e73f44b79752e6))
+* **web:** menus on Rules, Links and Inbox rows open in full instead of a clipped sliver ([#139](https://github.com/andersthemagi/reliquary/issues/139)) ([45a05e6](https://github.com/andersthemagi/reliquary/commit/45a05e67a2c4e21608049ca3dbb54a6fa55f42fe))
+* **web:** no links to pages that 404, thread flags that say what they are, a rule that can never be approved says so ([#150](https://github.com/andersthemagi/reliquary/issues/150)) ([47190ad](https://github.com/andersthemagi/reliquary/commit/47190ad64637f3c4f31358d80db4fc6898201508))
+* **web:** phone table rows, a wrapping Links URL, no buttons that only scroll, a locked Change path ([#145](https://github.com/andersthemagi/reliquary/issues/145)) ([c5e4fc9](https://github.com/andersthemagi/reliquary/commit/c5e4fc928717bed69d8f9c2302541fa6ce10a961))
+* **web:** refused file and proposal forms keep what you typed; Create file never overwrites ([#147](https://github.com/andersthemagi/reliquary/issues/147)) ([74f7174](https://github.com/andersthemagi/reliquary/commit/74f7174f09b61f9b7d1fcabf9bc762b0afd57a2e))
+* **web:** renewing a session no longer signs people out when Supabase Auth is busy, and is limited per IP ([714c194](https://github.com/andersthemagi/reliquary/commit/714c19420e0b96639c74003ffb545ca66ac575bb))
+* **web:** template READMEs call variables examples and say what to do without npx ([#135](https://github.com/andersthemagi/reliquary/issues/135)) ([f05c39a](https://github.com/andersthemagi/reliquary/commit/f05c39a664ba7640a1fee847858ba716be8ed3d2))
+* **web:** the page that answers a refused save keeps the top bar's vault switcher and inbox ([#143](https://github.com/andersthemagi/reliquary/issues/143)) ([ace181f](https://github.com/andersthemagi/reliquary/commit/ace181fb5ae52fa55c6fe1eef52b94602892b06c))
+* **web:** variables keep multi-line values intact, ask before replacing one, and every refusal carries a reference ([#149](https://github.com/andersthemagi/reliquary/issues/149)) ([39d451e](https://github.com/andersthemagi/reliquary/commit/39d451ed1c2f95f9b7e7487007921fa7a4b5d149))
+* **web:** vault page copy says what is true: links are callable, no Rotate, no quorum, Erase file ([#144](https://github.com/andersthemagi/reliquary/issues/144)) ([f937baf](https://github.com/andersthemagi/reliquary/commit/f937bafe1ec355ec1c1b0841ad413dc5d68e0893))
+
+
+### Security
+
+* **links:** a link's url refuses a user name, password, query string or fragment ([#161](https://github.com/andersthemagi/reliquary/issues/161)) ([5518ce4](https://github.com/andersthemagi/reliquary/commit/5518ce465871cf892d6928479cc8f5fe929ca65c))
+* **web:** a refused client-metadata or link-discovery answer no longer holds its connection open ([06d56a3](https://github.com/andersthemagi/reliquary/commit/06d56a3086cb4b214614380493d8292e50c69548))
+* **web:** the Feedback popover no longer sends an invite link's token ([#141](https://github.com/andersthemagi/reliquary/issues/141)) ([9f89ed2](https://github.com/andersthemagi/reliquary/commit/9f89ed2b10dd079944e64bb869d261c43c44dd88))
+
 ## [0.15.0](https://github.com/andersthemagi/reliquary/compare/v0.14.0...v0.15.0) (2026-10-03)
 
 Vaults get threads, conversations between members and their agents, with a Threads page and four MCP tools, and work plans get a Tasks page and MCP tools to register a plan and work its steps. Changes replaces Activity in a vault's navigation as a plain-language feed, flags and claims move under Diagnostics, a file's page shows who is working on it, and agents are told when flags are waiting.
