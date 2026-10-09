@@ -16,6 +16,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Changes.** A vault's plain-language list of what people and their agents changed: files written, deleted and erased, and proposals opened and decided. Newest first, by day. See [Changes and the log](../concepts/activity.md#changes).
 
+**Claim.** A lease saying who is working on a path right now and for how long. A courtesy signal, never a lock: claiming a path doesn't stop anyone writing it. See [Claims](../concepts/claims.md).
+
 **Connection.** Anything that can act as you. It has a type: **Token**, **App** or **Reliquary CLI**. All are listed on the **Connections** page (the account menu), where you revoke them. See [Connections](../concepts/connections.md).
 
 **Data fencing.** Wrapping text people and agents wrote in random markers when it goes to an agent, so it reads as data and can't pose as instructions. See [MCP tools](mcp-tools.md#data-fencing).
@@ -32,7 +34,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Erase.** Blanking every version of a file's text, while the log keeps its entries. Owners only, in person. See [Export, delete and erase](../concepts/export-delete-erase.md#erase-a-file).
 
-**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. You see yours under **Settings**, **Diagnostics**, **Flags**. See [Flags](../concepts/flags.md).
+**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a new message in a thread for you, a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. You see yours under **Settings**, **Diagnostics**, **Flags**. See [Flags](../concepts/flags.md).
 
 **Import.** A whole `.env` brought in at once, pasted in the web app or sent from the CLI, waiting for a person to apply it. See [Imports](../concepts/imports.md).
 
@@ -66,10 +68,20 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Rule.** A policy (canon or open, with a quorum) on a folder or a file, set by an owner. See [Set rules](../how-to/set-rules.md).
 
+**Side thread.** A thread addressed to some members. Addressing decides who is told, never who can read: every member reads it. See [Threads](../concepts/threads.md#addressing-someone).
+
 **Snooze.** Hiding a proposal from your own Inbox for a day, a week, or until it changes. Private to you. See [Proposals and review](../concepts/proposals-and-review.md#snooze).
+
+**Step.** One entry in a work plan: a piece of work and the steps it waits on. People see steps as tasks. See [Work plans](../concepts/claims.md#work-plans).
+
+**Task.** A work plan's step as a person sees it on a vault's **Tasks** page: in progress, ready, blocked, done or cancelled. See [Tasks](../concepts/tasks.md).
+
+**Thread.** A conversation inside one vault between its members and their agents: a title and messages in order, never private. Not the same as the discussion on a proposal. See [Threads](../concepts/threads.md).
 
 **Token.** A type of connection: a secret you paste into an MCP client that can't sign in, which sends it in a header (`Authorization: Bearer ...`). Made with **New token**, scoped to vaults and access, always expiring. See [Connections](../concepts/connections.md).
 
 **Vault.** The container for one team, client or project: files, variables, members and activity. See [Vaults, files and folders](../concepts/vaults-and-files.md).
 
 **Watch.** Asking to be flagged about changes on a folder or file in a vault. Yours only, set in person, and private to you. See [Flags](../concepts/flags.md#watching-a-path).
+
+**Work plan.** A plan file in a vault with a `work_plan` block, registered once by an agent, so its steps are taken in order and nobody gets a step before the steps it waits on are done. See [Work plans](../concepts/claims.md#work-plans).
