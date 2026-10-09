@@ -109,6 +109,23 @@ test("write: the current expected_version succeeds", async () => {
   await ben.close();
 });
 
+test("write: the answer carries the new version, which the next write can expect without a read in between", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  const first = await call(ben, "write_file", { vault: "Team", path: "notes/chain.md", content: "one" });
+  assert.equal(first.isError, false, first.text);
+  const v1 = /\nversion: ([0-9a-f-]{36})$/.exec(first.text)?.[1];
+  assert.ok(v1, first.text);
+  assert.match((await call(ben, "read_file", { vault: "Team", path: "notes/chain.md" })).text, new RegExp(`^version: ${v1}$`, "m"));
+  const second = await call(ben, "write_file", { vault: "Team", path: "notes/chain.md", content: "two", expected_version: v1 });
+  assert.equal(second.isError, false, second.text);
+  const v2 = /\nversion: ([0-9a-f-]{36})$/.exec(second.text)[1];
+  assert.notEqual(v2, v1);
+  const stale = await call(ben, "write_file", { vault: "Team", path: "notes/chain.md", content: "three", expected_version: v1 });
+  assert.equal(stale.isError, true);
+  assert.match(stale.text, /^Conflict: /);
+  await ben.close();
+});
+
 test("delete: a stale expected_version is refused with a refusal an agent can act on", async () => {
   const ben = await connect(env.BEN_TOKEN);
   await call(ben, "write_file", { vault: "Team", path: "notes/swap3.md", content: "one" });

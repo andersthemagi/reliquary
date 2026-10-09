@@ -287,14 +287,15 @@ export function registerVaultFileTools(
         vault: VAULT,
         path: PATH,
         content: TEXT.describe("The file's full new text"),
-        expected_version: VERSION.optional().describe("read_file's version: line; the write is refused if the file changed since"),
+        expected_version: VERSION.optional().describe("The version: line of read_file or of your last write; the write is refused if the file changed since"),
       },
       annotations: DESTRUCTIVE,
     },
     async ({ vault, path, content, expected_version }) =>
       run(async (c) => {
-        await c.query("select public.write_file(private.vault_ref($1), $2, $3, $4)", [vault, path, content, expected_version ?? null]);
-        return ok(`Wrote ${path}. The change is logged as ${id.agent}.`);
+        const { rows } = await c.query("select public.write_file(private.vault_ref($1), $2, $3, $4) as version", [vault, path, content, expected_version ?? null]);
+        // The version a chained write expects, in read_file's own words.
+        return ok(`Wrote ${path}. The change is logged as ${id.agent}.\nversion: ${rows[0].version}`);
       }),
   );
 
