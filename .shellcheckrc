@@ -1,0 +1,6 @@
+# Read by shellcheck from the repo root (.github/workflows/lint.yml).
+# Every script here is bash; the files under scripts/lib are only ever
+# sourced, so they carry no shebang to say so.
+shell=bash
+external-sources=true
+source-path=SCRIPTDIR
