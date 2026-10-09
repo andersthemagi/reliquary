@@ -222,7 +222,8 @@ test("connected: a token used just now shows on Connect with its client, and the
   assert.doesNotMatch(h, /Nothing has connected/);
   const v = await page(vault);
   assert.doesNotMatch(v, NEXT);
-  assert.match(v, /New file<\/a> <a class="button ghost" href="\/connect">Connect an agent<\/a>/, "the empty vault's own button is back");
+  assert.match(v, /<a class="button" href="\/connect">Connect an agent<\/a>\s*<a class="button primary" href="[^"]+\/new">New file<\/a>/, "the header offers Connect beside New file");
+  assert.equal(v.match(/>Connect an agent</g).length, 1, "and the empty vault's body doesn't offer it a second time");
 });
 
 test("quick token: a person in several vaults is offered no token for all of them, and a one-click post that names no vaults is refused", async () => {
