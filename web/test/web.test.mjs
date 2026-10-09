@@ -316,7 +316,7 @@ test("connect: per-client setup with the MCP URL and no token anywhere", async (
 
 test("tokens: minted in the browser, shown once, then revocable", async () => {
   const token = await csrf("/connections");
-  const made = await text(await post("/connections/new", { csrf: token, name: "Hermes on Linux" }));
+  const made = await text(await post("/connections/new", { csrf: token, name: "Hermes on Linux", scope: "all" }));
   assert.match(made, /<p class="secret">rlq_[0-9a-f]{64}<\/p>/);
   const again = await page("/connections");
   assert.doesNotMatch(again, /rlq_[0-9a-f]{64}/);

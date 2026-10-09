@@ -64,8 +64,10 @@ async function call(client, name, args = {}) {
 }
 
 // What a client does, from a 401 to tokens: discovery, consent (as Ben, in
-// his browser session), code, token. `choice` is what Ben ticks.
-async function connectWithOAuth(choice = []) {
+// his browser session), code, token. `choice` is what Ben ticks: All my
+// vaults unless a test says otherwise, since Ben is in two vaults and the
+// page chooses nothing for him.
+async function connectWithOAuth(choice = [["reach", "all"]]) {
   const challenge401 = (await mcpPost()).headers.get("www-authenticate");
   const prmUrl = /resource_metadata="([^"]+)"/.exec(challenge401)[1];
   const prm = await (await fetch(prmUrl)).json();

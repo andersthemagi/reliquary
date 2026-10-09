@@ -43,8 +43,10 @@ let main = ""; // a config dir signed in once, for the tests that just need a si
 const page = (p) => pageWith(p, cookie);
 
 // `reliquary login` with the browser's part done here: the consent page as
-// Cara, then Allow (or Deny), then following the redirect to the CLI.
-async function login(config, { decision = "approve", choice = [], cwd } = {}) {
+// Cara, then Allow (or Deny), then following the redirect to the CLI. `choice`
+// is what she ticks: All my vaults unless a test says otherwise, since she is
+// in several vaults and the page chooses nothing for her.
+async function login(config, { decision = "approve", choice = [["reach", "all"]], cwd } = {}) {
   const r = start(["login", "--no-browser"], { config, cwd });
   const [, url] = await waitFor(r, "stderr", /^\s+(http:\/\/\S+\/oauth\/authorize\?\S+)$/m);
   const params = [...new URL(url).searchParams];

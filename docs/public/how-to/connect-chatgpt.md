@@ -8,7 +8,7 @@ ChatGPT's custom connectors use developer mode, which depends on your plan and w
 
 1. In ChatGPT, open **Settings**, **Apps and Connectors**, and under **Advanced** turn on **Developer mode**.
 2. Create a connector. Name it `Reliquary`, paste the MCP URL `https://mcp.reliquary.redmage.cc/mcp` (or the one your Connect page shows), and choose **OAuth** authentication.
-3. ChatGPT sends you to Reliquary. Sign in if you need to, choose the vaults and **Read only** or **Read and write**, and choose **Allow**.
+3. ChatGPT sends you to Reliquary. Sign in if you need to, choose the vaults and **Read only** or **Read and write**, and choose **Allow**. If you belong to more than one vault, nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md).
 
 ## Use it
 

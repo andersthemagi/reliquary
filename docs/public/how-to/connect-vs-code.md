@@ -4,7 +4,7 @@ VS Code connects with an access token that it asks for once and keeps in its sec
 
 ## Steps
 
-1. In Reliquary, open **Connect** in the top bar and choose the **VS Code** tab. Choose **Create read-only token**, or **Create read and write token** if the agent should also write files and propose changes. The token reaches all your vaults and expires in 90 days; for some vaults or another expiry, choose **use the full form**. The page that follows shows the token once, with the steps below.
+1. In Reliquary, open **Connect** in the top bar and choose the **VS Code** tab. Choose **Create read-only token**, or **Create read and write token** if the agent should also write files and propose changes. The token reaches all your vaults and expires in 90 days; for some vaults or another expiry, choose **use the full form**. If you belong to more than one vault, the tab takes you to the full form, where nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md). The page that follows shows the token once, with the steps below.
 2. In your project, create `.vscode/mcp.json`:
 
    ```json

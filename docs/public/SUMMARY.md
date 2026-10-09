@@ -41,6 +41,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Connect VS Code](how-to/connect-vs-code.md)
 - [Connect another client](how-to/connect-other-clients.md)
 - [Use the CLI](how-to/use-the-cli.md)
+- [Keep client work separate](how-to/keep-client-work-separate.md)
 - [Move a .env into a vault](how-to/move-env-into-vault.md)
 - [Invite someone](how-to/invite-someone.md)
 - [Set rules](how-to/set-rules.md)

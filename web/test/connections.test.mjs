@@ -229,7 +229,10 @@ test("connect: a tab shows only its client, and an unknown one shows Claude Code
   assert.match(cursor, /<a href="\/connect\?client=cursor" aria-current="page">Cursor<\/a>/);
   assert.match(cursor, /<section id="cursor">/);
   assert.doesNotMatch(cursor, /<section id="claude-code">/);
-  assert.match(cursor, /<a href="\/connections\/new\?client=cursor">use the full form<\/a>/);
+  // Ana belongs to several vaults, so nothing is chosen for her and the tab has
+  // no one-click form: it links to the full form (connect_flow.test.mjs covers
+  // the person in one vault, who keeps the form).
+  assert.match(cursor, /<a class="button primary" href="\/connections\/new\?client=cursor">Choose vaults and create a token<\/a>/);
   const odd = await page("/connect?client=%3Cscript%3E");
   assert.match(odd, /<section id="claude-code">/);
   assert.doesNotMatch(odd, /<script>/);

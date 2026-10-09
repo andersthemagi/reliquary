@@ -29,10 +29,10 @@ When a client signs in, there is no secret to copy: it signs in through your bro
 Quickest, for Cursor, VS Code or another client that can't sign in:
 
 1. On the **Connect** page, open that client's tab.
-2. Name the token after the agent and machine, then choose **Create read-only token** or **Create read and write token**. It reaches all your vaults and expires in 90 days.
+2. Name the token after the agent and machine, then choose **Create read-only token** or **Create read and write token**. It reaches all your vaults and expires in 90 days. If you belong to more than one vault, the tab takes you to the full form instead, where nothing is chosen for you.
 3. The next page shows the token once, with the steps for that client and the token already in them.
 
-For some vaults, or another expiry, choose **use the full form** on the tab, or **New token** on the Connections page: name it, choose its vaults, **Read only** or **Read and write**, and when it expires, then **Create token**. Copy the token, then choose **Done**. It is shown once.
+For some vaults, or another expiry, choose **use the full form** on the tab, or **New token** on the Connections page: name it, choose its vaults (if you belong to more than one vault, nothing is chosen for you), **Read only** or **Read and write**, and when it expires, then **Create token**. Copy the token, then choose **Done**. It is shown once.
 
 ## Check that it connected
 
@@ -45,6 +45,8 @@ If **Create token** is refused (no name, **Only the vaults I tick** with none ti
 ## Scope is fixed
 
 A connection's vaults and access are fixed when it is made. To change them, revoke it and make another. "All my vaults" includes vaults you join later; ticking vaults limits it to those.
+
+If you belong to more than one vault, the consent page and the **New token** page don't preselect either choice, and refuse an answer that names neither. If you belong to one vault, **All my vaults** is already chosen. To keep clients apart, see [Keep client work separate](../how-to/keep-client-work-separate.md).
 
 ## Revoking
 

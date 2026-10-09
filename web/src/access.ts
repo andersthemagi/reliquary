@@ -84,6 +84,7 @@ export async function connect(ctx: Ctx): Promise<Reply> {
         )
       ).rows[0] as Row | undefined,
   );
+  const many = tokenClient(client) ? (await myVaults(ctx)).length > 1 : false;
   return render(
     ctx,
     "Connect",
@@ -98,12 +99,12 @@ export async function connect(ctx: Ctx): Promise<Reply> {
     ${last
       ? callout("success", html`<p><strong>Connected.</strong> ${last.name} was last used ${lastUse(last)}. <a href="/connections">All connections</a></p>`)
       : callout("info", html`<p><strong>Nothing has connected in the last ${RECENT_MINUTES} minutes.</strong> When your agent does, it shows here: reload this page after the last step.</p>`)}
-    <div class="connect-panel">${clientSection(ctx, client)}</div>`,
+    <div class="connect-panel">${clientSection(ctx, client, many)}</div>`,
     "connect",
   );
 }
 
-function clientSection(ctx: Ctx, client: Client): Raw {
+function clientSection(ctx: Ctx, client: Client, many: boolean): Raw {
   const url = ctx.mcpUrl;
   switch (client) {
     case "claude-code":
@@ -122,20 +123,20 @@ function clientSection(ctx: Ctx, client: Client): Raw {
     case "cursor":
       return html`<section id="cursor"><h2>Cursor</h2>
       <p>Cursor can’t sign in, so it uses a token.</p>
-      ${tokenList(ctx, "cursor")}
+      ${tokenList(ctx, "cursor", many)}
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}</section>`;
     case "vscode":
       return html`<section id="vscode"><h2>VS Code</h2>
       <p>VS Code uses a token.</p>
-      ${tokenList(ctx, "vscode")}
+      ${tokenList(ctx, "vscode", many)}
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}</section>`;
     case "other": {
       const helper = JSON.stringify({ reliquary: { type: "http", url, headersHelper: "/path/to/reliquary/mcp/headers-helper.sh" } }, null, 2);
       return html`<section id="other"><h2>Other clients</h2>
       <p>A client that supports MCP sign-in (OAuth) only needs the MCP URL: it sends you here to sign in and approve. Any other client that speaks Streamable HTTP uses a token.</p>
-      ${tokenList(ctx, "other")}
+      ${tokenList(ctx, "other", many)}
       ${callout("warning", TOKEN_SAFETY)}
       ${callout("info", CEILING)}
       <details><summary>Local development (a Reliquary checkout on this machine)</summary>
@@ -168,7 +169,17 @@ const TOKEN_NAME: Record<TokenClient, string> = { cursor: "Cursor", vscode: "VS 
 // person takes, and the reach of either button is said before the click. All
 // vaults and 90 days are createToken's defaults, so the form leaves them out;
 // the full form is one link away.
-function quickToken(ctx: Ctx, client: TokenClient): Raw {
+function quickToken(ctx: Ctx, client: TokenClient, many: boolean): Raw {
+  // Both buttons reach every vault, so a person in several vaults is not
+  // offered them: an AI can use everything it reaches, and the vaults of a
+  // client are kept apart on purpose (newToken, the consent page). They go to
+  // the full form, where nothing is chosen for them.
+  if (many) {
+    return html`<div class="panel token-form token-choose">
+      <p class="hint">You belong to more than one vault, so nothing is chosen for you. Choose which vaults the token reaches, and whether it can write, on the next page.</p>
+      <div class="actions"><a class="button primary" href="/connections/new?client=${client}">Choose vaults and create a token</a></div>
+    </div>`;
+  }
   return html`<form method="post" action="/connections/new" class="panel token-form quick-token">
       ${csrfField(ctx.csrf)}<input type="hidden" name="client" value="${client}">
       <label for="qt-${client}">Name it after the agent and machine</label>
@@ -241,8 +252,8 @@ function tokenSteps(ctx: Ctx, client: TokenClient, token?: string): Raw[] {
 }
 
 // A Connect tab's list: create a token, then the client's steps.
-const tokenList = (ctx: Ctx, client: TokenClient): Raw =>
-  html`<ol class="setup"><li>Create a token. The next page shows it with the commands filled in.${quickToken(ctx, client)}</li>${tokenSteps(ctx, client).map((s) => html`<li>${s}</li>`)}</ol>`;
+const tokenList = (ctx: Ctx, client: TokenClient, many: boolean): Raw =>
+  html`<ol class="setup"><li>Create a token. The next page shows it with the commands filled in.${quickToken(ctx, client, many)}</li>${tokenSteps(ctx, client).map((s) => html`<li>${s}</li>`)}</ol>`;
 
 const afterToken = (ctx: Ctx, client: TokenClient, token: string): Raw =>
   html`<h2>Set up ${client === "other" ? "your client" : TOKEN_NAME[client]}</h2><ol class="setup">${tokenSteps(ctx, client, token).map((s) => html`<li>${s}</li>`)}</ol>`;
@@ -364,12 +375,12 @@ const newCrumb = [{ label: "Connections", href: "/connections" }, { label: "New 
 const EXPIRIES = [7, 30, 90, 180, 366];
 
 // The form's values as posted when creating was refused: shown again with
-// the reason and its reference, so nothing is chosen twice.
-type TokenDraft = { client?: TokenClient; name: string; scope: "all" | "some"; vaults: string[]; access: "read" | "write"; days: string; error: string; field?: "name" | "vaults" };
+// the reason and its reference, so nothing is chosen twice. No `scope` means
+// the form chose neither vault option, and the form shows it that way.
+type TokenDraft = { client?: TokenClient; name: string; scope?: "all" | "some"; vaults: string[]; access: "read" | "write"; days: string; error: string; field?: "name" | "vaults" };
 
-export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
-  const client = d ? d.client : tokenClient(ctx.url.searchParams.get("client"));
-  const vaults = await asPerson(
+const myVaults = (ctx: Ctx) =>
+  asPerson(
     ctx.userId,
     async (c) =>
       (
@@ -381,6 +392,17 @@ export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
         )
       ).rows as { id: string; name: string }[],
   );
+
+export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
+  const client = d ? d.client : tokenClient(ctx.url.searchParams.get("client"));
+  const vaults = await myVaults(ctx);
+  // "All my vaults" used to be preselected. An agent that reaches two clients'
+  // vaults can copy text between them when something it reads tells it to, so
+  // a person in several vaults chooses on purpose (as on the consent page); one
+  // in a single vault keeps the shortcut. A form shown again after a refusal
+  // keeps what was posted, which for a form that chose neither is neither.
+  const mustChoose = vaults.length > 1;
+  const allChecked = d?.scope ? d.scope === "all" : !mustChoose;
   // An expiry the form doesn't offer (a forged post) shows the default.
   const posted = Number(d?.days);
   const chosenDays = EXPIRIES.includes(posted) ? posted : 90;
@@ -404,7 +426,7 @@ export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
       }>
       <fieldset${d?.field === "vaults" ? raw(' aria-describedby="token-error"') : ""}>
         <legend>Vaults</legend>
-        <label class="choice"><input type="radio" name="scope" value="all"${d?.scope === "some" ? "" : raw(" checked")}> All my vaults, including ones I join later</label>
+        <label class="choice"><input type="radio" name="scope" value="all"${allChecked ? raw(" checked") : ""}> All my vaults, including ones I join later</label>
         <label class="choice"><input type="radio" name="scope" value="some"${d?.scope === "some" ? raw(" checked") : ""}> Only the vaults I tick</label>
         ${vaults.length
           ? html`<div class="choice-list">${vaults.map(
@@ -412,6 +434,9 @@ export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
             )}</div>`
           : html`<p class="hint">You don’t belong to any vaults yet. <a href="/vaults/new">Create one</a>.</p>`}
         <p class="hint">Ticking a vault limits the token to the ticked vaults.</p>
+        ${mustChoose
+          ? html`<p class="hint">You belong to ${vaults.length} vaults, so nothing is chosen for you. Tick only the vaults the token needs: an AI can use everything it reaches, so keep each client’s work apart.</p>`
+          : ""}
       </fieldset>
       <fieldset>
         <legend>Access</legend>
@@ -438,12 +463,14 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
   // mismatch between the two must never produce the broader token.
   const ticked = ctx.form.getAll("vault");
   const some = ticked.length > 0 || ctx.form.get("scope") === "some";
+  // What the form chose; neither, when it names no vaults and not "all" either.
+  const scope = some ? "some" : ctx.form.get("scope") === "all" ? "all" : undefined;
   const access = ctx.form.get("access") === "write" ? "write" : "read";
   const client = tokenClient(ctx.form.get("client"));
   const typedDays = ctx.form.get("days") ?? "90";
   const days = Number.parseInt(typedDays, 10);
   const again = (error: string, field?: TokenDraft["field"]) =>
-    newToken(ctx, { client, name, scope: some ? "some" : "all", vaults: ticked, access, days: typedDays, error, field });
+    newToken(ctx, { client, name, scope, vaults: ticked, access, days: typedDays, error, field });
   // The database refuses these too (a name's length is a check constraint,
   // whose own words talk about something else); said here, the form can say
   // which field.
@@ -452,6 +479,11 @@ export async function createToken(ctx: Ctx): Promise<Reply> {
   }
   if (some && ticked.length === 0) {
     return again(refuse("Tick at least one vault, or choose all your vaults. Nothing was created"), "vaults");
+  }
+  // Nothing is preselected for a person in several vaults, so a form that names
+  // neither choice is refused, not read as "all".
+  if (!scope && (await myVaults(ctx)).length > 1) {
+    return again(refuse("Choose all your vaults, or tick the vaults it may reach. Nothing was created"), "vaults");
   }
   if (!ticked.every((v) => UUID.test(v))) return notFound(ctx);
   let token: string;

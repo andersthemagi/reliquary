@@ -10,7 +10,7 @@ Reliquary identifies clients by a Client ID Metadata Document (an https URL); th
 
 ## With a token
 
-1. On the **Connect** page, choose the **Other clients** tab and choose **Create read-only token** (or **Create read and write token**). It reaches all your vaults and expires in 90 days; for some vaults or another expiry, choose **use the full form**. The page that follows shows the token once.
+1. On the **Connect** page, choose the **Other clients** tab and choose **Create read-only token** (or **Create read and write token**). It reaches all your vaults and expires in 90 days; for some vaults or another expiry, choose **use the full form**. If you belong to more than one vault, the tab takes you to the full form, where nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md). The page that follows shows the token once.
 2. Configure the client with the MCP URL and this header, reading the token from wherever the client keeps secrets:
 
    ```text

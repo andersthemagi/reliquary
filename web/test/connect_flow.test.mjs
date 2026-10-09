@@ -224,3 +224,24 @@ test("connected: a token used just now shows on Connect with its client, and the
   assert.doesNotMatch(v, NEXT);
   assert.match(v, /New file<\/a> <a class="button ghost" href="\/connect">Connect an agent<\/a>/, "the empty vault's own button is back");
 });
+
+test("quick token: a person in several vaults is offered no token for all of them, and a one-click post that names no vaults is refused", async () => {
+  const made = await post("/vaults/new", { csrf: csrfOf(await page("/vaults/new")), name: "Flow second vault", default_policy: "open" });
+  assert.equal(made.status, 303);
+  for (const c of ["cursor", "vscode", "other"]) {
+    const h = await page(`/connect?client=${c}`);
+    assert.doesNotMatch(h, /quick-token|Create read-only token|Either token reaches all your vaults/, `${c}: no one-click token for every vault`);
+    assert.match(h, /You belong to more than one vault, so nothing is chosen for you/, c);
+    assert.match(h, new RegExp(`<a class="button primary" href="/connections/new\\?client=${c}">Choose vaults and create a token</a>`), c);
+  }
+  // A stale tab, or a forged post, with the one-click form's fields: no scope, no vault.
+  const refused = await post("/connections/new", { csrf: await csrf(), client: "cursor", name: "Flow several", access: "read" });
+  assert.equal(refused.status, 400);
+  const h = await refused.text();
+  assert.match(h, /Choose all your vaults, or tick the vaults it may reach\. Nothing was created/);
+  assert.match(h, /<input type="hidden" name="client" value="cursor">/, "the client is kept, so the steps still follow");
+  assert.equal(await tokenRow("Flow several"), undefined, "nothing was created");
+  // Choosing every vault is a choice, so it still works.
+  await createdBy({ client: "cursor", name: "Flow chosen", access: "read", scope: "all" });
+  assert.equal((await tokenRow("Flow chosen")).all_vaults, true);
+});
