@@ -18,6 +18,19 @@ milestone's section there before building ahead of anything. Not built:
 waiting in line (`request_work`, `leave_queue`, places in line; issue #74).
 `spikes/` and `pilot/` are research, not product code or milestone work.
 
+## Commands
+
+Everything runs in containers (podman or docker); no Node on the host.
+
+- `./test.sh` runs every suite in parallel and `scripts/check-registry.sh` first; `./test.sh mcp web` runs only those (`sql`, `mcp`, `web`, `cli`).
+- `TEST_SLOT=8 ./test.sh`: the run takes slots 8 to 11, so two sessions need bases 4 or more apart.
+- One MCP test file: `MCP_TESTS=test/links.test.mjs ./mcp/test.sh`. The other suites have no per-file switch.
+- There is no linter or formatter. `tsc` is the only static check, inside each suite's build.
+- `./scripts/test-guard.sh origin/main` is CI's `guard` job; `./test.sh` does not run it, and it reads commit messages, so commit first.
+- Docs build without host Node, from the repo root: `podman run --rm --network none -v "$PWD":/repo:z -w /repo/web docker.io/library/node:22-slim node scripts/gen-docs.mjs` (writes `web/docs-build/`); `./test.sh web` checks them.
+- Run the app: `./mcp/dev.sh up` (web UI on `http://127.0.0.1:8790`, MCP on `http://127.0.0.1:8787/mcp`), `./mcp/dev.sh ui`, `./mcp/dev.sh down`.
+- CI also runs `./deploy/test.sh` (self-host smoke test), the CLI unit tests on Linux, macOS and Windows (`cd cli && npm test`, needs Node 20 or 22, only when `cli/` changed), TruffleHog, `npm audit` and CodeQL.
+
 ## Guardrails
 
 - **Secrets never reach a model.** No MCP tool, log line, change event,
@@ -25,6 +38,9 @@ waiting in line (`request_work`, `leave_queue`, places in line; issue #74).
   `reliquary run` (into one process) and `reliquary env pull` (into a
   gitignored `.env`) deliver values. A change that could route a value
   anywhere else is wrong even if a test passes.
+- **Secrets, for you.** Never read or print `.env*` (not `.env.example`), `mcp/.env.dev`, `mcp/.tokens/`, `web/.login*`, `mcp/.login-oauth-*`, `supabase/.access-token` or `supabase/.vercel-*.env`, `supabase/.*password`, `supabase/.*-secret`: they hold live values, and a database password reached a model that way once (`docs/ops/runbook.md`, "Rules that came from incidents").
+  Scripts print names, not values; don't ask the person to paste terminal output that may show one.
+  A command that might print a value is for the person to run in their own terminal.
 - **The database enforces access, not the API.** Every permission in the
   design's access table is an RLS policy or trigger. Adding a check only in
   route handlers does not count.
