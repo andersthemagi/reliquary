@@ -154,7 +154,11 @@ issue; these rules make the PR carry that, and CI checks what it can.
 
 - **Before you start,** find the issue (`gh issue list --search "<words>"`).
   A feature with none gets one first, with the job it does and what done
-  looks like. Add `status: in progress` when you take one up.
+  looks like; it lands on the board as Considering, which commits nothing.
+  Don't build a Considering item: only the owner moves one to Planned, so
+  comment and ask, unless the owner has already told you to build it (say so
+  on the issue and set it Planned). Set In progress when you take up a Planned
+  one.
 - **Every PR's description has one line saying which issue it is for:**
   `Closes #N` when merging finishes the issue, `Part of #N` when it is one
   step of it, `No issue: <why>` for a dependency bump, a docs fix or a bug
@@ -175,11 +179,13 @@ issue; these rules make the PR carry that, and CI checks what it can.
   a `bug` or `type:` label, linked from your PR. Not a line in a PR
   description or `docs/progress.md` that nobody will reopen.
 - **The roadmap is the board, so a real issue is on it,** with a Status
-  (Considering, Planned, In progress, Shipped) that says what is true. The
-  board adds new issues and sets a closed one to Shipped; you set it when you
-  take an issue up or when its state changes otherwise. A tracking issue's
-  sub-issues stay off the roadmap view on purpose. The commands and the
-  settings that must stay on: `docs/ops/runbook.md`, "The roadmap board".
+  (Considering, Planned, In progress) that says what is true; the board's
+  Status is the only status, not a `status:` label. The board adds a new
+  issue as Considering. Closing takes an issue off the roadmap: done is
+  `Closes #N`; closing as not planned is the owner's decision, never a way to
+  tidy up. A tracking issue's sub-issues stay off the roadmap view on purpose.
+  The commands and the settings that must stay on: `docs/ops/runbook.md`,
+  "The roadmap board".
 - `owner` marks what needs the owner: an account, money or a decision. Don't
   guess at those; comment on the issue.
 

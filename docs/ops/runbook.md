@@ -348,18 +348,25 @@ what shipped is `CHANGELOG.md`, and what was built and why is
 `docs/progress.md`.
 
 - **The default view, "Roadmap",** is a board by Status with the filter
-  `is:issue -status:Shipped no:parent-issue`. Shipped items, pull requests
-  and a tracking issue's sub-issues are hidden, so a visitor sees what is
-  being built, planned and considered. Edit it from the view's menu, or with
-  the `updateProjectV2View` GraphQL mutation.
-- **Status** is Considering (an idea, no commitment; label
-  `status: considering`), Planned (committed, in a milestone, not started),
-  In progress, or Shipped (closed).
+  `is:issue is:open no:parent-issue`. Closed issues, pull requests and a
+  tracking issue's sub-issues are hidden, so a visitor sees what is being
+  built, planned and considered. Edit it from the view's menu, or with the
+  `updateProjectV2View` GraphQL mutation.
+- **Status** is Considering, Planned or In progress. **Being on the board
+  commits nothing:** every new issue lands as Considering, and only the owner
+  moves one to Planned, because that is the decision to build it. In progress
+  is set when someone takes up a Planned item.
+- **Closing takes an issue off the roadmap, and the reason is the record.**
+  Done is closed as completed (a merged PR's `Closes #N` does that); a
+  decision against it is closed as not planned, by the owner. Nothing sets a
+  Status on close, deliberately: the built-in "Item closed" workflow would set
+  one status for both, and "Shipped" would then mean "declined" too. The
+  older Shipped status is unused.
 - **Settings that must stay on,** under the project's Workflows. The API can
   read them (`workflows { nodes { name enabled } }` on the project) and cannot
   turn them on, so this is a person's click: Auto-add to project, Auto-add
-  sub-issues to project, **Item added to project** (set Status to Planned) and
-  **Item closed** (set Status to Shipped). Auto-add has a filter in its own
+  sub-issues to project, and **Item added to project** set to Status
+  Considering. **Item closed** stays off. Auto-add has a filter in its own
   settings; on 2026-10-09 an issue labelled `type: feature` landed on the
   board by itself and one labelled only `documentation` did not, so label a
   new issue and look.
@@ -372,8 +379,8 @@ what shipped is `CHANGELOG.md`, and what was built and why is
     --field-id PVTSSF_lAHOAbfDDM4BlHL6zhj1Rhw --single-select-option-id OPTION
   ```
 
-  OPTION is `4065f07e` (Considering), `fd624e83` (Planned), `cf4d72d0` (In
-  progress) or `7c3ad389` (Shipped).
+  OPTION is `4065f07e` (Considering), `fd624e83` (Planned) or `cf4d72d0` (In
+  progress).
 
 ## Feedback
 
