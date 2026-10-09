@@ -161,14 +161,56 @@ select t.expect('revoke: an account deleted in Auth and made again with the same
 -- ---------------------------------------------------------------------------
 -- Invite-only off
 
-select t.expect('open: with invite-only off, an account nobody admitted creates vaults, within its plan',
-  t.ops('select private.set_invite_only(false)') || ' / ' || t.admission('kim2')
-  || ' / ' || coalesce(t.new_vault('kim2', 'kim1', 'Kim one'), 'refused'),
-  'open: every account creates vaults, within its plan / true false / ok');
-select t.expect('open: turned on again, the same account is refused',
-  t.ops('select private.set_invite_only(true)') || ' / ' || t.admission('kim2')
-  || ' / ' || t.run('kim2', $q$select public.create_vault('Kim two')::text$q$),
-  'invite-only: only admitted accounts create vaults / false true / ERR RLP02');
+-- Lou, Mia and Ned have accounts nobody admitted; the database starts with
+-- no daily quota (support.sql).
+insert into t.ids values
+  ('lou', '00000000-0000-0000-0000-0000000000f7'),
+  ('mia', '00000000-0000-0000-0000-0000000000f8'),
+  ('ned', '00000000-0000-0000-0000-0000000000f9');
+
+select t.expect('open: with invite-only off, an account nobody admitted creates vaults, within its plan, and is admitted by its first',
+  t.ops('select private.set_invite_only(false)') || ' / ' || t.admission('lou')
+  || ' / ' || coalesce(t.new_vault('lou', 'lou1', 'Lou one'), 'refused') || ' / ' || t.via('lou'),
+  'open: every account creates vaults, within its plan / true false / ok / open');
+select t.expect('open: turned on again, an account let in while open keeps its admission, and one that wasn''t is refused',
+  t.ops('select private.set_invite_only(true)') || ' / ' || t.admission('lou')
+  || ' / ' || coalesce(t.new_vault('lou', 'lou2', 'Lou two'), 'refused')
+  || ' / ' || t.run('mia', $q$select public.create_vault('Mia one')::text$q$),
+  'invite-only: only admitted accounts create vaults / true true / ok / ERR RLP02');
+select t.expect('quota: the operator sets how many accounts open admission lets in a day, counting today''s',
+  t.ops('select private.set_invite_only(false)') || ' / ' || t.ops('select private.set_open_per_day(2)'),
+  'open: every account creates vaults, within its plan / open admission: 2 new accounts a day (1 left today)');
+select t.expect('quota: within it, an account nobody admitted creates a vault and takes a place',
+  t.admission('mia') || ' / ' || coalesce(t.new_vault('mia', 'mia1', 'Mia one'), 'refused') || ' / ' || t.via('mia'),
+  'true false / ok / open');
+select t.expect('quota: once today''s places are taken, the next account reads that it can''t, and is refused with RLP02 saying when to try again',
+  t.admission('ned') || ' / ' || t.msg('ned', $q$select public.create_vault('Ned one')::text$q$),
+  'false false / RLP02 your account can''t create vaults yet: during the pre-alpha Reliquary lets in 2 new accounts a day, and today''s are taken. Try again after midnight UTC, or open an invite link someone sent you and join their vault (that lets you in now)');
+select t.expect('quota: the refusal''s detail says which limit and the quota, for programs',
+  t.msg('ned', $q$select public.create_vault('Ned one')::text$q$, null, true),
+  '{"limit": "admission", "per_day": 2, "invite_only": false}');
+select t.expect('quota: a refused vault leaves nothing behind and takes no place',
+  (select count(*)::text from public.vaults where created_by = t.id('ned')) || ' ' || t.via('ned'), '0 none');
+select t.expect('quota: an account already admitted isn''t held by it',
+  coalesce(t.new_vault('ivy', 'ivy2', 'Ivy two'), 'refused') || ' ' || coalesce(t.new_vault('lou', 'lou3', 'Lou three'), 'refused'),
+  'ok ok');
+select t.expect('quota: raised, the next account gets in; set to none, there is no quota',
+  t.ops('select private.set_open_per_day(3)') || ' / ' || coalesce(t.new_vault('ned', 'ned1', 'Ned one'), 'refused')
+  || ' / ' || t.ops('select private.set_open_per_day(null)'),
+  'open admission: 3 new accounts a day (1 left today) / ok / open admission: no daily quota');
+select t.expect('quota: a person, the web app, the MCP server and anonymous callers can''t set it, and the operator can''t set it below 0',
+  concat_ws(' ',
+    t.run('kim2', 'select private.set_open_per_day(1000)'),
+    t.run_role('reliquary_web', 'select private.set_open_per_day(1000)'),
+    t.run_role('reliquary_mcp', 'select private.set_open_per_day(1000)'),
+    t.run(null, 'select private.set_open_per_day(1000)'),
+    t.ops('select private.set_open_per_day(-1)')),
+  'ERR 42501 ERR 42501 ERR 42501 ERR 42501 ERR 22023');
+select t.expect('open: the web app reads whether invite-only is on, to make accounts at sign-in only when it''s off; a person can''t call it',
+  t.run_role('reliquary_web', 'select private.invite_only()::text') || ' '
+  || t.ops('select private.set_invite_only(true)') || ' ' || t.run_role('reliquary_web', 'select private.invite_only()::text')
+  || ' ' || t.run('kim2', 'select private.invite_only()::text'),
+  'false invite-only: only admitted accounts create vaults true ERR 42501');
 
 -- ---------------------------------------------------------------------------
 -- Only the operator admits

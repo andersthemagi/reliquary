@@ -42,5 +42,7 @@ revoke all on function test_support.roomy_free() from public, anon, authenticate
 -- turn it on themselves: supabase/tests/admission_test.sql (a database of
 -- its own), web/test/admission.test.mjs and mcp/test/admission.test.mjs
 -- (their suites run one file at a time; each turns it on in before() and
--- off again in after()).
-update private.settings set invite_only = false;
+-- off again in after()). With no daily quota on open admission
+-- (20261009200000_open_admission), since they make many accounts a day;
+-- admission_test.sql sets one.
+update private.settings set invite_only = false, open_per_day = null;

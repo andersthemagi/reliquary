@@ -299,9 +299,10 @@ names and counts only). The model and the numbers are in
 | Take it back to its account's plan | `scripts/plan.sh vault <vault-id> standard` |
 | Give one vault extra storage on top of its tier or plan (`500mb`, `2gb`; `0` to take it back) | `scripts/plan.sh grant-storage <vault-id> <amount>` |
 | Usage, largest first (everyone, one person's vaults, or one vault) | `scripts/plan.sh usage [<email>\|<vault-id>]` |
-| Let an account create vaults while invite-only | `scripts/plan.sh admit <email>` |
+| Let an account create vaults now (no invite, no day's place needed) | `scripts/plan.sh admit <email>` |
 | Take that back (they keep their vaults and memberships) | `scripts/plan.sh revoke-admission <email>` |
-| Open sign-ups to everyone after the alpha, or close them again | `scripts/plan.sh invite-only off` / `on` |
+| Open sign-ups to everyone, or close them again (a surge, abuse) | `scripts/plan.sh invite-only off` / `on` |
+| How many new accounts open sign-up lets in a day, and how many places are left today | `scripts/plan.sh open-per-day [<n>\|none]` |
 | Storage counters that drifted, and members whose account is gone from Auth | `scripts/plan.sh check` |
 | Set one vault's storage counter to a full scan | `scripts/plan.sh recount <vault-id>` |
 
@@ -328,6 +329,23 @@ names and counts only). The model and the numbers are in
   Supabase and made again starts un-admitted. Only postgres and
   `reliquary_ops` admit (hostile tests in
   `supabase/tests/admission_test.sql`).
+- **Open sign-up** (`supabase/migrations/20261009200000_open_admission.sql`):
+  with invite-only off, sign-in makes an account for any address, and an
+  account's first vault takes one of the day's places (`open-per-day`, 25
+  at first, since midnight UTC). Past that, `RLP02` until tomorrow. Accounts
+  that got in keep their admission if you close again. Before opening, and
+  whenever the quota goes up, check the email budget: every new account is
+  at least one sign-in email, so the Supabase "Rate limit for sending
+  emails" ("Email sender", step 6) and the Resend plan's daily and monthly
+  quota must cover the quota with room for existing people signing in.
+  When either runs out, people see "Sign-in emails are paused" (only while
+  open, or with an invite; invite-only it would tell who has an account).
+  Order: release the migration first, then `invite-only off`; opening on an
+  older release has no quota. In a surge: `invite-only on` (new strangers
+  stop at once; invites still work), or `open-per-day <smaller>`. Watch
+  `open-per-day` (places left) and `usage` for who is filling storage;
+  `revoke-admission` stops an abusive account creating more, and its vaults
+  stay until you deal with them.
 - **Drift**: the storage counters are kept by triggers, and pg_cron runs
   `private.log_storage_drift()` Mondays 04:00 UTC, recording any vault whose
   counter differs from a full scan in `private.storage_drift_log` (and a
