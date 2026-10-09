@@ -11,8 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: test-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push cancels the older run of the same branch or pull request,
+  # except on main: the guard job compares only the commits of its own push,
+  # so a run cancelled there leaves its commits unchecked for good. The
+  # run id gives every push to main a group of its own.
+  group: test-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   guard:
@@ -40,6 +44,21 @@ jobs:
             echo "new branch or rewritten history: comparing with origin/main"
             ./scripts/test-guard.sh origin/main
           fi
+      - name: Migrations are never edited, and a new one sorts last
+        env:
+          REF: ${{ github.ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base=origin/main
+          # On a push to main, origin/main is HEAD by now: compare with where
+          # main was, which also catches two pull requests that were each
+          # fine against the main they were tested on.
+          if [ "$REF" = refs/heads/main ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            base=$BEFORE
+          fi
+          ./scripts/check-migrations.sh "$base"
+      - name: The scripts' own tests
+        run: for t in scripts/*.test.sh; do "$t"; done
 
   test:
     runs-on: ubuntu-latest

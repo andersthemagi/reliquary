@@ -194,6 +194,13 @@ test("docs mcp: every tool in the contract has a section with its title, descrip
   assert.match(h, /<h2 id="data-fencing">Data fencing<\/h2>/);
 });
 
+test("docs mcp: every tool in the contract is named in the permissions reference", () => {
+  const tools = JSON.parse(readFileSync(join(REPO, "mcp/test/contract.snapshot.json"), "utf8"));
+  const page = readFileSync(join(SRC, "reference/permissions.md"), "utf8");
+  const missing = tools.map((t) => t.name).filter((name) => !page.includes(`\`${name}\``));
+  assert.deepEqual(missing, [], "docs/public/reference/permissions.md has a row naming each of these tools");
+});
+
 // Drift: the CLI reference ------------------------------------------------------------------------
 
 const cli = () => cliDefinitions(readFileSync(join(REPO, "cli/src/cli.ts"), "utf8"), readFileSync(join(REPO, "cli/src/config.ts"), "utf8"));

@@ -9,8 +9,10 @@
 # then `npm audit --audit-level=high` on the full dependency tree (the CLI
 # ships with none at runtime, but a compromised build-time dependency could
 # still taint dist/); a high or critical finding fails the run before
-# anything is published. The package is published without npm provenance,
-# which needs a public source repository (this one is private).
+# anything is published. Each publish carries npm provenance: npm signs a
+# statement with Sigstore, using the OIDC token below, which it can do now
+# that this repository is public (the publish step's log says "Signed
+# provenance statement").
 #
 # Auth: npm trusted publishing (OIDC, docs.npmjs.com/trusted-publishers),
 # not a stored token. npm CLI tries OIDC first, using the id-token: write
@@ -37,7 +39,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm trusted publishing (OIDC); unused until configured on npm's side
+  id-token: write # npm trusted publishing (OIDC) and the provenance signature
 
 concurrency:
   group: publish-cli
