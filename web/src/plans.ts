@@ -3,9 +3,10 @@
 // Settings' Usage tab. The database decides and counts (20260925230000_plans.sql:
 // public.my_plan, public.vault_usage); refusals arrive as SQLSTATE RLP01,
 // whose message pages.ts's message() shows where they happen. Admission
-// (20260925240000_admission.sql: public.my_admission): while
-// Reliquary is invite-only, an account creates vaults only once admitted;
-// create_vault refuses others with SQLSTATE RLP02.
+// (20260925240000_admission.sql, 20261009200000_open_admission.sql:
+// public.my_admission): an account creates vaults once admitted, by invite,
+// the operator, or open admission's daily quota; create_vault refuses
+// others with SQLSTATE RLP02.
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
@@ -50,9 +51,12 @@ export async function myAdmission(c: pg.PoolClient): Promise<Admission> {
   return { admitted: r.admitted, inviteOnly: r.invite_only };
 }
 
-// For an account that can't create vaults yet: why, and the way in.
-export const notAdmittedNote = (): Raw =>
-  html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account. <a href="/docs/concepts/plans-and-limits#invite-only">Invite-only</a></p>`;
+// For an account that can't create vaults yet: why, and the way in. Open
+// (invite-only off), the only reason is that today's places are taken.
+export const notAdmittedNote = (a: Admission): Raw =>
+  a.inviteOnly
+    ? html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account. <a href="/docs/concepts/plans-and-limits#who-can-create-vaults">Who can create vaults</a></p>`
+    : html`<p class="callout attention" role="status">Your account can’t create vaults yet: during the pre-alpha Reliquary lets in a limited number of new accounts a day, and today’s are taken. Try again after midnight UTC, or open an invite link someone sent you and join their vault. <a href="/docs/concepts/plans-and-limits#who-can-create-vaults">Who can create vaults</a></p>`;
 
 // Usage for the vaults in `ids` the person belongs to, in one query.
 export async function vaultUsages(c: pg.PoolClient, ids: string[]): Promise<Map<string, VaultUsage>> {
@@ -224,7 +228,7 @@ export async function accountPage(ctx: Ctx): Promise<Reply> {
         ? `The ${plan.planName} plan: up to ${plural(plan.maxVaults, "vault")} you own, each with its tier’s limits on people and storage.`
         : `The ${plan.planName} plan: no limit on the vaults you own, their people or their storage.`,
     })}
-    ${admission.admitted ? "" : notAdmittedNote()}
+    ${admission.admitted ? "" : notAdmittedNote(admission)}
     ${full
       ? html`<p class="callout attention" role="status">You own ${plan.vaultsOwned} ${plan.vaultsOwned === 1 ? "vault" : "vaults"}, and the ${plan.planName} plan allows ${plan.maxVaults}: delete one you no longer need before creating another. Nothing is deleted for you.</p>`
       : ""}

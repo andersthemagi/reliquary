@@ -2,18 +2,21 @@
 
 Your account's plan limits how many vaults you own. Each vault's tier limits how many people it holds and how much it stores. Nothing is billed yet.
 
-## Invite-only
+## Who can create vaults
 
-During the alpha, Reliquary is invite-only. Anyone can sign in, but an account creates vaults only once it is admitted. An account is admitted when:
+Reliquary is an open pre-alpha: anyone can make an account by signing in with their email. To keep a sudden rush from overwhelming the service, it lets in a limited number of new accounts a day. A new account takes one of the day's places when it creates its first vault. Once today's places are taken, creating a vault is refused until after midnight UTC.
+
+An account doesn't need a place, and can create vaults at once, when:
 
 - it opens an invite link and joins a vault (any invite, from anyone), or
-- the operator puts it on a plan, or admits it.
+- the operator puts it on a plan, or admits it, or
+- it already took a place on an earlier day.
 
-The sign-in page says so. Without an invite, use its **request access** link to ask the operator.
+The operator can make Reliquary invite-only again, for example during a surge. Then sign-in makes new accounts only for invite links, and an account creates vaults only once it is admitted in one of the ways above. Accounts that already got in keep their place. The sign-in page says which way Reliquary is working. Without an invite while it's invite-only, use the page's **request access** link to ask the operator.
 
-An account that isn't admitted belongs to no vault, so it sees nothing. **New vault** and **Plan and usage** say so (New vault shows no form), and creating a vault is refused with the reason (code `RLP02`), for the person and for their agent's `create_vault` alike. Over MCP the refusal reads `Not admitted:` and the message.
+An account that can't create vaults yet belongs to no vault, so it sees nothing. **New vault** and **Plan and usage** say so (New vault shows no form), and creating a vault is refused with the reason (code `RLP02`), for the person and for their agent's `create_vault` alike. Over MCP the refusal reads `Not admitted:` and the message.
 
-The operator can take admission back. The account keeps its vaults and memberships, and everything in them works as before, but it can't create another vault until it joins a vault by invite or is admitted again.
+The operator can take admission back. The account keeps its vaults and memberships, and everything in them works as before, but it can't create another vault until it joins a vault by invite, is admitted again, or (while Reliquary is open) takes a new day's place.
 
 ## Plans and tiers
 

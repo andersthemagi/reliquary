@@ -128,7 +128,18 @@ after(async () => {
   await sql("select private.set_invite_only(false)");
 });
 
-const NOTE = /<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha\. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account\. <a href="\/docs\/concepts\/plans-and-limits#invite-only">Invite-only<\/a><\/p>/;
+const NOTE = /<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha\. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account\. <a href="\/docs\/concepts\/plans-and-limits#who-can-create-vaults">Who can create vaults<\/a><\/p>/;
+
+test("admission: open, with today's places for new accounts taken, New vault says so and when to try again", async () => {
+  await sql("update private.settings set invite_only = false, open_per_day = 0");
+  try {
+    const h = await page("ada", "/vaults/new");
+    assert.match(h, /<p class="callout attention" role="status">Your account can’t create vaults yet: during the pre-alpha Reliquary lets in a limited number of new accounts a day, and today’s are taken\. Try again after midnight UTC, or open an invite link someone sent you and join their vault\. <a href="\/docs\/concepts\/plans-and-limits#who-can-create-vaults">Who can create vaults<\/a><\/p>/);
+    assert.doesNotMatch(h, /<form method="post" action="\/vaults\/new"/);
+  } finally {
+    await sql("update private.settings set invite_only = true, open_per_day = null");
+  }
+});
 
 test("admission: New vault tells an account nobody admitted that it can't create vaults yet, and how to get in", async () => {
   assert.match(await page("ada", "/vaults/new"), NOTE);

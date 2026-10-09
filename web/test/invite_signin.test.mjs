@@ -2,8 +2,11 @@
 // against web/test.sh's AUTH_MODE=supabase instance A and the fake Auth
 // (test/fake-auth.mjs). Ana owns "Invite Signin" and "Invite Signin Two"
 // and invites newbie@example.test (no account yet) to each. Sign-ups start
-// off, as in the hosted project. (Eve is left alone: vaults.test.mjs needs
-// her with no vaults.)
+// off in the fake Auth, and this file turns invite-only on in before() and
+// off again in after() (web/test.sh runs one file at a time), so sign-in
+// makes accounts only for invites; the "open sign-up" tests turn it off
+// for themselves. (Eve is left alone: vaults.test.mjs needs her with no
+// vaults.)
 //
 // Every invite token and sign-in code seen goes to AUTH_SECRETS_FILE, so
 // test.sh checks none reached the server logs.
@@ -56,7 +59,7 @@ const csrfOf = (html) => /name="csrf" value="([0-9a-f]+)"/.exec(html)?.[1];
 const fake = async (path, init) => (await fetch(FAKE + path, init)).json();
 const stats = () => fake("/_stats");
 const otpRace = (on) => fake("/_otp_race", { method: "POST", body: JSON.stringify({ on }) });
-const failOtp = (status) => fake("/_fail_otp", { method: "POST", body: JSON.stringify({ status }) });
+const failOtp = (status, error_code, msg) => fake("/_fail_otp", { method: "POST", body: JSON.stringify({ status, error_code, msg }) });
 const signups = (on) => fake("/_signups", { method: "POST", body: JSON.stringify({ on }) });
 const lastEmail = async (email) => {
   const m = await fake(`/_last_email?email=${encodeURIComponent(email)}`);
@@ -118,12 +121,82 @@ before(async () => {
   remember(T.newbie, T.two, T.open);
   remember(T.accent);
   await signups(false);
+  await sql("select private.set_invite_only(true)");
 });
 
 after(async () => {
   await otpRace(false);
   await failOtp(0);
   await signups(false);
+  await sql("select private.set_invite_only(false)");
+});
+
+test("sign-in: while invite-only, the page says so, what an invite does, and how to request access", async () => {
+  const h = await (await get("/signin", new Jar())).text();
+  assert.match(h, /<p class="hint">Reliquary is invite-only\. Anyone can sign in, but an account creates vaults only after it joins one by invite\. Have an invite\? Open its link\. Otherwise, <a href="mailto:[^"?]+\?subject=Reliquary%20early%20access">request access<\/a>\.<\/p>/);
+  assert.match(h, /<a href="[^"]*\/docs">About Reliquary<\/a>/);
+});
+
+// Open sign-up (20261009200000_open_admission.sql): invite-only off, with
+// the hosted project's sign-ups on.
+async function openSignup(fn) {
+  await sql("select private.set_invite_only(false)");
+  await signups(true);
+  try {
+    await fn();
+  } finally {
+    await failOtp(0);
+    await signups(false);
+    await sql("select private.set_invite_only(true)");
+  }
+}
+
+test("open sign-up: with invite-only off, the sign-in page says the same step makes your account", () =>
+  openSignup(async () => {
+    const page = await (await get("/signin", new Jar())).text();
+    assert.match(page, /<p class="hint">New to Reliquary\? The same step makes your account\. Reliquary is pre-alpha and lets in a limited number of new accounts a day\. Have an invite\? Open its link\.<\/p>/);
+    assert.doesNotMatch(page, /invite-only/);
+  }));
+
+test("open sign-up: an address with no account and no invite gets one, and its code signs it in", () =>
+  openSignup(async () => {
+    const jar = new Jar();
+    const page = await (await get("/signin", jar)).text();
+    const r = await post("/signin", { csrf: csrfOf(page), email: "walkin@example.test", next: "/" }, jar);
+    assert.equal(r.status, 200);
+    const codePage = await r.text();
+    assert.match(codePage, /<h1>Check your email<\/h1>/);
+    assert.equal((await stats()).lastCreateUser, true, "asked without making one first, then with");
+    const { code } = await lastEmail("walkin@example.test");
+    const done = await post("/signin/code", { csrf: csrfOf(codePage), email: "walkin@example.test", code, next: "/" }, jar);
+    assert.equal(done.status, 303);
+  }));
+
+test("open sign-up: with the project's hourly email limit spent, the page says sign-in emails are paused, with where, why and a reference", () =>
+  openSignup(async () => {
+    await failOtp(429, "over_email_send_rate_limit", "email rate limit exceeded");
+    const jar = new Jar();
+    const page = await (await get("/signin", jar)).text();
+    const r = await post("/signin", { csrf: csrfOf(page), email: "walkin2@example.test", next: "/" }, jar);
+    assert.equal(r.status, 503);
+    const h = await r.text();
+    assert.match(h, /<h1>Sign-in emails are paused<\/h1>/);
+    assert.match(h, /<dt>Where<\/dt><dd>sign-in email \(Supabase Auth\)<\/dd>/);
+    assert.match(h, /Reliquary has sent as many emails as its email service allows this hour, so no code was sent/);
+    assert.match(h, /<dt>Reference<\/dt><dd><code>ref [0-9a-f]{8}<\/code><\/dd>/);
+  }));
+
+test("sign-in: while invite-only, a spent email limit reads as a sent code for an address no invite backs, so it says nothing about the address", async () => {
+  await failOtp(429, "over_email_send_rate_limit", "email rate limit exceeded");
+  try {
+    const jar = new Jar();
+    const page = await (await get("/signin", jar)).text();
+    const r = await post("/signin", { csrf: csrfOf(page), email: "ana@example.test", next: "/" }, jar);
+    assert.equal(r.status, 200);
+    assert.match(await r.text(), /<h1>Check your email<\/h1>/);
+  } finally {
+    await failOtp(0);
+  }
 });
 
 test("invite sign-in: a signed-out invite link sends you to sign in and back to it", async () => {

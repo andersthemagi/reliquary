@@ -323,7 +323,7 @@ async function newVault(ctx: Ctx, d?: VaultDraft): Promise<Reply> {
   // Where the page can't create a vault, it doesn't offer the form: it
   // says why, and the way on.
   const why = !admission.admitted
-    ? html`${notAdmittedNote()}${ref ? refusedLine(ref) : ""}`
+    ? html`${notAdmittedNote(admission)}${ref ? refusedLine(ref) : ""}`
     : callout(
         "warning",
         html`<p>You own ${plan.vaultsOwned} of the ${plan.maxVaults} ${vaultWord(plan.maxVaults)} the ${plan.planName} plan allows, so a new one can’t be created.</p>

@@ -74,6 +74,17 @@ Status 2026-10-09: Threads (#126 to #129), the audience split (#121 to #125),
 the Tasks page (#122) and the MCP step tools (#124) are built. `request_work`,
 `leave_queue`, places in line and who is waiting are not (#74 is open).
 
+### 2026-10-09: open sign-up
+
+Owner's decision, 2026-10-09 (#230): the pre-alpha opens to anyone who
+finds Reliquary, rather than invited people only. This is an operating
+change, not milestone work, but it needs new code, so it's logged here as
+another exception. With invite-only off, sign-in makes an account for any
+address, and a daily quota on new accounts' first vaults (25 to start,
+enforced in the database) bounds a surge or a botnet. The owner switches it
+on after the release deploys, once the email limits cover the quota
+(`docs/ops/runbook.md`, "Plans and testers").
+
 ## Milestone 1: core, MCP and UI
 
 Vaults, files with canon/open policies, proposals with quorum, log, gate,
