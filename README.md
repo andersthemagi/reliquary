@@ -55,7 +55,8 @@ for what's shipped and what's next.
 
 ## In this repo
 
-- `docs/design.md`: the design (v3 draft) and build order.
+- `docs/design.md`: the design and build order. [docs/README.md](docs/README.md)
+  says what the other internal docs are and in what order to read them.
 - `docs/public/`: the docs served at `/docs` on the hosted site (tutorials,
   concepts, how-to guides, reference).
 - `docs/research/`: hosting and architecture, server load, UX and the
