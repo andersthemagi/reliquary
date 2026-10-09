@@ -73,8 +73,18 @@ for what's shipped and what's next.
 
 ## Stack
 
-Supabase (Postgres with RLS, Auth, Vault, `pg_cron`, `pgmq`, `pg_net`, Edge
-Functions), Next.js for the web UI, MCP endpoint and REST, and a small CLI.
+TypeScript on Node with no web framework: `web/` (server-rendered HTML, the
+OAuth server, the environment API) and `mcp/` (the MCP endpoint) are small
+`node:http` servers that reach Postgres through `pg`. Postgres 17 enforces
+access with row-level security, Supabase Auth signs people in, and `pg_cron`
+runs housekeeping where it is installed. Hosted on Vercel and Supabase, or
+self-hosted with Docker Compose. The CLI has no runtime dependencies.
+
+## Contributing
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers what you need installed, the
+day-to-day loop and how a change is reviewed; [AGENTS.md](AGENTS.md) is the
+manual for agents and people alike (guardrails, testing policy, conventions).
 
 ## License
 

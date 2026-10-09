@@ -9,6 +9,59 @@ page is the "done so far" detail behind whichever milestone
 Written as work lands. Read the section for the milestone you're touching,
 not the whole file top to bottom.
 
+## Decisions
+
+The owner's calls on building ahead of the current milestone, newest last.
+They were AGENTS.md's Build order until 2026-10-09, moved here as written
+(the "Current" and "Proposed" wording is as of its own date, not today's;
+the status lines after each entry are today's). AGENTS.md keeps the rule:
+work on the current milestone only, and an exception is a logged decision
+here, not a precedent.
+
+### 2026-09-28 and 2026-09-29: links start early; milestones 1 and 2 are done
+
+Current (updated 2026-09-29): milestones 1 and 2 have both held their week
+of real use and are done. Milestone 3 (links) is current; it started early
+(owner's decision, 2026-09-28), alongside path ownership and flags, before
+milestone 2's week had finished. That head start was a deliberate, logged
+exception to "work on the current milestone only," not a new default —
+check `docs/progress.md` before assuming the same is fine for something
+else mid-flight.
+
+### 2026-09-30: compare-and-swap writes, claims and work plans
+
+Also (owner's decision, 2026-09-30, tracking issue #52): compare-and-swap
+writes, path claims and work plans start now too, another deliberate,
+logged exception, in three phases — phase 1 (compare-and-swap writes) and
+phase 2 (claims) are shipped (2026-10-01); phase 3 (work plans) started
+2026-10-02, the maintainer's own call, informed by how claims held up in
+real use, not a calendar (an earlier version of this required 14 and 30
+days respectively; dropped the same day as the first decision). Usage is
+tracked informally in `docs/progress.md` as each phase ships, for the
+maintainer's own judgement, not as a formal precondition.
+
+Status 2026-10-09: phases 1 and 2 are shipped, and phase 3 is built apart
+from waiting in line (CL-3.9, #74; see the entry below).
+
+### 2026-10-02: Threads, the audience split and the Tasks view
+
+Also (owner's decision, 2026-10-02): Threads, the audience split in the web
+UI, and the Tasks view with the MCP step tools start now too, another
+deliberate, logged exception to "work on the current milestone only." The
+audience split puts what a person reads or acts on first (Tasks, Threads,
+Changes) and moves the full log, flags and the claims table one click away
+under Diagnostics; their URLs keep resolving. The design is in
+`docs/design.md` ("Who each surface is for", "Threads"), what is built is
+in `docs/progress.md`. Proposed, not yet confirmed by the owner: the Tasks
+view and the step tools start ahead of CL-3.9 (#74, waiting and places in
+line), which issues #75 and #76 list as a blocker, and anything that needs
+CL-3.9 (`request_work`, `leave_queue`, places in line, who is waiting) is
+left out of both until it lands.
+
+Status 2026-10-09: Threads (#126 to #129), the audience split (#121 to #125),
+the Tasks page (#122) and the MCP step tools (#124) are built. `request_work`,
+`leave_queue`, places in line and who is waiting are not (#74 is open).
+
 ## Milestone 1: core, MCP and UI
 
 Vaults, files with canon/open policies, proposals with quorum, log, gate,
