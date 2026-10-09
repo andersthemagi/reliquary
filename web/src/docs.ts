@@ -13,13 +13,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRE_ALPHA, html, preAlphaNote, raw, type Raw, type Theme } from "./html.js";
 import { renderDocMarkdown } from "./markdown.js";
-import { siteOrigin, sitePage, suggestFeatureHref } from "./site.js";
+import { siteOrigin, sitePage } from "./site.js";
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "docs-build");
 
 type Page = { slug: string; title: string; navTitle: string; summary: string; section: string; source: string };
-type RoadmapItem = { title: string; summary: string; status: string; milestone?: string; issue?: string; docs?: string; version?: string };
-type Docs = { sections: { title: string; pages: Page[] }[]; bySlug: Map<string, Page>; order: Page[]; roadmap: RoadmapItem[] };
+type Docs = { sections: { title: string; pages: Page[] }[]; bySlug: Map<string, Page>; order: Page[] };
 
 let loaded: Docs | null | undefined;
 function docs(): Docs | null {
@@ -33,8 +32,7 @@ function docs(): Docs | null {
       pages: s.pages.map((p) => ({ ...p, section: s.title, source: readFileSync(join(DIR, `${p.slug}.md`), "utf8") })),
     }));
     const order = sections.flatMap((s) => s.pages);
-    const roadmap = JSON.parse(readFileSync(join(DIR, "roadmap.json"), "utf8")) as RoadmapItem[];
-    loaded = { sections, order, bySlug: new Map(order.map((p) => [p.slug, p])), roadmap };
+    loaded = { sections, order, bySlug: new Map(order.map((p) => [p.slug, p])) };
   } catch {
     loaded = null;
   }
@@ -44,10 +42,10 @@ function docs(): Docs | null {
 export const pageUrl = (slug: string) => (slug === "index" ? "/docs" : `/docs/${slug}`);
 const rawUrl = (slug: string) => `/docs/${slug}.md`;
 
-// The public paths of the roadmap and every docs page, for the sitemap.
+// The public paths of every docs page, for the sitemap.
 export function docsPaths(): string[] {
   const d = docs();
-  return d ? ["/roadmap", ...d.order.map((p) => pageUrl(p.slug))] : [];
+  return d ? d.order.map((p) => pageUrl(p.slug)) : [];
 }
 
 // A link as a page's Markdown writes it (relative to the page's own file,
@@ -65,7 +63,7 @@ function resolver(fromSlug: string): (href: string) => string {
   };
 }
 
-// For llms-full.txt and /roadmap.md: every Markdown link as an absolute
+// For llms-full.txt: every Markdown link as an absolute
 // URL, docs pages as their Markdown (an agent follows them as text).
 function absoluteLinks(p: Page): string {
   const resolve = resolver(p.slug);
@@ -170,69 +168,25 @@ function llmsFullTxt(d: Docs): string {
   return `${d.order.map((p) => `<!-- ${siteOrigin}${pageUrl(p.slug)} -->\n\n${absoluteLinks(p).trim()}\n`).join("\n\n")}`;
 }
 
-// /roadmap: docs/public/roadmap.yml as four columns. Shipped items link to
-// their docs page and the changelog.
-const ROADMAP_COLUMNS: [string, string][] = [
-  ["shipped", "Shipped"],
-  ["in-progress", "In progress"],
-  ["planned", "Planned"],
-  ["considering", "Considering"],
-];
-const SUGGEST = suggestFeatureHref();
+// The roadmap is the GitHub project board, not a page of ours: two copies
+// meant every feature was moved twice. /roadmap stays as the stable URL (the
+// Pre-alpha badge, the README, old links) and sends people there.
+export const ROADMAP_URL = "https://github.com/users/andersthemagi/projects/3";
 
-function roadmapPage(d: Docs, theme: Theme): string {
-  const item = (it: RoadmapItem) => {
-    const meta = [
-      it.milestone ? html`<span>Milestone ${it.milestone.slice(1)}</span>` : "",
-      it.version ? html`<span>In ${it.version}</span>` : "",
-      it.issue ? html`<span>Issue #${it.issue}</span>` : "",
-      it.docs && d.bySlug.has(it.docs) ? html`<a href="${pageUrl(it.docs)}">Docs</a>` : "",
-      it.status === "shipped" ? html`<a href="/docs/changelog">Changelog</a>` : "",
-    ].filter((m) => m !== "");
-    return html`<li class="roadmap-item"><h3>${it.title}</h3><p>${it.summary}</p>${
-      meta.length ? html`<p class="roadmap-meta">${meta}</p>` : ""
-    }</li>`;
-  };
-  const body = html`<div class="roadmap-page">
-    <h1>Roadmap</h1>
-    <p class="lede">What Reliquary does today, what is being built, and what may come next. ${PRE_ALPHA}</p>
-    <p class="roadmap-actions"><a class="button primary" href="${SUGGEST}">Suggest a feature</a> <a class="button" href="/docs/changelog">Changelog</a> <a class="button" href="/roadmap.md">As Markdown</a></p>
-    <div class="roadmap">${ROADMAP_COLUMNS.map(([status, label]) => {
-      const list = d.roadmap.filter((it) => it.status === status);
-      return html`<section class="roadmap-col" aria-labelledby="rm-${status}">
-        <h2 id="rm-${status}">${label} <span class="count">${list.length}</span></h2>
-        ${list.length ? html`<ul class="roadmap-list">${list.map(item)}</ul>` : html`<p class="muted small">Nothing here yet.</p>`}
-      </section>`;
-    })}</div>
-  </div>`;
-  return sitePage({
-    title: "Roadmap",
-    description: "What Reliquary does today, what is being built, and what may come next.",
-    path: "/roadmap",
-    body,
-    theme,
-    alternate: "/roadmap.md",
-  });
-}
-
-export type DocsReply = { status?: number; type: string; body: string };
+export type DocsReply = { status?: number; type: string; body: string; location?: string };
 
 const TEXT = "text/plain; charset=utf-8";
 const MARKDOWN = "text/markdown; charset=utf-8";
 
 // GET only (the caller checks). undefined: not a docs path.
 export function docsRoute(path: string, theme: Theme): DocsReply | undefined {
-  const isDocs = path === "/docs" || path.startsWith("/docs/") || path === "/roadmap";
-  if (!isDocs && !["/llms.txt", "/llms-full.txt", "/roadmap.md"].includes(path)) return undefined;
+  if (path === "/roadmap") return { status: 302, type: TEXT, body: `The roadmap is ${ROADMAP_URL}\n`, location: ROADMAP_URL };
+  const isDocs = path === "/docs" || path.startsWith("/docs/");
+  if (!isDocs && !["/llms.txt", "/llms-full.txt"].includes(path)) return undefined;
   const d = docs();
   if (!d) return isDocs ? notFound(null, path, theme) : { status: 404, type: TEXT, body: "Docs aren't built on this server.\n" };
   if (path === "/llms.txt") return { type: TEXT, body: llmsTxt(d) };
   if (path === "/llms-full.txt") return { type: TEXT, body: llmsFullTxt(d) };
-  if (path === "/roadmap") return { type: "text/html; charset=utf-8", body: roadmapPage(d, theme) };
-  if (path === "/roadmap.md") {
-    const p = d.bySlug.get("roadmap");
-    return p ? { type: MARKDOWN, body: absoluteLinks(p) } : { status: 404, type: TEXT, body: "No roadmap.\n" };
-  }
   if (path === "/docs" || path === "/docs/") return { type: "text/html; charset=utf-8", body: docPage(d, d.bySlug.get("index")!, theme) };
   const rest = path.slice("/docs/".length);
   if (rest.endsWith(".md")) {

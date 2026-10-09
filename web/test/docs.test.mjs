@@ -10,7 +10,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import http from "node:http";
 import { join } from "node:path";
 import { before, test } from "node:test";
-import { cliDefinitions, parseRoadmap, parseSummary, roadmapProblems } from "../scripts/docs-lib.mjs";
+import { cliDefinitions, parseSummary } from "../scripts/docs-lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://127.0.0.1:8791";
 const { WEB_AUTH_A_URL: A, WEB_AUTH_PUBLIC_URL: PUBLIC_URL, LOGIN_FILE } = process.env;
@@ -290,13 +290,14 @@ test("docs nav: the public site links Docs and Roadmap, and the app's Account me
   assert.match(menu, /<a href="\/roadmap">Roadmap<\/a>/);
 });
 
-test("docs nav: the sitemap lists the roadmap and every docs page at PUBLIC_URL", async () => {
+test("docs nav: the sitemap lists every docs page at PUBLIC_URL, and not the roadmap, which is a redirect", async () => {
   const origin = new URL(PUBLIC_URL).origin;
   const locs = [...(await (await get("/sitemap.xml", A)).text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-  for (const path of ["/roadmap", ...slugs.map(urlOf)]) assert.ok(locs.includes(origin + path), path);
+  for (const path of slugs.map(urlOf)) assert.ok(locs.includes(origin + path), path);
+  assert.ok(!locs.includes(origin + "/roadmap"));
 });
 
-test("stage: the landing page, the docs, the roadmap and the app say pre-alpha", async () => {
+test("stage: the landing page, the docs and the app say pre-alpha", async () => {
   const badge = /<a class="stage" href="\/roadmap" title="Pre-alpha: things change and may break; data is backed up daily\.">Pre-alpha<\/a>/;
   const landing = await (await get("/", A)).text();
   assert.match(landing, badge);
@@ -304,7 +305,6 @@ test("stage: the landing page, the docs, the roadmap and the app say pre-alpha",
   const docs = await html("/docs/concepts/vaults-and-files");
   assert.match(docs, badge);
   assert.ok(docs.includes(`<strong>Pre-alpha:</strong> ${PRE_ALPHA}`), "the docs say it in full");
-  assert.ok((await html("/roadmap")).includes(`Pre-alpha: ${PRE_ALPHA}`), "the roadmap says it in full");
   const app = await (await get("/inbox", BASE, { cookie })).text();
   assert.match(app, badge);
   assert.ok(app.includes(`Pre-alpha: ${PRE_ALPHA}`), "the Account menu says it in full");
@@ -330,85 +330,13 @@ test("docs changelog: /docs/changelog renders CHANGELOG.md, or says there are no
 
 // Roadmap -----------------------------------------------------------------------------------------------
 
-const roadmap = () => parseRoadmap(readFileSync(join(SRC, "roadmap.yml"), "utf8"));
-
-test("roadmap: roadmap.yml validates: statuses, milestones, versions, docs pages that exist, no duplicate titles", () => {
-  const items = roadmap();
-  assert.ok(items.length > 10);
-  assert.deepEqual(roadmapProblems(items, slugs), []);
-  for (const status of ["shipped", "in-progress", "planned", "considering"]) assert.ok(items.some((it) => it.status === status), status);
-  for (const it of items.filter((i) => i.status === "shipped" && i.docs)) assert.ok(slugs.includes(it.docs), `${it.title}: ${it.docs}`);
-});
-
-test("roadmap: the validator refuses a bad status, an unknown page, a duplicate, a bad milestone and a version on unshipped work", () => {
-  const problems = roadmapProblems(
-    [
-      { title: "A", summary: "s", status: "done" },
-      { title: "B", summary: "s", status: "shipped", docs: "concepts/nope" },
-      { title: "b", summary: "s", status: "planned", milestone: "M9", version: "1.0.0" },
-      { title: "C", status: "planned", issue: "x" },
-    ],
-    slugs,
-  );
-  for (const want of [/"A": status/, /"B": docs page concepts\/nope/, /"b" is listed twice/, /"b": milestone/, /"b": only a shipped item/, /"C" has no summary/, /"C": issue/]) {
-    assert.ok(problems.some((p) => want.test(p)), String(want));
-  }
-  assert.throws(() => parseRoadmap("- title: x\n  colour: red\n"), /unknown key colour/);
-  assert.throws(() => parseRoadmap("- title: a: b\n"), /quote this value/);
-  assert.throws(() => parseRoadmap("title: x\n"), /expected/);
-  assert.deepEqual(parseRoadmap('# c\n- title: "a: b" # note\n  status: planned\n'), [{ title: "a: b", status: "planned" }]);
-});
-
-test("roadmap: the validator asks an in-progress or planned item for its issue, and a shipped or considering one for none", () => {
-  const problems = roadmapProblems(
-    [
-      { title: "A", summary: "s", status: "in-progress" },
-      { title: "B", summary: "s", status: "planned" },
-      { title: "C", summary: "s", status: "shipped" },
-      { title: "D", summary: "s", status: "considering" },
-      { title: "E", summary: "s", status: "planned", issue: "12" },
-    ],
-    slugs,
-  );
-  assert.deepEqual(problems.map((p) => p.split(":")[0]), ['"A"', '"B"']);
-  assert.match(problems[0], /an in-progress item needs its issue/);
-  assert.match(problems[1], /a planned item needs its issue/);
-});
-
-test("roadmap: /roadmap shows four columns with every item, public and indexable, with a way to suggest a feature", async () => {
+test("roadmap: /roadmap goes to the GitHub project board, and no docs page, sitemap entry or llms.txt line keeps a second copy", async () => {
   const r = await get("/roadmap");
-  assert.equal(r.status, 200);
-  const h = await r.text();
-  assert.doesNotMatch(h, /noindex|<script/i);
-  const items = roadmap();
-  const labels = { shipped: "Shipped", "in-progress": "In progress", planned: "Planned", considering: "Considering" };
-  for (const [status, label] of Object.entries(labels)) {
-    const col = new RegExp(`<section class="roadmap-col" aria-labelledby="rm-${status}">([\\s\\S]*?)</section>`).exec(h)?.[1];
-    assert.ok(col, status);
-    const list = items.filter((it) => it.status === status);
-    assert.match(col, new RegExp(`<h2 id="rm-${status}">${label} <span class="count">${list.length}</span></h2>`));
-    for (const it of list) assert.ok(col.includes(`<h3>${escapeHtml(it.title)}</h3>`), it.title);
-  }
-  assert.match(h, /<a class="button primary" href="mailto:andres@redmage\.cc\?subject=Reliquary%20feature%20suggestion">Suggest a feature<\/a>/);
-  assert.match(h, /<a href="\/roadmap" aria-current="page">Roadmap<\/a>/);
-});
-
-test("roadmap: every shipped item links to its docs page and the changelog", async () => {
-  const h = await html("/roadmap");
-  for (const it of roadmap().filter((i) => i.status === "shipped")) {
-    const li = h.split(`<h3>${escapeHtml(it.title)}</h3>`)[1].split("</li>")[0];
-    if (it.docs) assert.ok(li.includes(`<a href="${urlOf(it.docs)}">Docs</a>`), it.title);
-    assert.ok(li.includes('<a href="/docs/changelog">Changelog</a>'), it.title);
-  }
-});
-
-test("roadmap: /roadmap.md and /docs/roadmap serve the same items for agents", async () => {
-  const r = await get("/roadmap.md");
-  assert.equal(r.headers.get("content-type"), "text/markdown; charset=utf-8");
-  const md = await r.text();
-  for (const it of roadmap()) assert.ok(md.includes(`- **${it.title}.** ${it.summary}`), it.title);
-  assert.doesNotMatch(md, /\]\((?!https?:|mailto:)[^)]*\)/, "links are absolute");
-  assert.ok((await (await get("/llms.txt")).text()).includes(`${LOCAL_ORIGIN}/docs/roadmap.md`));
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get("location"), "https://github.com/users/andersthemagi/projects/3");
+  for (const path of ["/docs/roadmap", "/docs/roadmap.md"]) assert.equal((await get(path)).status, 404, path);
+  assert.doesNotMatch(await (await get("/llms.txt")).text(), /docs\/roadmap/);
+  assert.ok(!existsSync(join(SRC, "roadmap.yml")), "docs/public/roadmap.yml is back: the roadmap is the board");
 });
 
 // The registry and copy ------------------------------------------------------------------------------------

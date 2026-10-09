@@ -59,21 +59,21 @@ page.
 ./test.sh    # real Postgres + this server; sign-in, escaping, CSRF, approve, threads, snooze, tokens, contrast; log leak check
 ```
 
-## Docs and roadmap
+## Docs
 
 `/docs` serves the public docs (`src/docs.ts`), public and indexable like the
 legal pages, in the public site's frame: a sidebar from
 `docs/public/SUMMARY.md`, on-page contents, previous and next. Every page is
 also Markdown at `/docs/<page>.md`, and `/llms.txt` and `/llms-full.txt` index
-and concatenate them for agents. `/roadmap` shows `docs/public/roadmap.yml` in
-four columns. Pages are rendered with the file-preview Markdown renderer
+and concatenate them for agents. `/roadmap` redirects to the GitHub project
+board, which is the roadmap (`ROADMAP_URL` in `src/docs.ts`). Pages are rendered with the file-preview Markdown renderer
 (`src/markdown.ts`, raw HTML off), plus heading ids and resolved links.
 
 `scripts/gen-docs.mjs` (`npm run docs`) builds them into `docs-build/`
 (gitignored), first in `npm run build` (then `npm run compile`: `tsc` and the
 version stamp): it copies `docs/public` and fills in the generated parts (the
 MCP tools from `mcp/test/contract.snapshot.json`, the CLI's help,
-`CHANGELOG.md`, the roadmap). It reads outside `web/`, so it needs the whole
+`CHANGELOG.md`). It reads outside `web/`, so it needs the whole
 checkout (Vercel builds from one); `vercel.json` bundles `docs-build/**` into
 the function. Only pages in the build's manifest are served; without
 `docs-build/`, `/docs` is a 404. Drift tests: `test/docs.test.mjs`.
@@ -164,7 +164,7 @@ What the server does differently when hosted:
   no `Domain`. Unset (dev.sh, tests), the old rule applies: `http://<Host>`,
   absent Origin allowed, unprefixed cookies.
 - **`SITE_URL`** (optional, e.g. `https://example.com`): the public site
-  (landing, docs, roadmap, legal pages, robots.txt, sitemap.xml,
+  (landing, docs, legal pages, robots.txt, sitemap.xml,
   security.txt) on a host of its own, `PUBLIC_URL` staying the app's
   (`src/hosts.ts`). The Host header picks the side: the site host serves only
   those pages and sets no cookie, anything else is a 308 to the app host;
