@@ -132,7 +132,7 @@ One connection per server, in the operating system's keychain when there is one:
 | Linux | your keyring through the Secret Service (GNOME Keyring, KWallet), with `secret-tool` from libsecret, when it's installed and a keyring answers |
 | Windows | `credentials.dpapi` in the config directory, encrypted with DPAPI so only your Windows account on this computer can read it |
 
-Without one (a server, a container, Linux without `secret-tool`), connections are kept in `credentials.json` in the config directory, mode 600 in a mode 700 directory. `reliquary login` says which it used. The config directory is `RELIQUARY_CONFIG_DIR`, else `%APPDATA%\reliquary` on Windows, else `$XDG_CONFIG_HOME/reliquary`, else `~/.config/reliquary`; it also holds the lock file that keeps two commands from refreshing at once.
+Without one (a server, a container, Linux without `secret-tool`), connections are kept in `credentials.json` in the config directory, mode 600 in a mode 700 directory. `reliquary login` says which it used. The config directory is `RELIQUARY_CONFIG_DIR`, else `%APPDATA%\reliquary` on Windows, else `$XDG_CONFIG_HOME/reliquary`, else `~/.config/reliquary`; it also holds the lock file that keeps two commands from refreshing at once. A command waits for the lock; one left behind by a crashed command is replaced once it is a minute old, so after a crash the next command may wait up to a minute.
 
 `RELIQUARY_CREDENTIALS=file` always uses the file. `RELIQUARY_CREDENTIALS=keychain` always uses the keychain, and fails if none answers instead of falling back to the file.
 

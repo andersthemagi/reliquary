@@ -131,7 +131,9 @@ for it (a refresh, a login, a logout) puts it in the keychain and takes it
 out of the file.
 
 Refreshing happens under a lock file in the config directory, because two
-processes presenting the same refresh token would revoke the grant. No
+processes presenting the same refresh token would revoke the grant. A command
+waits for the lock; one left by a crashed command is replaced once it is a
+minute old (longer than a refresh can take, even over a slow connection). No
 token is ever printed, logged, put in a URL, an argument (a keychain tool's
 included) or a child's environment, and nothing a keychain tool prints is
 shown, only its exit code.
