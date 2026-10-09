@@ -81,7 +81,7 @@ Sends a `.env` file's variables to the vault for approval. Nothing is set until 
 
 Also takes `--vault`, `--env` and `--server`.
 
-Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected or expired; 3 when `--wait` ran out of time first (the push stays pending).
+Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected or expired; 3 when `--wait` ran out of time first, or couldn't check the push three times in a row (the push stays pending, or may; one failed check is retried, not reported). Don't push again on a 3: open the approval link to see what became of it.
 
 ## Options for every command
 
@@ -147,7 +147,7 @@ A connection made before the keychain, in `credentials.json`, keeps working. The
 | 0 | done |
 | 1 | an error, in a plain sentence on stderr starting `reliquary:` |
 | 2 | a usage error (an unknown command or option, a missing value, an argument `run` can't pass to a `.cmd` on Windows) |
-| 3 | `env push --wait` ran out of time |
+| 3 | `env push --wait` ran out of time, or couldn't check the push three times in a row |
 | other | `run` passes on its command's exit code |
 
 Common errors: the connection was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this connection; the server has no key for variables; a file or folder the system won't let the CLI use (the message names the path and the reason, such as no permission, a full disk or a read-only folder; for the config directory, `RELIQUARY_CONFIG_DIR` moves it). No error prints a value, a token or a server response.

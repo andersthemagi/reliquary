@@ -210,7 +210,8 @@ function duration(raw: string): number {
 }
 
 // `reliquary env push`: exit 0 when sent (with --wait: when applied), 1 when
-// refused, rejected or expired, 3 when --wait ran out of time first.
+// refused, rejected or expired, 3 when --wait ran out of time first or
+// couldn't check the push three times running (it may still be pending).
 async function push(args: string[], project: ProjectConfig | null): Promise<number> {
   const { opts, positionals } = parse(args, { values: ["server", "vault", "env", "file", "timeout"], flags: ["wait"] });
   if (opts.help) return help();

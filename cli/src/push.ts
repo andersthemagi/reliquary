@@ -9,7 +9,7 @@ import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { pushStatus, type PushStatus } from "./api.js";
 import type { Server } from "./config.js";
 import { DOTENV_MAX_BYTES, dotenvTooBig, parseDotenv, type DotenvResult } from "./dotenv.js";
-import { CliError, fsFailure } from "./errors.js";
+import { CliError, fsFailure, NotSignedIn } from "./errors.js";
 
 // Reads and parses the file. A directory, a device or anything over the
 // limit is refused before its contents are looked at.
@@ -46,6 +46,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Polls a push until a person decides, it expires, or `timeoutMs` passes
 // (then "pending"). Starts at 2 s and backs off to 15 s: a person takes
 // minutes, and every poll is a request the server has to answer.
+//
+// The wait may run for a day, so one failed poll (a dropped connection, a
+// 5xx, a rate limit) is not the end of it: exit 1 means the push was refused,
+// rejected or expired, and a script that reads it that way may push again.
+// Only a run of failures gives up, with exit 3 (still undecided as far as we
+// know). A connection that is no longer accepted needs a person, so it is
+// not retried.
+const GIVE_UP_AFTER = 3;
+
 export async function waitForDecision(
   server: Server,
   id: string,
@@ -54,12 +63,24 @@ export async function waitForDecision(
 ): Promise<PushStatus> {
   const until = Date.now() + timeoutMs;
   let delay = opts.firstMs ?? 2000;
+  let failed = 0;
   for (;;) {
     const left = until - Date.now();
     if (left <= 0) return "pending";
     await sleep(Math.min(delay, left));
-    const s = await pushStatus(server, id);
-    if (s !== "pending") return s;
+    try {
+      const s = await pushStatus(server, id);
+      failed = 0;
+      if (s !== "pending") return s;
+    } catch (err) {
+      if (!(err instanceof CliError) || err instanceof NotSignedIn) throw err;
+      if (++failed >= GIVE_UP_AFTER) {
+        throw new CliError(
+          `Couldn't check whether the push was applied (${failed} tries in a row): ${err.message} It may still be waiting for approval; open its link to check.`,
+          3,
+        );
+      }
+    }
     delay = Math.min(Math.round(delay * 1.5), opts.maxMs ?? 15_000);
   }
 }
