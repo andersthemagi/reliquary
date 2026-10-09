@@ -377,6 +377,7 @@ strong { font-weight: 600; }
 }
 @media (max-width: 1080px) {
   .app-top .top-inner { gap: var(--space-4); }
+  .app-top .top-inner > .stage { margin-left: calc(-1 * var(--space-2)); }
   .top-search input[type="search"] { width: 14rem; }
 }
 /* Phones: search behind a button; every menu opens full width under the bar. */
@@ -387,17 +388,30 @@ strong { font-weight: 600; }
   }
   .app-top .app-nav a, .vault-switch > summary { padding: 0 10px; }
   .app-top .top-inner { column-gap: var(--space-3); }
+  .app-top .top-inner > .stage { margin-left: 0; }
   .top-tools { gap: 0; flex: none; }
-  .icon-button { padding: 0 9px; }
+  /* Two classes: .button, further down, would otherwise win the padding,
+     and the bar needs these narrow to hold the badge and all three
+     buttons on one row at 320px. The account button is its avatar alone. */
+  .top-tools .icon-button { padding: 0 10px; min-height: 44px; }
+  .top-tools .account-button { padding: 0 6px; min-height: 44px; }
+  .top-tools .account-button::after { content: none; }
   .top-tools > .top-search { display: none; }
   .search-pop { display: block; }
   .account-name { display: none; }
-  .account-button { padding: 0 6px; }
   .app-top .top-tools > .menu-wrap, .app-top .app-nav > .vault-switch { position: static; }
   .app-top .top-tools > .menu-wrap > .menu {
     left: var(--space-5); right: var(--space-5); top: 50px; width: auto; min-width: 0; max-width: none;
   }
   .app-top .vault-menu { left: var(--space-5); right: var(--space-5); top: calc(100% + 1px); width: auto; min-width: 0; max-width: none; }
+}
+/* Narrow phones: the badge, the wordmark and three buttons are 296px wide
+   with their gaps, and a 320px screen has 288px, so each gives up a little
+   rather than the buttons dropping to a second line. */
+@media (max-width: 359px) {
+  .top-tools .icon-button { padding: 0 8px; }
+  .app-top .top-inner > .stage { padding: 0 6px; }
+  .app-top .wordmark { gap: 8px; }
 }
 
 /* Layout ------------------------------------------------------------------- */
