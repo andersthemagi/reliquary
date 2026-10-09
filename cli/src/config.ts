@@ -10,7 +10,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { CliError, UsageError } from "./errors.js";
+import { CliError, fsFailure, UsageError } from "./errors.js";
 
 export const DEFAULT_SERVER = "https://app.reliquary.redmage.cc";
 export const PROJECT_FILE = ".reliquary.json";
@@ -33,9 +33,15 @@ export function projectConfig(dir = process.cwd()): ProjectConfig | null {
   for (let d = path.resolve(dir); ; d = path.dirname(d)) {
     const file = path.join(d, PROJECT_FILE);
     if (existsSync(file)) {
+      let text: string;
+      try {
+        text = readFileSync(file, "utf8");
+      } catch (err) {
+        throw fsFailure("read", file, err);
+      }
       let raw: unknown;
       try {
-        raw = JSON.parse(readFileSync(file, "utf8"));
+        raw = JSON.parse(text);
       } catch {
         throw new CliError(`${file} isn't valid JSON.`);
       }
@@ -57,6 +63,11 @@ const LOOPBACK = new Set(["127.0.0.1", "[::1]", "localhost"]);
 
 // An origin we may send tokens to: https, or http on this computer only.
 export function serverOrigin(flag: string | undefined, project: ProjectConfig | null): string {
+  // An exported empty variable is a mistake to name, not a reason to quietly
+  // use another server: tokens go wherever this points.
+  if (flag === undefined && process.env.RELIQUARY_URL === "") {
+    throw new UsageError(`RELIQUARY_URL is set but empty. Unset it, or set it to a server like ${DEFAULT_SERVER}.`);
+  }
   const raw = flag ?? process.env.RELIQUARY_URL ?? project?.server ?? DEFAULT_SERVER;
   let u: URL;
   try {
