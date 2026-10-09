@@ -36,7 +36,19 @@ type Link = { id: string; name: string; url: string; created_by: string; created
 type LinkForm = { id?: string; name: string; url: string; credential?: string; error?: string; field?: "name" | "url" | "credential" };
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
-const URL_RE = /^https:\/\/[^/?#]+/;
+// The rules of private.check_link_url (20261009120041_link_url_shape.sql),
+// in its order, so the form refuses what the database would and says which
+// rule broke. A url is plain text every member and agent reads, and the log
+// keeps it, so nothing that could be a credential may ride in it.
+function urlProblem(url: string): string | null {
+  if (!url.startsWith("https://")) return "A link’s URL must start with https://.";
+  if (url.length > 2048) return "A link’s URL is at most 2048 characters.";
+  const leak = "Every member and agent can read a link’s URL, and it is logged: put a key or token in the link’s credential instead.";
+  if (/^https:\/\/[^/?#]*@/.test(url)) return `A link’s URL can’t hold a user name or password (user:password@). ${leak}`;
+  if (/[?#]/.test(url)) return `A link’s URL can’t have a query string (?) or a fragment (#). ${leak}`;
+  if (!/^https:\/\/[^/?#@]+(\/[^?#]*)?$/.test(url)) return "A link’s URL is https://, a host and an optional path.";
+  return null;
+}
 
 async function loadLinks(c: pg.PoolClient, id: string): Promise<Link[]> {
   return (
@@ -80,7 +92,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
               : html`<div><label for="lc">Credential</label><input id="lc" type="password" name="credential" autocomplete="new-password" required maxlength="65536"${described("credential", "lc-hint")}></div>`}
           </div>
           <p class="hint" id="ln-hint">Letters, digits and underscores, not starting with a digit: an agent calls this link’s granted tools as <code>&lt;name&gt;.&lt;tool&gt;</code>.</p>
-          <p class="hint" id="lu-hint">The upstream MCP server’s URL. Must be https.</p>
+          <p class="hint" id="lu-hint">The upstream MCP server’s URL: https://, a host and a path, with no user name, password, query string or fragment. Every member and agent can read it, so a key or token goes in the credential.</p>
           ${editing
             ? html`<p class="hint" id="lc-hint">The credential isn’t shown or changed here. To replace it, delete this link and add it again; its grants are deleted too. Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered.</p>`
             : html`<p class="hint" id="lc-hint">An API key or token for the upstream server. Stored encrypted, the same way environment variable values are; never shown again once saved.</p>`}
@@ -148,9 +160,8 @@ export async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
   if (!NAME.test(name)) {
     return again(refuse("A link’s name is letters, digits and underscores, not starting with a digit, up to 64 characters. Nothing was saved"), "name");
   }
-  if (!URL_RE.test(url) || url.length > 2048) {
-    return again(refuse("A link’s URL must start with https:// and be at most 2048 characters. Nothing was saved"), "url");
-  }
+  const problem = urlProblem(url);
+  if (problem) return again(refuse(`${problem} Nothing was saved`), "url");
   if (!linkId && credential.trim().length === 0) {
     return again(refuse("A credential is required to add a link. Nothing was saved"), "credential");
   }

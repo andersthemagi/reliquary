@@ -47,6 +47,7 @@ export const DEFAULT_LIMITS = {
   signin_code_address: { limit: 5, window: 900 }, // codes entered, per email address
   signin_code_ip: { limit: 30, window: 900 }, // codes entered and links opened, per IP
   signin_refresh_session: { limit: 30, window: 3600 }, // session refreshes, per session
+  signin_refresh_ip: { limit: 120, window: 3600 }, // session refreshes, per IP: the one bound the caller can't choose
   // OAuth
   oauth_authorize_ip: { limit: 60, window: 600 },
   oauth_authorize_client: { limit: 600, window: 600 },

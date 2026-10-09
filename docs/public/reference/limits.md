@@ -25,13 +25,14 @@ What your plan and a vault's tier allow. How they count, and what happens at a l
 | A comment | 1 to 4000 characters, at most 200 per proposal |
 | Quorum (approvals a canon change needs) | 1 to 20 |
 | Paths you watch for [flags](../concepts/flags.md) | 100 per vault; a path up to 1024 characters |
-| A web form | 2 MB; forms carrying a file's text 3 MiB + 64 KiB, so 1 MiB of any text fits |
+| A web form | 2 MB; forms carrying a file's text 3 MiB + 64 KiB, so 1 MiB of any text fits. A form over its limit is answered 413 with the limit and a reference, sign-in forms too |
 
 ## MCP
 
 | What | Limit |
 |---|---|
 | Messages in one batch | 10 |
+| A request body | 3 MiB + 64 KiB, so 1 MiB of file text fits once it is written as JSON. A larger one is refused with a 400 that names the limit, before any tool runs |
 | `read_file` | 100000 bytes by default, up to 1048576 with `max_bytes`; `from_line` and `to_line` pick lines |
 | `list_files` | 200 files by default, up to 1000; continue with `after` |
 | `search` | 10 files by default, up to 50; a query up to 500 characters; up to 3 matching lines per file |
@@ -99,7 +100,7 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 | Asking for a sign-in code | 5 an hour per email address, 20 an hour per IP address |
 | Entering a sign-in code | 5 every 15 minutes per email address, then that address's codes are locked until the 15 minutes are up (the emailed link still works) |
 | Entering codes and opening sign-in links | 30 every 15 minutes per IP address |
-| Renewing a web session | 30 an hour per session |
+| Renewing a web session | 120 an hour per IP address, and 30 an hour per session |
 | Form posts in the web app | 60 a minute and 1000 an hour per session |
 | Opening or accepting invite links | 30 an hour per IP address |
 | OAuth consent page (`/oauth/authorize`) | 60 every 10 minutes per IP address, 600 per app |

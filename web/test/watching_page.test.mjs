@@ -132,6 +132,14 @@ before(async () => {
   await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.empty, WREN, OLA]);
   [{ id: V.ola }] = await as(OLA, "select public.create_vault('Watch ola', 'open') as id");
   await as(OLA, "select public.write_file($1, 'x.md', 'Text')", [V.ola]);
+  // Watches that name something there and things that aren't (yet): a file
+  // and a folder with content, a file never written, a file since deleted,
+  // and a folder with nothing under it.
+  [{ id: V.gone }] = await as(OLA, "select public.create_vault('Watch gone', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.gone, WREN, OLA]);
+  for (const f of ["kept.md", "docs/a.md", "old.md"]) await as(OLA, "select public.write_file($1, $2, 'Text')", [V.gone, f]);
+  await as(OLA, "select public.delete_file($1, 'old.md')", [V.gone]);
+  for (const t of ["kept.md", "docs/", "later.md", "old.md", "ghost/"]) await as(WREN, "select public.create_subscription($1, 'path', $2)", [V.gone, t]);
 });
 
 after(async () => {
@@ -244,6 +252,15 @@ test("watching tab: every member has Settings, Watching, listing only their own 
   assert.match(h, /<button class="quiet" aria-label="Unwatch notes\/">Unwatch<\/button>/);
 });
 
+test("watching tab: a watched path with no file or folder there is plain text, not a link to a page that doesn't exist", async () => {
+  const h = await page(watching(V.gone));
+  assert.match(h, new RegExp(`<a href="${re(file(V.gone, "kept.md"))}"><code>kept\\.md</code></a><span class="token-client">File</span>`));
+  assert.match(h, new RegExp(`<a href="${re(tree(V.gone, "docs/"))}"><code>docs/</code></a><span class="token-client">Folder, and everything in it</span>`));
+  for (const [t, label] of [["later.md", "File"], ["old.md", "File"], ["ghost/", "Folder, and everything in it"]]) {
+    assert.match(h, new RegExp(`<td><code>${re(t)}</code><span class="token-client">${label}, nothing there yet</span></td>`), t);
+  }
+});
+
 test("watching tab: with nothing watched, it says how to start, with the form under it and no header button that only scrolls to it", async () => {
   const h = await page(watching(V.empty));
   assert.match(h, /<div class="empty"><strong>You don’t watch anything here<\/strong><p>Watch a folder or file from its page, or type one below\. Changes there are flagged to you and your agents from then on\.<\/p><\/div>/);
@@ -260,7 +277,7 @@ test("watching tab: a typed path is watched, existing yet or not; one the databa
   const token = csrfOf(await page(watching(V.empty)));
   const h = await landed(await post(watching(V.empty), { csrf: token, action: "watch", path: " clients/ ", back: watching(V.empty) }));
   assert.deepEqual(flashOf(h), ["success", "status", "Watching clients/. From now on, changes there are flagged to you and your agents."]);
-  assert.match(h, /<code>clients\/<\/code><\/a><span class="token-client">Folder, and everything in it<\/span>/);
+  assert.match(h, /<code>clients\/<\/code><span class="token-client">Folder, and everything in it, nothing there yet<\/span>/);
   const bad = await post(watching(V.empty), { csrf: token, action: "watch", path: "/clients/", back: watching(V.empty) });
   assert.equal(bad.status, 400, "the form again, not a flash");
   assert.match(refusedForm(await bad.text()), /^A watched path starts with \/, but paths in a vault are relative: write clients\/ rather than \/clients\/\. \(ref [0-9a-f]{8}\)$/);

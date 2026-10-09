@@ -10,7 +10,7 @@ Reliquary identifies clients by a Client ID Metadata Document (an https URL); th
 
 ## With a token
 
-1. On the **Connections** page, choose **New token** and create a token with the vaults and access the client needs. If you belong to more than one vault, nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md). Copy it; it is shown once.
+1. On the **Connect** page, choose the **Other clients** tab and choose **Create read-only token** (or **Create read and write token**). It reaches all your vaults and expires in 90 days; for some vaults or another expiry, choose **use the full form**. If you belong to more than one vault, the tab takes you to the full form, where nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md). The page that follows shows the token once.
 2. Configure the client with the MCP URL and this header, reading the token from wherever the client keeps secrets:
 
    ```text
@@ -21,7 +21,9 @@ Tokens are for clients without sign-in: headless agents like Hermes, scripts, CI
 
 ## Check it
 
-A `tools/list` call returns the tools in [MCP tools](../reference/mcp-tools.md). `list_vaults` returns the vaults the token reaches, with your role in each.
+The page that shows your token also gives a test command, for bash or zsh (`curl`) and for PowerShell (`Invoke-RestMethod`). It sets the token in your terminal, then calls `tools/list`; a JSON answer that lists tools means the token works. The tools are in [MCP tools](../reference/mcp-tools.md). `list_vaults` returns the vaults the token reaches, with your role in each.
+
+Once the client has used the token, the **Connect** page says **Connected** and names it, for 15 minutes. Reload the page to see it.
 
 ## Environment variables
 

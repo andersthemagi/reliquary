@@ -30,6 +30,8 @@ The log is append-only: no row can be updated or deleted, by anyone, including t
 
 Each event is named in plain words, like "Approved", "Set a variable" or "Added an environment". Member changes say whom and which role, like "Made ben@example.test an editor", "Removed ben@example.test from the vault" or "Invited someone as a viewer". An invite never shows the address it was sent to.
 
+The path of a write links to its file while the file is there. Once it's deleted, the path is plain text, since there is nothing to open.
+
 Times read like "6 min ago". Hover over one for the exact time in UTC.
 
 On a phone, each event is two lines: what happened and when, then who, the vault and the path.

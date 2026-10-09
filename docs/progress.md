@@ -189,6 +189,23 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   registered tool carries the upstream's own argument names (untyped:
   the SDK's `registerTool` has no hook for a raw JSON Schema, only Zod);
   a tool discovered with none takes one `args` field instead.
+- Key rotation covers link credentials (2026-10-09,
+  `20261009120040_link_secrets_rotation.sql`, `web/src/rekey.ts`; tests in
+  `supabase/tests/variables_keys_test.sql` and
+  `web/test/variables_keys.test.mjs`): until then the rotation functions
+  read only variable values and pending imports, so a rotation left every
+  link credential on the old key, the start-up check didn't see it, and
+  dropping the old key as the runbook says broke every link call. Design's
+  open question ("reuse `VARIABLES_KEYS`'s rotation as it stands?")
+  answered yes.
+- A link's url is a host and a path only (2026-10-09,
+  `20261009120041_link_url_shape.sql`, `web/src/linkspage.ts`; tests in
+  `supabase/tests/links_test.sql` and `web/test/links_page.test.mjs`): the
+  check had been a prefix test, so a `user:password@`, `?key=` or `#`
+  passed into a url every member and agent reads and the append-only log
+  keeps. Now refused, saying which rule broke and that a key goes in the
+  credential. The table's check is `NOT VALID`: a link saved before keeps
+  its url, and its next edit must give one that passes.
 
 Not built: rediscovering a link's tools by hand (`web/src/discovery.ts`'s
 own header: today, retrying a failed discovery means deleting and
@@ -359,6 +376,13 @@ start the next one.
   `supabase/tests/compare_and_swap_test.sql`, races in
   `web/test/races.test.mjs` (exactly one of many simultaneous writers
   from one base wins; a stale write racing an erasure never deadlocks).
+  A deleted file counts as no file yet (`20261009153417_cas_deleted_files.sql`):
+  the check became one private function, `private.check_expected_version`,
+  that both functions call, so a stale save made after someone deleted the
+  file is refused instead of bringing it back. In the web app that save
+  comes back as New file with the typed text (`conflictReply()`), and the
+  Delete confirm page carries the version it showed, so a delete confirmed
+  after someone saved the file is refused (`web/src/files.ts`).
   Registry: `tests/features.md` F437-F439.
 - **Phase 2: path claims** (who's working a path, with a lease). Built,
   2026-10-01, across five pull requests (CL-2.1 through CL-2.7; CL-2.2 and

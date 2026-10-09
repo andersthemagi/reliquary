@@ -36,7 +36,7 @@ Only an owner of the vault can, in person, in the web app: no agent, token or co
 
 1. On **Rules**, open the **⋯** menu on the rule's row and choose **Named owners**.
 2. Under **Name an owner**, choose a member, then **Name owner…**. Nothing changes yet.
-3. Read the confirm page: who they are, that they and their agents will write the path directly with no review, how its approvals needed change, and which rules inside it keep their own owners.
+3. Read the confirm page: who they are, that they and their agents will write the path directly with no review, how its approvals needed change, and which rules inside it keep their own owners. If naming them leaves fewer named owners than the rule's approvals, the page warns that changes there would wait until more owners are named or the approvals are lowered.
 4. Choose **Name**, their email, **owner of** and the path, or **Cancel**.
 
 It's logged in the vault's [log](activity.md). On a path whose rule is open, naming an owner changes nothing until the rule becomes canon, and the page says so.
@@ -44,7 +44,7 @@ It's logged in the vault's [log](activity.md). On a path whose rule is open, nam
 ## Remove an owner
 
 1. On the path's **Named owners** page, choose **Remove** on their row.
-2. Read what they go back to: reading only, for a viewer, or proposing like anyone else, for an editor. If they're the last named owner, any editor's or owner's approval counts toward the path's approvals needed again.
+2. Read what they go back to: reading only, for a viewer, or proposing like anyone else, for an editor. If they're the last named owner, any editor's or owner's approval counts toward the path's approvals needed again. If what's left can't reach the rule's approvals, the page warns that changes there would wait.
 3. Choose **Remove**, their email, **as owner**, or **Cancel**.
 
 Removing a rule removes its named owners with it. Adding the rule again doesn't bring them back: name them again.

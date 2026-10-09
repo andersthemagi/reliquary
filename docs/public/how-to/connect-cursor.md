@@ -4,18 +4,15 @@ Cursor connects with an access token that it reads from an environment variable,
 
 ## Steps
 
-1. In Reliquary, open the **Connections** page (the account menu, then **Connections**) and choose **New token**:
-   - name it after the agent and machine, like `Cursor on my laptop`;
-   - choose its vaults (if you belong to more than one vault, nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md)) and **Read only** or **Read and write**;
-   - choose when it expires (90 days is the default).
-2. Copy the token. It is shown once.
-3. Set it as `RELIQUARY_TOKEN` in the environment Cursor starts from, for example in your shell profile, then start Cursor from a new shell. Paste it in your own terminal, never in a chat:
+1. In Reliquary, open **Connect** in the top bar and choose the **Cursor** tab. Name the token after the agent and machine, like `Cursor on my laptop`, then choose **Create read-only token**, or **Create read and write token** if the agent should also write files and propose changes. The token reaches all your vaults and expires in 90 days. For some vaults or another expiry, choose **use the full form** under the buttons. If you belong to more than one vault, the tab takes you to the full form, where nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md).
+2. Copy the steps on the page that follows. The token is in them, and it is shown once.
+3. Set it as `RELIQUARY_TOKEN` in the environment Cursor starts from, then start Cursor from that shell. The page gives the command for bash or zsh and for PowerShell, to paste in your own terminal, never in a chat. In bash or zsh:
 
    ```bash
    export RELIQUARY_TOKEN='paste-the-token-here'
    ```
 
-4. Add Reliquary with the **add Reliquary to Cursor** link on your Connect page, or put this in `~/.cursor/mcp.json`:
+4. Add Reliquary with the **Add Reliquary to Cursor** link on that page, or put this in `~/.cursor/mcp.json`:
 
    ```json
    {
@@ -30,7 +27,7 @@ Cursor connects with an access token that it reads from an environment variable,
    }
    ```
 
-5. In Cursor's MCP settings, check that reliquary is enabled and lists its tools.
+5. In Cursor's MCP settings, check that reliquary is enabled and lists its tools. Then reload the Connect page: once Cursor has used the token, the page says **Connected** and names it.
 
 ## Keep the token safe
 

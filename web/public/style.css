@@ -1517,6 +1517,11 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .connect-panel section > h2:first-child { margin-top: 0; }
 .connect-panel pre.code { user-select: all; }
 .connect-panel .callout { margin-top: var(--space-4); max-width: 80ch; }
+.setup { margin: var(--space-4) 0 0; padding-left: 1.4em; max-width: 80ch; }
+.setup > li { margin: 0 0 var(--space-5); padding-left: var(--space-2); }
+.setup > li > pre.code, .setup > li > .quick-token { margin-top: var(--space-3); }
+.setup pre.code { user-select: all; }
+.quick-token { max-width: 36rem; }
 @media (max-width: 639px) {
   .token-list td.num { width: auto; }
 }

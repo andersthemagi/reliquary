@@ -198,7 +198,7 @@ test("folder: the root's header offers Search and New file, not Connect an agent
   const h = await page(`/v/${V.main}`);
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>/.exec(h)[1];
   assert.match(actions, new RegExp(`<a class="button vault-search-link" href="/v/${V.main}/search">Search</a>\\s*<a class="button primary" href="/v/${V.main}/new">New file</a>`));
-  assert.doesNotMatch(h, /Connect an agent/);
+  assert.doesNotMatch(actions, /Connect an agent/);
   assert.match(h, /<td class="num small muted hide-sm"><time datetime="[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/td>/);
 });
 
@@ -207,10 +207,11 @@ test("folder: an empty vault with a proposal waiting says so and links to it", a
   assert.match(h, new RegExp(`<div class="empty"><strong>No files yet</strong><p>1 proposal waits to add the first file\\.</p><p class="empty-action"><a class="button" href="/v/${V.waiting}/proposals">Review it</a></p></div>`));
 });
 
-test("folder: an empty vault with nothing waiting offers New file and Connect an agent to a writer", async () => {
+test("folder: an empty vault with nothing waiting offers New file to a writer, and Connect an agent once, in the first-run step", async () => {
   const h = await page(`/v/${V.blank}`);
   assert.match(h, /<strong>No files yet<\/strong><p>Create the first file, or connect an agent and ask it to write one\.<\/p>/);
-  assert.match(h, new RegExp(`<a class="button" href="/v/${V.blank}/new">New file</a> <a class="button ghost" href="/connect">Connect an agent</a>`));
+  assert.match(h, new RegExp(`<p class="empty-action"><a class="button" href="/v/${V.blank}/new">New file</a></p>`));
+  assert.equal(h.match(/>Connect an agent</g).length, 1);
 });
 
 // ---------------------------------------------------------------------------
@@ -275,7 +276,9 @@ test("delete: the confirm page names the file, what goes and what stays, and a G
 
 test("delete: confirming deletes the file and says so as a success", async () => {
   const { action, fields } = formFields(await page(file(V.main, "notes/gone.md", "&confirm=delete")), "Delete gone.md");
-  assert.deepEqual({ ...fields, csrf: "" }, { csrf: "", path: "notes/gone.md", action: "delete" });
+  const { expected_version: version, ...rest } = fields;
+  assert.match(version, /^[0-9a-f-]{36}$/);
+  assert.deepEqual({ ...rest, csrf: "" }, { csrf: "", path: "notes/gone.md", action: "delete" });
   const r = await post(action, fields);
   assert.equal(r.status, 303);
   assert.equal(r.headers.get("location"), `/v/${V.main}`);

@@ -31,13 +31,17 @@ The **Inbox** in the top bar counts what waits on you, across all your vaults, a
 5. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
 6. Approvals so far and the discussion.
 
-If a decision is refused, for example **Reject** without a note, the page comes back with the reason in the decision box and your note as you typed it; nothing was decided. Once a proposal is decided, the top of its page says how it ended, who decided and when, in place of the approvals.
+If a decision is refused, for example **Reject** without a note, the page comes back with the reason in the decision box and your note as you typed it; nothing was decided.
+
+Your decision is on the revision you read. If the proposer or their agent revises the proposal while you're reading it, your **Approve**, **Request changes** or **Reject** is refused, and the page comes back showing the new revision, with the reason and your note: read it, then decide again. **Edit, then approve** works the same way: your edit isn't saved, it comes back in the editor, and saving it again replaces the newer revision.
+
+Once a proposal is decided, the top of its page says how it ended, who decided and when, in place of the approvals.
 
 If the file changed after an open proposal was made, its page says so in a warning above the decision and offers **Reject** but not **Approve** or **Request changes**: approving could only mark it stale, and neither **Revise** nor **Edit, then approve** moves it onto the new version. Reject it, then propose the same text again against the current version.
 
-- **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it.
+- **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it. If another proposal for the same file applied first, it goes stale instead, even when both were approved at the same moment.
 - **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
-- **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit. If the edit is refused while the proposal is still open (for example, applying it would pass the vault's storage limit), the editor comes back with the reason and your text and note as you typed them.
+- **Edit, then approve** lets you fix the text yourself and approve your version; its page shows the file as it is now, folded above the editor. It is credited to you, and with a quorum above 1 it waits for another approval of the edit. If the proposer revises it after your edit, the new revision is theirs again, and is credited to them. If the edit is refused while the proposal is still open (for example, applying it would pass the vault's storage limit), the editor comes back with the reason and your text and note as you typed them.
 
 ### Worth a closer look
 

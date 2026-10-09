@@ -41,11 +41,17 @@ function logFilters(ctx: Ctx, id: string, action: string, name: string): Raw {
   </form>`;
 }
 
-function detail(r: AccessLogRow): string {
-  const d = r.detail as { attempt?: string; reason?: string; from?: string; values?: number; imports?: number; key_ids?: string[] };
+// Without this, a value an applied import set looks like one typed by hand.
+// A pasted import is its author's alone, who is also who applied it, so only
+// a CLI import names who sent it.
+function detail(ctx: Ctx, r: AccessLogRow): string {
+  const d = r.detail as { attempt?: string; reason?: string; from?: string; values?: number; imports?: number; links?: number; key_ids?: string[]; import?: string; source?: string; by?: string };
+  if ((r.action === "set" || r.action === "rotate") && d.import) {
+    return d.source === "cli" ? `from a CLI import sent by ${who(ctx, d.by ?? null, null)}` : "from a pasted import";
+  }
   if (r.action === "rename_environment") return `from ${d.from ?? "?"}`;
   if (r.action === "delete_environment") return `${d.values ?? 0} value${d.values === 1 ? "" : "s"} destroyed`;
-  if (r.action === "rotate_key") return `${(d.values ?? 0) + (d.imports ?? 0)} to key ${(d.key_ids ?? []).join(", ")}`;
+  if (r.action === "rotate_key") return `${(d.values ?? 0) + (d.imports ?? 0) + (d.links ?? 0)} to key ${(d.key_ids ?? []).join(", ")}`;
   if (r.action === "reject" && d.reason) return d.reason;
   if (r.action !== "refused") return "";
   return `${d.attempt ? `${d.attempt}: ` : ""}${d.reason ?? ""}`;
@@ -81,8 +87,8 @@ export async function log(ctx: Ctx, id: string): Promise<Reply> {
             (r) => html`<tr${r.action === "refused" ? raw(' class="refused"') : ""}><td class="small" data-label="When"><div>${time(r.at)}</div></td>
               <td class="small" data-label="Who"><div>${who(ctx, r.actor, null)} <span class="muted">· ${client(r)}</span></div></td>
               <td class="small" data-label="What"><div>${r.action === "refused"
-                ? html`<span class="badge danger">Refused</span> <span class="muted">${detail(r)}</span>`
-                : html`${ACTION_LABEL[r.action] ?? r.action}${detail(r) ? html` <span class="muted">${detail(r)}</span>` : ""}`}</div></td>
+                ? html`<span class="badge danger">Refused</span> <span class="muted">${detail(ctx, r)}</span>`
+                : html`${ACTION_LABEL[r.action] ?? r.action}${detail(ctx, r) ? html` <span class="muted">${detail(ctx, r)}</span>` : ""}`}</div></td>
               <td class="small path-cell" data-label="Variables"><div>${r.names.length ? r.names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`) : NONE}</div></td>
               <td class="small" data-label="Environment"><div>${r.environment ? r.environment : NONE}</div></td></tr>`,
           )}</tbody></table></div>`

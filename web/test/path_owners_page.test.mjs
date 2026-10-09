@@ -151,6 +151,18 @@ before(async () => {
 
   [{ id: V.ursa }] = await as(URSA, "select public.create_vault('Owners ursa', 'open') as id");
   await as(URSA, "select public.set_policy($1, 'x/', 'canon', 1)", [V.ursa]);
+
+  // Rules that ask for more approvals than the people who can give them, in
+  // a vault of two (Pat, an owner, and Edda, an editor): pact/ and duo/ have
+  // no named owners, pair/ has both of them, wide/ has Pat alone.
+  [{ id: V.short }] = await as(PAT, "select public.create_vault('Owners short', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.short, EDDA, PAT]);
+  for (const [path, quorum] of [["pact/", 2], ["duo/", 1], ["pair/", 2], ["wide/", 3]]) {
+    await as(PAT, "select public.set_policy($1, $2, 'canon', $3)", [V.short, path, quorum]);
+  }
+  for (const [path, user] of [["pair/", PAT], ["pair/", EDDA], ["wide/", PAT]]) {
+    await as(PAT, "select public.set_path_owner($1, $2, $3)", [V.short, path, user]);
+  }
 });
 
 after(async () => {
@@ -286,6 +298,16 @@ test("name owner: on a path that has owners already, the confirm page says their
   assert.deepEqual(await named(V.main, "legal/"), [EDDA, OTTO].sort());
 });
 
+test("name owner: naming leaves fewer named owners than the rule's approvals, and the confirm page warns that changes would wait", async () => {
+  const warned = await page(pat, `${owners(V.short, "pact/")}&add=${EDDA}`);
+  assert.match(
+    warned,
+    /<li><strong>Changes there would wait\.<\/strong> Only 1 named owner can approve changes there, so with 2 approvals needed they would stay open until more owners are named or the approvals needed are lowered\.<\/li>/,
+  );
+  assert.doesNotMatch(await page(pat, `${owners(V.short, "duo/")}&add=${EDDA}`), /Changes there would wait/, "one named owner is enough for 1 approval");
+  assert.deepEqual(await named(V.short, "pact/"), [], "asking names no one");
+});
+
 test("name owner: someone already named is said to be, and nothing changes", async () => {
   const h = await landed(pat, await get(pat, `${owners(V.main, "legal/")}&add=${OTTO}`));
   assert.deepEqual(flashOf(h), ["info", "status", "otto@example.test is already a named owner of legal/."]);
@@ -342,6 +364,21 @@ test("remove owner: the confirm page says what they go back to, and opening it r
   assert.match(editor, /<li>As an editor, they propose changes to it and wait for approval, like anyone else\.<\/li>/);
   assert.doesNotMatch(editor, /last named owner/, "Edda is still named");
   assert.deepEqual(await named(V.main, "hr/"), [VIO], "nothing removed by looking");
+});
+
+test("remove owner: removing leaves fewer people able to approve than the rule's approvals, and the confirm page warns that changes would wait", async () => {
+  const named_ = await page(pat, `${owners(V.short, "pair/")}&remove=${EDDA}`);
+  assert.match(
+    named_,
+    /<li><strong>Changes there would wait\.<\/strong> Only 1 named owner can approve changes there, so with 2 approvals needed they would stay open until more owners are named or the approvals needed are lowered\.<\/li>/,
+  );
+  // The last named owner: owners and editors approve again, but only two of them.
+  const last = await page(pat, `${owners(V.short, "wide/")}&remove=${PAT}`);
+  assert.match(
+    last,
+    /<li><strong>Changes there would wait\.<\/strong> Only 2 owners and editors can approve changes there, so with 3 approvals needed they would stay open until more members become editors or owners or the approvals needed are lowered\.<\/li>/,
+  );
+  assert.deepEqual(await named(V.short, "pair/"), [PAT, EDDA].sort(), "asking removes no one");
 });
 
 test("remove owner: a form without the confirm page's field is sent to that page and removes nothing", async () => {

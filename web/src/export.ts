@@ -192,6 +192,10 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
   const root = `${slug(h.vault.name)}-${h.exported_at.slice(0, 10)}`;
   const gz = createGzip();
   const piped = pipeline(gz, out);
+  // A download dropped while a page query is pending rejects `piped` long
+  // before `await piped` below is reached, and an unhandled rejection ends the
+  // process. The same rejection still reaches that await.
+  piped.catch(() => {});
   // Waits for the gzip stream to take more, or fails if the download ended.
   const drained = () =>
     new Promise<void>((resolve, reject) => {

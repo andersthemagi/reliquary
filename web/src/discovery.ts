@@ -40,6 +40,7 @@
 // or SELF_HOSTED is set.
 
 import type http from "node:http";
+import { current } from "./failure.js";
 import { isLoopbackHost, safeFetch, type Resolved } from "./netsafety.js";
 import { BUILD } from "./version.js";
 
@@ -126,7 +127,7 @@ function post(
 // A single JSON-RPC response out of a body that's either a plain JSON
 // object or a minimal Server-Sent Events stream (Streamable HTTP allows
 // either). Picks the event whose id matches, or the only one there is.
-function parseJsonRpc(res: RawResponse, id: number): { result?: unknown; error?: { message?: string } } {
+function parseJsonRpc(res: RawResponse, id: number): { result?: unknown; error?: { code?: unknown; message?: unknown } } {
   const contentType = (res.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
   const candidates: unknown[] = [];
   if (contentType === "application/json") {
@@ -149,14 +150,37 @@ function parseJsonRpc(res: RawResponse, id: number): { result?: unknown; error?:
       }
     }
   } else {
-    throw new DiscoveryError(`This link’s server answered with an unexpected content type (${contentType || "none"}).`);
+    // The header is the upstream's text: shown only if it is a media type.
+    const shown = !contentType ? "none" : /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(contentType) ? contentType : "not a media type";
+    throw new DiscoveryError(`This link’s server answered with an unexpected content type (${shown}).`);
   }
-  const isRpc = (c: unknown): c is { jsonrpc: string; id?: unknown; result?: unknown; error?: { message?: string } } =>
+  const isRpc = (c: unknown): c is { jsonrpc: string; id?: unknown; result?: unknown; error?: { code?: unknown; message?: unknown } } =>
     !!c && typeof c === "object" && (c as { jsonrpc?: unknown }).jsonrpc === "2.0";
   const rpcs = candidates.filter(isRpc);
   const match = rpcs.find((c) => c.id === id) ?? (rpcs.length === 1 ? rpcs[0] : undefined);
   if (!match) throw new DiscoveryError("This link’s server didn’t send a matching MCP response.");
   return match;
+}
+
+// `said` with the credential taken out: the whole value, then any piece of 8
+// or more characters of it, since servers echo a prefix or a masked form
+// ("sk_live_****abcd"), and whatever follows "Bearer". Over-redacting a log
+// line costs nothing.
+function withoutCredential(said: string, credential: string): string {
+  const out = said.replace(/\bBearer\s+\S+/gi, "Bearer [credential]");
+  if (!credential) return out;
+  const whole = out.split(credential).join("[credential]");
+  if (credential.length <= 8) return whole;
+  const pieces = new Set<string>();
+  for (let i = 0; i + 8 <= credential.length; i++) pieces.add(credential.slice(i, i + 8));
+  const hidden = new Uint8Array(whole.length);
+  for (let i = 0; i + 8 <= whole.length; i++) if (pieces.has(whole.slice(i, i + 8))) hidden.fill(1, i, i + 8);
+  let masked = "";
+  for (let i = 0; i < whole.length; i++) {
+    if (!hidden[i]) masked += whole[i];
+    else if (i === 0 || !hidden[i - 1]) masked += "[credential]";
+  }
+  return masked;
 }
 
 export type CallOptions = Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve">;
@@ -190,9 +214,34 @@ export async function call(
   }
   const rpc = parseJsonRpc(res, id);
   if (rpc.error) {
-    throw new DiscoveryError(`This link’s server refused: ${String(rpc.error.message ?? "unknown error").slice(0, 200)}`);
+    // What the server said is its own text, not ours: it can be an
+    // instruction for whoever reads it, and servers answer "Invalid token:
+    // <the bearer they were sent>". So it is never shown, only logged, under
+    // this request's reference and without the credential.
+    const code = Number.isInteger(rpc.error.code) ? (rpc.error.code as number) : undefined;
+    const said = withoutCredential(String(rpc.error.message ?? ""), credential).slice(0, 200);
+    console.info(`link upstream error ref=${current().ref} ${JSON.stringify({ code, said })}`);
+    throw new DiscoveryError(
+      `This link’s server answered with an error of its own${code === undefined ? "" : ` (code ${code})`}. What it said is kept in the web app’s server log.`,
+    );
   }
   return { result: rpc.result, sessionId: typeof returnedSession === "string" ? returnedSession : undefined };
+}
+
+// An upstream's description is third-party text that an owner approves a
+// grant by and that mcp/ later puts in front of agents. Stored as one
+// bounded line without control or invisible formatting characters (bidi
+// overrides, zero-width marks), so what the owner read is what is stored.
+// mcp/src/links-tools.ts applies the same limits again at the point of use,
+// for rows stored before this and rows written any other way.
+const DESCRIPTION_MAX = 300;
+function tidyDescription(raw: string): string | null {
+  const one = raw
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, " ")
+    .replace(/\p{Cf}+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return one ? Array.from(one).slice(0, DESCRIPTION_MAX).join("") : null;
 }
 
 function toolOf(raw: unknown): DiscoveredTool | null {
@@ -201,7 +250,7 @@ function toolOf(raw: unknown): DiscoveredTool | null {
   if (typeof t.name !== "string" || t.name.length === 0 || t.name.length > 200) return null;
   const annotations = t.annotations && typeof t.annotations === "object" ? (t.annotations as Record<string, unknown>) : undefined;
   const isWrite = annotations?.readOnlyHint !== true;
-  const description = typeof t.description === "string" ? t.description : null;
+  const description = typeof t.description === "string" ? tidyDescription(t.description) : null;
   return { name: t.name, isWrite, description };
 }
 

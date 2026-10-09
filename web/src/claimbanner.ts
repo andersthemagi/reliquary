@@ -16,23 +16,12 @@
 import type pg from "pg";
 import { siteHref } from "./hosts.js";
 import { breakHref } from "./claimbreak.js";
-import { activeClaim } from "./claimlookup.js";
+import { activeClaim, claimAgents } from "./claimlookup.js";
 import { callout, html, time, type Raw } from "./html.js";
 import { canWrite, who, type Ctx, type Vault } from "./pages.js";
 
 // What the person is about to do on the page the banner sits on.
 export type ClaimMode = "view" | "write" | "propose";
-
-// The newest grant on the path is the active claim's: a renewal keeps the
-// holder, and any new holder comes with a new grant.
-async function grantedByAgent(c: pg.PoolClient, vaultId: string, path: string): Promise<boolean> {
-  const { rows } = await c.query(
-    `select agent is not null as by_agent from public.log
-      where vault_id = $1 and path = $2 and event = 'claim.grant' order by seq desc limit 1`,
-    [vaultId, path],
-  );
-  return rows[0]?.by_agent ?? false;
-}
 
 // `back` is the page Break returns to once the claim is broken. Owners and
 // editors get Break; the database is what decides who may break a claim
@@ -41,7 +30,7 @@ async function grantedByAgent(c: pg.PoolClient, vaultId: string, path: string): 
 export async function claimBanner(c: pg.PoolClient, ctx: Ctx, v: Vault, path: string, mode: ClaimMode, back: string): Promise<Raw | ""> {
   const claim = await activeClaim(c, v.id, path);
   if (!claim) return "";
-  const agent = await grantedByAgent(c, v.id, path);
+  const agent = (await claimAgents(c, v.id, [path])).has(path);
   const mine = claim.holder === ctx.userId;
   const subject = agent ? (mine ? "Your agent" : `${who(ctx, claim.holder, null)}’s agent`) : mine ? "You" : who(ctx, claim.holder, null);
   const verb = !agent && mine ? "are" : "is";
