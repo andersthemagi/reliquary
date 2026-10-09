@@ -21,6 +21,11 @@ permissions:
 
 jobs:
   lint:
+    # release-please's own pull requests are titled "Release v1.2.3", which
+    # is not a conventional commit and doesn't need to be: its squash commit
+    # is the release itself. Skipped only for a branch in this repository, so
+    # a fork can't dodge the lint by naming its branch release-please--x.
+    if: github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-please--')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
