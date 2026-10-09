@@ -32,7 +32,8 @@
 
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { TIMEOUT_MS } from "./config.js";
 import os from "node:os";
 import path from "node:path";
 import { CliError, fsFailure, UsageError } from "./errors.js";
@@ -55,8 +56,26 @@ export interface CredentialStore {
 
 const REFRESH = /^rlr_[0-9a-f]{64}$/;
 const ACCESS = /^rle_[0-9a-f]{64}$/;
-const LOCK_STALE_MS = 30_000;
-const LOCK_WAIT_MS = 15_000;
+
+// A keychain tool is killed after this long (realExec), and fails the command.
+const EXEC_TIMEOUT_MS = 20_000;
+
+// The lock's timings, compared here and nowhere else.
+//
+// What runs under the lock is a token refresh: one request to the server
+// (TIMEOUT_MS) and the keychain around it. A hung keychain tool is killed
+// after EXEC_TIMEOUT_MS and fails the command, so a hold has at most one
+// hang in it: the longest honest hold is a request plus one hung tool.
+//
+// A lock older than a hold can last is a crashed process's, and a waiter may
+// replace it. If that limit were shorter than a slow refresh, a second process
+// would take the lock mid-refresh and present the same rotating refresh token
+// (the 30 s limit this replaced equalled the request timeout), and presenting
+// a rotated token again revokes the whole grant. A waiter waits longer than
+// that limit so a crashed process's lock is outwaited and replaced, rather
+// than reported as another process holding it.
+const LOCK_STALE_MS = TIMEOUT_MS + EXEC_TIMEOUT_MS + 10_000;
+const LOCK_WAIT_MS = LOCK_STALE_MS + 15_000;
 
 export const SERVICE = "reliquary-cli";
 
@@ -180,7 +199,7 @@ export const realExec: Exec = (file, args, opts = {}) => {
     encoding: "utf8",
     shell: false,
     windowsHide: true,
-    timeout: opts.timeoutMs ?? 20_000,
+    timeout: opts.timeoutMs ?? EXEC_TIMEOUT_MS,
     maxBuffer: 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -376,20 +395,28 @@ export function setCredential(server: string, c: Credential | null): void {
   credentialStore().set(server, c);
 }
 
-// An exclusive lock around a read-modify-write of the store. A lock older
-// than 30 s is a crashed process's and is taken over.
+// An exclusive lock around a read-modify-write of the store. It holds a token
+// naming its owner; one older than LOCK_STALE_MS is a crashed process's and
+// is replaced.
 export async function withLock<T>(fn: () => Promise<T>): Promise<T> {
   const dir = ensureDir();
   const lock = path.join(dir, "credentials.lock");
+  const mine = randomBytes(8).toString("hex");
   const start = Date.now();
   for (;;) {
     try {
-      closeSync(openSync(lock, "wx", 0o600));
+      writeFileSync(lock, mine, { flag: "wx", mode: 0o600 });
       break;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw fsFailure("create the lock file", lock, err, CONFIG_HINT);
       try {
-        if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
+        // Judged on one lock, not two: its owner must read the same before
+        // and after we look at its age, and again just before we remove it,
+        // so a lock that changed hands meanwhile is never the one deleted.
+        // A few microseconds remain between that last read and the removal;
+        // closing them takes kernel file locks, which Node doesn't offer.
+        const seen = readFileSync(lock, "utf8");
+        if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS && readFileSync(lock, "utf8") === seen) {
           unlinkSync(lock);
           continue;
         }
@@ -405,6 +432,12 @@ export async function withLock<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } finally {
-    rmSync(lock, { force: true });
+    // Only if it is still ours: had it been replaced (we outlived
+    // LOCK_STALE_MS), the file is the new owner's.
+    try {
+      if (readFileSync(lock, "utf8") === mine) unlinkSync(lock);
+    } catch {
+      // already gone
+    }
   }
 }
