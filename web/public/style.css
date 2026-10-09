@@ -82,6 +82,12 @@
   --shadow-menu: 0 8px 24px -6px rgb(28 25 23 / 0.18), 0 0 0 1px var(--border);
 }
 
+/* A fingertip needs about 44px: on phones every button and field grows from
+   36px, and the small ones in table rows and menus from 28px. */
+@media (max-width: 640px) {
+  :root { --control-sm: 44px; --control-md: 44px; }
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
@@ -555,6 +561,9 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .choice-form label.choice input { margin-top: 4px; }
 .token-form .choice-list { margin: 0 0 0 7px; padding-left: 18px; border-left: 1px solid var(--border); }
 .token-form select.token-expiry { min-width: 12rem; }
+@media (max-width: 640px) {
+  :is(.token-form, .choice-form) label.choice { min-height: 44px; padding: 10px 0; }
+}
 
 /* Callouts ------------------------------------------------------------------ */
 
@@ -1027,6 +1036,8 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
     border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg);
   }
   .tree-mobile[open] > summary { margin-bottom: var(--space-3); }
+  .tree-mobile .tree summary, .tree-mobile .tree .leaf { min-height: 44px; padding-top: 0; padding-bottom: 0; }
+  .tree-mobile .tree a { align-self: stretch; display: flex; align-items: center; }
   .tree-mobile .side-links, .tree-mobile .tree {
     background: var(--bg-subtle); border: 1px solid var(--border); padding: var(--space-3);
   }
@@ -1197,6 +1208,11 @@ form.confirm .actions:first-child { margin-top: 0; }
 footer a { color: var(--fg-muted); }
 footer a:hover { color: var(--link); }
 .footer-version { display: inline-block; padding: var(--space-1) 0; font-variant-numeric: tabular-nums; }
+/* The links are 20px tall otherwise, and a phone's footer is five of them. */
+@media (max-width: 640px) {
+  .footer-links { row-gap: 0; }
+  .footer-links a, .site-footer > a, .footer-version { display: inline-flex; align-items: center; min-height: 44px; padding: 0; }
+}
 
 /* Reading copy, not tables: proportional figures and punctuation. */
 body.site { font-variant-numeric: normal; }
@@ -1551,6 +1567,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .connections-ended > summary:hover { color: var(--fg); }
 .connections-ended[open] > summary { margin-bottom: var(--space-2); }
 .connections-ended .hint { margin: 0 0 var(--space-3); }
+@media (max-width: 640px) { .connections-ended > summary { min-height: 44px; } }
 .new-token-hint { margin: 0 0 var(--space-4); }
 /* Connect (/connect): the URL in the header, one client per tab, and a
    click selects a whole command. */
