@@ -8,50 +8,15 @@ secrets or the feed.
 
 Milestones and their exit checks are in the design's Build order table
 ([docs/design.md](docs/design.md#build-order)). Work on the current
-milestone only. A milestone is done when its check has held for a week of
-real use, not when the code merges.
-
-What's shipped for each milestone — file by file, with the hostile-test
-suite that proves it and the decision that shaped it — is
-[docs/progress.md](docs/progress.md). Read the section for the milestone
-you're touching before changing it.
-
-Current (updated 2026-09-29): milestones 1 and 2 have both held their week
-of real use and are done. Milestone 3 (links) is current; it started early
-(owner's decision, 2026-09-28), alongside path ownership and flags, before
-milestone 2's week had finished. That head start was a deliberate, logged
-exception to "work on the current milestone only," not a new default —
-check `docs/progress.md` before assuming the same is fine for something
-else mid-flight.
-
-Also (owner's decision, 2026-09-30, tracking issue #52): compare-and-swap
-writes, path claims and work plans start now too, another deliberate,
-logged exception, in three phases — phase 1 (compare-and-swap writes) and
-phase 2 (claims) are shipped (2026-10-01); phase 3 (work plans) started
-2026-10-02, the maintainer's own call, informed by how claims held up in
-real use, not a calendar (an earlier version of this required 14 and 30
-days respectively; dropped the same day as the first decision). Usage is
-tracked informally in `docs/progress.md` as each phase ships, for the
-maintainer's own judgement, not as a formal precondition.
-
-Also (owner's decision, 2026-10-02): Threads, the audience split in the web
-UI, and the Tasks view with the MCP step tools start now too, another
-deliberate, logged exception to "work on the current milestone only." The
-audience split puts what a person reads or acts on first (Tasks, Threads,
-Changes) and moves the full log, flags and the claims table one click away
-under Diagnostics; their URLs keep resolving. The design is in
-`docs/design.md` ("Who each surface is for", "Threads"), what is built is
-in `docs/progress.md`. Proposed, not yet confirmed by the owner: the Tasks
-view and the step tools start ahead of CL-3.9 (#74, waiting and places in
-line), which issues #75 and #76 list as a blocker, and anything that needs
-CL-3.9 (`request_work`, `leave_queue`, places in line, who is waiting) is
-left out of both until it lands.
-
-All of it needs podman or docker; nothing needs Node installed on the host.
-
-`spikes/` and `pilot/` are research that informed v3 (the audience gate, session
-minting, a Telegram surface). They are not product code, and are not
-milestone work.
+milestone only; it is done when its check has held for a week of real use,
+not when the code merges. Milestones 1 and 2 are done; milestone 3 (links)
+is current until the owner marks it done in [docs/progress.md](docs/progress.md).
+Three owner decisions started work early (path ownership and flags; claims
+and work plans; Threads and the Tasks view). Each is a logged exception, not
+a precedent: read [the decision log](docs/progress.md#decisions) and the
+milestone's section there before building ahead of anything. Not built:
+waiting in line (`request_work`, `leave_queue`, places in line; issue #74).
+`spikes/` and `pilot/` are research, not product code or milestone work.
 
 ## Guardrails
 
