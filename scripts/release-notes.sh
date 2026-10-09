@@ -6,8 +6,6 @@
 #   - "Database migrations in this release": the files added under
 #     supabase/migrations/ since the previous v* tag (all of them for the
 #     first release);
-#   - "Roadmap items in this release": items in docs/public/roadmap.yml whose
-#     `version` is this one (skipped without that file or without yq);
 #   - "Deploy": what publishing the release does, and how to redeploy or roll
 #     back.
 #
@@ -69,22 +67,6 @@ section() {
   echo
   echo "Migrations are forward-only. Rolling back this release later redeploys older app code on the newer schema; it never undoes a migration."
 
-  local roadmap=docs/public/roadmap.yml items=""
-  if git cat-file -e "$tag:$roadmap" 2>/dev/null && command -v yq >/dev/null; then
-    # Any mapping with a matching `version` (v-prefixed or not), titled by
-    # its title, name or summary: the file's layout isn't fixed here.
-    items=$(git show "$tag:$roadmap" | V="$version" yq -r '
-      .. | select(tag == "!!map" and has("version"))
-         | select((.version | tostring) == strenv(V) or (.version | tostring) == "v" + strenv(V))
-         | (.title // .name // .summary // "")' 2>/dev/null | grep -v '^$' || true)
-  fi
-  if [ -n "$items" ]; then
-    echo
-    echo "### Roadmap items in this release"
-    echo
-    while IFS= read -r i; do echo "- $i"; done <<< "$items"
-  fi
-
   echo
   echo "### Deploy"
   echo
@@ -107,4 +89,4 @@ fi
   printf '%s\n\n' "$body"
   section
 } | gh release edit "$tag" --notes-file -
-echo "$tag: added pre-alpha note, $(grep -c . <<< "$migrations" || true) migration(s), roadmap and deploy note"
+echo "$tag: added pre-alpha note, $(grep -c . <<< "$migrations" || true) migration(s) and deploy note"
