@@ -74,7 +74,7 @@ jobs:
             echo "::notice title=release skipped::no v* tag yet: cut v0.1.0 by hand first (docs/ops/runbook.md, Deploy)"
           fi
 
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: rp
         if: steps.cut.outputs.ok == 'true'
         with:

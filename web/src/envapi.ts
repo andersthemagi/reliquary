@@ -65,6 +65,7 @@ const REASONS: Record<string, [string, string]> = {
   not_found: ["database (only what’s shared with you is visible)", "There’s no such vault, environment or push for this connection"],
   push_not_allowed: ["env API (connection)", "This connection wasn’t allowed to send values: “Also let it send .env files” wasn’t ticked when it was approved"],
   rate_limited: ["rate limit", "Too many requests from this connection in a short time"],
+  too_many_pending: ["rate limit (pushes waiting for approval)", "You already have as many pushes waiting for approval in this vault as it allows. Apply or reject some on its Variables page, then push again; waiting won’t clear this"],
   not_configured: ["encryption", "This server has no key for variables (VARIABLES_KEY), so it can’t deliver or seal values"],
   method_not_allowed: ["env API", "That method isn’t accepted on this path"],
   unsupported_media_type: ["env API", "A push must be sent as application/json"],
@@ -113,7 +114,7 @@ async function asGrant<T>(g: Grant, fn: (c: pg.PoolClient) => Promise<T>): Promi
   }
 }
 
-const STATUS: Record<string, number> = { unauthorized: 401, forbidden: 403, not_found: 404, push_not_allowed: 403, rate_limited: 429 };
+const STATUS: Record<string, number> = { unauthorized: 401, forbidden: 403, not_found: 404, push_not_allowed: 403, rate_limited: 429, too_many_pending: 429 };
 
 // A push: {"variables": {"NAME": "value", ...}, "refused": [{"line", "name", "reason"}]}.
 // The CLI parsed its file with the same rules (dotenv.ts); names and values
@@ -301,6 +302,15 @@ export async function envApi(req: http.IncomingMessage, res: http.ServerResponse
   return true;
 }
 
+// The database answers rate_limited for two limits, and only one clears by
+// deciding pushes: the cap on pending imports in a vault (the other is the
+// hourly count). Ask which, so the CLI can tell a person to apply or reject
+// some instead of waiting. A grant can't read the table (row-level security
+// shows it nothing), hence a function.
+async function atPendingCap(c: pg.PoolClient, vaultId: string): Promise<boolean> {
+  return (await c.query("select public.env_import_limit($1) as limit", [vaultId])).rows[0].limit === "pending";
+}
+
 // POST /api/env/<vault>/<environment>/imports: seal what the CLI sent and
 // make a pending import for a person to approve. Nothing is set here.
 async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: Grant, vaultId: string, environment: string): Promise<string> {
@@ -316,13 +326,14 @@ async function push(req: http.IncomingMessage, res: http.ServerResponse, grant: 
     // transaction as the import itself (create_env_import checks it again).
     r = await asGrant(grant, async (c) => {
       const pre = await precheckImport(c, vaultId, entries);
-      if (!pre.ok) return pre;
-      const items = sealItems(vaultId, [environment], entries);
-      return (
-        await c.query("select public.create_env_import($1, $2, $3, $4) as r", [
-          vaultId, [environment], JSON.stringify(items), JSON.stringify(refused),
-        ])
-      ).rows[0].r;
+      const out = pre.ok
+        ? (
+            await c.query("select public.create_env_import($1, $2, $3, $4) as r", [
+              vaultId, [environment], JSON.stringify(sealItems(vaultId, [environment], entries)), JSON.stringify(refused),
+            ])
+          ).rows[0].r
+        : pre;
+      return !out.ok && out.error === "rate_limited" && (await atPendingCap(c, vaultId)) ? { ok: false, error: "too_many_pending" } : out;
     });
   } catch (err) {
     // 22023: the database refused the input (a name, the shape).

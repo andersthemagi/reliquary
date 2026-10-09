@@ -82,6 +82,12 @@
   --shadow-menu: 0 8px 24px -6px rgb(28 25 23 / 0.18), 0 0 0 1px var(--border);
 }
 
+/* A fingertip needs about 44px: on phones every button and field grows from
+   36px, and the small ones in table rows and menus from 28px. */
+@media (max-width: 640px) {
+  :root { --control-sm: 44px; --control-md: 44px; }
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
@@ -377,6 +383,7 @@ strong { font-weight: 600; }
 }
 @media (max-width: 1080px) {
   .app-top .top-inner { gap: var(--space-4); }
+  .app-top .top-inner > .stage { margin-left: calc(-1 * var(--space-2)); }
   .top-search input[type="search"] { width: 14rem; }
 }
 /* Phones: search behind a button; every menu opens full width under the bar. */
@@ -385,19 +392,39 @@ strong { font-weight: 600; }
     width: calc(100% + 2 * var(--space-5)); margin: 0 calc(-1 * var(--space-5));
     padding: 0 var(--space-2); overflow: visible; flex-wrap: wrap;
   }
-  .app-top .app-nav a, .vault-switch > summary { padding: 0 10px; }
+  .app-top .app-nav a, .vault-switch > summary { padding: 0 10px; min-height: 44px; }
   .app-top .top-inner { column-gap: var(--space-3); }
+  .app-top .top-inner > .stage { margin-left: 0; }
   .top-tools { gap: 0; flex: none; }
-  .icon-button { padding: 0 9px; }
+  /* Two classes: .button, further down, would otherwise win the padding,
+     and the bar needs these narrow to hold the badge and all three
+     buttons on one row at 320px. The account button is its avatar alone. */
+  .top-tools .icon-button { padding: 0 10px; min-height: 44px; }
+  .top-tools .account-button { padding: 0 6px; min-height: 44px; }
+  .top-tools .account-button::after { content: none; }
   .top-tools > .top-search { display: none; }
   .search-pop { display: block; }
   .account-name { display: none; }
-  .account-button { padding: 0 6px; }
   .app-top .top-tools > .menu-wrap, .app-top .app-nav > .vault-switch { position: static; }
   .app-top .top-tools > .menu-wrap > .menu {
     left: var(--space-5); right: var(--space-5); top: 50px; width: auto; min-width: 0; max-width: none;
   }
   .app-top .vault-menu { left: var(--space-5); right: var(--space-5); top: calc(100% + 1px); width: auto; min-width: 0; max-width: none; }
+}
+/* Narrow phones: the badge, the wordmark and three buttons are 296px wide
+   with their gaps, and a 320px screen has 288px, so each gives up a little
+   rather than the buttons dropping to a second line. The main links do the
+   same so "Docs" doesn't sit alone on a second line (a long vault name
+   still wraps them, and a wrapped link is still 44px tall). */
+@media (max-width: 374px) {
+  .app-top .app-nav a, .vault-switch > summary { padding: 0 8px; }
+}
+@media (max-width: 359px) {
+  .top-tools .icon-button { padding: 0 8px; }
+  .app-top .top-inner > .stage { padding: 0 6px; }
+  .app-top .wordmark { gap: 8px; }
+  .app-top .app-nav { gap: 0; }
+  .app-top .app-nav a, .vault-switch > summary { padding: 0 6px; }
 }
 
 /* Layout ------------------------------------------------------------------- */
@@ -505,6 +532,16 @@ input::placeholder, textarea::placeholder { color: var(--fg-muted); opacity: 1; 
 input[type="text"]:hover, input[type="search"]:hover, input[type="date"]:hover, input[type="number"]:hover, textarea:hover, select:hover { border-color: var(--fg-muted); }
 input[type="text"]:focus-visible, input[type="search"]:focus-visible, input[type="date"]:focus-visible, input[type="number"]:focus-visible,
 textarea:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
+/* The Add a link form's credential is the app's one password input. Its own
+   rules, not the list above, which components_unit.test.mjs pins. */
+input[type="password"] {
+  width: 100%; min-height: var(--control-md);
+  font: 400 var(--text-md)/1.4 var(--font-sans); color: var(--fg);
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  padding: 6px 12px; transition: border-color 120ms ease-out;
+}
+input[type="password"]:hover { border-color: var(--fg-muted); }
+input[type="password"]:focus-visible { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
 /* A locked field (the Rules form's path while changing a rule) must not look editable. */
 input[readonly] { background: var(--bg-subtle); }
 textarea { min-height: 280px; resize: vertical; line-height: 1.6; padding: 10px 12px; }
@@ -517,6 +554,11 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .fields { display: grid; grid-template-columns: minmax(0, 1fr) 10rem 7rem; gap: var(--space-4); align-items: end; }
 .fields label { margin-top: 0; }
 .fields select { width: 100%; }
+/* The Links form's three fields are a name, a URL and a credential, not the
+   Rules form's path, policy and approvals: the URL gets the room. */
+@media (min-width: 641px) {
+  #add-link .fields { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); }
+}
 .inline-field { display: flex; gap: var(--space-3); align-items: stretch; }
 .inline-field input { flex: 1; }
 .result { margin: var(--space-4) 0 0; }
@@ -534,6 +576,9 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .choice-form label.choice input { margin-top: 4px; }
 .token-form .choice-list { margin: 0 0 0 7px; padding-left: 18px; border-left: 1px solid var(--border); }
 .token-form select.token-expiry { min-width: 12rem; }
+@media (max-width: 640px) {
+  :is(.token-form, .choice-form) label.choice { min-height: 44px; padding: 10px 0; }
+}
 
 /* Callouts ------------------------------------------------------------------ */
 
@@ -608,7 +653,10 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .results .snippet { display: block; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin-top: var(--space-2); max-width: var(--measure); }
 .results .badge { margin-left: var(--space-2); }
 
-.table-wrap { overflow-x: auto; }
+/* Positioned, so the visually hidden "Actions" header (position: absolute) is
+   clipped here: left to the page it would sit at the table's far edge and
+   make the whole page scroll sideways, where the table itself scrolls. */
+.table-wrap { overflow-x: auto; position: relative; }
 table {
   width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--text-sm); line-height: var(--lh-sm);
   border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden;
@@ -662,6 +710,21 @@ a.dir { font-weight: 600; }
   height: 2px; background: var(--brand); border-radius: 2px 2px 0 0;
 }
 .tabs a:focus-visible { outline-offset: -2px; border-radius: var(--radius-md); }
+/* A strip that scrolls sideways with no scrollbar shows no sign there is
+   more of it, and the current tab can sit out of sight. Where the tabs
+   don't fit on one line they wrap (the page has no script to scroll the
+   current one into view), and the current one is filled rather than
+   underlined, since a row of underlines under each line would read as
+   dividers. 800px is where the Connect page's six client tabs stop fitting. */
+@media (max-width: 800px) {
+  .tabs { flex-wrap: wrap; box-shadow: none; }
+  .tabs a { border-radius: var(--radius-md); }
+  .tabs a[aria-current="page"] { background: var(--bg-muted); }
+  .tabs a[aria-current="page"]::after { content: none; }
+}
+@media (max-width: 640px) {
+  .tabs a { min-height: var(--control-md); }
+}
 
 /* Sidebar --------------------------------------------------------------------- */
 
@@ -994,6 +1057,8 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
     border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg);
   }
   .tree-mobile[open] > summary { margin-bottom: var(--space-3); }
+  .tree-mobile .tree summary, .tree-mobile .tree .leaf { min-height: 44px; padding-top: 0; padding-bottom: 0; }
+  .tree-mobile .tree a { align-self: stretch; display: flex; align-items: center; }
   .tree-mobile .side-links, .tree-mobile .tree {
     background: var(--bg-subtle); border: 1px solid var(--border); padding: var(--space-3);
   }
@@ -1057,6 +1122,14 @@ time { white-space: nowrap; }
 .crumb li + li::before { content: "/"; margin: 0 var(--space-3); color: var(--border-strong); }
 .crumb li[aria-current="page"] { color: var(--fg); }
 .crumb a { display: inline-block; padding: 2px 0; }
+/* On a phone the breadcrumb links and the stage badge are 20 to 24px tall.
+   Growing them would push every page header down, so only the part that
+   takes a tap grows, past the box. */
+@media (max-width: 640px) {
+  .crumb a, .stage { position: relative; }
+  .crumb a::after { content: ""; position: absolute; inset: -12px -6px; }
+  .stage::after { content: ""; position: absolute; inset: -11px -4px; }
+}
 
 /* Page header: a one-sentence description, and tabs flush under it. */
 .page-desc { margin: 0; color: var(--fg-muted); max-width: var(--measure); }
@@ -1164,6 +1237,11 @@ form.confirm .actions:first-child { margin-top: 0; }
 footer a { color: var(--fg-muted); }
 footer a:hover { color: var(--link); }
 .footer-version { display: inline-block; padding: var(--space-1) 0; font-variant-numeric: tabular-nums; }
+/* The links are 20px tall otherwise, and a phone's footer is five of them. */
+@media (max-width: 640px) {
+  .footer-links { row-gap: 0; }
+  .footer-links a, .site-footer > a, .footer-version { display: inline-flex; align-items: center; min-height: 44px; padding: 0; }
+}
 
 /* Reading copy, not tables: proportional figures and punctuation. */
 body.site { font-variant-numeric: normal; }
@@ -1331,6 +1409,15 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
     border-top: 1px solid var(--border); min-height: 44px;
   }
   .site-top nav::-webkit-scrollbar { display: none; }
+}
+/* On a phone the six site links (446px) scrolled sideways under a header
+   with no scrollbar: Roadmap sat off screen, and the current page's link
+   could too. Three to a row shows every one at 320px. */
+@media (max-width: 479px) {
+  .site-top nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; padding: 0 var(--space-2); }
+  .site-top nav a { min-height: 44px; border-radius: var(--radius-md); }
+  .site-top nav a[aria-current="page"] { background: var(--bg-muted); }
+  .site-top nav a[aria-current="page"]::after { content: none; }
 }
 
 /* Docs (web/src/docs.ts): sidebar, article, on-page contents. No script:
@@ -1509,6 +1596,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .connections-ended > summary:hover { color: var(--fg); }
 .connections-ended[open] > summary { margin-bottom: var(--space-2); }
 .connections-ended .hint { margin: 0 0 var(--space-3); }
+@media (max-width: 640px) { .connections-ended > summary { min-height: 44px; } }
 .new-token-hint { margin: 0 0 var(--space-4); }
 /* Connect (/connect): the URL in the header, one client per tab, and a
    click selects a whole command. */
@@ -1701,6 +1789,7 @@ label.choice-card input:focus-visible { outline: none; }
 .diag-tabs > .tabs a { min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); }
 .diag-tabs > .tabs a[aria-current="page"] { background: var(--bg-muted); }
 .diag-tabs > .tabs a[aria-current="page"]::after { content: none; }
+@media (max-width: 640px) { .diag-tabs > .tabs a { min-height: var(--control-md); } }
 .diag-tabs + h2 { margin-top: 0; }
 /* A section heading with a quiet line at its right: "People · 3 of 10 places". */
 .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-5); margin: var(--space-8) 0 var(--space-4); }
@@ -1719,7 +1808,7 @@ label.choice-card input:focus-visible { outline: none; }
 .member-list .role-form { flex-wrap: nowrap; }
 td.row-actions { width: 1%; white-space: nowrap; }
 /* A cell's second line (the only owner, a tier's source, a connection's kind). */
-:is(.member-list, .usage-table, .plan-vaults) .token-client { display: block; color: var(--fg-muted); font-size: var(--text-sm); }
+:is(.member-list, .usage-table, .plan-vaults, .connection-list) .token-client { display: block; color: var(--fg-muted); font-size: var(--text-sm); }
 .connection-list .conn-name { font-weight: 500; overflow-wrap: anywhere; }
 .invite-list td:first-child { overflow-wrap: anywhere; }
 .invite-form input[type="text"] { max-width: 28rem; }
@@ -1828,6 +1917,7 @@ td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
    sliver on a table with one or two rows. */
 .var-menu.menu-wrap { position: static; flex: none; }
 .var-menu > summary.icon-button { width: 32px; min-height: var(--control-sm); padding: 0; }
+@media (max-width: 640px) { .var-menu > summary.icon-button { width: 44px; } }
 .var-menu > .menu { top: auto; right: auto; left: auto; margin-top: 4px; transform: translateX(calc(-100% + 32px)); }
 .var-menu > .menu > .menu-label { max-width: 17rem; font-weight: 400; font-size: var(--text-xs); line-height: var(--lh-xs); white-space: normal; }
 .var-row-end { text-align: right; width: 1%; }

@@ -117,12 +117,6 @@ Deleting a vault deletes its threads with everything else. Threads aren't in a v
 
 ## Limits
 
-| What | Limit |
-|---|---|
-| A thread's title | 1 to 200 characters, on one line |
-| A message | 1 to 4000 characters; line breaks and tabs, but no other control characters |
-| Members a thread is addressed to | 20 |
-| Threads in a vault | 1000, open and resolved together |
-| Messages in a vault | 10000 |
+How long a title and a message can be, how many members a thread can be addressed to, and how many threads and messages a vault holds are in [Limits](../reference/limits.md#threads).
 
 These numbers are a starting point and may change. Threads and messages are never deleted, so a vault at a limit stays at it: ask for more with **Ask for a bigger plan**, on **Plan and usage**. Long text belongs in a file: write it there and mention its path in the thread.

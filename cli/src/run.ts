@@ -19,9 +19,12 @@ import { spawn } from "node:child_process";
 import { statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { isatty } from "node:tty";
 import { CliError } from "./errors.js";
 
 const POSIX_FORWARD: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT", "SIGUSR2"];
+// The two a terminal sends itself, to every process in its foreground group.
+const FROM_TERMINAL = new Set<NodeJS.Signals>(["SIGINT", "SIGQUIT"]);
 
 // ---------------------------------------------------------------------------
 // The environment
@@ -158,7 +161,17 @@ export function runWith(command: string[], variables: Map<string, string>, say: 
       process.on(sig, h);
     };
     if (!win) {
+      // At a terminal the command is in the foreground group and gets Ctrl-C
+      // and Ctrl-\ without us; passing them on as well would deliver each
+      // twice, and a program that reads the second as "force quit" skips its
+      // clean shutdown. We only wait for it, as on Windows below. Without a
+      // terminal (CI, an editor, `kill -INT`) nothing else delivers them.
+      const atTerminal = isatty(0);
       for (const sig of POSIX_FORWARD) {
+        if (atTerminal && FROM_TERMINAL.has(sig)) {
+          on(sig, () => {});
+          continue;
+        }
         on(sig, () => {
           try {
             child.kill(sig);

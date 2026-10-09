@@ -14,7 +14,8 @@ file=${1:-$(ls -1t "$dir"/reliquary-*.dump 2>/dev/null | head -1)}
 [[ -n $file && -s $file ]] || { echo "No backup found (run scripts/backup.sh)."; exit 1; }
 
 name=reliquary-restore-test
-cleanup() { "$engine" rm -f "$name" >/dev/null 2>&1 || true; }
+# -v: the postgres image keeps its data in an anonymous volume that a plain rm leaves behind.
+cleanup() { "$engine" rm -f -v "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 cleanup
 "$engine" run -d --name "$name" --network none -e POSTGRES_PASSWORD=test \

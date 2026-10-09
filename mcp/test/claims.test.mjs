@@ -170,3 +170,20 @@ test("list_claims: shows an active claim with its label fenced, and drops it onc
     await ben.close();
   }
 });
+
+test("list_claims: the people line names each holder once, and marks the caller's own person", async () => {
+  const ben = await connect(env.BEN_TOKEN);
+  try {
+    const claimed = await call(ben, "claim_path", { vault: "Team", path: "notes/claim-g.md" });
+    try {
+      const during = await call(ben, "list_claims", { vault: "Team" });
+      assert.equal(during.isError, false, during.text);
+      assert.match(during.text, new RegExp(`^people: p1=${BEN} \\(your person\\)$`, "m"));
+      assert.match(during.text, /^notes\/claim-g\.md {2}fence 1 {2}p1 {2}until /m);
+    } finally {
+      await call(ben, "release_claim", { vault: "Team", path: "notes/claim-g.md", ...parsed(claimed.text) });
+    }
+  } finally {
+    await ben.close();
+  }
+});
