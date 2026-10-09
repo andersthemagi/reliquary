@@ -662,6 +662,18 @@ a.dir { font-weight: 600; }
   height: 2px; background: var(--brand); border-radius: 2px 2px 0 0;
 }
 .tabs a:focus-visible { outline-offset: -2px; border-radius: var(--radius-md); }
+/* A strip that scrolls sideways with no scrollbar shows no sign there is
+   more of it, and the current tab can sit out of sight. Where the tabs
+   don't fit on one line they wrap (the page has no script to scroll the
+   current one into view), and the current one is filled rather than
+   underlined, since a row of underlines under each line would read as
+   dividers. 800px is where the Connect page's six client tabs stop fitting. */
+@media (max-width: 800px) {
+  .tabs { flex-wrap: wrap; box-shadow: none; }
+  .tabs a { border-radius: var(--radius-md); }
+  .tabs a[aria-current="page"] { background: var(--bg-muted); }
+  .tabs a[aria-current="page"]::after { content: none; }
+}
 
 /* Sidebar --------------------------------------------------------------------- */
 
