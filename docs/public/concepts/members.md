@@ -25,7 +25,7 @@ An invite is a link with a role, for one email address or for anyone who holds i
 - Inviting the same address again replaces its earlier invite.
 - An owner can have at most 50 invites waiting in a vault (a link with no address counts as one, whatever its use count), and one person can create 20 an hour.
 
-The person opens the link, signs in (or is asked to, and comes back), and joins with that role. Someone who already has an account with an address invite's address can instead choose **Join** or **Decline** on it in their [Inbox](inbox-and-account.md#join-or-decline-an-invite); declining ends the invite, and the vault's log says so. A link with no address never appears in anyone's Inbox: there's no address to match it to. Joining by invite, either kind, also admits a new account while Reliquary is [invite-only](plans-and-limits.md#invite-only). See [Invite someone](../how-to/invite-someone.md).
+The person opens the link, signs in (or is asked to, and comes back), and joins with that role. Someone who already has an account with an address invite's address can instead choose **Join** or **Decline** on it in their [Inbox](inbox-and-account.md#join-or-decline-an-invite); declining ends the invite, and the vault's log says so. A link with no address never appears in anyone's Inbox: there's no address to match it to. Joining by invite, either kind, also lets a new account create vaults at once, without waiting in the [line](plans-and-limits.md#who-can-create-vaults). See [Invite someone](../how-to/invite-someone.md).
 
 ## Leaving and removal
 

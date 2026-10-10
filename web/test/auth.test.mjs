@@ -11,7 +11,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHmac, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { appendFileSync } from "node:fs";
-import { before, test } from "node:test";
+import { after, before, test } from "node:test";
+import pg from "pg";
 
 const { WEB_AUTH_A_URL: A, WEB_AUTH_B_URL: B, WEB_AUTH_PUBLIC_URL: PUBLIC_URL, FAKE_AUTH_URL: FAKE, AUTH_SECRETS_FILE } = process.env;
 const ORIGIN = PUBLIC_URL ? new URL(PUBLIC_URL).origin : "";
@@ -89,13 +90,41 @@ async function signInByCode(base, email = "ana@example.test", next) {
   return { jar, done };
 }
 
-before(() => {
+// Sign-in here is invite-only's, as hosted today: this file turns it on in
+// before() and off again in after() (web/test.sh runs one file at a time);
+// open sign-up is web/test/invite_signin.test.mjs's.
+async function setInviteOnly(on) {
+  const port = 54332 + (Number(new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791").port) - 8791);
+  const db = new pg.Client({ connectionString: `postgres://postgres:test@127.0.0.1:${port}/postgres` });
+  await db.connect();
+  try {
+    await db.query("select private.set_invite_only($1)", [on]);
+  } finally {
+    await db.end();
+  }
+}
+
+before(async () => {
   assert.ok(A && B && FAKE && PUBLIC_URL && AUTH_SECRETS_FILE, "run through web/test.sh (supabase-mode instances and the fake Auth)");
   assert.match(PUBLIC_URL, /^https:\/\//);
   appendFileSync(AUTH_SECRETS_FILE, "");
+  await setInviteOnly(true);
 });
 
+after(() => setInviteOnly(false));
+
 // Sign-in ------------------------------------------------------------------
+
+test("sign-in: a form with its hidden bot field filled sends no code, and reads as sent", async () => {
+  const jar = new Jar();
+  const page = await (await get(A, "/signin", jar)).text();
+  assert.match(page, /<div class="trap" aria-hidden="true"><label for="website">Leave this empty<\/label><input type="text" id="website" name="website" tabindex="-1" autocomplete="off"><\/div>/);
+  const before = await stats();
+  const r = await post(A, "/signin", { csrf: csrfOf(page), email: "ana@example.test", website: "http://spam.example", next: "/" }, jar);
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /<h1>Check your email<\/h1>/);
+  assert.equal((await stats()).otp, before.otp, "no code asked for");
+});
 
 test("sign-in: a signed-out page sends you to sign in and back", async () => {
   const r = await get(A, "/review?x=1", new Jar());
@@ -207,12 +236,6 @@ test("sign-in: copy has no em dashes or straight apostrophes", async () => {
     assert.doesNotMatch(visible, /—/);
     assert.doesNotMatch(visible, /[a-z]'[a-z]/i);
   }
-});
-
-test("sign-in: the page says Reliquary is invite-only, what an invite does, and how to request access", async () => {
-  const h = await (await get(A, "/signin", new Jar())).text();
-  assert.match(h, /<p class="hint">Reliquary is invite-only\. Anyone can sign in, but an account creates vaults only after it joins one by invite\. Have an invite\? Open its link\. Otherwise, <a href="mailto:[^"?]+\?subject=Reliquary%20early%20access">request access<\/a>\.<\/p>/);
-  assert.match(h, /<a href="[^"]*\/docs">About Reliquary<\/a>/);
 });
 
 test("sign-in: a malformed email is refused in the danger tone, announced, and tied to the email field", async () => {

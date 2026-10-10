@@ -299,9 +299,10 @@ names and counts only). The model and the numbers are in
 | Take it back to its account's plan | `scripts/plan.sh vault <vault-id> standard` |
 | Give one vault extra storage on top of its tier or plan (`500mb`, `2gb`; `0` to take it back) | `scripts/plan.sh grant-storage <vault-id> <amount>` |
 | Usage, largest first (everyone, one person's vaults, or one vault) | `scripts/plan.sh usage [<email>\|<vault-id>]` |
-| Let an account create vaults while invite-only | `scripts/plan.sh admit <email>` |
+| Let an account create vaults now (no invite, no wait in the line) | `scripts/plan.sh admit <email>` |
 | Take that back (they keep their vaults and memberships) | `scripts/plan.sh revoke-admission <email>` |
-| Open sign-ups to everyone after the alpha, or close them again | `scripts/plan.sh invite-only off` / `on` |
+| Open sign-ups to everyone, or close them again (a surge, abuse) | `scripts/plan.sh invite-only off` / `on` |
+| How many accounts a day are let in from the line, and how many wait | `scripts/plan.sh open-per-day [<n>\|none]` |
 | Storage counters that drifted, and members whose account is gone from Auth | `scripts/plan.sh check` |
 | Set one vault's storage counter to a full scan | `scripts/plan.sh recount <vault-id>` |
 
@@ -328,6 +329,27 @@ names and counts only). The model and the numbers are in
   Supabase and made again starts un-admitted. Only postgres and
   `reliquary_ops` admit (hostile tests in
   `supabase/tests/admission_test.sql`).
+- **Open sign-up** (`supabase/migrations/20261009200000_open_admission.sql`):
+  with invite-only off, sign-in makes an account for any address, and an
+  account nobody admitted waits in a line, in the order it confirmed its
+  address. pg_cron (`reliquary-let-in-from-line`, every 10 minutes) lets in
+  the front of the line, `open-per-day` accounts a UTC day (25 at first).
+  People see their place and andres@redmage.cc to write to; `admit <email>`
+  lets someone in at once. Accounts that got in stay in if you close
+  again. A bot's made-up address never confirms, so never queues; a form
+  bot that fills the sign-in page's hidden field gets no code (logged as
+  "sign-in trap field filled"). Before opening, and whenever the pace goes
+  up, check the email budget: every sign-in is an email, so the Supabase
+  "Rate limit for sending emails" ("Email sender", step 6) and the Resend
+  plan's daily and monthly quota must cover the pace with room for
+  existing people. When either runs out, people see "Sign-in emails are
+  paused". Order: release the migration first, then `invite-only off`;
+  opening on an older release lets everyone straight in. In a surge:
+  `invite-only on` (the line stops; invites still work), or a smaller
+  `open-per-day`. `open-per-day` with no number shows how many wait; `usage`
+  shows who is filling storage; `revoke-admission` stops an abusive account
+  creating more. Without pg_cron the line only moves when you run
+  `select private.let_in_from_line()` as postgres.
 - **Drift**: the storage counters are kept by triggers, and pg_cron runs
   `private.log_storage_drift()` Mondays 04:00 UTC, recording any vault whose
   counter differs from a full scan in `private.storage_drift_log` (and a

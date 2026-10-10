@@ -6,8 +6,8 @@ import { html, preAlphaNote, type Raw, type Theme } from "./html.js";
 import { OPERATOR, PRICING, requestAccessHref, sitePage } from "./site.js";
 
 const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
-  <a class="button primary" href="${requestAccessHref()}">Request access</a>
-  <a class="button" href="${appHref("/signin")}">Sign in</a>
+  <a class="button primary" href="${appHref("/signin")}">Sign up</a>
+  <a class="button" href="${requestAccessHref()}">Talk to us</a>
 </div>`;
 
 // A static picture of the product's core loop, drawn in HTML: an agent's
@@ -121,7 +121,7 @@ export function landing(theme: Theme): string {
     <p class="hero-sub">Your agents propose changes to canon. You approve them.</p>
     <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use: Claude, ChatGPT, Cursor, Claude Code and more. People and agents alike only see what they're scoped to. Secrets stay out of the chat.</p>
     ${cta("Get started")}
-    <p class="hero-small">EU-hosted. Bring your own model. Invite-only while in beta: tell us about your team and we'll set up your first vault with you, usually within 24 to 48 hours.</p>
+    <p class="hero-small">EU-hosted. Bring your own model. Open pre-alpha: sign up with your email. We're letting people in steadily as usage grows.</p>
     ${preAlphaNote()}
   </div>
   ${proposalCard}
@@ -197,7 +197,7 @@ ${PRICING.show
 
 <section class="site-section closing" aria-labelledby="closing-title">
   <h2 id="closing-title">Try it on your next project</h2>
-  <p>Reliquary is invite-only while in beta. Tell us about your team and the AI tools you use, and we'll set up your first vault with you, usually within 24 to 48 hours.</p>
+  <p>Reliquary is an open pre-alpha: sign up with your email and create a vault. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? Tell us about your team and the AI tools you use, and we'll set up your first vault with you.</p>
   ${cta("Get started")}
 </section>`;
   return sitePage({

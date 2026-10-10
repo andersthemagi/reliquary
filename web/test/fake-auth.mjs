@@ -29,7 +29,8 @@
 //                                 makes the account and emails the code, then answers 500
 //                                 (the losing request); a repeat with create_user: false
 //                                 within the throttle answers 429 and sends nothing
-//   POST /_fail_otp                { status }: answer every /otp with that status, no account
+//   POST /_fail_otp                { status, error_code?, msg? }: answer every /otp with that status (and
+//                                 that error, else a fake outage), no account
 //                                 made and no email sent (0: as normal). For when Auth is down
 //                                 outright, including for sendSigninEmail's own retry.
 //   GET  /_user?email=...         { id } of that account, or null
@@ -98,7 +99,7 @@ const refreshKey = { unknown: false }; // /_refresh_key_unknown
 const TTL = 3600;
 const signups = { on: false };
 const otpRace = { on: false }; // /_otp_race
-const failOtp = { status: 0 }; // /_fail_otp: answer every /otp with this status instead
+const failOtp = { status: 0, error_code: "", msg: "" }; // /_fail_otp: answer every /otp with this instead
 
 function accessToken(sub, email, sessionId, kid = KID) {
   const now = Math.floor(Date.now() / 1000);
@@ -144,7 +145,8 @@ http
       return json(res, 200, otpRace);
     }
     if (p === "/_fail_otp" && req.method === "POST") {
-      failOtp.status = Number((await readJson(req)).status) || 0;
+      const b = await readJson(req);
+      Object.assign(failOtp, { status: Number(b.status) || 0, error_code: String(b.error_code ?? ""), msg: String(b.msg ?? "") });
       return json(res, 200, failOtp);
     }
     if (p === "/_user") {
@@ -247,7 +249,7 @@ http
     if (p === "/auth/v1/otp") {
       stats.otp++;
       stats.lastCreateUser = body.create_user;
-      if (failOtp.status) return json(res, failOtp.status, { code: failOtp.status, error_code: "unexpected_failure", msg: "fake outage" });
+      if (failOtp.status) return json(res, failOtp.status, { code: failOtp.status, error_code: failOtp.error_code || "unexpected_failure", msg: failOtp.msg || "fake outage" });
       const email = String(body.email ?? "").toLowerCase();
       if (otpRace.on && body.create_user === false && lastEmail.has(email)) {
         return json(res, 429, { code: 429, error_code: "over_email_send_rate_limit", msg: "For security purposes, you can only request this after 60 seconds." });
