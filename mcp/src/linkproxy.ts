@@ -13,7 +13,7 @@ let SECRET = "";
 // Called once at startup (server.ts), alongside the rest of oauthConfig:
 // issuer is the web app's own URL, already resolved there (AUTH_ISSUER).
 export function configureLinkProxy(env: NodeJS.ProcessEnv, issuer: string): void {
-  const strict = env.VERCEL ? "VERCEL" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
+  const strict = env.NETLIFY ? "NETLIFY" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
   SECRET = env.LINK_PROXY_SECRET ?? "";
   if (strict && !SECRET) throw new Error(`Refusing to start: ${strict} is set but LINK_PROXY_SECRET is not`);
   BASE = issuer;

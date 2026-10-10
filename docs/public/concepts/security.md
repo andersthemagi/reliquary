@@ -47,7 +47,7 @@ Each rule has a test that tries to break it: a session for one vault reading ano
 
 ## Hosting
 
-The database (Supabase) is in Frankfurt (AWS eu-central-1), and the app runs in Frankfurt (Vercel, fra1). Connections to the database use TLS verified against Supabase's certificate authority. Data is backed up daily. Email (sign-in codes, account notices and vault invites) is sent through Resend, from Ireland; Resend keeps its delivery records in the US for 30 days. The companies involved are on the [sub-processors](/subprocessors) page.
+The database (Supabase) is in Frankfurt (AWS eu-central-1), and the app runs in Frankfurt (Netlify, its `fra` functions region). Connections to the database use TLS verified against Supabase's certificate authority. Data is backed up daily. Email (sign-in codes, account notices and vault invites) is sent through Resend, from Ireland; Resend keeps its delivery records in the US for 30 days. The companies involved are on the [sub-processors](/subprocessors) page.
 
 ## What we can't promise
 

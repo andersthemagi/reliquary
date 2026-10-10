@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { before, test } from "node:test";
 import pg from "pg";
+import { clientIp, configureRateLimits } from "../dist/ratelimit.js";
 
 const { MCP_RL_URL: URL_, TEST_SUPER_URL: SUPER } = process.env;
 let n = 0;
@@ -158,4 +159,29 @@ test("rate limits: counters hold no token, hash or address: every key is 64 hex 
   for (const { key } of rows) {
     assert.match(key, /^[0-9a-f]{64}$/);
   }
+});
+
+// Which header names the client when hosted (NETLIFY) or behind a proxy of
+// one's own (TRUST_PROXY_IP=1): Netlify's header first, since its edge sets
+// and overwrites it; the others are a self-hosted proxy's. Unit tests on
+// clientIp itself, against a request shaped like node:http's.
+const reqFrom = (headers, remoteAddress = "203.0.113.9") => ({ headers, socket: { remoteAddress } });
+
+test("rate limit ip: hosted, x-nf-client-connection-ip wins over x-real-ip and x-forwarded-for, and an IPv6 address counts by its /64", () => {
+  configureRateLimits({ NETLIFY: "true" });
+  try {
+    const all = { "x-nf-client-connection-ip": "198.51.100.1", "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3, 198.51.100.4" };
+    assert.equal(clientIp(reqFrom(all)), "198.51.100.1");
+    assert.equal(clientIp(reqFrom({ "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3" })), "198.51.100.2");
+    assert.equal(clientIp(reqFrom({ "x-forwarded-for": "198.51.100.3, 198.51.100.4" })), "198.51.100.3");
+    assert.equal(clientIp(reqFrom({ "x-nf-client-connection-ip": "2001:db8:1:2:3:4:5:6" })), "2001:db8:1:2::/64");
+  } finally {
+    configureRateLimits({});
+  }
+});
+
+test("rate limit ip: without NETLIFY or TRUST_PROXY_IP every forwarding header is ignored and the socket's address counts", () => {
+  configureRateLimits({});
+  const forged = { "x-nf-client-connection-ip": "198.51.100.1", "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3" };
+  assert.equal(clientIp(reqFrom(forged)), "203.0.113.9");
 });

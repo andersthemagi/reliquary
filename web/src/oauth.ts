@@ -25,7 +25,7 @@
 // database (public.create_cli_grant), and its access tokens are `rle_`, so
 // neither side's tokens work at the other (docs/variables.md).
 // CIMD_ALLOW_LOOPBACK=1 lets tests serve client metadata from loopback; it is
-// refused when VERCEL or SELF_HOSTED is set.
+// refused when NETLIFY or SELF_HOSTED is set.
 
 import { createHash, randomBytes } from "node:crypto";
 import type http from "node:http";
@@ -37,10 +37,10 @@ import type { Ctx, Reply } from "./pages.js";
 import { doing, fail, failure } from "./failure.js";
 
 function config() {
-  // Hosted on Vercel, or self-hosted (SELF_HOSTED=1, deploy/): the same
+  // Hosted on Netlify, or self-hosted (SELF_HOSTED=1, deploy/): the same
   // refusals, since either way real clients depend on these URLs.
-  const onVercel = !!process.env.VERCEL;
-  const strict = onVercel ? "VERCEL" : process.env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
+  const onNetlify = !!process.env.NETLIFY;
+  const strict = onNetlify ? "NETLIFY" : process.env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
   const allowLoopback = process.env.CIMD_ALLOW_LOOPBACK === "1";
   if (strict && allowLoopback) throw new Error(`Refusing to start: CIMD_ALLOW_LOOPBACK is for tests and must not be set with ${strict}`);
   let issuer = `http://${process.env.HOST ?? "127.0.0.1"}:${process.env.PORT ?? 8790}`;

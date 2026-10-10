@@ -5,7 +5,7 @@
 #
 #   podman build -f web/Dockerfile -t reliquary-web --build-arg GIT_COMMIT=$(git rev-parse HEAD) .
 #
-# The hosted service doesn't use this image (it runs on Vercel from source).
+# The hosted service doesn't use this image (it runs on Netlify from source).
 # The image runs as the unprivileged `node` user, writes nothing to its
 # filesystem (run it read-only), listens on PORT (8790) on all interfaces,
 # and answers GET /healthz. SELF_HOSTED=1 is set: the server refuses to start

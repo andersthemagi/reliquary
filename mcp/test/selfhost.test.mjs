@@ -24,7 +24,7 @@ test("self-hosted db: bad TLS settings are refused, never showing the URL", () =
     [{ DATABASE_TLS: "yes" }, /DATABASE_TLS must be off or system/],
     [{ DATABASE_TLS: "off", DATABASE_CA_FILE: "supabase-ca.crt" }, /not both/],
     [{ DATABASE_TLS: "off", DATABASE_URL: `${DB_URL}?sslmode=disable` }, /must not carry sslmode/],
-    [{ DATABASE_TLS: "off", VERCEL: "1" }, /never on Vercel/],
+    [{ DATABASE_TLS: "off", NETLIFY: "1" }, /never on Netlify/],
   ]) {
     try {
       poolConfig({ SELF_HOSTED: "1", DATABASE_URL: DB_URL, ...env });
@@ -38,7 +38,7 @@ test("self-hosted db: bad TLS settings are refused, never showing the URL", () =
 
 test("self-hosted db: without SELF_HOSTED or DATABASE_TLS, nothing changes", () => {
   assert.equal(poolConfig({ DATABASE_URL: DB_URL }).ssl, undefined);
-  assert.throws(() => poolConfig({ VERCEL: "1", DATABASE_URL: DB_URL }), /VERCEL is set but DATABASE_CA_FILE is not/);
+  assert.throws(() => poolConfig({ NETLIFY: "1", DATABASE_URL: DB_URL }), /NETLIFY is set but DATABASE_CA_FILE is not/);
 });
 
 test("self-hosted rate limits: TRUST_PROXY_IP may be 0 (off), as compose passes it; anything but 1, 0 or unset is refused", () => {

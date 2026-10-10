@@ -44,7 +44,7 @@ and never shows file text.
 
 **Sign-in** has two modes (`AUTH_MODE`). `local`, the default under `dev.sh`,
 is a stand-in: the server acts only as the one local person `dev.sh`
-created, and refuses to start on Vercel. `supabase` is the hosted one: see
+created, and refuses to start on Netlify. `supabase` is the hosted one: see
 "Sign-in with Supabase Auth" below.
 
 Tokens (made on Connections, `/connections/new`; the old `/tokens` URLs
@@ -74,7 +74,7 @@ board, which is the roadmap (`ROADMAP_URL` in `src/docs.ts`). Pages are rendered
 version stamp): it copies `docs/public` and fills in the generated parts (the
 MCP tools from `mcp/test/contract.snapshot.json`, the CLI's help,
 `CHANGELOG.md`). It reads outside `web/`, so it needs the whole
-checkout (Vercel builds from one); `vercel.json` bundles `docs-build/**` into
+checkout (the deploy workflow builds from one); `netlify.toml` ships `docs-build/**` with
 the function. Only pages in the build's manifest are served; without
 `docs-build/`, `/docs` is a 404. Drift tests: `test/docs.test.mjs`.
 
@@ -116,9 +116,9 @@ points them at its protected resource metadata, which names this app.
 
 Config: the issuer is `PUBLIC_URL` (locally `http://HOST:PORT`);
 `MCP_RESOURCE` (else `MCP_PUBLIC_URL`) is the one resource accepted and must
-be byte for byte the MCP app's `MCP_RESOURCE`. On Vercel both are required.
+be byte for byte the MCP app's `MCP_RESOURCE`. On Netlify both are required.
 `CIMD_ALLOW_LOOPBACK=1` lets tests serve client metadata on loopback; the
-server refuses to start with it on Vercel.
+server refuses to start with it on Netlify.
 
 **The Reliquary CLI** is a first-party client of the same server
 (docs/variables.md): its client id is `<issuer>/cli/oauth-client.json`,
@@ -141,23 +141,32 @@ the MCP side end to end in `mcp/test/oauth.test.mjs`.
 no `public/`) for `test/hosting.test.mjs`, and a split one (`PUBLIC_URL` and
 `SITE_URL`, driven by the Host header) for `test/split_hosts.test.mjs`.
 
-## Deploy (Vercel)
+## Deploy (Netlify)
 
-Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
-project, `reliquary-web`, Root Directory `web`. Vercel runs the app as one function, `api/index.js`, which hands every
-request to the handler `src/server.ts` exports (built by `npm run build`: the docs into `docs-build/`, `tsc` into `dist/`, then `stamp-version.mjs` writes `dist/version.json` from `../version.txt` for `GET /version`);
-every path is rewritten to it after `public/` gets its turn on the CDN. The
-zero-config Node server detection only recognises Express-style apps, so it
-failed on this plain `node:http` server. `vercel.json` sets region `fra1`, Fluid
-compute, `maxDuration` 30 s, bundles `supabase-ca.crt` into the function, and
-turns off automatic deploys from `main`: only a published release deploys
-(the deploy workflow applies its migrations first, then deploys exactly the
-tagged commit; `docs/ops/runbook.md`, "Deploy"). `public/` is served by Vercel's CDN.
+Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5 for the
+shape, 11 for the move to Netlify). One Netlify site, `reliquary-web`, not
+connected to the repository: the deploy workflow builds the tagged commit
+itself (`npm run build`: the docs into `docs-build/`, `tsc` into `dist/`, then
+`stamp-version.mjs` writes `dist/version.json` from `../version.txt` for `GET
+/version`) and uploads `public/` and the function with the Netlify CLI
+(`scripts/netlify-deploy.sh`; `docs/ops/runbook.md`, "Deploy"). The app runs
+as one function, `netlify/functions/index.mjs`, routed to every path after
+`public/` has had its turn on the CDN (`preferStatic`): it keeps the real
+`node:http` server listening on a loopback port inside the function and
+relays each web `Request` to it, so nothing imitates `IncomingMessage` or
+`ServerResponse`. `netlify.toml` names the files the function needs at run
+time (`dist/**`, `node_modules/**` after `npm prune --omit=dev`,
+`docs-build/**`, the invite email template, `supabase-ca.crt`, `public/**`),
+and the long cache headers for `/style.css` and `/fonts/`. The function runs
+in Frankfurt (`region: "fra"` in its config; a Pro plan setting) within
+Netlify's 60 s synchronous limit and 6 MB request ceiling.
 
 What the server does differently when hosted:
 
-- **`VERCEL` set**: opens no port (the function calls the exported handler),
-  and refuses to start unless `DATABASE_CA_FILE` is set.
+- **`NETLIFY` set** (the entry point sets it before loading the server, since
+  Netlify's runtime doesn't promise it): opens no port (the function relays
+  into the exported handler), and refuses to start unless `DATABASE_CA_FILE`
+  is set.
 - **`PUBLIC_URL`** (e.g. `https://app.example.com`): every POST must carry
   exactly that `Origin`; any other, `null` or none gets 403. With `https`,
   cookies are `__Host-rlq_session` / `__Host-rlq_theme`, `Secure`, `Path=/`,
@@ -172,17 +181,19 @@ What the server does differently when hosted:
   every answer; static files answer on both. Canonical and Open Graph URLs,
   the sitemap and llms.txt use it. Unset, one host serves both.
 - **No `public/`**: the static map stays empty and the stylesheet version
-  comes from `VERCEL_GIT_COMMIT_SHA`.
+  comes from the build's commit (`dist/version.json`).
+- **Client address**: `x-nf-client-connection-ip`, which Netlify's edge sets
+  (`src/ratelimit.ts`).
 - **Database**: `DATABASE_URL` is the Supavisor transaction pooler (port
   6543, user `reliquary_web.<project-ref>`) with no `sslmode` in it;
   `DATABASE_CA_FILE=supabase-ca.crt` turns on TLS verified against
   Supabase's root CA. Pool `max` is `DB_POOL_MAX`, default 3.
 
-Env vars: see `/.env.example`. Mark `DATABASE_URL` (and later
-`SESSION_SECRET`) Sensitive.
+Env vars: see `/.env.example`. Mark `DATABASE_URL`, `SESSION_SECRET`,
+`VARIABLES_KEYS` and `LINK_PROXY_SECRET` secret.
 
 Hosted, set `AUTH_MODE=supabase` (below); the local stand-in refuses to
-start when `VERCEL` is set.
+start when `NETLIFY` is set.
 
 ## Sign-in with Supabase Auth
 
@@ -226,19 +237,19 @@ pages are plain forms (`src/signin.ts`), since the CSP forbids scripts.
 Logs carry method, path and status, and fixed reasons for refused tokens;
 never a JWT, refresh token, code, token hash or email (`test.sh` checks).
 
-| Var | Sensitive | Value |
+| Var | Secret | Value |
 |---|---|---|
 | `AUTH_MODE` | no | `supabase` |
 | `SUPABASE_URL` | no | `https://bigonndpibguxuwtysnx.supabase.co` (https, no path) |
 | `SUPABASE_PUBLISHABLE_KEY` | no, but server-only | `sb_publishable_...` (Project Settings, API Keys) |
 | `JWT_ALG` | no | `ES256` or `RS256`: the `alg` of the current key in `/auth/v1/.well-known/jwks.json` |
 | `SESSION_SECRET` | **yes** | 32 random bytes, base64url; rotating it signs nobody out but voids open forms and flash notices |
-| `VARIABLES_KEY` | **yes** | 32 random bytes, base64url: encrypts environment variables (`src/secrets.ts`, docs/variables.md). Required on Vercel; keep a copy outside Vercel, since losing it loses every value. Never in the mcp project |
-| `PUBLIC_URL` | no | the app's https URL (required on Vercel) |
+| `VARIABLES_KEY` | **yes** | 32 random bytes, base64url: encrypts environment variables (`src/secrets.ts`, docs/variables.md). Required on Netlify; keep a copy outside Netlify, since losing it loses every value. Never in the mcp project |
+| `PUBLIC_URL` | no | the app's https URL (required on Netlify) |
 | `SITE_URL` | no | optional: the public site's https origin, when it has its own host |
 | `RESEND_API_KEY` | **yes** | optional: a Resend API key with sending access only, to email vault invites (`src/mailer.ts`) |
 | `EMAIL_FROM` | no | optional, with `RESEND_API_KEY`: the sender, e.g. `Reliquary <no-reply@mail.reliquary.redmage.cc>`, on a domain verified in Resend |
-| `FEEDBACK_EMAIL` | no | optional: where feedback notices go (`src/feedback.ts`); unset, only the hosted service (`VERCEL`) falls back to the operator's contact address, and a self-hosted instance emails nobody |
+| `FEEDBACK_EMAIL` | no | optional: where feedback notices go (`src/feedback.ts`); unset, only the hosted service (`NETLIFY`) falls back to the operator's contact address, and a self-hosted instance emails nobody |
 
 The server refuses to start without these, naming the variable, never its
 value. It never uses a Supabase key that bypasses RLS.
@@ -302,7 +313,7 @@ value. It never uses a Supabase key that bypasses RLS.
   with the same `Idempotency-Key`), the invite is still made and the
   Members page shows the link to copy, with why (and a ref for a failure).
   `RESEND_API_URL` points it at a fake in tests; it is ignored with
-  `VERCEL` or `SELF_HOSTED` set. `vercel.json` ships `emails/` with the
+  `NETLIFY` or `SELF_HOSTED` set. `netlify.toml` ships `emails/` with the
   function for this.
 
 ### Tests

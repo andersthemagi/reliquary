@@ -203,6 +203,6 @@ test("errors: no source says something went wrong or an error occurred", () => {
       else if (/\.(ts|mjs|js)$/.test(name) && banned.test(readFileSync(p, "utf8"))) hits.push(p.slice(REPO.length));
     }
   };
-  for (const dir of ["web/src", "mcp/src", "cli/src", "mcp/api", "web/api"]) walk(join(REPO, dir));
+  for (const dir of ["web/src", "mcp/src", "cli/src", "mcp/netlify", "web/netlify"]) walk(join(REPO, dir));
   assert.deepEqual(hits, []);
 });

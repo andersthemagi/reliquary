@@ -10,13 +10,13 @@
 // claim lapses after 10 minutes, at most 5 tries, the last 7 days), sends
 // each, and marks it notified. It runs after every feedback form, on a
 // signed-in page at most once a minute per instance (server.ts), and every
-// minute where the server is long-running (not on Vercel). So an agent's
+// minute where the server is long-running (not on Netlify). So an agent's
 // feedback is emailed on the next of those; a notice that fails is tried
 // again later, and the message itself is never lost: scripts/feedback.sh
 // lists everything.
 //
 // Where notices go: FEEDBACK_EMAIL when set. Otherwise, only on the hosted
-// service (VERCEL, not SELF_HOSTED), the operator's contact address in
+// service (NETLIFY, not SELF_HOSTED), the operator's contact address in
 // site.ts. A self-hosted instance with no FEEDBACK_EMAIL emails nobody:
 // its feedback stays with its own operator, never Red Mage.
 
@@ -193,7 +193,7 @@ export function noticeTarget(env: NodeJS.ProcessEnv = process.env): { to: string
   const set = (env.FEEDBACK_EMAIL ?? "").trim();
   if (set) return ADDRESS.test(set) && validFrom(set) ? { to: set } : { off: "FEEDBACK_EMAIL isn’t an email address" };
   if (env.SELF_HOSTED === "1") return { off: "FEEDBACK_EMAIL isn’t set: a self-hosted instance emails its own operator only, at that address" };
-  if (env.VERCEL) return { to: OPERATOR.contactEmail };
+  if (env.NETLIFY) return { to: OPERATOR.contactEmail };
   return { off: "FEEDBACK_EMAIL isn’t set (only the hosted service falls back to its operator’s contact address)" };
 }
 

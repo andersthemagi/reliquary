@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
-# Writes the environment variables for one Vercel project, built from the
-# gitignored secret files, to supabase/.vercel-<app>.env (mode 600,
-# gitignored) as KEY=VALUE lines you can paste into Vercel (Project Settings
-# -> Environment Variables accepts a pasted .env block). It prints only the
-# file's path and the variable names, never a value, so it is safe to run
-# from anywhere, including a chat with a model.
+# Writes the environment variables for one Netlify site, built from the
+# gitignored secret files, to supabase/.netlify-<app>.env (mode 600,
+# gitignored) as KEY=VALUE lines for Netlify to import (Site configuration
+# -> Environment variables -> Import from a .env file, or `netlify env:import
+# supabase/.netlify-<app>.env --site <site id>`; tick "Contains secret
+# values"). It prints only the file's path and the variable names, never a
+# value, so it is safe to run from anywhere, including a chat with a model.
 #
-#   scripts/vercel-env.sh web https://<app-host> https://<mcp-host> [https://<site-host>]
-#   scripts/vercel-env.sh mcp https://<app-host> https://<mcp-host>
+#   scripts/netlify-env.sh web https://<app-host> https://<mcp-host> [https://<site-host>]
+#   scripts/netlify-env.sh mcp https://<app-host> https://<mcp-host>
 #
 # The app host is the web app's PUBLIC_URL (sign-in, the OAuth issuer, the
 # env API). The optional site host is its SITE_URL: the public site (landing,
 # docs, legal pages) on a host of its own (web/src/hosts.ts); without it one
 # host serves both. Production (docs/ops/runbook.md, "Hosts"):
 #
-#   scripts/vercel-env.sh web https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc
-#   scripts/vercel-env.sh mcp https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc
+#   scripts/netlify-env.sh web https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc
+#   scripts/netlify-env.sh mcp https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc
 #
 # The web app also needs SUPABASE_PUBLISHABLE_KEY, from the Supabase dashboard
 # (Project Settings -> API Keys); it is printed as a placeholder. So is
@@ -36,14 +37,14 @@
 # the current key first (scripts/variables-keys.sh). To rotate
 # (docs/ops/runbook.md, "Rotating VARIABLES_KEY"):
 #
-#   scripts/vercel-env.sh new-variables-key       a new current key; then `web`
-#   scripts/vercel-env.sh drop-variables-key <id> after re-encrypting; then `web`
-#   scripts/vercel-env.sh variables-keys          the key ids, current first
+#   scripts/netlify-env.sh new-variables-key       a new current key; then `web`
+#   scripts/netlify-env.sh drop-variables-key <id> after re-encrypting; then `web`
+#   scripts/netlify-env.sh variables-keys          the key ids, current first
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
 
-next="Next: scripts/vercel-env.sh web <app-origin> <mcp-origin> [<site-origin>], then put VARIABLES_KEYS in the web Vercel project and redeploy (docs/ops/runbook.md)."
+next="Next: scripts/netlify-env.sh web <app-origin> <mcp-origin> [<site-origin>], then import it into the web Netlify site and redeploy (docs/ops/runbook.md)."
 case ${1:-} in
   new-variables-key)
     scripts/variables-keys.sh new
@@ -77,7 +78,7 @@ enc() { jq -rn --arg v "$(cat)" '$v|@uri'; }
 
 # The password is read inside a here-document below, where a failing command
 # substitution doesn't stop the script: without this, a missing file writes
-# a DATABASE_URL with an empty password for pasting into Vercel.
+# a DATABASE_URL with an empty password for Netlify to import.
 if [[ $app == web || $app == mcp ]] && [[ -z $(pw "$app" 2>/dev/null) ]]; then
   echo "supabase/.$app-db-password is missing or empty. Run scripts/set-role-passwords.sh first: it makes the database passwords of reliquary_web and reliquary_mcp (docs/ops/runbook.md, \"Rotating secrets\")." >&2
   exit 1
@@ -91,7 +92,7 @@ if [[ ! -s $link_secret ]]; then
   (umask 077; head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$link_secret")
 fi
 
-out=supabase/.vercel-$app.env
+out=supabase/.netlify-$app.env
 case $app in
   web)
     secret=supabase/.web-session-secret
@@ -101,7 +102,7 @@ case $app in
     # The variables encryption keys (docs/variables.md, "Key rotation"), the
     # current one first. Made once (an older supabase/.variables-secret is
     # taken over as k1) into a gitignored file; keep a copy of each in a
-    # password manager too: Vercel can't show a Sensitive value again, and
+    # password manager too: Netlify can't show a secret value again, and
     # losing a key loses every value sealed with it.
     scripts/variables-keys.sh ensure
     cat > "$out" <<EOF

@@ -6,16 +6,26 @@ when the repo shows them done; the rest are the owner's to confirm.
 ## Do next
 
 1. **Three hosts** (`docs/ops/runbook.md`, "Hosts"):
+   - Netlify (`docs/research/hosting.md`, section 11, has the whole move from
+     Vercel in order): a team on the Pro plan (the Frankfurt functions region
+     needs it), two sites made without a repository (`netlify sites:create
+     --name reliquary-web`, then `reliquary-mcp`, or Add new site > Deploy
+     manually): never connect them to the repository, or Netlify builds
+     every push. Domains: `reliquary.redmage.cc` and
+     `app.reliquary.redmage.cc` on `reliquary-web`, `mcp.reliquary.redmage.cc`
+     on `reliquary-mcp`. In each site's environment variables,
+     `AWS_LAMBDA_JS_RUNTIME=nodejs22.x`.
    - DNS in Squarespace (redmage.cc): CNAME `reliquary`, `app.reliquary` and
-     `mcp.reliquary` to `cname.vercel-dns.com`.
-   - Vercel: `reliquary.redmage.cc` and `app.reliquary.redmage.cc` on
-     `reliquary-web`, `mcp.reliquary.redmage.cc` on `reliquary-mcp`.
-   - Environment: `scripts/vercel-env.sh web https://app.reliquary.redmage.cc
+     `mcp.reliquary` to the owning site's `<name>.netlify.app` address, as
+     Netlify shows when the domain is added (today they point at Vercel's
+     `cname.vercel-dns.com`; moving them is the cutover).
+   - Environment: `scripts/netlify-env.sh web https://app.reliquary.redmage.cc
      https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc` and
-     `scripts/vercel-env.sh mcp https://app.reliquary.redmage.cc
-     https://mcp.reliquary.redmage.cc`, pasted into each project (`PUBLIC_URL`,
-     `SITE_URL`, `MCP_PUBLIC_URL`, `MCP_RESOURCE`, `AUTH_ISSUER`), then a
-     redeploy of the live release.
+     `scripts/netlify-env.sh mcp https://app.reliquary.redmage.cc
+     https://mcp.reliquary.redmage.cc`, each file imported into its site
+     (Site configuration > Environment variables > Import from a .env file,
+     "Contains secret values" on; or `netlify env:import`), then a redeploy
+     of the live release.
    - Supabase Auth, URL Configuration: Site URL
      `https://app.reliquary.redmage.cc`, redirect URL
      `https://app.reliquary.redmage.cc/**`.
@@ -31,14 +41,15 @@ when the repo shows them done; the rest are the owner's to confirm.
    - GitHub, Settings > Actions > General > Workflow permissions: turn on
      "Allow GitHub Actions to create and approve pull requests", or
      release-please can't open the release pull request.
-   - Secret `VERCEL_TOKEN` (deferred during pre-alpha by the owner's decision; releases are deployed by hand, then verified with the deploy workflow's tag input): a Vercel access token (Account Settings >
-     Tokens) scoped to the team that owns `reliquary-web` and
-     `reliquary-mcp`, so a release deploys exactly its tagged commit. If the
-     projects are under a team, also the variable `VERCEL_TEAM_ID`
-     (`team_...`; not secret); if they were renamed, `VERCEL_PROJECT_WEB`
-     and `VERCEL_PROJECT_MCP`. Until it's set, the deploy falls back to the
-     Deploy Hook secrets `VERCEL_DEPLOY_HOOK_WEB` / `_MCP` (if they exist),
-     which build `main`, not the tag.
+   - Secret `NETLIFY_AUTH_TOKEN`: a Netlify personal access token (User
+     settings > Applications > Personal access tokens) of a member of the
+     team that owns `reliquary-web` and `reliquary-mcp`, so a release deploys
+     exactly its tagged commit. Variables `NETLIFY_SITE_WEB` and
+     `NETLIFY_SITE_MCP`: each site's API ID (Site configuration > General >
+     Site details; not secret). Until all three are set, the deploy
+     workflow skips its Netlify stage with a notice and nothing goes live.
+     Afterwards, delete the `VERCEL_TOKEN` secret and the `VERCEL_TEAM_ID`
+     variable, and the two Vercel projects.
    - Optional, recommended: secret `RELEASE_PLEASE_TOKEN`, a fine-grained
      token (or GitHub App token) with Contents and Pull requests read and
      write on this repository only. With it, the release pull request gets
@@ -95,7 +106,7 @@ when the repo shows them done; the rest are the owner's to confirm.
      port 465, user `resend`, password the first key, sender
      `Reliquary <no-reply@mail.reliquary.redmage.cc>`; then Rate Limits: raise the
      30-an-hour email limit to what the Resend plan allows.
-   - Vercel `reliquary-web`: `RESEND_API_KEY` (the second key, Sensitive)
+   - Netlify `reliquary-web`: `RESEND_API_KEY` (the second key, secret)
      and `EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>`, then redeploy.
      Invites are then emailed; without them owners keep copying the link.
    - Check: sign in by code, and invite an address you own.

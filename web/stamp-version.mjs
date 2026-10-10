@@ -6,7 +6,8 @@
 //            app's package.json version (release-please bumps it in the same
 //            pull request), for a build that sees only this directory. If
 //            both exist and disagree, the build fails.
-//   commit   VERCEL_GIT_COMMIT_SHA (Vercel sets it at build time), else
+//   commit   COMMIT_REF (Netlify's name for the commit being built; the
+//            deploy workflow sets it before `npm run build`), else
 //            GITHUB_SHA, else "unknown". Anything but 7 to 40 hex digits is
 //            "unknown".
 //
@@ -37,7 +38,7 @@ if (released !== null && released !== pkg) {
 const version = released ?? pkg;
 if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) fail(`not a version: ${JSON.stringify(version)}`);
 
-const sha = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "").toLowerCase();
+const sha = (process.env.COMMIT_REF || process.env.GITHUB_SHA || "").toLowerCase();
 const commit = /^[0-9a-f]{7,40}$/.test(sha) ? sha : "unknown";
 
 mkdirSync(dirname(out), { recursive: true });

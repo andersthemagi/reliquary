@@ -245,8 +245,8 @@ test("crypto: VARIABLES_KEY must be 32 bytes of base64url, and errors never cont
   crypto.configureVariables({ VARIABLES_KEY: KEY });
 });
 
-test("crypto: on Vercel, no VARIABLES_KEY refuses to start; locally, values are just off", () => {
-  assert.throws(() => crypto.configureVariables({ VERCEL: "1" }), /Refusing to start: VERCEL is set but VARIABLES_KEY is not/);
+test("crypto: on Netlify, no VARIABLES_KEY refuses to start; locally, values are just off", () => {
+  assert.throws(() => crypto.configureVariables({ NETLIFY: "1" }), /Refusing to start: NETLIFY is set but VARIABLES_KEY is not/);
   assert.equal(crypto.configureVariables({}), false);
   assert.throws(() => crypto.seal("x", { vaultId: team, environment: "development", name: "X" }), crypto.SecretsError);
   assert.equal(crypto.configureVariables({ VARIABLES_KEY: KEY }), true);

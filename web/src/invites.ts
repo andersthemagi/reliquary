@@ -47,7 +47,7 @@ export async function deliverInvite(mail: InviteMail, siteUrl: string): Promise<
   try {
     ({ subject, html: body } = vaultInviteEmail(mail, siteUrl));
   } catch (err) {
-    // A deploy without web/emails/ (vercel.json's includeFiles): the link
+    // A deploy without web/emails/ (netlify.toml's included_files): the link
     // is still shown, with this reason and its ref.
     return { sent: false, failure: fail(err, { where: "email template (web/emails/vault-invite.html)", what: "Emailing the invite", status: 500 }) };
   }

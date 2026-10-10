@@ -208,11 +208,11 @@ const SUBPROCESSORS: Sub[] = [
     link: ["https://supabase.com/privacy", "Supabase privacy policy"],
   },
   {
-    name: "Vercel",
+    name: "Netlify",
     what: "Hosting and CDN for the web app and MCP endpoint",
-    where: "Functions in Frankfurt (fra1); CDN and request logs global (US company)",
+    where: "Functions in Frankfurt (fra); CDN and request logs global (US company)",
     data: "Requests in transit, request logs with IP addresses",
-    link: ["https://vercel.com/legal/privacy-policy", "Vercel privacy policy"],
+    link: ["https://www.netlify.com/privacy/", "Netlify privacy policy"],
   },
   {
     name: "Resend",

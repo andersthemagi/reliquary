@@ -2,7 +2,7 @@
 //
 //  - local (default): the dev.sh stand-in. The server acts only as
 //    LOCAL_USER_ID; a one-time login link in LOGIN_FILE opens an in-memory
-//    session. Refuses to start on Vercel (VERCEL set).
+//    session. Refuses to start on Netlify (NETLIFY set).
 //  - supabase: Supabase Auth email sign-in, handled here on the server (the
 //    CSP forbids client script). The session is two cookies: the Supabase
 //    access JWT (verified on every request against the project's JWKS, with
@@ -72,8 +72,8 @@ export function configureAuth(
     secret: Buffer.alloc(0),
   };
   if (mode === "local") {
-    if (env.VERCEL) {
-      throw new Error("Refusing to start: AUTH_MODE is local (the dev.sh stand-in) but VERCEL is set. Hosted, use AUTH_MODE=supabase");
+    if (env.NETLIFY) {
+      throw new Error("Refusing to start: AUTH_MODE is local (the dev.sh stand-in) but NETLIFY is set. Hosted, use AUTH_MODE=supabase");
     }
     if (env.SELF_HOSTED === "1") {
       throw new Error("Refusing to start: AUTH_MODE is local (the dev.sh stand-in) but SELF_HOSTED is set. Self-hosted, use AUTH_MODE=supabase with AUTH_URL");
@@ -93,7 +93,7 @@ export function configureAuth(
     throw new Error("SUPABASE_URL must be the project URL, https://<project-ref>.supabase.co");
   }
   const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback && !env.VERCEL)) {
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback && !env.NETLIFY)) {
     throw new Error("SUPABASE_URL must be https");
   }
   if (url.pathname !== "/" || url.search || url.hash) throw new Error("SUPABASE_URL must be the bare project URL, with no path");
@@ -103,7 +103,7 @@ export function configureAuth(
   if (alg !== "ES256" && alg !== "RS256") throw new Error("JWT_ALG must be ES256 or RS256, as the project's JWKS says");
   const secret = env.SESSION_SECRET ?? "";
   if (secret.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters (32 random bytes, base64url)");
-  if (env.VERCEL && !site.secure) throw new Error("Refusing to start: on Vercel, PUBLIC_URL must be https");
+  if (env.NETLIFY && !site.secure) throw new Error("Refusing to start: on Netlify, PUBLIC_URL must be https");
   const supabaseUrl = url.origin;
   cfg = { ...base, mode, supabaseUrl, issuer: `${supabaseUrl}/auth/v1`, apiKey, alg, secret: Buffer.from(secret, "utf8") };
   return mode;
@@ -131,7 +131,7 @@ function configureAuthUrl(
     throw new Error("AUTH_URL must be the Auth server's URL, like http://auth:9999");
   }
   const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
-  const plainOk = !env.VERCEL && (loopback || env.SELF_HOSTED === "1");
+  const plainOk = !env.NETLIFY && (loopback || env.SELF_HOSTED === "1");
   if (url.protocol !== "https:" && !(url.protocol === "http:" && plainOk)) {
     throw new Error("AUTH_URL must be https (plain http only on loopback, or on a private network with SELF_HOSTED=1)");
   }
@@ -142,7 +142,7 @@ function configureAuthUrl(
   if (alg !== "ES256" && alg !== "RS256") throw new Error("JWT_ALG must be ES256 or RS256, as the Auth server's JWKS says");
   const secret = env.SESSION_SECRET ?? "";
   if (secret.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters (32 random bytes, base64url)");
-  if (env.VERCEL && !site.secure) throw new Error("Refusing to start: on Vercel, PUBLIC_URL must be https");
+  if (env.NETLIFY && !site.secure) throw new Error("Refusing to start: on Netlify, PUBLIC_URL must be https");
   const issuer = url.href.replace(/\/+$/, "");
   cfg = { ...base, mode: "supabase", supabaseUrl: url.origin, issuer, apiKey, alg, secret: Buffer.from(secret, "utf8") };
   return "supabase";
@@ -499,7 +499,7 @@ const REFRESH_TOKEN = /^[\x21-\x7e]{1,512}$/;
 // A session from Supabase, or undefined if it refused the token. Throws
 // Unavailable on network failure and on any answer that isn't a clear yes or
 // no. Only 400, 401 and 403 say the refresh token itself is dead (unknown,
-// used, or its session revoked). Anything else (Auth's shared 429 over Vercel's
+// used, or its session revoked). Anything else (Auth's shared 429 over Netlify's
 // egress IPs, a timeout, a 5xx) says nothing about this session, and clearing
 // the cookies on it would sign out a person whose session is fine.
 async function refreshSession(refreshToken: string): Promise<Tokens | undefined> {

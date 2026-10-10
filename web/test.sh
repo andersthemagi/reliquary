@@ -100,7 +100,7 @@ wait_until "$hosted" "the hosted web server to answer /healthz" curl -sf "http:/
   -e FAKE_AUTH_USERS=ana@example.test=00000000-0000-0000-0000-00000000000a,eve@example.test=00000000-0000-0000-0000-0000000000e1 \
   "$node" node test/fake-auth.mjs >/dev/null
 wait_until "$fake" "the fake Supabase Auth to serve its keys" curl -sf -H "apikey: $fake_key" "$fake_url/auth/v1/.well-known/jwks.json"
-# One secret for both instances (as on Vercel), fresh each run, never printed.
+# One secret for both instances (as hosted), fresh each run, never printed.
 session_secret=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
 for inst in "$auth_a:$auth_a_port" "$auth_b:$auth_b_port"; do
   "$engine" run -d --name "${inst%%:*}" --network host -v "$PWD":/app:Z -w /app \

@@ -36,7 +36,7 @@
 // tool until an owner flips it.
 //
 // LINK_DISCOVERY_ALLOW_LOOPBACK=1 lets tests serve a fixture MCP server from
-// loopback, exactly like CIMD_ALLOW_LOOPBACK (cimd.ts); refused when VERCEL
+// loopback, exactly like CIMD_ALLOW_LOOPBACK (cimd.ts); refused when NETLIFY
 // or SELF_HOSTED is set.
 
 import type http from "node:http";
@@ -51,7 +51,7 @@ let ALLOW_LOOPBACK = false;
 // Called once at server startup (server.ts, alongside configureVariables
 // and the rest); throws rather than returns, matching those.
 export function configureDiscovery(env: NodeJS.ProcessEnv): void {
-  const strict = env.VERCEL ? "VERCEL" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
+  const strict = env.NETLIFY ? "NETLIFY" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
   const allow = env.LINK_DISCOVERY_ALLOW_LOOPBACK === "1";
   if (strict && allow) throw new Error(`Refusing to start: LINK_DISCOVERY_ALLOW_LOOPBACK is for tests and must not be set with ${strict}`);
   ALLOW_LOOPBACK = allow;
@@ -92,7 +92,7 @@ function post(
   // certificate, so with the same allowLoopback that safeFetch checks the
   // address with, a loopback target is still spoken to over plain HTTP.
   // Refused in anything but a test the same way allowLoopback itself is
-  // (LINK_DISCOVERY_ALLOW_LOOPBACK, refused with VERCEL or SELF_HOSTED).
+  // (LINK_DISCOVERY_ALLOW_LOOPBACK, refused with NETLIFY or SELF_HOSTED).
   const plainLoopback = opts.allowLoopback && isLoopbackHost(u.hostname);
   const useHttp = u.protocol === "https:" && plainLoopback;
   // node:http's own request() refuses a URL whose protocol isn't "http:"

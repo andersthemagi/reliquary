@@ -12,7 +12,7 @@
 // Authenticated by a shared secret (LINK_PROXY_SECRET), not a person's
 // session or any kind of access token: this is Reliquary's own two
 // servers talking, the same shape as /healthz?db=1's KEEPALIVE_TOKEN.
-// Required (refuses to start without it) whenever VERCEL or SELF_HOSTED
+// Required (refuses to start without it) whenever NETLIFY or SELF_HOSTED
 // is set, matching every other required-secret startup check in this app.
 //
 //   POST /internal/link-call   Authorization: Bearer <LINK_PROXY_SECRET>
@@ -47,7 +47,7 @@ const REQUEST_REASONS: Record<string, string> = {
 
 let SECRET = "";
 export function configureLinkProxy(env: NodeJS.ProcessEnv = process.env): void {
-  const strict = env.VERCEL ? "VERCEL" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
+  const strict = env.NETLIFY ? "NETLIFY" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
   SECRET = env.LINK_PROXY_SECRET ?? "";
   if (strict && !SECRET) throw new Error(`Refusing to start: ${strict} is set but LINK_PROXY_SECRET is not`);
 }

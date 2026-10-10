@@ -101,7 +101,7 @@ server (plan: `docs/research/hosting.md`, section 4):
   resource, a refresh token or a code is refused; no token is passed on.
 
 `MCP_RESOURCE` defaults to `http://HOST:PORT/mcp` and `AUTH_ISSUER` to
-`http://127.0.0.1:8790` (dev.sh's web app); on Vercel both are required.
+`http://127.0.0.1:8790` (dev.sh's web app); on Netlify both are required.
 
 ## Test
 
@@ -114,21 +114,29 @@ in as Ben) as the authorization server for `test/oauth.test.mjs`: a client
 goes from a 401 to `tools/list` through discovery, consent and the token
 endpoint.
 
-## Deploy (Vercel)
+## Deploy (Netlify)
 
-Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5). One Vercel
-project, `reliquary-mcp`, Root Directory `mcp`. Vercel runs the app as one function, `api/index.js`, which hands every
-request to the handler `src/server.ts` exports (built by `npm run build`: `tsc` into `dist/`, then `stamp-version.mjs` writes `dist/version.json` from `../version.txt` for `GET /version`);
-every path is rewritten to it after `public/` gets its turn on the CDN. The
-zero-config Node server detection only recognises Express-style apps, so it
-failed on this plain `node:http` server. `vercel.json` sets region `fra1`, Fluid
-compute, `maxDuration` 60 s, bundles `supabase-ca.crt` into the function, and
-turns off automatic deploys from `main`: only a published release deploys
-(the deploy workflow applies its migrations first, then deploys exactly the
-tagged commit; `docs/ops/runbook.md`, "Deploy"). Answers are plain JSON, so nothing streams.
+Plan and reasons: `docs/research/hosting.md` (sections 1, 2, 5 for the
+shape, 11 for the move to Netlify). One Netlify site, `reliquary-mcp`, not
+connected to the repository: the deploy workflow builds the tagged commit
+itself (`npm run build`: `tsc` into `dist/`, then `stamp-version.mjs` writes
+`dist/version.json` from `../version.txt` for `GET /version`) and uploads
+`public/` and the function with the Netlify CLI (`scripts/netlify-deploy.sh`;
+`docs/ops/runbook.md`, "Deploy"). The app runs as one function,
+`netlify/functions/index.mjs`, routed to every path after `public/` has had
+its turn on the CDN (`preferStatic`): it keeps the real `node:http` server
+listening on a loopback port inside the function and relays each web
+`Request` to it. `netlify.toml` names the files the function needs at run
+time (`dist/**`, `node_modules/**` after `npm prune --omit=dev`,
+`supabase-ca.crt`, `public/**`). The function runs in Frankfurt (`region:
+"fra"`; a Pro plan setting) within Netlify's 60 s synchronous limit and 6 MB
+request ceiling. Answers are plain JSON, so nothing streams.
 
-- **`VERCEL` set**: opens no port (the function calls the exported handler),
-  and refuses to start unless `DATABASE_CA_FILE` is set.
+- **`NETLIFY` set** (the entry point sets it before loading the server):
+  opens no port (the function relays into the exported handler), and refuses
+  to start unless `DATABASE_CA_FILE` is set.
+- **Client address**: `x-nf-client-connection-ip`, which Netlify's edge sets
+  (`src/ratelimit.ts`).
 - **Database**: `DATABASE_URL` is the Supavisor transaction pooler (port
   6543, user `reliquary_mcp.<project-ref>`) with no `sslmode` in it;
   `DATABASE_CA_FILE=supabase-ca.crt` turns on TLS verified against
@@ -138,11 +146,11 @@ tagged commit; `docs/ops/runbook.md`, "Deploy"). Answers are plain JSON, so noth
   transaction mode; never pass `name` to a query (no named prepared
   statements) and never a session-level `SET`.
 
-Env vars: see `/.env.example`. Mark `DATABASE_URL` Sensitive. Production
-needs the custom domain: Deployment Protection puts a Vercel login in front
-of `*.vercel.app`, which MCP clients can't pass.
+Env vars: see `/.env.example`. Mark `DATABASE_URL` and `LINK_PROXY_SECRET`
+secret.
 
 OAuth needs `MCP_RESOURCE` (e.g. `https://mcp.example.com/mcp`, the URL
 people paste, byte for byte the web app's `MCP_RESOURCE`) and `AUTH_ISSUER`
-(the web app's `PUBLIC_URL`); the server refuses to start on Vercel without
+(the web app's `PUBLIC_URL`); the server refuses to start on Netlify without
 them.
+

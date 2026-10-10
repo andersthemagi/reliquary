@@ -14,7 +14,7 @@ const ORIGIN = PUBLIC_URL ? new URL(PUBLIC_URL).origin : "";
 const LEGAL = ["/terms", "/privacy", "/dpa", "/subprocessors", "/security"];
 // The only other sites a public page may link to (links, never loaded):
 // the sub-processors' own privacy policies.
-const DOCUMENTED_LINKS = ["https://supabase.com/privacy", "https://vercel.com/legal/privacy-policy", "https://resend.com/legal/privacy-policy"];
+const DOCUMENTED_LINKS = ["https://supabase.com/privacy", "https://www.netlify.com/privacy/", "https://resend.com/legal/privacy-policy"];
 const CONTACT = "mailto:andres@redmage.cc";
 
 let localCookie = "";
@@ -194,10 +194,10 @@ test("site legal: facts not known yet are visible placeholders, not invented", a
   assert.match(h, /<mark class="placeholder">\[to be filled: address\]<\/mark>/);
 });
 
-test("site legal: sub-processors names Supabase and Vercel in Frankfurt, Resend for email, and no model providers", async () => {
+test("site legal: sub-processors names Supabase and Netlify in Frankfurt, Resend for email, and no model providers", async () => {
   const h = await text(A, "/subprocessors");
   assert.match(h, /<strong>Supabase<\/strong>[\s\S]*?Database and sign-in[\s\S]*?Frankfurt/);
-  assert.match(h, /<strong>Vercel<\/strong>[\s\S]*?Hosting and CDN[\s\S]*?Frankfurt \(fra1\)/);
+  assert.match(h, /<strong>Netlify<\/strong>[\s\S]*?Hosting and CDN[\s\S]*?Frankfurt \(fra\)/);
   assert.match(h, /<strong>Resend<\/strong>[\s\S]*?Sending email[\s\S]*?Ireland, eu-west-1[\s\S]*?stored in the US/);
   assert.doesNotMatch(h, /Email provider/);
   assert.match(h, /<h2>Model providers: none<\/h2>/);

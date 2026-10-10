@@ -7,7 +7,7 @@
 //   EMAIL_FROM      the sender, "Reliquary <no-reply@notify.example.com>",
 //                   on a domain verified in Resend
 //   RESEND_API_URL  another base URL for the API (a fake in tests); honoured
-//                   only when neither VERCEL nor SELF_HOSTED is set
+//                   only when neither NETLIFY nor SELF_HOSTED is set
 //
 // Both of the first two are optional. Without them nothing is sent, and the
 // Members page shows the invite link for the owner to send themself; with
@@ -42,7 +42,7 @@ export function readMailer(env: NodeJS.ProcessEnv): { config: Config; warnings: 
   const key = (env.RESEND_API_KEY ?? "").trim();
   const from = (env.EMAIL_FROM ?? "").trim();
   const warnings: string[] = [];
-  const strict = env.VERCEL ? "VERCEL" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
+  const strict = env.NETLIFY ? "NETLIFY" : env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
   let api = DEFAULT_API;
   if (env.RESEND_API_URL) {
     if (strict) warnings.push(`RESEND_API_URL is ignored with ${strict} set: email goes to ${DEFAULT_API}`);

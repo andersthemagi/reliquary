@@ -59,7 +59,7 @@ into one repo. v3 separates the two.
   MacBook is an AIS-OS decision (Claude Code cloud routines, n8n, or
   launchd). Any that act on shared context become Reliquary routines.
 - **Secrets become a product feature:** shared environment variables per
-  vault, Vercel-style, and a large part of the continuity story.
+  vault, Netlify-style, and a large part of the continuity story.
 - **The gate generalises.** Access is decided by who will see the output:
   the person for their own agent, the declared audience for a routine,
   everyone present for a chat.
@@ -161,7 +161,7 @@ Five jobs:
 - **Routine.** A declarative automation inside a vault: a trigger, a
   prompt, an audience, and outputs.
 - **Environment.** A named set of variables in a vault (`development`,
-  `preview`, `production`, or custom), like Vercel's.
+  `preview`, `production`, or custom), like Netlify's.
 - **Log.** Every change to a vault, append-only, with a monotonic sequence
   number for the feed.
 
@@ -1447,7 +1447,7 @@ framework.
   variables key, so it can never decrypt anything; link calls go through
   the web app's internal endpoint with a shared secret.
 - **`cli/`** is the `reliquary` binary (Node, no runtime dependencies).
-- **Hosting:** two Vercel projects (`web`, `mcp`) and a Supabase project, or
+- **Hosting:** two Netlify sites (`web`, `mcp`) and a Supabase project, or
   `deploy/compose` for self-hosting. No customer-side infrastructure.
 - **Multi-tenant:** vaults are the tenancy boundary, and RLS enforces it.
 - **Not built, and not in use anywhere:** `pgmq`, `pg_net`, Edge Functions
