@@ -51,7 +51,23 @@ import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure, noteUpstream, Refusal, sqlstateName, upstreamNote } from "./failure.js";
-import { requestAccessHref } from "./site.js";
+import { contactEmail, requestAccessHref, waitingHref } from "./site.js";
+import { pool } from "./db.js";
+
+// Whether sign-in makes an account for any address: invite-only is off
+// (20261009200000_open_admission.sql). The database's quota then decides
+// who creates vaults, so an account made here costs a row and nothing more.
+async function signupsOpen(): Promise<boolean | "unavailable"> {
+  try {
+    return !(await pool.query("select private.invite_only() as on")).rows[0].on;
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    noteUpstream("sign-up setting (database)", `The database couldn’t be asked whether sign-ups are open${code ? ` (${sqlstateName(code)})` : ""}, so no sign-in code was sent`);
+    return "unavailable";
+  }
+}
+// For a page's wording only: unknown reads as invite-only.
+const openForWording = async () => (await signupsOpen()) === true;
 
 // The live invite a sign-in is for, if `next` is an invite page. Looking
 // one up counts against the address's invite limit (ratelimit.ts), like
@@ -108,6 +124,10 @@ export const FRESH_SIGNIN = "rlq_fresh";
 const freshCookie = () => setCookie(FRESH_SIGNIN, "1", 1800);
 export const EMAIL = /^[^\s@<>()",;:\\]{1,64}@[^\s@<>()",;:\\]{1,190}\.[^\s@<>()",;:\\]{1,63}$/;
 const CODE = /^[0-9]{6,10}$/;
+// A field people never see (style.css .trap) and form-filling bots fill:
+// filled, sign-in sends nothing and answers as if it had, so the bot
+// learns nothing. Not a CAPTCHA: nothing asks a person anything.
+const TRAP = "website";
 const TOKEN_HASH = /^[A-Za-z0-9_-]{16,256}$/;
 
 type In = {
@@ -128,7 +148,7 @@ const hidden = (name: string, value: string) => html`<input type="hidden" name="
 const formError = (id: string, error?: string) => (error ? html`<p class="callout danger" role="alert" id="${id}">${error}</p>` : "");
 const invalid = (id: string, error?: string) => (error ? html` aria-invalid="true" aria-describedby="${id}"` : "");
 
-function emailForm(csrf: string, next: string, theme: Theme, error?: string, invite?: Peek): string {
+function emailForm(csrf: string, next: string, theme: Theme, open: boolean, error?: string, invite?: Peek): string {
   const openInvite = invite !== undefined && invite.email === null;
   return page(
     "Sign in",
@@ -147,13 +167,16 @@ function emailForm(csrf: string, next: string, theme: Theme, error?: string, inv
       ${formError("email-error", error)}
       <form method="post" action="/signin" class="panel">
         ${hidden("csrf", csrf)}${hidden("next", next)}
+        <div class="trap" aria-hidden="true"><label for="${TRAP}">Leave this empty</label><input type="text" id="${TRAP}" name="${TRAP}" tabindex="-1" autocomplete="off"></div>
         <label for="email">Email</label>
         <input type="text" id="email" name="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${invalid("email-error", error)}>
         <div class="actions"><button class="primary">Email me a code</button></div>
       </form>
       ${invite
         ? ""
-        : html`<p class="hint">Reliquary is invite-only. Anyone can sign in, but an account creates vaults only after it joins one by invite. Have an invite? Open its link. Otherwise, <a href="${requestAccessHref()}">request access</a>.</p>`}
+        : open
+          ? html`<p class="hint">New to Reliquary? The same step makes your account. We’re letting people in steadily as usage grows, so it may take a while before you can create a vault. If it’s taking too long, email <a href="${waitingHref()}">${contactEmail()}</a>. Have an invite? Open its link to get in now.</p>`
+          : html`<p class="hint">Reliquary is invite-only. Anyone can sign in, but an account creates vaults only after it joins one by invite. Have an invite? Open its link. Otherwise, <a href="${requestAccessHref()}">request access</a>.</p>`}
       <p class="hint"><a href="${siteHref("/docs")}">About Reliquary</a></p>
     </div>`,
     { theme },
@@ -255,7 +278,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (i.method === "GET" && p === "/signin") {
     const next = safeNext(i.url.searchParams.get("next"));
     if (i.session) return out({ redirect: next });
-    return out({ html: emailForm(pre(), next, i.theme, undefined, (await inviteFor(next, i.ip, i.theme)).invite) });
+    return out({ html: emailForm(pre(), next, i.theme, await openForWording(), undefined, (await inviteFor(next, i.ip, i.theme)).invite) });
   }
 
   if (i.method === "GET" && p === "/auth/confirm") {
@@ -282,23 +305,41 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (!preTokenOk(i.req, i.form)) {
     // Also the answer to a cross-site post that got past the Origin rule.
     const why = "That form expired: its security cookie was missing or didn’t match, which happens when this browser blocks cookies or the page was opened before this one. Enter your email again";
-    return out({ status: 403, html: emailForm(pre(), next, i.theme, refusalText(new Refusal({ status: 403, where: "sign-in form check", why }))) });
+    return out({ status: 403, html: emailForm(pre(), next, i.theme, await openForWording(), refusalText(new Refusal({ status: 403, where: "sign-in form check", why }))) });
   }
 
   if (p === "/signin") {
     const email = (i.form.get("email") ?? "").trim();
     const { invite, refused } = await inviteFor(next, i.ip, i.theme);
     if (!EMAIL.test(email) || email.length > 254) {
-      return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.", invite) });
+      return out({ status: 400, html: emailForm(pre(), next, i.theme, await openForWording(), "Enter your email address, like name@example.com.", invite) });
     }
     if (refused) return out(refused);
+    if (i.form.get(TRAP)) {
+      console.error("sign-in trap field filled: no code sent");
+      return out({ html: codeForm(pre(), email, next, i.theme) });
+    }
     const limited = await signinLimit([
       { name: "signin_email_address", kind: "email", value: emailKey(email) },
       { name: "signin_email_ip", kind: "ip", value: i.ip },
     ], i.theme);
     if (limited) return out(limited);
-    const r = await sendSigninEmail(email, invite !== undefined && (invite.email === null || emailKey(email) === invite.email));
+    const backed = invite !== undefined && (invite.email === null || emailKey(email) === invite.email);
+    const open = await signupsOpen();
+    if (open === "unavailable") return out(unavailable(i.theme));
+    let r = await sendSigninEmail(email, backed);
+    if (r.noAccount && open) r = await sendSigninEmail(email, true);
     if (r.unavailable) return out(unavailable(i.theme));
+    // Said only where the address may learn it has no account anyway (an
+    // invite backs it, or sign-ups are open): invite-only, an address with
+    // none never reaches the email limit, so the page would tell them apart.
+    if (r.emailsPaused && (backed || open)) {
+      const f = failure({ status: 503, where: "sign-in email (Supabase Auth)", why: "Reliquary has sent as many emails as its email service allows this hour, so no code was sent" });
+      return out({
+        status: 503,
+        html: errorPage(f, { theme: i.theme, title: "Sign-in emails are paused", lede: "Reliquary has sent as many sign-in emails as it can this hour, so no code was sent. Try again within the hour.", back: signinUrl(next) }),
+      });
+    }
     if (r.signupsOff) {
       // The reason is logged, so it names no address; the page does.
       const f = failure({ status: 403, where: "sign-in (Supabase Auth)", why: "This site isn’t making new accounts on its own right now, and the address has no account yet" });
@@ -323,7 +364,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
   if (p === "/signin/code") {
     const email = (i.form.get("email") ?? "").trim();
     const code = (i.form.get("code") ?? "").replace(/[\s-]/g, "");
-    if (!EMAIL.test(email)) return out({ status: 400, html: emailForm(pre(), next, i.theme, "Enter your email address, like name@example.com.") });
+    if (!EMAIL.test(email)) return out({ status: 400, html: emailForm(pre(), next, i.theme, await openForWording(), "Enter your email address, like name@example.com.") });
     const bad = "That code didn’t work. It may have expired or been used already: check the latest email, or send a new code.";
     if (!CODE.test(code)) return out({ status: 400, html: codeForm(pre(), email, next, i.theme, bad) });
     // Guessing protection: a few codes per address, then that address's

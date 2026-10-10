@@ -195,8 +195,9 @@ export function sqlstateStatus(code: string): number {
   if (code === "P0002" || code === "RLV01") return 404;
   // A plan limit (20260925230000_plans.sql): allowed, but not with room.
   if (code === "RLP01") return 403;
-  // An account not admitted while Reliquary is invite-only
-  // (20260925240000_admission.sql): signed in, but not let in.
+  // An account not admitted: invite-only, or waiting in open admission's
+  // line (20260925240000_admission.sql, 20261009200000_open_admission.sql):
+  // signed in, but not let in.
   if (code === "RLP02") return 403;
   // A session its person signed out everywhere after, or a deleted
   // account's (20260926140100_sign_out_everywhere.sql): sign in again.

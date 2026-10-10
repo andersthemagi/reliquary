@@ -534,11 +534,16 @@ export type SigninResult = { ok: true; cookies: string[]; newAccount: boolean } 
 // createUser: only while a live invite backs the address (signin.ts checks
 // that with the database first) — either it was sent to this exact
 // address, or it's an open link (no address), good for whichever one is
-// entered. Supabase then makes the account if there is none, provided the
-// project allows sign-ups; if it doesn't, `signupsOff` says so, so the
-// invitee gets a clear answer. That tells the holder of the invite link
-// whether its address has an account, and nobody else anything.
-export async function sendSigninEmail(email: string, createUser = false): Promise<{ unavailable: boolean; signupsOff?: boolean }> {
+// entered — or while invite-only is off. Supabase then makes the account if
+// there is none, provided the project allows sign-ups; if it doesn't,
+// `signupsOff` says so, so the invitee gets a clear answer. That tells the
+// holder of the invite link whether its address has an account, and nobody
+// else anything. Without createUser, `noAccount` is the same refusal: the
+// address has none and nothing was sent; signin.ts shows it to no one, and
+// asks again with createUser only when sign-ups are open.
+// `emailsPaused`: the project's hourly email limit is spent (Supabase's
+// "email rate limit exceeded", not the per-address throttle).
+export async function sendSigninEmail(email: string, createUser = false): Promise<{ unavailable: boolean; signupsOff?: boolean; noAccount?: boolean; emailsPaused?: boolean }> {
   try {
     let r;
     try {
@@ -551,12 +556,14 @@ export async function sendSigninEmail(email: string, createUser = false): Promis
       // success and the first email stays valid.
       r = await gotrue("/otp", { email, create_user: false });
     }
-    if (createUser && r.status === 422) {
-      const code = String(r.json?.error_code ?? "");
-      const msg = String(r.json?.msg ?? r.json?.message ?? "");
-      if (code === "otp_disabled" || code === "signup_disabled" || /signups? not allowed/i.test(msg)) {
-        return { unavailable: false, signupsOff: true };
-      }
+    const code = String(r.json?.error_code ?? "");
+    const msg = String(r.json?.msg ?? r.json?.message ?? "");
+    if (r.status === 422 && (code === "otp_disabled" || code === "signup_disabled" || /signups? not allowed/i.test(msg))) {
+      return createUser ? { unavailable: false, signupsOff: true } : { unavailable: false, noAccount: true };
+    }
+    if (r.status === 429 && /email rate limit exceeded/i.test(msg)) {
+      noteUpstream("sign-in email (Supabase Auth)", "POST /otp answered 429: the project's hourly email limit is spent");
+      return { unavailable: false, emailsPaused: true };
     }
     return { unavailable: false };
   } catch (err) {

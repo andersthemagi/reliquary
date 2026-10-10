@@ -3,16 +3,17 @@
 // Settings' Usage tab. The database decides and counts (20260925230000_plans.sql:
 // public.my_plan, public.vault_usage); refusals arrive as SQLSTATE RLP01,
 // whose message pages.ts's message() shows where they happen. Admission
-// (20260925240000_admission.sql: public.my_admission): while
-// Reliquary is invite-only, an account creates vaults only once admitted;
-// create_vault refuses others with SQLSTATE RLP02.
+// (20260925240000_admission.sql, 20261009200000_open_admission.sql:
+// public.my_admission): an account creates vaults once admitted, by invite,
+// the operator, or being let in from open admission's line; create_vault refuses
+// others with SQLSTATE RLP02.
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { html, pageHeader, plural, type Raw } from "./html.js";
 import { render, vaultPath, type Ctx, type Reply } from "./pages.js";
 import { selfHosted } from "./selfhost.js";
-import { biggerPlanHref } from "./site.js";
+import { biggerPlanHref, contactEmail, waitingHref } from "./site.js";
 
 export type Plan = { plan: string; planName: string; vaultsOwned: number; maxVaults: number };
 export type VaultUsage = {
@@ -43,16 +44,20 @@ export async function myPlan(c: pg.PoolClient): Promise<Plan> {
   return { plan: r.plan, planName: r.plan_name, vaultsOwned: r.vaults_owned, maxVaults: r.max_vaults };
 }
 
-export type Admission = { admitted: boolean; inviteOnly: boolean };
+// place: where the account is in the line (1 is next), while it waits.
+export type Admission = { admitted: boolean; inviteOnly: boolean; place: number | null };
 
 export async function myAdmission(c: pg.PoolClient): Promise<Admission> {
-  const r = (await c.query(`select admitted, invite_only from public.my_admission()`)).rows[0];
-  return { admitted: r.admitted, inviteOnly: r.invite_only };
+  const r = (await c.query(`select a.admitted, a.invite_only, public.my_place_in_line() as place from public.my_admission() a`)).rows[0];
+  return { admitted: r.admitted, inviteOnly: r.invite_only, place: r.place === null ? null : Number(r.place) };
 }
 
-// For an account that can't create vaults yet: why, and the way in.
-export const notAdmittedNote = (): Raw =>
-  html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account. <a href="/docs/concepts/plans-and-limits#invite-only">Invite-only</a></p>`;
+// For an account that can't create vaults yet: why, and the way in. Open
+// (invite-only off), the only reason is that it's waiting in the line.
+export const notAdmittedNote = (a: Admission): Raw =>
+  a.inviteOnly
+    ? html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account. <a href="/docs/concepts/plans-and-limits#who-can-create-vaults">Who can create vaults</a></p>`
+    : html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is letting people in steadily as usage grows, and ${a.place ? html`you’re number ${String(a.place)} in line` : "you’re in line"}. It may take a while. If it’s taking too long, email <a href="${waitingHref()}">${contactEmail()}</a>. An invite link someone sends you gets you in now. <a href="/docs/concepts/plans-and-limits#who-can-create-vaults">Who can create vaults</a></p>`;
 
 // Usage for the vaults in `ids` the person belongs to, in one query.
 export async function vaultUsages(c: pg.PoolClient, ids: string[]): Promise<Map<string, VaultUsage>> {
@@ -224,7 +229,7 @@ export async function accountPage(ctx: Ctx): Promise<Reply> {
         ? `The ${plan.planName} plan: up to ${plural(plan.maxVaults, "vault")} you own, each with its tier’s limits on people and storage.`
         : `The ${plan.planName} plan: no limit on the vaults you own, their people or their storage.`,
     })}
-    ${admission.admitted ? "" : notAdmittedNote()}
+    ${admission.admitted ? "" : notAdmittedNote(admission)}
     ${full
       ? html`<p class="callout attention" role="status">You own ${plan.vaultsOwned} ${plan.vaultsOwned === 1 ? "vault" : "vaults"}, and the ${plan.planName} plan allows ${plan.maxVaults}: delete one you no longer need before creating another. Nothing is deleted for you.</p>`
       : ""}

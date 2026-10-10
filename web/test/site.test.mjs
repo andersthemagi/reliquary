@@ -98,10 +98,11 @@ test("site landing: the demo card's buttons can't be focused or reached by assis
   assert.doesNotMatch(actions[2], /<button|<a /);
 });
 
-test("site landing: calls to action are Sign in and Request access by email with a subject", async () => {
+test("site landing: calls to action are Sign up, to the sign-in page that makes accounts, and Talk to us by email with a subject", async () => {
   const h = await text(A, "/");
-  assert.match(h, /<a class="button primary" href="mailto:andres@redmage\.cc\?subject=Reliquary%20early%20access">Request access<\/a>/);
-  assert.match(h, /<a class="button[^"]*" href="\/signin">Sign in<\/a>/);
+  assert.match(h, /<a class="button primary" href="\/signin">Sign up<\/a>/);
+  assert.match(h, /<a class="button" href="mailto:andres@redmage\.cc\?subject=Reliquary%20early%20access">Talk to us<\/a>/);
+  assert.doesNotMatch(h, /invite-only/i);
 });
 
 test("site landing: pricing shows the plans and their limits, clearly marked free while in beta", async () => {

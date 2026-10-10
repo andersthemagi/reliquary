@@ -161,14 +161,85 @@ select t.expect('revoke: an account deleted in Auth and made again with the same
 -- ---------------------------------------------------------------------------
 -- Invite-only off
 
-select t.expect('open: with invite-only off, an account nobody admitted creates vaults, within its plan',
-  t.ops('select private.set_invite_only(false)') || ' / ' || t.admission('kim2')
-  || ' / ' || coalesce(t.new_vault('kim2', 'kim1', 'Kim one'), 'refused'),
-  'open: every account creates vaults, within its plan / true false / ok');
-select t.expect('open: turned on again, the same account is refused',
-  t.ops('select private.set_invite_only(true)') || ' / ' || t.admission('kim2')
-  || ' / ' || t.run('kim2', $q$select public.create_vault('Kim two')::text$q$),
-  'invite-only: only admitted accounts create vaults / false true / ERR RLP02');
+-- Lou, Mia and Ned have accounts nobody admitted. Mia and Ned confirmed
+-- their addresses before Kim2 (made above), so the line is Mia, Ned, Kim2;
+-- Pip's address isn't confirmed. The database starts with no line
+-- (support.sql).
+insert into t.ids values
+  ('lou', '00000000-0000-0000-0000-0000000000f7'),
+  ('mia', '00000000-0000-0000-0000-0000000000f8'),
+  ('ned', '00000000-0000-0000-0000-0000000000f9'),
+  ('pip', '00000000-0000-0000-0000-0000000000fa');
+insert into auth.users (id, email, email_confirmed_at) values
+  (t.id('lou'), 'lou@example.test', '2026-01-01'), (t.id('mia'), 'mia@example.test', '2026-01-02'),
+  (t.id('ned'), 'ned@example.test', '2026-01-03'), (t.id('pip'), 'pip@example.test', null);
+create function t.place(p_user text) returns text language sql as
+$$ select coalesce(t.run(p_user, 'select public.my_place_in_line()::text'), 'none') $$;
+create function t.let_in() returns text language sql as $$ select private.let_in_from_line()::text $$;
+
+select t.expect('open: with invite-only off and no line, an account nobody admitted creates vaults, within its plan, and is admitted by its first',
+  t.ops('select private.set_invite_only(false)') || ' / ' || t.admission('lou')
+  || ' / ' || coalesce(t.new_vault('lou', 'lou1', 'Lou one'), 'refused') || ' / ' || t.via('lou'),
+  'open: every account creates vaults, within its plan / true false / ok / open');
+select t.expect('open: turned on again, an account let in while open keeps its admission, and one that wasn''t is refused',
+  t.ops('select private.set_invite_only(true)') || ' / ' || t.admission('lou')
+  || ' / ' || coalesce(t.new_vault('lou', 'lou2', 'Lou two'), 'refused')
+  || ' / ' || t.run('mia', $q$select public.create_vault('Mia one')::text$q$),
+  'invite-only: only admitted accounts create vaults / true true / ok / ERR RLP02');
+select t.expect('line: the operator sets how many accounts a day are let in from the line, and reads how many wait',
+  t.ops('select private.set_invite_only(false)') || ' / ' || t.ops('select private.set_open_per_day(2)'),
+  'open: every account creates vaults, within its plan / open admission: 2 accounts a day from the line (3 waiting)');
+select t.expect('line: a waiting account reads that it can''t create vaults yet, and its place, in the order addresses were confirmed',
+  t.admission('mia') || ' / ' || t.place('mia') || ' ' || t.place('ned') || ' ' || t.place('kim2'),
+  'false false / 1 2 3');
+select t.expect('line: creating a vault while waiting is refused with RLP02, saying its place and the way to get in sooner',
+  t.msg('ned', $q$select public.create_vault('Ned one')::text$q$),
+  'RLP02 your account can''t create vaults yet: Reliquary is letting people in steadily as usage grows, and you''re number 2 in line. It may take a while; if it''s taking too long, write to the operator, or open an invite link someone sent you and join their vault (that lets you in now)');
+select t.expect('line: the refusal''s detail says which limit and the place, for programs',
+  t.msg('ned', $q$select public.create_vault('Ned one')::text$q$, null, true),
+  '{"limit": "admission", "place": 2, "invite_only": false}');
+select t.expect('line: a refused vault leaves nothing behind and keeps the account in line',
+  (select count(*)::text from public.vaults where created_by = t.id('ned')) || ' ' || t.via('ned') || ' ' || t.place('ned'), '0 none 2');
+select t.expect('line: an address not confirmed isn''t in line, so a made-up address never queues',
+  t.place('pip') || ' ' || t.msg('pip', $q$select public.create_vault('Pip one')::text$q$),
+  'none RLP02 your account can''t create vaults yet: Reliquary is letting people in steadily as usage grows, and you''re in line once your address is confirmed. It may take a while; if it''s taking too long, write to the operator, or open an invite link someone sent you and join their vault (that lets you in now)');
+select t.expect('line: the job lets in the front of the line, up to the day''s pace less who got in today, and no more',
+  t.let_in() || ' / ' || t.via('mia') || ' ' || t.via('ned') || ' ' || t.via('kim2') || ' / ' || t.let_in(),
+  '1 / open none none / 0');
+select t.expect('line: an account let in creates its vault, and the next one moves up',
+  coalesce(t.new_vault('mia', 'mia1', 'Mia one'), 'refused') || ' / ' || t.place('mia') || ' ' || t.place('ned') || ' ' || t.place('kim2'),
+  'ok / none 1 2');
+select t.expect('line: raised, the next run lets in the next account',
+  t.ops('select private.set_open_per_day(3)') || ' / ' || t.let_in() || ' / ' || t.via('ned') || ' ' || t.via('kim2'),
+  'open admission: 3 accounts a day from the line (2 waiting) / 1 / open none');
+select t.expect('line: an account already admitted isn''t held by it',
+  coalesce(t.new_vault('ivy', 'ivy2', 'Ivy two'), 'refused') || ' ' || coalesce(t.new_vault('lou', 'lou3', 'Lou three'), 'refused'),
+  'ok ok');
+select t.expect('line: invite-only, the job lets no one in and nobody has a place',
+  t.ops('select private.set_open_per_day(10)') || ' / ' || t.ops('select private.set_invite_only(true)')
+  || ' / ' || t.let_in() || ' ' || t.place('kim2') || ' ' || t.via('kim2'),
+  'open admission: 10 accounts a day from the line (1 waiting) / invite-only: only admitted accounts create vaults / 0 none none');
+select t.expect('line: with no pace there is no line: a waiting account may create vaults, and has no place',
+  t.ops('select private.set_invite_only(false)') || ' / ' || t.ops('select private.set_open_per_day(null)')
+  || ' / ' || t.admission('kim2') || ' ' || t.place('kim2'),
+  'open: every account creates vaults, within its plan / open admission: no line, every account straight in / true false none');
+select t.expect('line: a person, the web app, the MCP server and anonymous callers can''t set the pace or move the line, the operator can''t set it below 0, and anonymous callers have no place',
+  concat_ws(' ',
+    t.run('kim2', 'select private.set_open_per_day(1000)'),
+    t.run_role('reliquary_web', 'select private.set_open_per_day(1000)'),
+    t.run_role('reliquary_mcp', 'select private.set_open_per_day(1000)'),
+    t.run(null, 'select private.set_open_per_day(1000)'),
+    t.ops('select private.set_open_per_day(-1)'),
+    t.run('kim2', 'select private.let_in_from_line()::text'),
+    t.ops('select private.let_in_from_line()::text'),
+    t.run_role('reliquary_web', 'select private.let_in_from_line()::text'),
+    t.run(null, 'select public.my_place_in_line()::text')),
+  'ERR 42501 ERR 42501 ERR 42501 ERR 42501 ERR 22023 ERR 42501 ERR 42501 ERR 42501 ERR 42501');
+select t.expect('open: the web app reads whether invite-only is on, to make accounts at sign-in only when it''s off; a person can''t call it',
+  t.run_role('reliquary_web', 'select private.invite_only()::text') || ' '
+  || t.ops('select private.set_invite_only(true)') || ' ' || t.run_role('reliquary_web', 'select private.invite_only()::text')
+  || ' ' || t.run('kim2', 'select private.invite_only()::text'),
+  'false invite-only: only admitted accounts create vaults true ERR 42501');
 
 -- ---------------------------------------------------------------------------
 -- Only the operator admits

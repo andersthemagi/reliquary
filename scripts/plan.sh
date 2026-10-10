@@ -13,13 +13,15 @@
 #   scripts/plan.sh usage [<email>|<vault-id>]    people and storage per vault, largest first
 #   scripts/plan.sh admit <email>                 let an account create vaults while invite-only
 #   scripts/plan.sh revoke-admission <email>      take that back (they keep their vaults)
-#   scripts/plan.sh invite-only on|off            whether accounts need admitting (on in the alpha)
+#   scripts/plan.sh invite-only on|off            whether accounts need admitting; off lets anyone sign up
+#   scripts/plan.sh open-per-day [<n>|none]       accounts let in a day from the line while invite-only is off, and how many wait
 #   scripts/plan.sh check                         storage counters that drifted, accounts gone from Auth
 #   scripts/plan.sh recount <vault-id>            set a vault's storage counter to a full scan
 #
 # Nothing is deleted when a plan or tier is smaller: a vault over a limit
 # takes nothing new until it is under. Admission and the checks are
-# supabase/migrations/20260925240000_admission.sql and 20260925240400_storage_drift.sql.
+# supabase/migrations/20260925240000_admission.sql, 20261009200000_open_admission.sql
+# and 20260925240400_storage_drift.sql.
 #
 # Runs psql as postgres against the hosted database, with
 # supabase/.db-password read inside the container (never printed). Prints
@@ -34,7 +36,7 @@ source scripts/lib/supabase-env.sh
 source scripts/lib/engine.sh
 source scripts/lib/psql-helpers.sh
 
-usage() { sed -n '6,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '6,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 
 NAME='^[a-z][a-z0-9_]{0,31}$'
 EMAIL='^[^[:space:][:cntrl:]@]+@[^[:space:][:cntrl:]@]+\.[^[:space:][:cntrl:]@]+$'
@@ -99,7 +101,7 @@ select p.name as plan, o.n || ' of ' || p.max_vaults as "vaults owned",
   cross join private.plan_of(u.id) p
   cross join lateral (select count(*) as n from public.vaults v where v.created_by = u.id) o
   left join private.account_plans a on a.user_id = u.id;
-select case when not private.invite_only() then 'yes (invite-only is off)'
+select case when d.user_id is null and not private.invite_only() then coalesce('not yet: number ' || (select l.place from private.line() l where l.user_id = u.id) || ' in line', 'not yet: in line once their address is confirmed')
             when d.user_id is null then 'no: they can''t create a vault until they accept an invite or are admitted'
             else 'yes (' || d.via || ', ' || to_char(d.admitted_at, 'YYYY-MM-DD') || ')' end as admitted
   from (select private.user_by_email(:'arg') as id) u
@@ -160,6 +162,21 @@ SQL
     run -v on="$([ "$2" = on ] && echo true || echo false)" <<'SQL'
 select private.set_invite_only(:'on'::boolean) as done;
 SQL
+    ;;
+  open-per-day)
+    [ $# -le 2 ] || usage
+    if [ $# -eq 2 ]; then
+      [[ $2 == none || $2 =~ ^[0-9]{1,6}$ ]] || usage
+      run -v n="$([ "$2" = none ] && echo '' || echo "$2")" <<'SQL'
+select private.set_open_per_day(nullif(:'n', '')::int) as done;
+SQL
+    else
+      run <<'SQL'
+select case when private.invite_only() then 'on' else 'off' end as "invite-only",
+       coalesce((select open_per_day::text from private.settings), 'none (no line)') as "let in a day",
+       (select count(*) from private.line()) as waiting
+SQL
+    fi
     ;;
   check)
     [ $# -eq 1 ] || usage

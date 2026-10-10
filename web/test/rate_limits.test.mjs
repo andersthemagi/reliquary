@@ -116,6 +116,9 @@ async function askForCode(jar, email, from) {
 let ana; // Ana's signed-in jar on the rate-limit instance
 before(async () => {
   assert.ok(RL && FAKE && PUBLIC_URL && AUTH_SECRETS_FILE, "run through web/test.sh (the rate-limit instance and the fake Auth)");
+  // Invite-only, as hosted today, so an unknown address is asked for and
+  // answered as before open sign-up; this database is this file's own.
+  await sql("select private.set_invite_only(true)");
   ana = new Jar();
   const from = addr();
   const r = await askForCode(ana, "ana@example.test", from);
