@@ -38,7 +38,7 @@ Everything runs in containers (podman or docker); no Node on the host.
   `reliquary run` (into one process) and `reliquary env pull` (into a
   gitignored `.env`) deliver values. A change that could route a value
   anywhere else is wrong even if a test passes.
-- **Secrets, for you.** Never read or print `.env*` (not `.env.example`), `mcp/.env.dev`, `mcp/.tokens/`, `web/.login*`, `mcp/.login-oauth-*`, `supabase/.access-token` or `supabase/.vercel-*.env`, `supabase/.*password`, `supabase/.*-secret`: they hold live values, and a database password reached a model that way once (`docs/ops/runbook.md`, "Rules that came from incidents").
+- **Secrets, for you.** Never read or print `.env*` (not `.env.example`), `mcp/.env.dev`, `mcp/.tokens/`, `web/.login*`, `mcp/.login-oauth-*`, `supabase/.access-token` or `supabase/.netlify-*.env`, `supabase/.*password`, `supabase/.*-secret`: they hold live values, and a database password reached a model that way once (`docs/ops/runbook.md`, "Rules that came from incidents").
   Scripts print names, not values; don't ask the person to paste terminal output that may show one.
   A command that might print a value is for the person to run in their own terminal.
 - **The database enforces access, not the API.** Every permission in the

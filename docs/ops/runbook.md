@@ -2,14 +2,14 @@
 
 How the hosted Reliquary is run. Plan and reasons: `docs/research/hosting.md`.
 Where things live: Supabase project `reliquary` (ref `bigonndpibguxuwtysnx`,
-Frankfurt, Pro); Vercel projects `reliquary-web` and `reliquary-mcp` (functions
-in `fra1`); GitHub Actions for tests, deploys and uptime.
+Frankfurt, Pro); Netlify sites `reliquary-web` and `reliquary-mcp` (functions
+in Frankfurt, `fra`); GitHub Actions for tests, deploys and uptime.
 
 ## Hosts
 
-Three hostnames, two Vercel projects:
+Three hostnames, two Netlify sites:
 
-| Host | Project | Serves |
+| Host | Site | Serves |
 |---|---|---|
 | `reliquary.redmage.cc` | `reliquary-web` | the public site: landing, `/docs` (and `.md`, `/llms.txt`, `/llms-full.txt`), `/roadmap` (a redirect to the roadmap board), the legal and trust pages, `robots.txt`, `sitemap.xml`, `/.well-known/security.txt`, static files |
 | `app.reliquary.redmage.cc` | `reliquary-web` | the app: sign-in, Home and every signed-in page, the OAuth authorization server (issuer), the env API, `/cli/oauth-client.json`, `/version`, `/healthz`, static files |
@@ -24,7 +24,7 @@ and every answer carries `X-Robots-Tag: noindex`. A redirect only ever goes
 to one of those two origins. Without `SITE_URL` one host serves both, as in
 local development and most tests.
 
-Production values (`scripts/vercel-env.sh web https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc`):
+Production values (`scripts/netlify-env.sh web https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc https://reliquary.redmage.cc`):
 
 | Where | Variable | Value |
 |---|---|---|
@@ -38,15 +38,17 @@ Production values (`scripts/vercel-env.sh web https://app.reliquary.redmage.cc h
 | Supabase Auth, URL Configuration | Redirect URLs | `https://app.reliquary.redmage.cc/**` |
 | GitHub, repository variables | `WEB_URL` / `MCP_URL` | `https://app.reliquary.redmage.cc` / `https://mcp.reliquary.redmage.cc` |
 
-Both web hostnames are domains of `reliquary-web` in Vercel; DNS for all
-three is a CNAME to `cname.vercel-dns.com`. Changing `PUBLIC_URL` changes the
+Both web hostnames are domains of the `reliquary-web` site in Netlify
+(Domain management); DNS for all three is a CNAME to the owning site's
+`<name>.netlify.app` address, as Netlify's instructions say when a domain is
+added. Changing `PUBLIC_URL` changes the
 OAuth issuer: every connector and the CLI signs in again once. Changing only
 `SITE_URL` signs nobody out. After changing any of them, redeploy (below).
 
 ## Rules that came from incidents
 
 - **Secrets never pass through a model.** Scripts that handle secrets write
-  mode-600 gitignored files and print names only (`vercel-env.sh`,
+  mode-600 gitignored files and print names only (`netlify-env.sh`,
   `set-role-passwords.sh`, `backup.sh`, `variables-keys.sh`,
   `rotate-variables-key.sh`). Don't `cat` those files, don't paste
   them into a chat, and don't ask an agent to read the terminal while one is
@@ -56,9 +58,9 @@ OAuth issuer: every connector and the CLI signs in again once. Changing only
   a value. An agent can read what its commands print.
 - **A new required env var needs a deploy-time check, not just a runtime
   refusal.** On 2026-09-28, v0.10.0 shipped the link proxy's
-  `LINK_PROXY_SECRET` (`web/src/linkproxy.ts`, refuses to start on Vercel
+  `LINK_PROXY_SECRET` (`web/src/linkproxy.ts`, refuses to start on Netlify
   without it, same pattern as `mcp/`'s `VARIABLES_KEYS`), but the variable
-  was never set in Vercel production. The build succeeded, Vercel aliased it
+  was never set in Netlify production. The build succeeded, Netlify published it
   to the live domains immediately, and both apps 500'd on every request
   until the variable was set and the workflow re-run. See "Deploy" below:
   the deploy workflow now rolls production back automatically when the
@@ -120,30 +122,25 @@ change only bumps the minor while below 1.0).
    Release; the `release` workflow adds the pre-alpha line, the database
    migrations in this release and a deploy note to it.
 4. **The deploy** (`deploy` workflow, for that tag): migrations (dry run,
-   then `supabase db push` to the session pooler), then a production
-   deployment of exactly the tagged commit in both Vercel projects through
-   the API (`VERCEL_TOKEN`; `scripts/vercel-deploy.sh` waits for both
-   builds), then smoke checks (`scripts/deploy-check.sh`) including that both
-   apps' `/version` answers the release and its commit. A failing check fails
-   the run: read it, then fix forward or roll back.
+   then `supabase db push` to the session pooler), then both apps built
+   from the tagged checkout in the workflow itself (Node 22, `npm ci && npm
+   run build`), uploaded as **draft** deploys of their Netlify sites with the
+   Netlify CLI (`NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_WEB`, `NETLIFY_SITE_MCP`;
+   `scripts/netlify-deploy.sh`), smoke-checked on the drafts' own addresses
+   (`scripts/deploy-check.sh`, including that both apps' `/version` answers
+   the release and its commit), **published** (`scripts/netlify-publish.sh`:
+   production now serves them), and smoke-checked once more on the live
+   hostnames. A failing check fails the run: read it, then fix forward.
 
-   Vercel aliases a production deployment to the live domains the moment its
-   build succeeds, before any smoke check runs — a build succeeding says
-   nothing about whether the app actually boots (a missing required env var
-   is a runtime failure, not a build one; see "Rules that came from
-   incidents" above, 2026-09-28). So the deploy step first
-   records each project's current production deployment with
-   `scripts/vercel-deploy.sh`; if the smoke checks step then fails, a **Roll
-   back** step points production straight back at it with
-   `scripts/vercel-rollback.sh`, automatically, and the run still fails so a
-   person sees it. This bounds an accidental outage to roughly the smoke
-   checks' own retry window (`DEPLOY_WAIT`, default 300s) instead of
-   production staying broken until someone notices by hand. It only fires
-   right after `scripts/vercel-deploy.sh` itself succeeded (not on a
-   migration failure, and not on the Deploy Hooks fallback path, which can't
-   be rolled back to a pinned commit the same way) and only if a previous
-   production deployment existed to roll back to (never on a project's first
-   deploy).
+   An upload succeeding says nothing about whether the app actually boots (a
+   missing required env var is a runtime failure, not a build one; see
+   "Rules that came from incidents" above, 2026-09-28). That is why nothing
+   is published before its draft has passed the same checks production gets:
+   a failing draft leaves production on the previous release, with nothing
+   to roll back. A failure on the live hostnames after publishing is DNS or
+   certificates, not the app (the same deploy just passed on its draft
+   address); "Redeploy or roll back" below says how to put the previous
+   deploy back by hand.
 
 Without `RELEASE_PLEASE_TOKEN`, the release pull request shows no `test`
 checks (GitHub doesn't run workflows for what `GITHUB_TOKEN` creates): close
@@ -184,15 +181,15 @@ start the next release pull request.
 
 ### Redeploy or roll back
 
-If the deploy workflow's own smoke checks just failed right after a deploy,
-it already rolled Vercel back for you (see "Deploy" above) — this section is
-for rolling back by hand later, once a problem the smoke checks didn't catch
-turns up.
+If the deploy workflow's smoke checks failed on the drafts, nothing was
+published and production still serves the previous release (see "Deploy"
+above) — this section is for rolling back by hand later, once a problem the
+smoke checks didn't catch turns up.
 
 Actions > deploy > Run workflow, on `main`, with the tag (`vX.Y.Z`).
 
 - **The newest release**: a redeploy (migrations are a no-op if applied).
-  This is the "redeploy" after changing a Vercel environment variable (key
+  This is the "redeploy" after changing a Netlify environment variable (key
   rotation, secrets): it rebuilds the live release with the new values.
 - **An older release**: a rollback. Migrations are forward-only, so the
   workflow skips them and deploys only that tag's app code, on today's
@@ -200,8 +197,10 @@ Actions > deploy > Run workflow, on `main`, with the tag (`vX.Y.Z`).
   (additive migrations are; a dropped or renamed column isn't): read the
   "Database migrations in this release" lists of the releases you step back
   over. If it isn't safe, fix forward instead.
-- Instant alternative for app code only: promote the previous production
-  deployment in Vercel. The next release deploys over it as usual.
+- Instant alternative for app code only: in Netlify, the site's Deploys,
+  pick the previous one, **Publish deploy**; or `scripts/netlify-publish.sh
+  <site id>=<deploy id>` with the ids a deploy run printed. The next release
+  deploys over it as usual.
 
 ### Hotfix
 
@@ -229,8 +228,9 @@ path: it's usually one click away from live.
 
 `scripts/db-push.sh` (dry run), then `scripts/db-push.sh --apply`.
 Migrations must be applied in timestamp order; never edit one that shipped.
-Deploy only releases: never deploy `main` from the Vercel dashboard, or live
-stops matching a release (the next deploy's `/version` check says so).
+Deploy only releases: never `netlify deploy` from a checkout of `main`, and
+never connect a site to the repository (Netlify would build every push), or
+live stops matching a release (the next deploy's `/version` check says so).
 
 ## Checks
 
@@ -245,7 +245,7 @@ stops matching a release (the next deploy's `/version` check says so).
   curl -s https://mcp.reliquary.redmage.cc/version     # which release is live
   ```
 
-- **Logs:** Vercel project, Logs; or the Vercel connector's runtime logs.
+- **Logs:** the Netlify site, Logs > Functions, the `index` function.
   Server logs never contain tokens, values or file text (tests enforce it).
 - **Database advisors:** Supabase dashboard, Advisors. Expected: "RLS enabled,
   no policy" on the private tables (deny-all by design).
@@ -269,14 +269,14 @@ stops matching a release (the next deploy's `/version` check says so).
 - **Supabase:** daily backups, 7 days on Pro (dashboard, Database, Backups).
 - **Off-site:** `scripts/backup.sh` writes `~/reliquary-backups/*.dump`
   (mode 600, keeps 14). Variable values are ciphertext only; the key is in
-  Vercel and your password manager.
+  Netlify and your password manager.
 - **Test a restore** after each backup, or at least monthly:
   `scripts/restore-test.sh` restores the newest dump into a throwaway local
   Postgres and prints row counts.
 - **Real restore:** prefer Supabase's restore (dashboard). From an off-site
   dump, restore into a new project with `pg_restore --no-owner
   --no-privileges`, apply any newer migrations with `db push`, set the app
-  role passwords (`set-role-passwords.sh`), then point both Vercel projects'
+  role passwords (`set-role-passwords.sh`), then point both Netlify sites'
   `DATABASE_URL` at it.
 
 ## Plans and testers
@@ -404,7 +404,7 @@ and answers with `scripts/feedback.sh` (psql as postgres, like
 
 - **Notices.** Each new item is emailed to the operator through Resend,
   from the web app (the MCP server has no mailer): to `FEEDBACK_EMAIL` if
-  set, else, on the hosted service only (`VERCEL` and not `SELF_HOSTED`),
+  set, else, on the hosted service only (`NETLIFY` and not `SELF_HOSTED`),
   to `OPERATOR.contactEmail` in `web/src/site.ts`. The web app claims
   unsent items (`private.claim_feedback_notices`) after every feedback
   form, on a signed-in page load at most once a minute per instance, and
@@ -484,10 +484,10 @@ end of this section).
    (`docs/public/reference/limits.md`) sit in front of it.
 7. **Templates**: paste them, per "Email templates" below
    (`scripts/email-templates.sh`), if not done yet.
-8. **Invites from the web app**: in Vercel, `reliquary-web` > Settings >
-   Environment Variables (Production), add `RESEND_API_KEY` = the
-   `reliquary-web` key (Sensitive) and `EMAIL_FROM` =
-   `Reliquary <no-reply@mail.reliquary.redmage.cc>`. `scripts/vercel-env.sh web ...`
+8. **Invites from the web app**: in Netlify, the `reliquary-web` site >
+   Site configuration > Environment variables, add `RESEND_API_KEY` = the
+   `reliquary-web` key (secret) and `EMAIL_FROM` =
+   `Reliquary <no-reply@mail.reliquary.redmage.cc>`. `scripts/netlify-env.sh web ...`
    lists both (the key as a placeholder). Never in `reliquary-mcp`. Then
    redeploy the live release (see "Redeploy or roll back").
 9. **Check**: sign out and sign in with a code (the email comes from
@@ -501,7 +501,7 @@ end of this section).
    `daily_quota_exceeded`). The invite is kept either way; the owner can send
    the shown link.
 
-Rotating a key: create the new one, put it in its place (Supabase or Vercel,
+Rotating a key: create the new one, put it in its place (Supabase or Netlify,
 then redeploy), check as in 9, then delete the old one in Resend.
 
 Sources: Resend, [SMTP](https://resend.com/docs/send-with-smtp),
@@ -562,21 +562,21 @@ tokens in a URL fragment the server never sees.
 
 | Secret | Where it lives | How to rotate | Effect |
 |---|---|---|---|
-| `reliquary_web` / `reliquary_mcp` DB passwords | `supabase/.web-db-password`, `.mcp-db-password`; Vercel `DATABASE_URL` | delete the file, run `scripts/set-role-passwords.sh`, run `scripts/vercel-env.sh <app> ...`, paste the new `DATABASE_URL` into that Vercel project, redeploy | that app can't reach the database until redeployed |
-| `reliquary_ops` DB password (the operator's role, key rotation only) | `supabase/.ops-db-password`; nowhere else (not Vercel) | `scripts/set-role-passwords.sh ops-off` (nologin, file removed), then `scripts/set-role-passwords.sh ops` when next needed | only `rotate-variables-key.sh` uses it; nologin between rotations is fine |
-| `SESSION_SECRET` (web) | `supabase/.web-session-secret`; Vercel | delete the file, run `vercel-env.sh web ...`, update Vercel, redeploy | everyone is signed out of the web UI once; CLI and connectors unaffected |
-| `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Vercel; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values and link credentials are re-encrypted loses them |
-| `LINK_PROXY_SECRET` (web and mcp, the same value on both) | `supabase/.link-proxy-secret`; Vercel (both projects) | rewrite the file, `scripts/vercel-env.sh web ...` and `scripts/vercel-env.sh mcp ...`, redeploy both at once (a mismatch refuses every proxied link call with 401 until both are live) | proxied `<link>.<tool>` calls fail (401) between the two deploys; nothing else |
+| `reliquary_web` / `reliquary_mcp` DB passwords | `supabase/.web-db-password`, `.mcp-db-password`; Netlify `DATABASE_URL` | delete the file, run `scripts/set-role-passwords.sh`, run `scripts/netlify-env.sh <app> ...`, import the new `DATABASE_URL` into that Netlify site, redeploy | that app can't reach the database until redeployed |
+| `reliquary_ops` DB password (the operator's role, key rotation only) | `supabase/.ops-db-password`; nowhere else (not Netlify) | `scripts/set-role-passwords.sh ops-off` (nologin, file removed), then `scripts/set-role-passwords.sh ops` when next needed | only `rotate-variables-key.sh` uses it; nologin between rotations is fine |
+| `SESSION_SECRET` (web) | `supabase/.web-session-secret`; Netlify | delete the file, run `netlify-env.sh web ...`, update Netlify, redeploy | everyone is signed out of the web UI once; CLI and connectors unaffected |
+| `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Netlify; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values and link credentials are re-encrypted loses them |
+| `LINK_PROXY_SECRET` (web and mcp, the same value on both) | `supabase/.link-proxy-secret`; Netlify (both sites) | rewrite the file, `scripts/netlify-env.sh web ...` and `scripts/netlify-env.sh mcp ...`, redeploy both at once (a mismatch refuses every proxied link call with 401 until both are live) | proxied `<link>.<tool>` calls fail (401) between the two deploys; nothing else |
 | `postgres` password | `supabase/.db-password`; GitHub secret `SUPABASE_DB_PASSWORD` | reset in the dashboard, rewrite the file, `tr -d '[:space:]' < supabase/.db-password \| gh secret set SUPABASE_DB_PASSWORD` | migrations and backups need the new one |
 | A person's agent token or connection | database | Connections page, Revoke | stops within one request |
 
 ### Setting VARIABLES_KEYS the first time
 
-Keys come from `scripts/variables-keys.sh`, through `scripts/vercel-env.sh
+Keys come from `scripts/variables-keys.sh`, through `scripts/netlify-env.sh
 web ...`, and are never pasted into a chat. Set `VARIABLES_KEYS` in the
-**web** Vercel project only, marked Sensitive: the mcp project refuses to
-start with it. Keep a copy of every key somewhere safe outside Vercel (a
-password manager): Vercel can't show a Sensitive value again, and without a
+**web** Netlify site only, marked secret: the mcp site refuses to start
+with it. Keep a copy of every key somewhere safe outside Netlify (a
+password manager): Netlify can't show a secret value again, and without a
 key every value sealed with it is lost. Apply a migration with
 `scripts/db-push.sh --apply` (after the dry run) before deploying the web app
 that needs it.
@@ -599,16 +599,16 @@ call).
    `ops-off`: `scripts/set-role-passwords.sh ops` gives it a password in
    `supabase/.ops-db-password` (mode 600, gitignored, never printed) and
    checks it can log in through the pooler.
-1. **Add a key.** `scripts/vercel-env.sh new-variables-key` adds `k2` (the
+1. **Add a key.** `scripts/netlify-env.sh new-variables-key` adds `k2` (the
    next id) to `supabase/.variables-keys-secret` as the current key. Copy
    it from that file into your password manager, yourself.
-2. **Deploy both keys.** `scripts/vercel-env.sh web <web-origin>
-   <mcp-origin>`, then in the web Vercel project set `VARIABLES_KEYS` from
-   `supabase/.vercel-web.env` (Sensitive) and delete `VARIABLES_KEY` if it
+2. **Deploy both keys.** `scripts/netlify-env.sh web <web-origin>
+   <mcp-origin>`, then in the web Netlify site set `VARIABLES_KEYS` from
+   `supabase/.netlify-web.env` (secret) and delete `VARIABLES_KEY` if it
    is still there (the first time only). Redeploy, and check the site is up.
    New values are now sealed with `k2`; old ones open with `k1`.
 3. **Re-encrypt.** `scripts/rotate-variables-key.sh`. It uses the database
-   and keys in `supabase/.vercel-web.env`, logs in as `reliquary_ops` with
+   and keys in `supabase/.netlify-web.env`, logs in as `reliquary_ops` with
    `supabase/.ops-db-password` (it stops with exit 2 and says so if that file
    is missing: step 0), moves every value, pending import value and link
    credential to `k2`, and prints counts. Exit 0 ("Everything is on k2")
@@ -619,8 +619,8 @@ call).
    editors see one "Re-encrypted (key rotation)" row per vault in its
    access log.
 4. **Drop the old key.** Only after step 3 exits 0:
-   `scripts/vercel-env.sh drop-variables-key k1`, then `scripts/vercel-env.sh
-   web ...`, set `VARIABLES_KEYS` in Vercel again, redeploy.
+   `scripts/netlify-env.sh drop-variables-key k1`, then `scripts/netlify-env.sh
+   web ...`, set `VARIABLES_KEYS` in Netlify again, redeploy.
    `scripts/rotate-variables-key.sh --check` should still exit 0.
 5. **Optionally, close the operator's role again:**
    `scripts/set-role-passwords.sh ops-off`.
@@ -628,7 +628,7 @@ call).
 If a deployment ever lacks a key that stored values name, the web app
 refuses to start and its log says which id: put that key back in
 `VARIABLES_KEYS` and redeploy. Once step 2 is live, don't roll the web app
-back (Vercel instant rollback) to a deployment from before it: that one
+back (publishing an older deploy in Netlify) to one from before it: that one
 holds only the old key and can't open values sealed with the new one. Keep old keys in the password manager until
 backups taken before the rotation have aged out (7 days on Supabase, 14 for
 `backup.sh`): restoring one needs the key it was sealed with. After a
@@ -646,11 +646,11 @@ one log line that starts with it:
 failure ref=7f3a2c9e {"status":504,"what":"POST /v/:id/file <vault id> action=write","where":"database (function public.search)","why":"57014 statement timeout: ...","sqlstate":"57014","message":"canceling statement due to statement timeout","functions":"public.search line 12 < ...","routine":"ProcessInterrupts","stack":"..."}
 ```
 
-1. Vercel, the project the person was using (web app for pages, the env
-   API, OAuth and the CLI; MCP for tool calls), **Logs**, set the time range
-   around when it happened, and search for the ref (`7f3a2c9e`). With the
-   CLI: `vercel logs <deployment url> | grep 7f3a2c9e` (logs are kept for a
-   limited time, so look soon).
+1. Netlify, the site the person was using (web app for pages, the env
+   API, OAuth and the CLI; MCP for tool calls), **Logs > Functions**, the
+   `index` function, set the time range around when it happened, and search
+   for the ref (`7f3a2c9e`). Function logs are kept for a limited time (a
+   day without a log drain), so look soon.
 2. Read the JSON: `status`, `what` (the route's shape and ids, never a path
    or name someone typed), `where`, `why`, and for database errors
    `sqlstate`, `constraint`, `table`, `column`, `functions` (innermost
@@ -666,9 +666,9 @@ failure ref=7f3a2c9e {"status":504,"what":"POST /v/:id/file <vault id> action=wr
    database or pooler dropped while idle or mid-request; the process kept
    running and the next request connected again. A `sign-in (Supabase
    Auth)` failure names the call and its status or network error.
-5. A failed `<link>.<tool>` call has two refs: the MCP project's own, and
-   `web app ref ...` in its reason. Search the web app project for the second.
-   When the linked server answered with an error of its own, that project also
+5. A failed `<link>.<tool>` call has two refs: the MCP site's own, and
+   `web app ref ...` in its reason. Search the web app site for the second.
+   When the linked server answered with an error of its own, that site also
    has `link upstream error ref=<ref> {"code":...,"said":"..."}`: what the
    server said, cut to 200 characters, with the link's credential replaced by
    `[credential]`. The person and the agent never see it.
@@ -682,7 +682,7 @@ anything else.
 1. Check the uptime issue and the last `deploy` run.
 2. Read the runtime logs for the failing app.
 3. A bad release: roll back (Actions > deploy with the previous tag, or
-   promote the previous deployment in Vercel; [Redeploy or roll
+   publish the previous deploy in Netlify; [Redeploy or roll
    back](#redeploy-or-roll-back)). Migrations are forward-only: fix forward
    with a new migration.
 4. A leaked secret: rotate it (table above), then check the access logs

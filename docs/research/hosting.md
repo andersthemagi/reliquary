@@ -1,4 +1,8 @@
-# Hosting: Vercel, Supabase, sign-in and MCP OAuth
+# Hosting: Netlify (Vercel until 2026-10), Supabase, sign-in and MCP OAuth
+
+> Sections 1 to 10 are the 2026-09 plan and were built on Vercel. Section 11
+> records the move to Netlify in 2026-10: what changed, what did not, and the
+> cutover order. Where the two disagree, section 11 is current.
 
 2026-09-24 · Status: RESEARCH and PLAN · Companions:
 [design.md](../design.md) (Access surfaces, Architecture, Privacy, Open
@@ -633,3 +637,72 @@ Acceptance:
 - Design doc updates after C: Open decision 3 (decided: own AS), "one URL per
   vault" (one URL, vault chosen at consent), Architecture ("Next.js" is plain
   Node on Vercel).
+
+## 11. Moving to Netlify (2026-10)
+
+The owner decided to leave Vercel for Netlify. The apps stay what section 1
+made them: one plain `node:http` server each, exporting `handle`, with the
+hosted marker deciding the strict checks (TLS to the database, https origins,
+no loopback allowances). What changed:
+
+| Was (Vercel) | Is (Netlify) | Why |
+|---|---|---|
+| Marker `VERCEL`, set by the platform | Marker `NETLIFY`, set by the function's own entry point before it loads the server | Netlify's runtime promises functions only `URL`, `SITE_NAME` and `SITE_ID`; the entry file runs nowhere but on Netlify, so it is the one place that knows |
+| `api/index.js` exporting the Node handler; `vercel.json` rewrites every path to it after the CDN | `netlify/functions/index.mjs`, a Functions 2.0 module (`Request` in, `Response` out) with `path: "/*"`, `preferStatic: true`, `region: "fra"`; it keeps the real server on a loopback port inside the function and relays each request through Node's http client | Netlify Functions speak web `Request`/`Response`, not `(req, res)`; relaying through Node's own client keeps headers, bodies and statuses exact without imitating `IncomingMessage` |
+| Vercel traced `dist/**` into the function (`includeFiles`) | `included_files` in `netlify.toml`: `dist/**`, `node_modules/**` (after `npm prune --omit=dev`), the CA, `public/**`, and for web `docs-build/**` and the invite template | Netlify bundles a Functions 2.0 entry with esbuild and would inline `dist/server.js`, breaking its `import.meta.url` reads (`version.json`, `public/`); so the server is imported by a URL the bundler can't follow, and everything ships as included files |
+| Commit from `VERCEL_GIT_COMMIT_SHA` | `COMMIT_REF`, set by the deploy workflow before `npm run build` | Netlify's name for it; a CLI deploy has no build-time commit of its own |
+| Client address from `x-real-ip` | `x-nf-client-connection-ip` first, then `x-real-ip` (self-hosting), then `x-forwarded-for` | Netlify's edge sets and overwrites its own header |
+| Region `fra1`, Fluid compute, `maxDuration` 30/60 s, 4.5 MB bodies | Region `fra` (Frankfurt; a Pro plan feature), 60 s synchronous limit, 6 MB buffered bodies | Netlify's limits; the app's own body ceilings (2 MB, 3 MiB + 64 KiB) stay under them |
+| Deploy: Vercel API builds the pinned commit from the Git connection, production serves it as soon as it is built, and a failed smoke check rolls back | Deploy: the workflow builds the tagged checkout (Node 22) and uploads a **draft** deploy per site with the Netlify CLI (`scripts/netlify-deploy.sh`); the smoke checks run on the drafts' own addresses; only then are they published (`scripts/netlify-publish.sh`, `POST /sites/{id}/deploys/{id}/restore`), and checked again on the live hostnames | Netlify's builds and build hooks build a branch head, never a pinned SHA; a draft has an address production doesn't serve, so nothing unchecked is ever live and there is no rollback to automate; a site that is not connected to the repository can't deploy by accident |
+| Env values pasted into Vercel, marked Sensitive | `scripts/netlify-env.sh` writes `supabase/.netlify-<app>.env`; imported into the site ("Import from a .env file" or `netlify env:import`), marked "Contains secret values" | Same script, same files, new name |
+| Settings: `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, Deploy Hook fallback | `NETLIFY_AUTH_TOKEN` (secret), `NETLIFY_SITE_WEB`, `NETLIFY_SITE_MCP` (site API IDs); no hook fallback | Hooks would build `main`, not the tag: the thing the workflow exists to prevent |
+| Rollback by hand: promote a deployment in Vercel | Publish deploy in Netlify, or `scripts/netlify-publish.sh <site id>=<deploy id>` | The same call the workflow uses to publish a checked draft |
+| Deployment Protection in front of `*.vercel.app` | None; the `*.netlify.app` addresses serve the app too, and `hosts.ts` treats them like the app host | MCP clients couldn't pass Vercel's login anyway; the custom domains were always the real ones |
+
+What did not change: the hostnames, `PUBLIC_URL`, `SITE_URL`, `MCP_RESOURCE`
+and `AUTH_ISSUER` (so the OAuth issuer is the same and nobody signs in
+again), Supabase Auth's URL configuration, the smoke checks, `/version`, the
+database, the pooler, TLS and the CA, the rate limits (shared in Postgres,
+instance memory never counted), the legal pages' structure (the sub-processor
+row now names Netlify; the logs retention figure is Netlify's).
+
+Verified before the first release on Netlify, locally: the function bundled
+with zip-it-and-ship-it as the CLI does (basePath the app directory) holds
+`netlify/functions/index.mjs` (1.6 KB, the relay only), `dist/server.js`,
+`dist/version.json`, `supabase-ca.crt`, `public/`, `node_modules/pg` and no
+`typescript`; unzipped into a task directory and called with a dummy
+database URL, `/healthz` answers `ok`, `/version` the stamp with its commit,
+unknown paths the app's own 404, and `POST /mcp` without a token the 401 with
+`WWW-Authenticate: ... resource_metadata=...` the smoke check looks for.
+
+### Cutover order
+
+1. Owner: Netlify team on Pro, two sites without a repository, Frankfurt
+   confirmed in the first deploy's function settings, `AWS_LAMBDA_JS_RUNTIME=
+   nodejs22.x`, env imported from `scripts/netlify-env.sh web` and `mcp`,
+   both custom domains added to each site (Netlify provisions certificates
+   once DNS points at it), GitHub secret `NETLIFY_AUTH_TOKEN` and variables
+   `NETLIFY_SITE_WEB`, `NETLIFY_SITE_MCP`.
+2. Merge the release pull request that carries this change. The deploy
+   workflow applies migrations, uploads both drafts, smoke-checks them on
+   their own addresses and publishes them. Its last step, the same checks
+   against `WEB_URL` and `MCP_URL`, fails: DNS still sends those names to
+   Vercel, which serves the old version. Expected, once.
+3. Check the two `*.netlify.app` addresses by hand: `/healthz`, `/version`
+   (the new release), `/healthz?db=1` on the MCP site.
+4. Move the three CNAMEs to the Netlify sites (mcp first, then web, as
+   #225 says; lower the TTLs a day ahead). Certificates issue within
+   minutes. Re-run `deploy` with the tag: every check now passes, and every
+   later release deploys as before. Rolling back during the soak is putting
+   the CNAMEs back: the Vercel projects keep serving v0.16.2 untouched, since
+   nothing deploys to them any more.
+5. After a quiet day: delete the Vercel projects, the `VERCEL_TOKEN` secret
+   and the `VERCEL_TEAM_ID` variable. Nothing else references them.
+
+### Open
+
+- Netlify's function logs are kept for a day without a log drain; the
+  runbook's "Finding an error by its ref" says so. A drain is a later choice.
+- `region` in the function's config needs the Pro plan; on a lower plan
+  Netlify ignores it and runs the function in US East, far from the database
+  in Frankfurt. The first deploy's function page shows the region in use.
