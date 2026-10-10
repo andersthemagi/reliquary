@@ -151,10 +151,10 @@ async function openSignup(fn) {
   }
 }
 
-test("open sign-up: with invite-only off, the sign-in page says the same step makes your account", () =>
+test("open sign-up: with invite-only off, the sign-in page says the same step makes your account, that people are let in steadily, and whom to email", () =>
   openSignup(async () => {
     const page = await (await get("/signin", new Jar())).text();
-    assert.match(page, /<p class="hint">New to Reliquary\? The same step makes your account\. Reliquary is pre-alpha and lets in a limited number of new accounts a day\. Have an invite\? Open its link\.<\/p>/);
+    assert.match(page, /<p class="hint">New to Reliquary\? The same step makes your account\. We’re letting people in steadily as usage grows, so it may take a while before you can create a vault\. If it’s taking too long, email <a href="mailto:andres@redmage\.cc\?subject=Reliquary%3A%20waiting%20to%20get%20in">andres@redmage\.cc<\/a>\. Have an invite\? Open its link to get in now\.<\/p>/);
     assert.doesNotMatch(page, /invite-only/);
   }));
 

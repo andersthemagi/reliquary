@@ -5,7 +5,7 @@
 // whose message pages.ts's message() shows where they happen. Admission
 // (20260925240000_admission.sql, 20261009200000_open_admission.sql:
 // public.my_admission): an account creates vaults once admitted, by invite,
-// the operator, or open admission's daily quota; create_vault refuses
+// the operator, or being let in from open admission's line; create_vault refuses
 // others with SQLSTATE RLP02.
 
 import type pg from "pg";
@@ -13,7 +13,7 @@ import { asPerson } from "./db.js";
 import { html, pageHeader, plural, type Raw } from "./html.js";
 import { render, vaultPath, type Ctx, type Reply } from "./pages.js";
 import { selfHosted } from "./selfhost.js";
-import { biggerPlanHref } from "./site.js";
+import { biggerPlanHref, contactEmail, waitingHref } from "./site.js";
 
 export type Plan = { plan: string; planName: string; vaultsOwned: number; maxVaults: number };
 export type VaultUsage = {
@@ -44,19 +44,20 @@ export async function myPlan(c: pg.PoolClient): Promise<Plan> {
   return { plan: r.plan, planName: r.plan_name, vaultsOwned: r.vaults_owned, maxVaults: r.max_vaults };
 }
 
-export type Admission = { admitted: boolean; inviteOnly: boolean };
+// place: where the account is in the line (1 is next), while it waits.
+export type Admission = { admitted: boolean; inviteOnly: boolean; place: number | null };
 
 export async function myAdmission(c: pg.PoolClient): Promise<Admission> {
-  const r = (await c.query(`select admitted, invite_only from public.my_admission()`)).rows[0];
-  return { admitted: r.admitted, inviteOnly: r.invite_only };
+  const r = (await c.query(`select a.admitted, a.invite_only, public.my_place_in_line() as place from public.my_admission() a`)).rows[0];
+  return { admitted: r.admitted, inviteOnly: r.invite_only, place: r.place === null ? null : Number(r.place) };
 }
 
 // For an account that can't create vaults yet: why, and the way in. Open
-// (invite-only off), the only reason is that today's places are taken.
+// (invite-only off), the only reason is that it's waiting in the line.
 export const notAdmittedNote = (a: Admission): Raw =>
   a.inviteOnly
     ? html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is invite-only during the alpha. To get in, open an invite link someone sent you and join their vault, or ask the operator to admit your account. <a href="/docs/concepts/plans-and-limits#who-can-create-vaults">Who can create vaults</a></p>`
-    : html`<p class="callout attention" role="status">Your account can’t create vaults yet: during the pre-alpha Reliquary lets in a limited number of new accounts a day, and today’s are taken. Try again after midnight UTC, or open an invite link someone sent you and join their vault. <a href="/docs/concepts/plans-and-limits#who-can-create-vaults">Who can create vaults</a></p>`;
+    : html`<p class="callout attention" role="status">Your account can’t create vaults yet: Reliquary is letting people in steadily as usage grows, and ${a.place ? html`you’re number ${String(a.place)} in line` : "you’re in line"}. It may take a while. If it’s taking too long, email <a href="${waitingHref()}">${contactEmail()}</a>. An invite link someone sends you gets you in now. <a href="/docs/concepts/plans-and-limits#who-can-create-vaults">Who can create vaults</a></p>`;
 
 // Usage for the vaults in `ids` the person belongs to, in one query.
 export async function vaultUsages(c: pg.PoolClient, ids: string[]): Promise<Map<string, VaultUsage>> {

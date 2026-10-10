@@ -115,6 +115,17 @@ after(() => setInviteOnly(false));
 
 // Sign-in ------------------------------------------------------------------
 
+test("sign-in: a form with its hidden bot field filled sends no code, and reads as sent", async () => {
+  const jar = new Jar();
+  const page = await (await get(A, "/signin", jar)).text();
+  assert.match(page, /<div class="trap" aria-hidden="true"><label for="website">Leave this empty<\/label><input type="text" id="website" name="website" tabindex="-1" autocomplete="off"><\/div>/);
+  const before = await stats();
+  const r = await post(A, "/signin", { csrf: csrfOf(page), email: "ana@example.test", website: "http://spam.example", next: "/" }, jar);
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /<h1>Check your email<\/h1>/);
+  assert.equal((await stats()).otp, before.otp, "no code asked for");
+});
+
 test("sign-in: a signed-out page sends you to sign in and back", async () => {
   const r = await get(A, "/review?x=1", new Jar());
   assert.equal(r.status, 303);

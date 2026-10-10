@@ -121,7 +121,7 @@ export function landing(theme: Theme): string {
     <p class="hero-sub">Your agents propose changes to canon. You approve them.</p>
     <p class="hero-lede">One shared vault of context and credentials for your team and every AI tool you use: Claude, ChatGPT, Cursor, Claude Code and more. People and agents alike only see what they're scoped to. Secrets stay out of the chat.</p>
     ${cta("Get started")}
-    <p class="hero-small">EU-hosted. Bring your own model. Open pre-alpha: sign in with your email to start. Want help setting up? Tell us about your team.</p>
+    <p class="hero-small">EU-hosted. Bring your own model. Open pre-alpha: sign up with your email. We're letting people in steadily as usage grows.</p>
     ${preAlphaNote()}
   </div>
   ${proposalCard}
@@ -197,7 +197,7 @@ ${PRICING.show
 
 <section class="site-section closing" aria-labelledby="closing-title">
   <h2 id="closing-title">Try it on your next project</h2>
-  <p>Reliquary is an open pre-alpha: sign in with your email and create a vault. New accounts a day are limited while we grow, so if today's are taken, come back tomorrow. Want a hand? Tell us about your team and the AI tools you use, and we'll set up your first vault with you.</p>
+  <p>Reliquary is an open pre-alpha: sign up with your email and create a vault. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? Tell us about your team and the AI tools you use, and we'll set up your first vault with you.</p>
   ${cta("Get started")}
 </section>`;
   return sitePage({

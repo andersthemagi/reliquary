@@ -92,6 +92,9 @@ export const PRICING = {
 // Mail to the operator (OPERATOR.contactEmail), one subject per reason.
 const mailOperator = (subject: string) => `mailto:${OPERATOR.contactEmail}?subject=${encodeURIComponent(subject)}`;
 export const requestAccessHref = () => mailOperator("Reliquary early access");
+// For someone in the line to get in (20261009200000_open_admission.sql).
+export const waitingHref = () => mailOperator("Reliquary: waiting to get in");
+export const contactEmail = () => OPERATOR.contactEmail;
 export const biggerPlanHref = () => mailOperator("Reliquary: a bigger plan");
 export const suggestFeatureHref = () => mailOperator("Reliquary feature suggestion");
 

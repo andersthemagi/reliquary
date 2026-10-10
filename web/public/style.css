@@ -2007,3 +2007,14 @@ table.env-log td[data-label="Environment"] { white-space: nowrap; }
 .chip:hover { border-color: var(--border-strong); }
 .chip[aria-current="true"] { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 600; }
 .chips + .hint { margin: var(--space-3) 0 0; }
+
+/* Sign-in's bot trap (signin.ts TRAP): off screen and out of the tab
+   order, for people and screen readers alike; display:none would let a
+   bot skip it. */
+.trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}

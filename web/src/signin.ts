@@ -51,7 +51,7 @@ import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure, noteUpstream, Refusal, sqlstateName, upstreamNote } from "./failure.js";
-import { requestAccessHref } from "./site.js";
+import { contactEmail, requestAccessHref, waitingHref } from "./site.js";
 import { pool } from "./db.js";
 
 // Whether sign-in makes an account for any address: invite-only is off
@@ -124,6 +124,10 @@ export const FRESH_SIGNIN = "rlq_fresh";
 const freshCookie = () => setCookie(FRESH_SIGNIN, "1", 1800);
 export const EMAIL = /^[^\s@<>()",;:\\]{1,64}@[^\s@<>()",;:\\]{1,190}\.[^\s@<>()",;:\\]{1,63}$/;
 const CODE = /^[0-9]{6,10}$/;
+// A field people never see (style.css .trap) and form-filling bots fill:
+// filled, sign-in sends nothing and answers as if it had, so the bot
+// learns nothing. Not a CAPTCHA: nothing asks a person anything.
+const TRAP = "website";
 const TOKEN_HASH = /^[A-Za-z0-9_-]{16,256}$/;
 
 type In = {
@@ -163,6 +167,7 @@ function emailForm(csrf: string, next: string, theme: Theme, open: boolean, erro
       ${formError("email-error", error)}
       <form method="post" action="/signin" class="panel">
         ${hidden("csrf", csrf)}${hidden("next", next)}
+        <div class="trap" aria-hidden="true"><label for="${TRAP}">Leave this empty</label><input type="text" id="${TRAP}" name="${TRAP}" tabindex="-1" autocomplete="off"></div>
         <label for="email">Email</label>
         <input type="text" id="email" name="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${invalid("email-error", error)}>
         <div class="actions"><button class="primary">Email me a code</button></div>
@@ -170,7 +175,7 @@ function emailForm(csrf: string, next: string, theme: Theme, open: boolean, erro
       ${invite
         ? ""
         : open
-          ? html`<p class="hint">New to Reliquary? The same step makes your account. Reliquary is pre-alpha and lets in a limited number of new accounts a day. Have an invite? Open its link.</p>`
+          ? html`<p class="hint">New to Reliquary? The same step makes your account. We’re letting people in steadily as usage grows, so it may take a while before you can create a vault. If it’s taking too long, email <a href="${waitingHref()}">${contactEmail()}</a>. Have an invite? Open its link to get in now.</p>`
           : html`<p class="hint">Reliquary is invite-only. Anyone can sign in, but an account creates vaults only after it joins one by invite. Have an invite? Open its link. Otherwise, <a href="${requestAccessHref()}">request access</a>.</p>`}
       <p class="hint"><a href="${siteHref("/docs")}">About Reliquary</a></p>
     </div>`,
@@ -310,6 +315,10 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
       return out({ status: 400, html: emailForm(pre(), next, i.theme, await openForWording(), "Enter your email address, like name@example.com.", invite) });
     }
     if (refused) return out(refused);
+    if (i.form.get(TRAP)) {
+      console.error("sign-in trap field filled: no code sent");
+      return out({ html: codeForm(pre(), email, next, i.theme) });
+    }
     const limited = await signinLimit([
       { name: "signin_email_address", kind: "email", value: emailKey(email) },
       { name: "signin_email_ip", kind: "ip", value: i.ip },
