@@ -6,6 +6,14 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.17.0](https://github.com/andersthemagi/reliquary/compare/v0.16.2...v0.17.0) (2026-10-10)
+
+
+### Features
+
+* anyone can sign up to the pre-alpha, and new accounts are let in steadily from a line ([#231](https://github.com/andersthemagi/reliquary/issues/231)) ([be12fd0](https://github.com/andersthemagi/reliquary/commit/be12fd0a8fa4f17814152254d030d8df8a1e957f))
+* **web:** the roadmap is the GitHub project board, and /roadmap goes there ([#213](https://github.com/andersthemagi/reliquary/issues/213)) ([799a9b8](https://github.com/andersthemagi/reliquary/commit/799a9b8431d1ccac7a3c3e31fa3d05fd9671fa94))
+
 ## [0.16.2](https://github.com/andersthemagi/reliquary/compare/v0.16.1...v0.16.2) (2026-10-09)
 
 Phone layouts stop hiding tabs off-screen and use fingertip-sized controls, and agents get more from the MCP server: every tool says whether it reads, adds or destroys, every argument is described, bad arguments and cut-off lists say what to do, and names people choose are fenced as data. The three `cli:` entries are the CLI's own changes, to be released separately as 0.4.2, and are listed here because they touched shared files; one adds a database function, so a push refused at 20 waiting says to apply or reject some, not to wait.
