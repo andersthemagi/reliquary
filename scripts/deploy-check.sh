@@ -2,7 +2,7 @@
 # shellcheck disable=SC2329 # checks are called through check()
 # Smoke checks after a deploy (.github/workflows/deploy.yml). Retries each
 # check until it passes or the deadline runs out, so it can be started right
-# after the Vercel Deploy Hooks fire.
+# after a deploy is published.
 #
 #   WEB_URL=https://app.example.com MCP_URL=https://mcp.example.com \
 #     scripts/deploy-check.sh

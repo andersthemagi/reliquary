@@ -1,9 +1,10 @@
-# Deploys one release: migrations to Supabase, then both Vercel projects
-# built from exactly the tagged commit, then smoke checks that production's
-# /version is that release. "Live" always equals a release: pushes to main
-# only test (test.yml); release.yml turns merged release pull requests into
-# tags. Plan: docs/research/hosting.md, sections 8 and 10D; how to release,
-# redeploy and roll back: docs/ops/runbook.md, "Deploy".
+# Deploys one release: migrations to Supabase, then both apps built from
+# exactly the tagged commit and uploaded to their Netlify sites, then smoke
+# checks that production's /version is that release. "Live" always equals a
+# release: pushes to main only test (test.yml); release.yml turns merged
+# release pull requests into tags. Plan: docs/research/hosting.md, sections
+# 8, 10D and 11; how to release, redeploy and roll back: docs/ops/runbook.md,
+# "Deploy".
 #
 # Runs when:
 #   - a product release (tag vX.Y.Z, not cli-v...) is published: by
@@ -18,40 +19,38 @@
 # today's schema. Fix forward with a new migration if the schema is the
 # problem.
 #
-# Vercel aliases a production deployment to the live domains the moment its
-# build succeeds, before anything checks that it actually boots (a build
-# succeeding says nothing about a missing required env var, for instance:
-# that's a runtime failure). So scripts/vercel-deploy.sh records each
-# project's current production deployment before deploying the new one; if
-# the smoke checks step then fails, the "Roll back" step points production
-# straight back at it with scripts/vercel-rollback.sh, and the run still
-# fails so a person sees it. Automatic, and bounded to roughly the smoke
-# checks' own retry window, instead of production staying broken until
-# someone notices and redeploys by hand.
+# An upload succeeding says nothing about whether the app boots (a missing
+# required env var is a runtime failure, not a build one), so nothing goes to
+# production unchecked: scripts/netlify-deploy.sh uploads each app as a draft
+# deploy, which has an address of its own that production does not serve;
+# scripts/deploy-check.sh runs against the two drafts; only when it passes
+# does scripts/netlify-publish.sh make them the published deploys, and the
+# same checks run once more against the live hostnames. A failing draft check
+# leaves production on the previous release with nothing to roll back; a
+# failing live check after publishing is DNS or certificates, not the app
+# (the same code just passed on its draft address), and the runbook's
+# "Redeploy or roll back" says what to do.
+#
+# The Netlify sites are not connected to the repository, on purpose:
+# Netlify's own builds and build hooks build a branch's latest commit, never
+# a pinned one, so this workflow builds the tagged checkout itself (Node 22,
+# `npm ci && npm run build` in web/ and mcp/) and uploads the result with the
+# Netlify CLI. Nothing else deploys: this workflow is the only path.
 #
 # Each stage skips with a notice until its settings exist. A stage with only
 # some of its settings fails, naming what's missing (names only, never
 # values).
 #
-#   stage   repository secrets and variables (Settings > Secrets and variables > Actions)
-#   db      secret SUPABASE_DB_PASSWORD; variables SUPABASE_PROJECT_REF and
-#           SUPABASE_POOLER_HOST (not secret). No Supabase access token: db
-#           push goes straight to the session pooler
-#   vercel  secret VERCEL_TOKEN (a Vercel access token scoped to the team);
-#           optional variables VERCEL_TEAM_ID (unset for a personal account),
-#           VERCEL_PROJECT_WEB and VERCEL_PROJECT_MCP (default reliquary-web
-#           and reliquary-mcp). Deploys the tagged commit through the API
-#           (scripts/vercel-deploy.sh) and waits for both builds
-#   hooks   fallback while VERCEL_TOKEN is unset: secrets
-#           VERCEL_DEPLOY_HOOK_WEB, VERCEL_DEPLOY_HOOK_MCP. Hooks build the
-#           latest commit on main, not the tag, so the smoke checks fail if
-#           main has moved on since the tag (live would not be the release)
-#   smoke   variables WEB_URL, MCP_URL (origins, e.g. https://app.example.com);
-#           secret KEEPALIVE_TOKEN if the MCP project has one
-#
-# Turn off Vercel's own production deploys from Git for both projects
-# (vercel.json: git.deploymentEnabled.main false), so code never goes live
-# before its migration or outside a release: this workflow is the only path.
+#   stage    repository secrets and variables (Settings > Secrets and variables > Actions)
+#   db       secret SUPABASE_DB_PASSWORD; variables SUPABASE_PROJECT_REF and
+#            SUPABASE_POOLER_HOST (not secret). No Supabase access token: db
+#            push goes straight to the session pooler
+#   netlify  secret NETLIFY_AUTH_TOKEN (a Netlify personal access token of a
+#            team member who can deploy both sites); variables
+#            NETLIFY_SITE_WEB and NETLIFY_SITE_MCP (each site's API ID, Site
+#            configuration > General > Site details; not secret)
+#   smoke    variables WEB_URL, MCP_URL (origins, e.g. https://app.example.com);
+#            secret KEEPALIVE_TOKEN if the MCP site has one
 #
 # First push (manual, once; hosting.md section 8, open question): before it,
 # run this in the Supabase SQL editor as `postgres`:
@@ -108,19 +107,16 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           SUPABASE_POOLER_HOST: ${{ vars.SUPABASE_POOLER_HOST }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_DEPLOY_HOOK_WEB: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
-          VERCEL_DEPLOY_HOOK_MCP: ${{ secrets.VERCEL_DEPLOY_HOOK_MCP }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_WEB: ${{ vars.NETLIFY_SITE_WEB }}
+          NETLIFY_SITE_MCP: ${{ vars.NETLIFY_SITE_MCP }}
           WEB_URL: ${{ vars.WEB_URL }}
           MCP_URL: ${{ vars.MCP_URL }}
         run: |
-          # Values that are derived from secrets aren't masked by GitHub on
-          # their own: the URL-encoded password, the hook IDs.
+          # A value derived from a secret isn't masked by GitHub on its own:
+          # the URL-encoded password.
           [ -z "$SUPABASE_DB_PASSWORD" ] ||
             echo "::add-mask::$(jq -rn --arg v "$SUPABASE_DB_PASSWORD" '$v|@uri')"
-          for hook in "$VERCEL_DEPLOY_HOOK_WEB" "$VERCEL_DEPLOY_HOOK_MCP"; do
-            [ -z "$hook" ] || echo "::add-mask::${hook##*/}"
-          done
 
           # stage <name> <var>...: all set runs it, none set skips it,
           # some set is a configuration mistake.
@@ -143,12 +139,7 @@ jobs:
             fi
           }
           stage db SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF SUPABASE_POOLER_HOST
-          stage vercel VERCEL_TOKEN
-          if [ -n "$VERCEL_TOKEN" ]; then
-            echo "hooks=false" >> "$GITHUB_OUTPUT"
-          else
-            stage hooks VERCEL_DEPLOY_HOOK_WEB VERCEL_DEPLOY_HOOK_MCP
-          fi
+          stage netlify NETLIFY_AUTH_TOKEN NETLIFY_SITE_WEB NETLIFY_SITE_MCP
           stage smoke WEB_URL MCP_URL
 
       - uses: actions/checkout@v7
@@ -204,42 +195,54 @@ jobs:
         if: steps.cfg.outputs.db == 'true' && steps.rel.outputs.rollback == 'false'
         run: supabase db push --db-url "$DB_URL" --yes
 
-      - name: Vercel production deploys of the tagged commit (web, mcp)
-        id: vercel_deploy
-        if: steps.cfg.outputs.vercel == 'true'
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
-          WEB_PROJECT: ${{ vars.VERCEL_PROJECT_WEB || 'reliquary-web' }}
-          MCP_PROJECT: ${{ vars.VERCEL_PROJECT_MCP || 'reliquary-mcp' }}
-          SHA: ${{ steps.rel.outputs.sha }}
-          ROLLBACK_TARGETS_FILE: rollback-targets.txt
-        run: ./scripts/vercel-deploy.sh "$SHA" "$WEB_PROJECT" "$MCP_PROJECT"
+      - uses: actions/setup-node@v7
+        if: steps.cfg.outputs.netlify == 'true'
+        with:
+          node-version: 22
 
-      - name: Vercel Deploy Hooks (fallback; builds main, not the tag)
-        if: steps.cfg.outputs.hooks == 'true'
+      - name: Build both apps from the tagged commit (web, mcp)
+        if: steps.cfg.outputs.netlify == 'true'
         env:
-          HOOK_WEB: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
-          HOOK_MCP: ${{ secrets.VERCEL_DEPLOY_HOOK_MCP }}
+          # The build stamp (stamp-version.mjs) names this commit in /version.
+          COMMIT_REF: ${{ steps.rel.outputs.sha }}
         run: |
-          echo "::warning title=deploy hooks::Deploy Hooks build the latest main, not the tag; set VERCEL_TOKEN to deploy exactly the release"
+          # The function ships node_modules/ as included files (netlify.toml),
+          # so the dev dependencies (tsc) go after the build.
           for app in web mcp; do
-            hook_var="HOOK_${app^^}"
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -X POST "${!hook_var}") || code=000
-            echo "$app deploy hook: HTTP $code"
-            case $code in 2??) ;; *) echo "::error::$app deploy hook failed (HTTP $code)"; exit 1 ;; esac
+            (cd "$app" && npm ci && npm run build && npm prune --omit=dev)
           done
 
-      - name: Wait for the hook builds
-        if: steps.cfg.outputs.hooks == 'true' && steps.cfg.outputs.smoke == 'true'
+      - name: Netlify draft deploys of the tagged commit (web, mcp)
+        id: draft
+        if: steps.cfg.outputs.netlify == 'true'
         env:
-          SETTLE: ${{ vars.DEPLOY_SETTLE_SECONDS || '120' }}
-        # Deploy Hooks return before the build and can't be watched, so give
-        # it time before checking production.
-        run: sleep "$SETTLE"
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SITE_WEB: ${{ vars.NETLIFY_SITE_WEB }}
+          SITE_MCP: ${{ vars.NETLIFY_SITE_MCP }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          SHA: ${{ steps.rel.outputs.sha }}
+          DEPLOYS_FILE: deploys.txt
+        run: ./scripts/netlify-deploy.sh "$TAG" "$SHA" "web=$SITE_WEB" "mcp=$SITE_MCP"
 
-      - name: Smoke checks (live /version is this release)
-        id: smoke
+      - name: Smoke checks against the drafts (their /version is this release)
+        if: steps.cfg.outputs.netlify == 'true'
+        env:
+          WEB_URL: ${{ steps.draft.outputs.web_url }}
+          MCP_URL: ${{ steps.draft.outputs.mcp_url }}
+          KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
+          EXPECT_VERSION: ${{ steps.tag.outputs.version }}
+          EXPECT_COMMIT: ${{ steps.rel.outputs.sha }}
+        run: ./scripts/deploy-check.sh
+
+      - name: Publish the drafts (production now serves this release)
+        if: steps.cfg.outputs.netlify == 'true'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          mapfile -t deploys < deploys.txt
+          ./scripts/netlify-publish.sh "${deploys[@]}"
+
+      - name: Smoke checks against the live hostnames (live /version is this release)
         if: steps.cfg.outputs.smoke == 'true'
         env:
           WEB_URL: ${{ vars.WEB_URL }}
@@ -248,17 +251,3 @@ jobs:
           EXPECT_VERSION: ${{ steps.tag.outputs.version }}
           EXPECT_COMMIT: ${{ steps.rel.outputs.sha }}
         run: ./scripts/deploy-check.sh
-
-      - name: Roll back (smoke checks failed; production was already serving the new deploy)
-        if: failure() && steps.vercel_deploy.outcome == 'success'
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
-        run: |
-          if [ ! -s rollback-targets.txt ]; then
-            echo "::warning::no previous production deployment was recorded (first deploy?); nothing to roll back to"
-            exit 0
-          fi
-          mapfile -t targets < rollback-targets.txt
-          echo "::warning::rolling back to the previous release: ${targets[*]}"
-          ./scripts/vercel-rollback.sh "${targets[@]}"

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # The keys that encrypt variable values (docs/variables.md, "Key rotation"),
 # kept in a gitignored file, mode 600, one `id:key` per line, the current
-# (sealing) key first. scripts/vercel-env.sh turns the file into the web
+# (sealing) key first. scripts/netlify-env.sh turns the file into the web
 # app's VARIABLES_KEYS. It prints key ids only, never a key, so it is safe to
 # run from anywhere, including a chat with a model. Keep a copy of every key
-# in a password manager too: Vercel can't show a Sensitive value again, and
+# in a password manager too: Netlify can't show a secret value again, and
 # losing a key loses every value sealed with it.
 #
 #   scripts/variables-keys.sh list        the key ids, current first
