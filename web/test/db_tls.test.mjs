@@ -11,16 +11,16 @@ const REPO = process.env.REPO_DIR ?? new URL("../..", import.meta.url).pathname;
 const PASSWORD = "not-a-real-password-7f3a";
 const URL = `postgres://reliquary_web.ref:${PASSWORD}@pooler.example:6543/postgres`;
 
-test("db tls: DATABASE_URL without TLS config is refused when VERCEL is set", () => {
-  assert.throws(() => poolConfig({ VERCEL: "1", DATABASE_URL: URL }), /DATABASE_CA_FILE/);
-  assert.throws(() => poolConfig({ VERCEL: "1", DATABASE_URL: `${URL}?sslmode=require` }), /DATABASE_CA_FILE/);
+test("db tls: DATABASE_URL without TLS config is refused when NETLIFY is set", () => {
+  assert.throws(() => poolConfig({ NETLIFY: "1", DATABASE_URL: URL }), /DATABASE_CA_FILE/);
+  assert.throws(() => poolConfig({ NETLIFY: "1", DATABASE_URL: `${URL}?sslmode=require` }), /DATABASE_CA_FILE/);
 });
 
 test("db tls: the refusal never contains the connection string or its password", () => {
   for (const env of [
-    { VERCEL: "1", DATABASE_URL: URL },
-    { VERCEL: "1", DATABASE_URL: `${URL}?sslmode=require`, DATABASE_CA_FILE: "supabase-ca.crt" },
-    { VERCEL: "1", DATABASE_URL: URL, DATABASE_CA_FILE: "no-such.crt" },
+    { NETLIFY: "1", DATABASE_URL: URL },
+    { NETLIFY: "1", DATABASE_URL: `${URL}?sslmode=require`, DATABASE_CA_FILE: "supabase-ca.crt" },
+    { NETLIFY: "1", DATABASE_URL: URL, DATABASE_CA_FILE: "no-such.crt" },
   ]) {
     try {
       poolConfig(env);
@@ -33,7 +33,7 @@ test("db tls: the refusal never contains the connection string or its password",
 });
 
 test("db tls: with the bundled Supabase CA, TLS is verified against it", () => {
-  const c = poolConfig({ VERCEL: "1", DATABASE_URL: URL, DATABASE_CA_FILE: "supabase-ca.crt" });
+  const c = poolConfig({ NETLIFY: "1", DATABASE_URL: URL, DATABASE_CA_FILE: "supabase-ca.crt" });
   assert.equal(c.ssl.rejectUnauthorized, true);
   assert.match(c.ssl.ca, /^-----BEGIN CERTIFICATE-----/);
   assert.equal(c.connectionString, URL);
@@ -51,7 +51,7 @@ test("db tls: a missing or non-PEM CA file is refused", () => {
   assert.throws(() => poolConfig({ DATABASE_URL: URL, DATABASE_CA_FILE: "package.json" }), /no PEM/);
 });
 
-test("db tls: local runs (no VERCEL, no CA) are unchanged: no TLS", () => {
+test("db tls: local runs (no NETLIFY, no CA) are unchanged: no TLS", () => {
   const c = poolConfig({ DATABASE_URL: "postgres://reliquary_web:test@127.0.0.1:5432/postgres" });
   assert.equal(c.ssl, undefined);
 });

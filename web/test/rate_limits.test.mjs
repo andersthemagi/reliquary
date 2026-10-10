@@ -12,6 +12,7 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 import { appendFileSync } from "node:fs";
 import { before, test } from "node:test";
 import pg from "pg";
+import { clientIp, configureRateLimits } from "../dist/ratelimit.js";
 
 const { WEB_RL_URL: RL, WEB_AUTH_PUBLIC_URL: PUBLIC_URL, FAKE_AUTH_URL: FAKE, AUTH_SECRETS_FILE, WEB_URL } = process.env;
 const ORIGIN = PUBLIC_URL ? new URL(PUBLIC_URL).origin : "";
@@ -399,4 +400,29 @@ test("rate limits: no IP address or email address is stored: every key is an HMA
   // Nothing else in the table could hold one either.
   const cols = (await sql("select column_name from information_schema.columns where table_schema = 'private' and table_name = 'rate_limits' order by ordinal_position")).map((c) => c.column_name);
   assert.deepEqual(cols, ["bucket", "key", "window_start", "expires_at", "hits"]);
+});
+
+// Which header names the client when hosted (NETLIFY) or behind a proxy of
+// one's own (TRUST_PROXY_IP=1): Netlify's header first, since its edge sets
+// and overwrites it; the others are a self-hosted proxy's. Unit tests on
+// clientIp itself, against a request shaped like node:http's.
+const reqFrom = (headers, remoteAddress = "203.0.113.9") => ({ headers, socket: { remoteAddress } });
+
+test("rate limit ip: hosted, x-nf-client-connection-ip wins over x-real-ip and x-forwarded-for, and an IPv6 address counts by its /64", () => {
+  configureRateLimits({ NETLIFY: "true" });
+  try {
+    const all = { "x-nf-client-connection-ip": "198.51.100.1", "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3, 198.51.100.4" };
+    assert.equal(clientIp(reqFrom(all)), "198.51.100.1");
+    assert.equal(clientIp(reqFrom({ "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3" })), "198.51.100.2");
+    assert.equal(clientIp(reqFrom({ "x-forwarded-for": "198.51.100.3, 198.51.100.4" })), "198.51.100.3");
+    assert.equal(clientIp(reqFrom({ "x-nf-client-connection-ip": "2001:db8:1:2:3:4:5:6" })), "2001:db8:1:2::/64");
+  } finally {
+    configureRateLimits({});
+  }
+});
+
+test("rate limit ip: without NETLIFY or TRUST_PROXY_IP every forwarding header is ignored and the socket's address counts", () => {
+  configureRateLimits({});
+  const forged = { "x-nf-client-connection-ip": "198.51.100.1", "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3" };
+  assert.equal(clientIp(reqFrom(forged)), "203.0.113.9");
 });

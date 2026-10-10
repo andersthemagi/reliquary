@@ -590,11 +590,11 @@ const supabaseEnv = {
   PUBLIC_URL: "https://app.example.test",
 };
 
-test("config: AUTH_MODE=local refuses to start when VERCEL is set, explicit or by default", () => {
+test("config: AUTH_MODE=local refuses to start when NETLIFY is set, explicit or by default", () => {
   for (const env of [{ AUTH_MODE: "local" }, {}]) {
-    const r = start({ ...env, VERCEL: "1", DATABASE_CA_FILE: "supabase-ca.crt" });
+    const r = start({ ...env, NETLIFY: "1", DATABASE_CA_FILE: "supabase-ca.crt" });
     assert.equal(r.status, 1, r.stderr);
-    assert.match(r.stderr, /AUTH_MODE is local .* VERCEL is set/);
+    assert.match(r.stderr, /AUTH_MODE is local .* NETLIFY is set/);
   }
 });
 
@@ -609,8 +609,8 @@ test("config: AUTH_MODE=supabase refuses to start without its settings, naming t
     [{ SUPABASE_URL: "https://ref.supabase.co/auth/v1" }, /SUPABASE_URL/],
     [{ SUPABASE_PUBLISHABLE_KEY: "" }, /SUPABASE_PUBLISHABLE_KEY/],
     [{ AUTH_MODE: "none" }, /AUTH_MODE/],
-    [{ VERCEL: "1", DATABASE_CA_FILE: "supabase-ca.crt", PUBLIC_URL: "http://app.example.test" }, /PUBLIC_URL must be https/],
-    [{ VERCEL: "1", DATABASE_CA_FILE: "supabase-ca.crt", SUPABASE_URL: "http://127.0.0.1:9" }, /SUPABASE_URL must be https/],
+    [{ NETLIFY: "1", DATABASE_CA_FILE: "supabase-ca.crt", PUBLIC_URL: "http://app.example.test" }, /PUBLIC_URL must be https/],
+    [{ NETLIFY: "1", DATABASE_CA_FILE: "supabase-ca.crt", SUPABASE_URL: "http://127.0.0.1:9" }, /SUPABASE_URL must be https/],
   ];
   for (const [env, message] of cases) {
     const r = start({ ...supabaseEnv, ...env });

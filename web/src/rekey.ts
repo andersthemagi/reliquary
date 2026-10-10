@@ -18,7 +18,7 @@
 // current key already.
 //
 // The connection: DATABASE_URL is the web app's (reliquary_web, as in
-// supabase/.vercel-web.env), and OPS_DB_PASSWORD the operator's; this logs
+// supabase/.netlify-web.env), and OPS_DB_PASSWORD the operator's; this logs
 // in to the same database as reliquary_ops (keeping the pooler's
 // `.project-ref` suffix). A DATABASE_URL for reliquary_ops is used as it is.
 //

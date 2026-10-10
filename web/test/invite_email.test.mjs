@@ -72,7 +72,7 @@ async function start(env) {
   const origin = `http://127.0.0.1:${port}`;
   const loginFile = `/tmp/invite-email-login-${process.pid}-${port}`;
   const base = { ...process.env };
-  for (const k of ["RESEND_API_KEY", "EMAIL_FROM", "RESEND_API_URL", "VERCEL", "SELF_HOSTED"]) delete base[k];
+  for (const k of ["RESEND_API_KEY", "EMAIL_FROM", "RESEND_API_URL", "NETLIFY", "SELF_HOSTED"]) delete base[k];
   const child = spawn(process.execPath, ["dist/server.js"], {
     env: { ...base, DATABASE_URL: WEB_DB, LOCAL_USER_ID: ROSA, LOGIN_FILE: loginFile, HOST: "127.0.0.1", PORT: String(port), PUBLIC_URL: "", ...env },
     stdio: ["ignore", "pipe", "pipe"],
@@ -241,14 +241,14 @@ test("invite email: the key, the link's token and the invited address never reac
   for (const c of calls) assert.equal(logs.includes(tokenOf(c.body) ?? "none"), false);
 });
 
-test("invite email: RESEND_API_URL is honoured only outside Vercel and self-hosting, and bad settings turn email off, naming the setting, never a value", async () => {
+test("invite email: RESEND_API_URL is honoured only outside Netlify and self-hosting, and bad settings turn email off, naming the setting, never a value", async () => {
   const { readMailer } = await import("../dist/mailer.js");
   const on = { RESEND_API_KEY: KEY, EMAIL_FROM: FROM, RESEND_API_URL: "http://127.0.0.1:9/" };
   assert.equal(readMailer(on).config.api, "http://127.0.0.1:9");
-  for (const strict of [{ VERCEL: "1" }, { SELF_HOSTED: "1" }]) {
+  for (const strict of [{ NETLIFY: "1" }, { SELF_HOSTED: "1" }]) {
     const r = readMailer({ ...on, ...strict });
     assert.equal(r.config.api, "https://api.resend.com");
-    assert.match(r.warnings.join("\n"), /RESEND_API_URL is ignored with (VERCEL|SELF_HOSTED) set/);
+    assert.match(r.warnings.join("\n"), /RESEND_API_URL is ignored with (NETLIFY|SELF_HOSTED) set/);
   }
   const cases = [
     [{ RESEND_API_KEY: KEY }, /RESEND_API_KEY is set but EMAIL_FROM isn’t/],

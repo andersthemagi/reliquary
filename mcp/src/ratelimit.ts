@@ -21,11 +21,12 @@
 //    this instance until its window ends, so its next token-less requests
 //    are refused without asking the database.
 //
-// Client IP: on Vercel (VERCEL set) or with TRUST_PROXY_IP=1, x-real-ip,
-// else the first x-forwarded-for entry. Vercel's edge sets both and
-// overwrites what the client sent, so they hold while requests reach the
-// function through Vercel alone. Anywhere else, the socket's address. IPv6
-// counts by its /64.
+// Client IP: on Netlify (NETLIFY set) or with TRUST_PROXY_IP=1,
+// x-nf-client-connection-ip (Netlify's edge sets it and overwrites what the
+// client sent, so it holds while requests reach the function through Netlify
+// alone), else x-real-ip (a self-hosted reverse proxy), else the first
+// x-forwarded-for entry. Anywhere else, the socket's address. IPv6 counts by
+// its /64.
 //
 // If the counter can't be reached, requests go through (fail open) and
 // "rate limit unavailable" is logged: every tool call needs the same
@@ -72,7 +73,7 @@ export function configureRateLimits(env: NodeJS.ProcessEnv): void {
   }
   if (env.TRUST_PROXY_IP !== undefined && env.TRUST_PROXY_IP !== "1" && env.TRUST_PROXY_IP !== "0") throw new Error("TRUST_PROXY_IP must be 1, 0 or unset");
   LIMITS = limits;
-  TRUST_PROXY = !!env.VERCEL || env.TRUST_PROXY_IP === "1";
+  TRUST_PROXY = !!env.NETLIFY || env.TRUST_PROXY_IP === "1";
 }
 
 function normalizeIp(raw: string | undefined): string | undefined {
@@ -92,9 +93,11 @@ function normalizeIp(raw: string | undefined): string | undefined {
 
 export function clientIp(req: http.IncomingMessage): string {
   if (TRUST_PROXY) {
-    const real = req.headers["x-real-ip"];
-    const fromReal = normalizeIp(typeof real === "string" ? real : undefined);
-    if (fromReal) return fromReal;
+    for (const name of ["x-nf-client-connection-ip", "x-real-ip"]) {
+      const v = req.headers[name];
+      const ip = normalizeIp(typeof v === "string" ? v : undefined);
+      if (ip) return ip;
+    }
     const xff = req.headers["x-forwarded-for"];
     const fromXff = normalizeIp((Array.isArray(xff) ? xff[0] : xff)?.split(",")[0]);
     if (fromXff) return fromXff;

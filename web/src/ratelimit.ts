@@ -1,7 +1,7 @@
 // Rate limits for the web app's public surfaces (docs/public/reference/limits.md,
 // "Rate limits"; supabase/migrations/20260925200000_rate_limits.sql).
 //
-// The app runs as many short-lived instances on Vercel, so a counter in one
+// The app runs as many short-lived instances on Netlify, so a counter in one
 // instance's memory limits nothing: every count is one upsert in Postgres
 // (private.rate_limit_hit, or private.rate_limit_token for a token's grant),
 // shared by every instance. Fixed windows; a refused request counts nothing.
@@ -12,13 +12,14 @@
 // fetched once per instance), of the kind and the value. A token is keyed
 // by its grant, in the database.
 //
-// Client IP: on Vercel (VERCEL set) or with TRUST_PROXY_IP=1, the address
-// Vercel's edge puts in x-real-ip (else the first x-forwarded-for entry).
-// Vercel sets both itself and overwrites what the client sent, so they
-// can't be forged from outside; that holds only while requests reach the
-// function through Vercel alone (a proxy in front would make every request
-// its address). Anywhere else, the socket's address. IPv6 addresses count
-// by their /64, which one household or server usually holds whole.
+// Client IP: on Netlify (NETLIFY set) or with TRUST_PROXY_IP=1, the address
+// Netlify's edge puts in x-nf-client-connection-ip, else x-real-ip (a
+// self-hosted reverse proxy), else the first x-forwarded-for entry. Netlify
+// sets its header itself and overwrites what the client sent, so it can't be
+// forged from outside; that holds only while requests reach the function
+// through Netlify alone (a proxy in front would make every request its
+// address). Anywhere else, the socket's address. IPv6 addresses count by
+// their /64, which one household or server usually holds whole.
 //
 // When the counter can't be reached: sign-in (asking for a code, entering
 // one, opening a link) fails closed, with the "sign-in is unavailable"
@@ -86,7 +87,7 @@ export function configureRateLimits(env: NodeJS.ProcessEnv): void {
   }
   if (env.TRUST_PROXY_IP !== undefined && env.TRUST_PROXY_IP !== "1" && env.TRUST_PROXY_IP !== "0") throw new Error("TRUST_PROXY_IP must be 1, 0 or unset");
   LIMITS = limits;
-  TRUST_PROXY = !!env.VERCEL || env.TRUST_PROXY_IP === "1";
+  TRUST_PROXY = !!env.NETLIFY || env.TRUST_PROXY_IP === "1";
 }
 export const limitOf = (name: LimitName): Limit => LIMITS[name];
 
@@ -111,9 +112,11 @@ function normalizeIp(raw: string | undefined): string | undefined {
 
 export function clientIp(req: http.IncomingMessage): string {
   if (TRUST_PROXY) {
-    const real = req.headers["x-real-ip"];
-    const fromReal = normalizeIp(typeof real === "string" ? real : undefined);
-    if (fromReal) return fromReal;
+    for (const name of ["x-nf-client-connection-ip", "x-real-ip"]) {
+      const v = req.headers[name];
+      const ip = normalizeIp(typeof v === "string" ? v : undefined);
+      if (ip) return ip;
+    }
     const xff = req.headers["x-forwarded-for"];
     const first = (Array.isArray(xff) ? xff[0] : xff)?.split(",")[0];
     const fromXff = normalizeIp(first);

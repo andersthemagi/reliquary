@@ -5,8 +5,8 @@
 // rendered here for deliverInvite() (invites.ts), which sends it through
 // Resend (mailer.ts).
 //
-// Files are read on first use, never at import. The hosted app on Vercel
-// reads only vault-invite.html and manifest.tsv (vercel.json's includeFiles).
+// Files are read on first use, never at import. The hosted app on Netlify
+// reads only vault-invite.html and manifest.tsv (netlify.toml's included_files).
 
 import { readFileSync } from "node:fs";
 

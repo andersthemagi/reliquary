@@ -5,7 +5,7 @@
 //    LOCAL_USER_ID. At start (and after each use) it writes a one-time login
 //    code to LOGIN_FILE (mode 600). `dev.sh ui` opens /login?code=... in the
 //    browser without printing it. The session is an HttpOnly,
-//    SameSite=Strict cookie. Refuses to start on Vercel.
+//    SameSite=Strict cookie. Refuses to start on Netlify.
 //  - supabase (hosted): an emailed code or link through Supabase Auth
 //    (src/signin.ts). The session is the Supabase JWT and refresh token in
 //    HttpOnly, SameSite=Lax cookies, verified on every request; no server
@@ -53,7 +53,7 @@ import { inSession, pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { configureMailer } from "./mailer.js";
 import { feedbackTick, flushFeedbackNotices, noticeTarget } from "./feedback.js";
-import { versionJson } from "./version.js";
+import { BUILD, versionJson } from "./version.js";
 import { emailTemplate, selfHosted } from "./selfhost.js";
 import { welcomeLanding } from "./welcome.js";
 import { FRESH_SIGNIN, safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
@@ -66,8 +66,8 @@ const MAX_BODY = 2 * 1024 * 1024;
 // text, and a browser percent-encodes each non-ASCII UTF-8 byte as three
 // characters, so 1 MiB of non-Latin text is about 3 MiB of form. 3 MiB plus
 // 64 KiB for the other fields (a 4000-character reason is at most 48 KB
-// encoded). Every other form keeps 2 MB. Vercel's own ceiling for a
-// function's request body is 4.5 MB.
+// encoded). Every other form keeps 2 MB. Netlify's own ceiling for a
+// function's request body is 6 MB.
 const MAX_FILE_FORM = 3 * 1024 * 1024 + 64 * 1024;
 const FILE_FORM = /^\/v\/[^/]+\/(file|proposals\/[^/]+\/(edit|revise))$/;
 const bodyLimit = (pathname: string): number => (FILE_FORM.test(pathname) ? MAX_FILE_FORM : MAX_BODY);
@@ -144,9 +144,9 @@ if (variablesConfigured()) {
 }
 
 // Static files: a fixed map built at start, so no request path ever touches
-// the filesystem. On Vercel, public/ is served by the CDN and may be missing
-// from the function bundle: then the map stays empty and the stylesheet
-// version comes from the deployed commit.
+// the filesystem. Hosted, public/ is served by the CDN; should it be missing
+// from the function bundle, the map stays empty and the stylesheet version
+// comes from the build's commit (dist/version.json).
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
@@ -162,7 +162,7 @@ for (const rel of ["style.css", "favicon.svg", "og.png", ...fonts]) {
   if (type && existsSync(join(PUBLIC, rel))) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
 }
 const style = STATIC.get("/style.css");
-const commit = /^[0-9a-f]{10,}$/.test(process.env.VERCEL_GIT_COMMIT_SHA ?? "") ? process.env.VERCEL_GIT_COMMIT_SHA! : "";
+const commit = /^[0-9a-f]{10,}$/.test(BUILD.commit) ? BUILD.commit : "";
 const STYLE_VERSION = style
   ? createHash("sha256").update(style.body).digest("hex").slice(0, 10)
   : commit
@@ -627,13 +627,13 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
 }
 
 if (MODE === "local") rotateLoginCode();
-// On Vercel the app runs as one function (api/index.js) that hands every
-// request to this handler; the platform owns the socket. Locally, listen on
+// On Netlify the app runs as one function (netlify/functions/index.mjs) that
+// hands every request to this handler; the platform owns the socket. Locally, listen on
 // loopback as before.
 export const handle: http.RequestListener = (req, res) => {
   server.emit("request", req, res);
 };
-if (!process.env.VERCEL) {
+if (!process.env.NETLIFY) {
   server.listen(PORT, HOST, () => console.info(`reliquary web on http://${HOST}:${PORT}`));
   // A long-running server also sends feedback notices on a timer, so an
   // agent's feedback is emailed within a minute or two even when nobody
