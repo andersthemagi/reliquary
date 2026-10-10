@@ -1,49 +1,89 @@
--- Open admission: invite-only off, with a daily quota
--- (supabase/tests/admission_test.sql, "open:").
+-- Open admission: invite-only off, and a waiting line let in steadily
+-- (supabase/tests/admission_test.sql, "open:" and "line:").
 --
 -- With invite-only off, sign-in makes an account for any address
 -- (web/src/signin.ts). An account costs a row; a vault costs storage,
--- members and requests, so the quota sits on the first vault: an account
--- nobody admitted is admitted ('open') by its first create_vault, while
--- fewer than private.settings.open_per_day accounts were let in that way
--- since midnight UTC. Past that, create_vault refuses with RLP02 until the
--- next day. That bounds what a surge of people, or a botnet making
--- accounts, can add in a day, without the operator awake. Null is no quota
--- (the test databases). An admission, once made, stays when invite-only
--- goes back on: closing the door doesn't lock out who came in. The
--- operator sets the quota with private.set_open_per_day (scripts/plan.sh
--- open-per-day <n|none>).
+-- members and requests. So an account nobody admitted waits in a line,
+-- in the order it confirmed its address (the first sign-in code or link),
+-- and private.let_in_from_line() admits ('open') the front of the line,
+-- private.settings.open_per_day accounts a UTC day (pg_cron runs it every
+-- 10 minutes, so a raised pace shows soon). Only a confirmed address is in
+-- line: an address a bot made up never signs in, so never queues. Nobody
+-- is ever told to come back tomorrow: they wait, and can see their place
+-- (public.my_place_in_line). Null means no line, everyone straight in (the
+-- test databases). An admission, once made, stays when invite-only goes
+-- back on. The operator sets the pace with private.set_open_per_day
+-- (scripts/plan.sh open-per-day <n|none>), and can let anyone in at once
+-- (plan.sh admit).
 
 alter table private.admissions drop constraint admissions_via_check;
 alter table private.admissions add constraint admissions_via_check
   check (via in ('invite', 'plan', 'operator', 'existing', 'open'));
 alter table private.settings add column open_per_day int default 25 check (open_per_day >= 0);
 
--- Places left today; null when there's no quota.
-create function private.open_places_left() returns int
-language sql stable security definer set search_path = '' as $$
-  -- Not greatest() alone: it skips a null, and would read no quota as full.
-  select case when s.open_per_day is not null then
-           greatest(s.open_per_day - (select count(*)::int from private.admissions a
-                                       where a.via = 'open' and a.admitted_at >= date_trunc('day', now(), 'UTC')), 0) end
-    from private.settings s
-$$;
-
--- Whether the account may create a vault now: admitted, or open with a
--- place left today.
+-- Without a line (no pace), invite-only off lets every account in, as
+-- before.
 create or replace function private.is_admitted(p_user uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
   select p_user is not null
      and (exists (select 1 from private.admissions a where a.user_id = p_user)
-          or (not private.invite_only() and coalesce(private.open_places_left() > 0, true)))
+          or (not private.invite_only()
+              and (select s.open_per_day is null from private.settings s)))
 $$;
 
--- create_vault's gate: the caller admitted, or admitted now ('open') if
--- invite-only is off and today has a place.
-create function private.require_admission() returns void
+-- Accounts waiting: confirmed, not admitted, in the order they confirmed.
+create function private.line() returns table (user_id uuid, place bigint)
+language sql stable security definer set search_path = '' as $$
+  select u.id, row_number() over (order by u.email_confirmed_at, u.id)
+    from auth.users u
+   where u.email_confirmed_at is not null
+     and not exists (select 1 from private.admissions a where a.user_id = u.id)
+$$;
+
+-- The caller's place in line (1 is next), or null when not waiting:
+-- admitted, invite-only, or no line.
+create function public.my_place_in_line() returns bigint
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.require_person();
+  if private.invite_only() or private.is_admitted(private.uid()) then
+    return null;
+  end if;
+  return (select l.place from private.line() l where l.user_id = private.uid());
+end $$;
+
+-- Lets in the front of the line, up to open_per_day less who it let in
+-- since midnight UTC. Returns how many it let in.
+create function private.let_in_from_line() returns int
 language plpgsql volatile security definer set search_path = '' as $$
 declare
   v_per_day int;
+  v_due int;
+  v_n int;
+begin
+  select s.open_per_day into v_per_day from private.settings s;
+  if private.invite_only() or v_per_day is null then
+    return 0;
+  end if;
+  -- One run at a time, so two can't both spend the same places.
+  perform pg_advisory_xact_lock(hashtextextended('reliquary.let_in_from_line', 0));
+  v_due := v_per_day - (select count(*)::int from private.admissions a
+               where a.via = 'open' and a.admitted_at >= date_trunc('day', now(), 'UTC'));
+  if v_due <= 0 then
+    return 0;
+  end if;
+  insert into private.admissions (user_id, via)
+  select l.user_id, 'open' from private.line() l order by l.place limit v_due
+  on conflict (user_id) do nothing;
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+
+-- create_vault's gate: admitted, or let in at once when there's no line.
+create function private.require_admission() returns void
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_place bigint;
 begin
   if exists (select 1 from private.admissions a where a.user_id = private.uid()) then
     return;
@@ -51,18 +91,15 @@ begin
   if private.invite_only() then
     perform private.admission_refusal();
   end if;
-  select s.open_per_day into v_per_day from private.settings s;
-  if v_per_day is not null then
-    -- One open admission at a time, so two first vaults can't both take
-    -- the last place.
-    perform pg_advisory_xact_lock(hashtextextended('reliquary.open_admission', 0));
-    if private.open_places_left() <= 0 then
-      raise exception 'your account can''t create vaults yet: during the pre-alpha Reliquary lets in % new accounts a day, and today''s are taken. Try again after midnight UTC, or open an invite link someone sent you and join their vault (that lets you in now)', v_per_day
-        using errcode = 'RLP02',
-              detail = jsonb_build_object('limit', 'admission', 'invite_only', false, 'per_day', v_per_day)::text;
-    end if;
+  if (select s.open_per_day is null from private.settings s) then
+    insert into private.admissions (user_id, via) values (private.uid(), 'open') on conflict (user_id) do nothing;
+    return;
   end if;
-  insert into private.admissions (user_id, via) values (private.uid(), 'open') on conflict (user_id) do nothing;
+  select l.place into v_place from private.line() l where l.user_id = private.uid();
+  raise exception 'your account can''t create vaults yet: Reliquary is letting people in steadily as usage grows, and you''re %. It may take a while; if it''s taking too long, write to the operator, or open an invite link someone sent you and join their vault (that lets you in now)',
+      case when v_place is null then 'in line once your address is confirmed' else 'number ' || v_place || ' in line' end
+    using errcode = 'RLP02',
+          detail = jsonb_build_object('limit', 'admission', 'invite_only', false, 'place', v_place)::text;
 end $$;
 
 -- As in 20260925240000_admission, but gated by private.require_admission.
@@ -109,15 +146,34 @@ create function private.set_open_per_day(p_n int) returns text
 language plpgsql volatile security definer set search_path = '' as $$
 begin
   if p_n < 0 then
-    raise exception 'the daily quota is a whole number from 0, or none' using errcode = '22023';
+    raise exception 'the pace is a whole number of accounts a day from 0, or none' using errcode = '22023';
   end if;
   update private.settings set open_per_day = p_n, set_at = now(), set_by = session_user;
-  return case when p_n is null then 'open admission: no daily quota'
-              else format('open admission: %s new accounts a day (%s left today)', p_n, private.open_places_left()) end;
+  return case when p_n is null then 'open admission: no line, every account straight in'
+              else format('open admission: %s accounts a day from the line (%s waiting)', p_n,
+                          (select count(*) from private.line())) end;
 end $$;
 
-revoke all on function private.open_places_left(), private.require_admission(), private.set_open_per_day(int)
+revoke all on function private.line(), private.let_in_from_line(), private.require_admission(),
+  private.set_open_per_day(int)
   from public, anon, authenticated, reliquary_web, reliquary_mcp, reliquary_ops;
 grant execute on function private.set_open_per_day(int) to reliquary_ops;
+revoke all on function public.my_place_in_line() from public, anon;
+grant execute on function public.my_place_in_line() to authenticated;
 -- Sign-in asks whether to make accounts for any address.
 grant execute on function private.invite_only() to reliquary_web;
+
+-- pg_cron, where the platform has it (Supabase does; plain Postgres, as in
+-- the tests, doesn't): the line moves every 10 minutes.
+do $$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
+    begin
+      create extension if not exists pg_cron;
+      perform cron.schedule('reliquary-let-in-from-line', '*/10 * * * *',
+        'select private.let_in_from_line()');
+    exception when others then
+      raise notice 'pg_cron is not usable here (%); the line only moves when the operator runs private.let_in_from_line()', sqlerrm;
+    end;
+  end if;
+end $$;

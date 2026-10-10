@@ -80,10 +80,13 @@ Owner's decision, 2026-10-09 (#230): the pre-alpha opens to anyone who
 finds Reliquary, rather than invited people only. This is an operating
 change, not milestone work, but it needs new code, so it's logged here as
 another exception. With invite-only off, sign-in makes an account for any
-address, and a daily quota on new accounts' first vaults (25 to start,
-enforced in the database) bounds a surge or a botnet. The owner switches it
-on after the release deploys, once the email limits cover the quota
-(`docs/ops/runbook.md`, "Plans and testers").
+address, and new accounts wait in a line let in steadily (25 a day to
+start, in the database), not a hard cap: the owner's call, so nobody is
+told to come back tomorrow, and they can email if it takes too long. Bots:
+only a confirmed address queues, and the sign-in form has a hidden field
+only bots fill; no CAPTCHA. The owner switches it on after the release
+deploys, once the email limits cover the pace (`docs/ops/runbook.md`,
+"Plans and testers").
 
 ## Milestone 1: core, MCP and UI
 

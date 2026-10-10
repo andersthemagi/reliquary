@@ -14,7 +14,7 @@
 #   scripts/plan.sh admit <email>                 let an account create vaults while invite-only
 #   scripts/plan.sh revoke-admission <email>      take that back (they keep their vaults)
 #   scripts/plan.sh invite-only on|off            whether accounts need admitting; off lets anyone sign up
-#   scripts/plan.sh open-per-day [<n>|none]       new accounts let in a day while invite-only is off, and today's count
+#   scripts/plan.sh open-per-day [<n>|none]       accounts let in a day from the line while invite-only is off, and how many wait
 #   scripts/plan.sh check                         storage counters that drifted, accounts gone from Auth
 #   scripts/plan.sh recount <vault-id>            set a vault's storage counter to a full scan
 #
@@ -101,7 +101,7 @@ select p.name as plan, o.n || ' of ' || p.max_vaults as "vaults owned",
   cross join private.plan_of(u.id) p
   cross join lateral (select count(*) as n from public.vaults v where v.created_by = u.id) o
   left join private.account_plans a on a.user_id = u.id;
-select case when d.user_id is null and not private.invite_only() then 'not yet: their first vault takes one of today''s places, if any are left'
+select case when d.user_id is null and not private.invite_only() then coalesce('not yet: number ' || (select l.place from private.line() l where l.user_id = u.id) || ' in line', 'not yet: in line once their address is confirmed')
             when d.user_id is null then 'no: they can''t create a vault until they accept an invite or are admitted'
             else 'yes (' || d.via || ', ' || to_char(d.admitted_at, 'YYYY-MM-DD') || ')' end as admitted
   from (select private.user_by_email(:'arg') as id) u
@@ -173,7 +173,8 @@ SQL
     else
       run <<'SQL'
 select case when private.invite_only() then 'on' else 'off' end as "invite-only",
-       coalesce(private.open_places_left()::text, 'no quota') as "places left today"
+       coalesce((select open_per_day::text from private.settings), 'none (no line)') as "let in a day",
+       (select count(*) from private.line()) as waiting
 SQL
     fi
     ;;
