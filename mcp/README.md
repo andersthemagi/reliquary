@@ -128,9 +128,9 @@ its turn on the CDN (`preferStatic`): it keeps the real `node:http` server
 listening on a loopback port inside the function and relays each web
 `Request` to it. `netlify.toml` names the files the function needs at run
 time (`dist/**`, `node_modules/**` after `npm prune --omit=dev`,
-`supabase-ca.crt`, `public/**`). The function runs in Frankfurt (`region:
-"fra"`; a Pro plan setting) within Netlify's 60 s synchronous limit and 6 MB
-request ceiling. Answers are plain JSON, so nothing streams.
+`supabase-ca.crt`, `public/**`). The function runs in Netlify's default
+region (US East; the database stays in Frankfurt) within Netlify's 60 s
+synchronous limit and 6 MB request ceiling. Answers are plain JSON, so nothing streams.
 
 - **`NETLIFY` set** (the entry point sets it before loading the server):
   opens no port (the function relays into the exported handler), and refuses

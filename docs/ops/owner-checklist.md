@@ -7,8 +7,9 @@ when the repo shows them done; the rest are the owner's to confirm.
 
 1. **Three hosts** (`docs/ops/runbook.md`, "Hosts"):
    - Netlify (`docs/research/hosting.md`, section 11, has the whole move from
-     Vercel in order): a team on the Pro plan (the Frankfurt functions region
-     needs it), two sites made without a repository (`netlify sites:create
+     Vercel in order): a team on any plan (functions run in Netlify's default
+     US region; the owner decided on 2026-10-11 not to claim EU hosting for
+     the app for now), two sites made without a repository (`netlify sites:create
      --name reliquary-web`, then `reliquary-mcp`, or Add new site > Deploy
      manually): never connect them to the repository, or Netlify builds
      every push. Domains: `reliquary.redmage.cc` and

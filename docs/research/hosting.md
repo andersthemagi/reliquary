@@ -648,11 +648,11 @@ no loopback allowances). What changed:
 | Was (Vercel) | Is (Netlify) | Why |
 |---|---|---|
 | Marker `VERCEL`, set by the platform | Marker `NETLIFY`, set by the function's own entry point before it loads the server | Netlify's runtime promises functions only `URL`, `SITE_NAME` and `SITE_ID`; the entry file runs nowhere but on Netlify, so it is the one place that knows |
-| `api/index.js` exporting the Node handler; `vercel.json` rewrites every path to it after the CDN | `netlify/functions/index.mjs`, a Functions 2.0 module (`Request` in, `Response` out) with `path: "/*"`, `preferStatic: true`, `region: "fra"`; it keeps the real server on a loopback port inside the function and relays each request through Node's http client | Netlify Functions speak web `Request`/`Response`, not `(req, res)`; relaying through Node's own client keeps headers, bodies and statuses exact without imitating `IncomingMessage` |
+| `api/index.js` exporting the Node handler; `vercel.json` rewrites every path to it after the CDN | `netlify/functions/index.mjs`, a Functions 2.0 module (`Request` in, `Response` out) with `path: "/*"`, `preferStatic: true`; it keeps the real server on a loopback port inside the function and relays each request through Node's http client | Netlify Functions speak web `Request`/`Response`, not `(req, res)`; relaying through Node's own client keeps headers, bodies and statuses exact without imitating `IncomingMessage` |
 | Vercel traced `dist/**` into the function (`includeFiles`) | `included_files` in `netlify.toml`: `dist/**`, `node_modules/**` (after `npm prune --omit=dev`), the CA, `public/**`, and for web `docs-build/**` and the invite template | Netlify bundles a Functions 2.0 entry with esbuild and would inline `dist/server.js`, breaking its `import.meta.url` reads (`version.json`, `public/`); so the server is imported by a URL the bundler can't follow, and everything ships as included files |
 | Commit from `VERCEL_GIT_COMMIT_SHA` | `COMMIT_REF`, set by the deploy workflow before `npm run build` | Netlify's name for it; a CLI deploy has no build-time commit of its own |
 | Client address from `x-real-ip` | `x-nf-client-connection-ip` first, then `x-real-ip` (self-hosting), then `x-forwarded-for` | Netlify's edge sets and overwrites its own header |
-| Region `fra1`, Fluid compute, `maxDuration` 30/60 s, 4.5 MB bodies | Region `fra` (Frankfurt; a Pro plan feature), 60 s synchronous limit, 6 MB buffered bodies | Netlify's limits; the app's own body ceilings (2 MB, 3 MiB + 64 KiB) stay under them |
+| Region `fra1`, Fluid compute, `maxDuration` 30/60 s, 4.5 MB bodies | Netlify's default region (US East, any plan), 60 s synchronous limit, 6 MB buffered bodies | Netlify's limits; the app's own body ceilings (2 MB, 3 MiB + 64 KiB) stay under them. The owner decided on 2026-10-11 not to claim EU hosting for the app for now: proper EU data practices need a partner or support the operator, a US company, does not have yet (#219). The legal pages say the database is in the EU and the app in the US; each database call crosses the Atlantic, which #227 measures |
 | Deploy: Vercel API builds the pinned commit from the Git connection, production serves it as soon as it is built, and a failed smoke check rolls back | Deploy: the workflow builds the tagged checkout (Node 22) and uploads a **draft** deploy per site with the Netlify CLI (`scripts/netlify-deploy.sh`); the smoke checks run on the drafts' own addresses; only then are they published (`scripts/netlify-publish.sh`, `POST /sites/{id}/deploys/{id}/restore`), and checked again on the live hostnames | Netlify's builds and build hooks build a branch head, never a pinned SHA; a draft has an address production doesn't serve, so nothing unchecked is ever live and there is no rollback to automate; a site that is not connected to the repository can't deploy by accident |
 | Env values pasted into Vercel, marked Sensitive | `scripts/netlify-env.sh` writes `supabase/.netlify-<app>.env`; imported into the site ("Import from a .env file" or `netlify env:import`), marked "Contains secret values" | Same script, same files, new name |
 | Settings: `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, Deploy Hook fallback | `NETLIFY_AUTH_TOKEN` (secret), `NETLIFY_SITE_WEB`, `NETLIFY_SITE_MCP` (site API IDs); no hook fallback | Hooks would build `main`, not the tag: the thing the workflow exists to prevent |
@@ -677,9 +677,8 @@ unknown paths the app's own 404, and `POST /mcp` without a token the 401 with
 
 ### Cutover order
 
-1. Owner: Netlify team on Pro, two sites without a repository, Frankfurt
-   confirmed in the first deploy's function settings, `AWS_LAMBDA_JS_RUNTIME=
-   nodejs22.x`, env imported from `scripts/netlify-env.sh web` and `mcp`,
+1. Owner: a Netlify team on any plan, two sites without a repository,
+   `AWS_LAMBDA_JS_RUNTIME=nodejs22.x`, env imported from `scripts/netlify-env.sh web` and `mcp`,
    both custom domains added to each site (Netlify provisions certificates
    once DNS points at it), GitHub secret `NETLIFY_AUTH_TOKEN` and variables
    `NETLIFY_SITE_WEB`, `NETLIFY_SITE_MCP`.
@@ -703,6 +702,7 @@ unknown paths the app's own 404, and `POST /mcp` without a token the 401 with
 
 - Netlify's function logs are kept for a day without a log drain; the
   runbook's "Finding an error by its ref" says so. A drain is a later choice.
-- `region` in the function's config needs the Pro plan; on a lower plan
-  Netlify ignores it and runs the function in US East, far from the database
-  in Frankfurt. The first deploy's function page shows the region in use.
+- The function runs in US East while the database is in Frankfurt: a
+  transatlantic round trip per database call. If latency turns out to matter
+  (#227), `region: "fra"` in the function's config moves it, on a Pro plan,
+  and the legal pages' hosting sentences change back with it.

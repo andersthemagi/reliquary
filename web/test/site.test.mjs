@@ -194,10 +194,10 @@ test("site legal: facts not known yet are visible placeholders, not invented", a
   assert.match(h, /<mark class="placeholder">\[to be filled: address\]<\/mark>/);
 });
 
-test("site legal: sub-processors names Supabase and Netlify in Frankfurt, Resend for email, and no model providers", async () => {
+test("site legal: sub-processors names Supabase in Frankfurt, Netlify in the United States, Resend for email, and no model providers", async () => {
   const h = await text(A, "/subprocessors");
   assert.match(h, /<strong>Supabase<\/strong>[\s\S]*?Database and sign-in[\s\S]*?Frankfurt/);
-  assert.match(h, /<strong>Netlify<\/strong>[\s\S]*?Hosting and CDN[\s\S]*?Frankfurt \(fra\)/);
+  assert.match(h, /<strong>Netlify<\/strong>[\s\S]*?Hosting and CDN[\s\S]*?United States/);
   assert.match(h, /<strong>Resend<\/strong>[\s\S]*?Sending email[\s\S]*?Ireland, eu-west-1[\s\S]*?stored in the US/);
   assert.doesNotMatch(h, /Email provider/);
   assert.match(h, /<h2>Model providers: none<\/h2>/);

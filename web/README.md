@@ -157,8 +157,8 @@ relays each web `Request` to it, so nothing imitates `IncomingMessage` or
 `ServerResponse`. `netlify.toml` names the files the function needs at run
 time (`dist/**`, `node_modules/**` after `npm prune --omit=dev`,
 `docs-build/**`, the invite email template, `supabase-ca.crt`, `public/**`),
-and the long cache headers for `/style.css` and `/fonts/`. The function runs
-in Frankfurt (`region: "fra"` in its config; a Pro plan setting) within
+and the long cache headers for `/style.css` and `/fonts/`. The function runs in
+Netlify's default region (US East; the database stays in Frankfurt) within
 Netlify's 60 s synchronous limit and 6 MB request ceiling.
 
 What the server does differently when hosted:

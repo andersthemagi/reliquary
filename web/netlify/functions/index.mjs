@@ -51,4 +51,7 @@ export default (req) =>
     else relay.end();
   });
 
-export const config = { path: "/*", preferStatic: true, region: "fra" };
+// No region: Netlify's default (US East) on any plan. The owner has decided
+// not to claim EU hosting for the app for now (docs/research/hosting.md,
+// section 11); the database stays in Frankfurt.
+export const config = { path: "/*", preferStatic: true };

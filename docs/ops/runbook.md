@@ -3,7 +3,8 @@
 How the hosted Reliquary is run. Plan and reasons: `docs/research/hosting.md`.
 Where things live: Supabase project `reliquary` (ref `bigonndpibguxuwtysnx`,
 Frankfurt, Pro); Netlify sites `reliquary-web` and `reliquary-mcp` (functions
-in Frankfurt, `fra`); GitHub Actions for tests, deploys and uptime.
+in Netlify's default region, US East; the owner chose not to claim EU hosting
+for the app for now); GitHub Actions for tests, deploys and uptime.
 
 ## Hosts
 
