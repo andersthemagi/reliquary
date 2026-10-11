@@ -191,8 +191,12 @@ issue; these rules make the PR carry that, and CI checks what it can.
   label: `status: considering` (the issue template's default, and the status of
   anything not definitively being worked), `status: planned` (the owner
   committed to it), `status: in progress` (someone is working on it now). Set
-  the Status and the label together; the board adds a new issue as Considering.
-  A tracking issue's sub-issues carry neither, their parent does. Closing takes an issue off the roadmap: done is
+  the label only, then run `scripts/roadmap-sync.sh --fix`, which copies it to
+  the board; run it whenever you file, attach, start or stop an issue (without
+  `--fix` it only reports, and exits 1 on drift). A tracking issue's sub-issues
+  carry neither, their parent does, and a PR for one names the sub-issue
+  (`Closes #224`), not the parent: `Part of #218` leaves the finished child
+  open. Closing takes an issue off the roadmap: done is
   `Closes #N`; closing as not planned is the owner's decision, never a way to
   tidy up. A tracking issue's sub-issues stay off the roadmap view on purpose.
   The commands and the settings that must stay on: `docs/ops/runbook.md`,
