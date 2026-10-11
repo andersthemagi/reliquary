@@ -70,7 +70,7 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   assert.equal(r.status, 200);
   const h = await r.text();
   assert.match(h, /<h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">A secure second brain<\/span><span class="p-canon">for people and their agents\.<\/span><\/h1>/);
-  assert.match(h, /<ul class="p-key" aria-label="The three states of everything in a vault">\s*<li class="p-key-open"><strong>Proposed\.<\/strong>[^<]*<\/li>\s*<li class="p-key-canon"><strong>Canon\.<\/strong>[^<]*<\/li>\s*<li class="p-key-sealed"><strong>Sealed\.<\/strong>[^<]*<\/li>/, "the key to the three marks sits under the H1");
+  assert.match(h, /<figcaption id="hub-cap">\s*<ul class="p-key" aria-label="The three states of everything in a vault">\s*<li class="p-key-open"><strong>Proposed\.<\/strong>[^<]*<\/li>\s*<li class="p-key-canon"><strong>Canon\.<\/strong>[^<]*<\/li>\s*<li class="p-key-sealed"><strong>Sealed\.<\/strong>[^<]*<\/li>/, "the key to the three marks is the hub's caption");
   assert.match(h, /Reliquary by Red Mage/);
   assert.match(h, /<h2 id="how-title">How it works<\/h2>/);
   assert.equal((h.match(/<ol class="p-steps">[\s\S]*?<\/ol>/)[0].match(/<li>/g) ?? []).length, 3, "three steps");
@@ -100,9 +100,17 @@ test("site landing: the page brings its own frame: the inverted band carries the
   assert.match(foot, /<div class="p-wrap p-footer">[\s\S]*href="\/terms"[\s\S]*href="\/privacy"/);
 });
 
-test("site landing: the mark and the rail are drawn and hidden from assistive tech, the mark in both bands", async () => {
+test("site landing: the hub, the mark and the rail are drawn; the hub in the first band, the mark in the closing", async () => {
   const h = await text(A, "/");
-  assert.equal(h.match(/<div class="p-mark" aria-hidden="true"><\/div>/g)?.length, 2, "the mark in the first band and the closing");
+  const hub = /<figure class="p-hub" aria-labelledby="hub-cap">([\s\S]*?)<\/figure>/.exec(h)?.[1] ?? "";
+  assert.ok(hub, "the hub is in the first band");
+  assert.ok(h.indexOf('<figure class="p-hub"') < h.indexOf("</header>"));
+  const tools = [...(/<ul class="p-hub-side p-hub-tools" aria-label="AI tools">([\s\S]*?)<\/ul>/.exec(hub)?.[1] ?? "").matchAll(/<li>(?:<svg [^>]*><path d="[^"]+"\/><\/svg>)?([^<]+)<\/li>/g)].map((m) => m[1]);
+  assert.deepEqual(tools, ["Claude", "Claude Code", "ChatGPT", "Cursor", "any MCP client"]);
+  assert.equal((hub.match(/<svg /g) ?? []).length, 4, "a mark for each tool that publishes one; ChatGPT is its name alone");
+  assert.match(hub, /<ul class="p-hub-side p-hub-people" aria-label="People">\s*<li>You<\/li><li>Your team<\/li><li>The client<\/li>/);
+  assert.match(hub, /<div class="p-hub-link p-hub-propose" aria-hidden="true"><i><\/i><span>propose<\/span><\/div>[\s\S]*<div class="p-hub-vault"><span class="p-hub-mark" aria-hidden="true"><\/span><strong>One vault<\/strong>[\s\S]*<div class="p-hub-link p-hub-approve" aria-hidden="true"><i><\/i><span>approve<\/span><\/div>/, "tools propose into the vault, people approve");
+  assert.equal(h.match(/<div class="p-mark" aria-hidden="true"><\/div>/g)?.length, 1, "the mark closes the page");
   assert.match(h, /<div class="p-rail" aria-hidden="true">(?:<i><\/i>){14}<\/div>/);
 });
 
@@ -161,37 +169,34 @@ test("site landing: the log is an example and says so, eight lines, nothing movi
   assert.doesNotMatch(log, /aria-hidden/);
 });
 
-test("site landing: the one filled button is Create your first vault, to the sign-in page that makes accounts, with See how approval works as a link; the email ask stays in the closing", async () => {
+test("site landing: the one filled button is Join the alpha test, to the sign-in page that makes accounts, with See how approval works as a link; the email ask stays in the closing", async () => {
   const h = await text(A, "/");
-  assert.equal(h.match(/<a class="button primary" href="\/signin">Create your first vault<\/a>/g).length, 3, "first band, pricing and closing");
-  assert.equal(h.match(/<a class="site-cta-link" href="#how">See how approval works<\/a>/g).length, 3);
+  assert.equal(h.match(/<a class="button primary" href="\/signin">Join the alpha test<\/a>/g).length, 3, "first band, pricing and closing");
+  assert.equal(h.match(/<a class="site-cta-link" href="#how">See how it works<\/a>/g).length, 3);
   assert.doesNotMatch(h, /<a class="button" href="#how"/, "the secondary is a link, not a second button");
   assert.match(h, /<a href="mailto:andres@redmage\.cc\?subject=Reliquary%20early%20access">Tell us about your team<\/a>/);
   assert.doesNotMatch(h, /invite-only/i);
 });
 
-test("site landing: the AI tools it works with sit under the band's buttons as a strip of inline marks and names, once, nothing loaded", async () => {
+test("site landing: each AI tool is named once, in the hub, and the band says what is free and public without an EU claim", async () => {
   const h = await text(A, "/");
-  const strip = /<div class="site-cta"[\s\S]*?<\/div>\s*<p class="p-works">([\s\S]*?)<\/p>/.exec(h)?.[1] ?? "";
-  const names = [...strip.matchAll(/<span class="p-logo">(?:<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="[^"]+"\/><\/svg>)?([^<]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(names, ["Claude", "Claude Code", "ChatGPT", "Cursor", "any MCP client"]);
-  assert.equal((strip.match(/<svg /g) ?? []).length, 4, "a mark for each tool that publishes one; ChatGPT is its name alone");
-  assert.match(h, /<p class="p-small">EU-hosted\. Free during the beta\.<\/p>/);
   const band = /<header class="p-inv p-fold">[\s\S]*?<\/header>/.exec(h)?.[0] ?? "";
+  for (const tool of ["Claude Code", "ChatGPT", "Cursor"]) assert.equal(band.match(new RegExp(`>${tool}<`, "g"))?.length, 1, tool);
+  assert.match(band, /<p class="p-small">Works with any MCP client\. The code is public and it's free for everyone during the alpha\. Self-host it if you'd rather\.<\/p>/);
+  assert.doesNotMatch(h, /EU-hosted|hosted in the EU|Frankfurt/, "no hosting-region claim: the app runs on Netlify");
   // The badge's title attribute carries the sentence; the visible text doesn't repeat it.
   assert.doesNotMatch(band.replace(/<[^>]+>/g, ""), /letting people in steadily|things change and may break/, "the first band says unfinished once, in the badge; the note moved to the closing");
   assert.match(h, /<footer class="p-inv p-fold p-close">[\s\S]*<p class="prealpha-note"><strong>Pre-alpha:<\/strong>/);
-  assert.equal(h.match(/Works with</g).length, 1);
   assert.doesNotMatch(h, /<img/);
 });
 
-test("site landing: each problem is paired with what Reliquary does about it, one ledger of five rows that also carries what makes it different", async () => {
+test("site landing: each problem is paired with what Reliquary does about it, one ledger of four rows that ends on no vendor lock-in", async () => {
   const h = await text(A, "/");
   const ledger = /<dl class="p-ledger">([\s\S]*?)<\/dl>/.exec(h)?.[1] ?? "";
   const rows = [...ledger.matchAll(/<div><dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd><\/div>/g)];
-  assert.equal(rows.length, 5);
-  assert.match(rows[3][2], /one vault, with one invite and one log/);
-  assert.match(rows[4][2], /export everything as plain markdown/);
+  assert.equal(rows.length, 4);
+  assert.match(rows[3][1], /already uses three of them/);
+  assert.match(rows[3][2], /Built for teams on different systems[\s\S]*export it all as plain markdown/);
   assert.doesNotMatch(h, /id="why-title"|id="trust-title"/, "no separate differentiators or promise sections");
   assert.match(rows[1][1], /nobody checked/);
   assert.match(rows[1][2], /a person, or a quorum, approves/);
@@ -204,10 +209,12 @@ test("site landing: the page says who builds it, in the closing band", async () 
   assert.match(h, /<p class="who-builds">Reliquary is built in Barcelona by Andrés of <a href="https:\/\/redmage\.cc">Red Mage<\/a>\./);
 });
 
-test("site landing: pricing shows the plans and their limits, clearly marked free while in beta", async () => {
+test("site landing: pricing shows the plans and their limits, clearly marked free during the alpha, with the roadmap and self-hosting", async () => {
   const h = await text(A, "/");
   const pricing = /<section[^>]*id="pricing"[\s\S]*?<\/section>/.exec(h)[0];
-  assert.match(pricing, /Early access: free while in beta/);
+  assert.match(pricing, /Alpha test: free for everyone/);
+  assert.match(pricing, /paid vaults for teams that need more room, ways to support the project, and enough to keep the lights on/);
+  assert.match(pricing, /self-hosting stays free/);
   for (const tier of ["Free", "Pro vault"]) assert.match(pricing, new RegExp(`<h3>${tier}\\b`), tier);
   assert.doesNotMatch(pricing, /Alpha tester/, "by-invitation plans are not on the price list");
   for (const limit of ["5 vaults you own", "Up to 10 people in each vault", "100 MB in each vault", "Up to 50 people", "5 GB"]) {
@@ -215,8 +222,8 @@ test("site landing: pricing shows the plans and their limits, clearly marked fre
   }
   assert.match(pricing, /<span class="amount">\$0<\/span>/);
   assert.match(pricing, /<span class="amount amount-word">Coming<\/span>/, "a word is not set like a price");
-  assert.match(pricing, /<a class="button primary" href="\/signin">Create your first vault<\/a>/, "a button under the plans");
-  assert.match(pricing, /Per-vault upgrades are coming; nothing is billed today/);
+  assert.match(pricing, /<a class="button primary" href="\/signin">Join the alpha test<\/a>/, "a button under the plans");
+  assert.match(pricing, /Nothing is billed today/);
 });
 
 test("site landing: a title, a description, Open Graph tags and the icon; indexable", async () => {

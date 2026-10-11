@@ -56,8 +56,8 @@ export function fill(key: keyof typeof OPERATOR, what: string): Raw {
 // the beta.
 export const PRICING = {
   show: true,
-  banner: "Early access: free while in beta",
-  note: "Everyone is on Free while we build. Per-vault upgrades are coming; nothing is billed today, and you’ll hear from us well before anything is.",
+  banner: "Alpha test: free for everyone",
+  note: "Everyone is on Free while we build. The plan is paid vaults for teams that need more room, ways to support the project, and enough to keep the lights on. Nothing is billed today, you’ll hear from us well before anything is, and self-hosting stays free.",
   tiers: [
     {
       name: "Free",

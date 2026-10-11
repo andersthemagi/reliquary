@@ -2033,7 +2033,7 @@ body.p-site { display: block; }
 .p-top nav a { color: var(--ifm); text-decoration: none; padding: 6px 0; border-bottom: 1px solid transparent; transition: color 120ms ease-out, border-color 120ms ease-out; }
 .p-top nav a:hover { color: var(--if); border-bottom-color: var(--if); }
 /* On a phone the links take their own row under the wordmark instead of wrapping one by one. */
-@media (max-width: 719px) { .p-top { flex-wrap: wrap; gap: 8px 12px; padding-block: 8px; } .p-top .site-signin { order: 1; } .p-top nav { width: 100%; justify-content: flex-start; gap: 4px 16px; order: 2; } }
+@media (max-width: 719px) { .p-top { flex-wrap: wrap; gap: 8px 12px; padding-block: 8px; } .p-top .site-signin { order: 1; } .p-top nav { width: 100%; justify-content: flex-start; gap: 2px 14px; order: 2; } }
 
 /* First screen ------------------------------------------------------------ */
 .p-fold { min-height: min(100svh, 960px); display: flex; flex-direction: column; position: relative; }
@@ -2057,21 +2057,46 @@ body.p-site { display: block; }
 .p-lede { margin: 16px 0 0; max-width: 36rem; color: var(--ifm); font-size: var(--text-md); line-height: var(--lh-md); }
 /* The key: the three states, each with its mark, as the first thing under
    the H1. It is the legend for every diamond on the page. */
-.p-key { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: var(--text-lg); line-height: var(--lh-lg); color: var(--ifm); }
-.p-key li { position: relative; padding-left: 2.25rem; }
+.p-key { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); }
+.p-key li { position: relative; padding-left: 2rem; }
 .p-key strong { color: var(--if); font-weight: 600; }
-.p-key li::before { content: ""; position: absolute; left: 0.3rem; top: 0.55em; width: 0.6rem; height: 0.6rem; transform: rotate(45deg); }
+.p-key li::before { content: ""; position: absolute; left: 0.3rem; top: 0.45em; width: 0.5rem; height: 0.5rem; transform: rotate(45deg); }
 .p-key-open::before { box-shadow: inset 0 0 0 1.5px var(--ibrand); }
 .p-key-canon::before { background: var(--ibrand); }
-.p-key-sealed::before { left: 0.1rem; top: 0.72em; width: 0.28rem; height: 0.28rem; background: var(--ibrand); box-shadow: 0.36rem -0.36rem 0 0 var(--ibrand), 0.72rem -0.72rem 0 0 var(--ibrand); }
+.p-key-sealed::before { left: 0.1rem; top: 0.62em; width: 0.24rem; height: 0.24rem; background: var(--ibrand); box-shadow: 0.32rem -0.32rem 0 0 var(--ibrand), 0.64rem -0.64rem 0 0 var(--ibrand); }
+
+/* The hub: tools, a link, the vault, a link, people; the key under it.
+   Phones stack it; from 900px it runs left to right. Chips and hairlines
+   only, in the band's own colours. */
+.p-hub { margin: 0; display: grid; gap: 0; justify-items: center; grid-template-areas: "tools" "l1" "vault" "l2" "people" "cap"; }
+.p-hub-side { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.p-hub-side li { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--ibds); color: var(--if); font-size: var(--text-sm); font-weight: 600; line-height: 1.2; }
+.p-hub-side svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+.p-hub-tools { grid-area: tools; }
+.p-hub-people { grid-area: people; }
+.p-hub-vault { grid-area: vault; display: grid; justify-items: center; gap: 4px; padding: 20px 24px; border: 1px solid var(--if); text-align: center; max-width: 16rem; }
+.p-hub-vault strong { font-weight: 800; letter-spacing: -0.02em; font-size: var(--text-lg); }
+.p-hub-vault span:last-child { font-size: var(--text-sm); color: var(--ifm); }
+.p-hub-mark { width: 56px; height: 56px; margin-bottom: 6px; background: var(--ibrand); -webkit-mask: url(/logo.svg) no-repeat center / contain; mask: url(/logo.svg) no-repeat center / contain; }
+.p-hub-link { position: relative; display: grid; place-items: center; width: 100%; height: 56px; }
+.p-hub-propose { grid-area: l1; }
+.p-hub-approve { grid-area: l2; }
+.p-hub-link::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px solid var(--ibds); }
+.p-hub-link i { position: relative; width: 10px; height: 10px; transform: rotate(45deg); background: var(--ib); }
+.p-hub-propose i { box-shadow: inset 0 0 0 1.5px var(--ibrand); }
+.p-hub-approve i { background: var(--ibrand); }
+.p-hub-link span { position: absolute; left: calc(50% + 16px); top: 50%; transform: translateY(-50%); font-size: var(--text-sm); color: var(--ifm); }
+.p-hub figcaption { grid-area: cap; margin-top: 24px; justify-self: stretch; }
+@media (min-width: 900px) {
+  .p-hub { grid-template-columns: auto minmax(40px, 1fr) auto minmax(40px, 1fr) auto; grid-template-areas: "tools l1 vault l2 people" "cap cap cap cap cap"; align-items: center; }
+  .p-hub-side { flex-direction: column; align-items: stretch; }
+  .p-hub-link { height: auto; align-self: stretch; }
+  .p-hub-link::before { left: 0; right: 0; top: 50%; bottom: auto; border-left: 0; border-top: 1px solid var(--ibds); }
+  .p-hub-link span { left: 50%; top: calc(50% + 12px); transform: translateX(-50%); }
+}
 .p-fold .site-cta { margin-top: 32px; align-items: center; }
 .site-cta-link, .p-inv .site-cta-link { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 0.25em; text-decoration-color: var(--ibds, var(--border-strong)); }
 .site-cta-link:hover { text-decoration-color: currentColor; }
-/* The strip: each tool's mark in the band's own colour beside its name. */
-.p-works { margin: 32px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; font-size: var(--text-sm); color: var(--ifm); }
-.p-works-lead { margin-right: 0; }
-.p-logo { display: inline-flex; align-items: center; gap: 8px; color: var(--if); font-weight: 600; }
-.p-logo svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
 .p-small { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
 .p-small strong { color: var(--if); }
 .p-fold .prealpha-note { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
@@ -2080,8 +2105,7 @@ body.p-site { display: block; }
 /* The mark: the logo masked in the band's brand colour. Below 900px it
    closes the band under the text; above, it is the right column and runs
    past the band's edge, cropped, the way a poster crops its image. */
-.p-mark { position: relative; min-height: 160px; margin: 0; order: -1; }
-@media (min-width: 900px) { .p-mark { order: 0; } }
+.p-mark { position: relative; min-height: 160px; margin: 0; }
 .p-mark::before {
   content: ""; position: absolute; inset: 0; background: var(--ibrand);
   -webkit-mask: url(/logo.svg) no-repeat center / contain; mask: url(/logo.svg) no-repeat center / contain;
@@ -2089,18 +2113,17 @@ body.p-site { display: block; }
 @media (prefers-reduced-motion: no-preference) {
   /* Only the first band settles: one authored moment, and the closing mark
      is never caught mid-settle when it scrolls into view. */
-  header .p-mark::before { animation: p-settle 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  header .p-hub { animation: p-settle 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
   @keyframes p-settle { from { opacity: 0; transform: scale(0.92); } }
 }
 @media (min-width: 900px) {
-  .p-fold-body { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); grid-template-areas: "head field" "text field"; align-items: center; }
+  .p-fold-body { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-areas: "head head" "text field"; align-items: center; }
   /* The H1 runs across both columns; the mark's left edge is far enough
      right that the longest line clears it at every width. */
-  .p-fold-head { grid-area: head; grid-column: 1 / -1; position: relative; z-index: 1; max-width: 17em; }
+  .p-fold-head { grid-area: head; position: relative; z-index: 1; }
   .p-fold-text { grid-area: text; }
   .p-fold { overflow: hidden; }
-  .p-fold-body .p-mark { grid-area: field; align-self: stretch; margin: 0; }
-  .p-fold-body .p-mark::before { inset: -4% -34% -4% 4%; -webkit-mask-position: right center; mask-position: right center; }
+  .p-fold-body .p-hub { grid-area: field; }
 }
 
 /* The rail: the mark's silhouette repeats down the left margin on wide screens,
@@ -2263,7 +2286,7 @@ body.p-site { display: block; }
   header .p-fold-text > :nth-child(4) { animation-delay: 480ms; }
   header .p-fold-text > :nth-child(5) { animation-delay: 540ms; }
   header .p-fold-text > :nth-child(6) { animation-delay: 600ms; }
-  header .p-mark::before { animation-delay: 240ms; }
+  header .p-hub { animation-delay: 240ms; }
   @keyframes p-rise { from { opacity: 0; transform: translateY(14px); } }
   @supports (animation-timeline: view()) {
     .p-sec > *, .p-close .p-fold-body > * { animation: p-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 240px; }

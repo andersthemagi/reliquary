@@ -419,15 +419,17 @@ same meanings for the diamond, and three devices of its own:
 |---|---|
 | One typeface at two extremes | Inter 200 is what is open or provisional (the first H1 line, prices); 800 is what is canon (the second H1 line, section headings, the ceiling). Display size caps at 4.75rem, tracking at -0.035em; the ceiling's lines cap at 2.25rem so they read as the H1's proof, not a second hero |
 | Inverted bands | The first and last screens carry the other theme's palette (`.p-inv`: dark values on the light page, light on the dark), with muted text dimmed from the band's own foreground, never a grey from the other theme. Vermilion stays on the marks only |
-| The mark | The one picture: the logo, masked from `/logo.svg` in the band's brand colour, as the first band's right column cropped by the band's edge, and smaller in the closing. It settles once on load. A rail of fourteen diamonds, its silhouette, down the left margin fills with scroll (scroll-driven animation, a static fallback where unsupported). A grid of diamonds came first and read as a dot grid, not a brand |
+| The hub and the mark | The first band's picture is the hub: the AI tools on one side, the people on the other, the vault between them with the mark in it, hollow diamonds on the propose side and filled on the approve side, the key to the marks as its caption. HTML and CSS, so it stacks on a phone (tools, vault, people) and runs left to right from 900px. It settles once on load. The mark alone (the logo, masked from `/logo.svg` in the band's brand colour) closes the page. A rail of fourteen diamonds, its silhouette, down the left margin fills with scroll (scroll-driven animation, a static fallback where unsupported). A grid of diamonds came first and read as a dot grid, not a brand |
 
 The copy follows the 2026-10-11 review (design roast, positioning and
 competitor research, demand research; notes in `private/research/`): the H1
 is the owner's line ("A secure second brain for people and their agents"),
 the key to the three marks (Proposed, Canon, Sealed) is the first thing
 under it, so every diamond on the page has its legend on the first screen,
-the works-with line is a strip of inline marks (CC0 paths from simple-icons
-where a tool publishes one; ChatGPT is its name alone), one filled button per band,
+each tool is named once, in the hub, with its mark (CC0 paths from
+simple-icons where a tool publishes one; ChatGPT is its name alone), the
+button is "Join the alpha test" and the page makes no hosting-region claim
+(the app runs on Netlify), one filled button per band,
 proof beside the ceiling, one ledger instead of three, and the honest
 limits in the FAQ rather than as a pull quote.
 

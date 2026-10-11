@@ -10,15 +10,16 @@ import { OPERATOR, PRICING, requestAccessHref, siteNav, sitePage } from "./site.
 // primary (the 2026-10-11 review: two bordered buttons of equal weight
 // made Sign up look like the second choice).
 const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
-  <a class="button primary" href="${appHref("/signin")}">Create your first vault</a>
-  <a class="site-cta-link" href="#how">See how approval works</a>
+  <a class="button primary" href="${appHref("/signin")}">Join the alpha test</a>
+  <a class="site-cta-link" href="#how">See how it works</a>
 </div>`;
 
 // The AI tools people scan for, likeliest first, each with its mark where
 // one is published under CC0 (simple-icons; Claude, Cursor and MCP are).
 // OpenAI publishes no reusable mark, so ChatGPT is its name alone. The
-// marks are inline paths in the page's own colour: nothing loads from
-// elsewhere, and the names stay for anyone who can't see them.
+// marks are inline paths in the band's own colour: nothing loads from
+// elsewhere, and the names stay for anyone who can't see them. They are
+// the hub's left side, so the page names each tool once.
 const icon = (d: string) => raw(`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`);
 const marks = {
   claude: icon("m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"),
@@ -26,7 +27,30 @@ const marks = {
   mcp: icon("M13.85 0a4.16 4.16 0 0 0-2.95 1.217L1.456 10.66a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l9.442-9.442a2.49 2.49 0 0 1 3.541 0 2.49 2.49 0 0 1 0 3.541L8.59 12.97l-.1.1a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l.1-.098 7.03-7.034a2.49 2.49 0 0 1 3.542 0l.049.05a2.49 2.49 0 0 1 0 3.54l-8.54 8.54a1.96 1.96 0 0 0 0 2.755l1.753 1.753a.835.835 0 0 0 1.18 0 .835.835 0 0 0 0-1.18l-1.753-1.753a.266.266 0 0 1 0-.394l8.54-8.54a4.185 4.185 0 0 0 0-5.9l-.05-.05a4.16 4.16 0 0 0-2.95-1.218c-.2 0-.401.02-.6.048a4.17 4.17 0 0 0-1.17-3.552A4.16 4.16 0 0 0 13.85 0m0 3.333a.84.84 0 0 0-.59.245L6.275 10.56a4.186 4.186 0 0 0 0 5.902 4.186 4.186 0 0 0 5.902 0L19.16 9.48a.835.835 0 0 0 0-1.18.835.835 0 0 0-1.18 0l-6.985 6.984a2.49 2.49 0 0 1-3.54 0 2.49 2.49 0 0 1 0-3.54l6.983-6.985a.835.835 0 0 0 0-1.18.84.84 0 0 0-.59-.245"),
 };
 const clients: Array<[string, Raw | null]> = [["Claude", marks.claude], ["Claude Code", marks.claude], ["ChatGPT", null], ["Cursor", marks.cursor], ["any MCP client", marks.mcp]];
-const worksWith = html`<p class="p-works"><span class="p-works-lead">Works with</span>${clients.map(([name, mark]) => html` <span class="p-logo">${mark ?? ""}${name}</span>`)}</p>`;
+// The hub: what Reliquary is, drawn. AI tools on one side, the people on
+// the other, the vault between them with the mark in it. Hollow diamonds
+// sit on the tools' side (they propose), filled on the people's (they
+// approve). HTML and CSS, so it reflows on a phone: tools above, people
+// below, the links turned vertical. The key under it is the legend for
+// every diamond on the page.
+const hub = html`<figure class="p-hub" aria-labelledby="hub-cap">
+  <ul class="p-hub-side p-hub-tools" aria-label="AI tools">
+    ${clients.map(([name, mark]) => html`<li>${mark ?? ""}${name}</li>`)}
+  </ul>
+  <div class="p-hub-link p-hub-propose" aria-hidden="true"><i></i><span>propose</span></div>
+  <div class="p-hub-vault"><span class="p-hub-mark" aria-hidden="true"></span><strong>One vault</strong><span>canon, proposals and sealed secrets</span></div>
+  <div class="p-hub-link p-hub-approve" aria-hidden="true"><i></i><span>approve</span></div>
+  <ul class="p-hub-side p-hub-people" aria-label="People">
+    <li>You</li><li>Your team</li><li>The client</li>
+  </ul>
+  <figcaption id="hub-cap">
+    <ul class="p-key" aria-label="The three states of everything in a vault">
+      <li class="p-key-open"><strong>Proposed.</strong> An agent wrote it. Nobody has said yes.</li>
+      <li class="p-key-canon"><strong>Canon.</strong> A person approved it, so every tool treats it as true.</li>
+      <li class="p-key-sealed"><strong>Sealed.</strong> A secret your tools can use and never see.</li>
+    </ul>
+  </figcaption>
+</figure>`;
 
 const ceiling = ["Approve its own change", "Change who approves what", "Add or remove people", "Reveal a secret's value", "Export or delete a vault"];
 
@@ -124,8 +148,7 @@ const problems: Array<[Raw, Raw]> = [
   [html`Every person and every tool has its own AI memory, so three people get three versions of the project.`, html`One vault of approved context that every tool and every person reads, kept current by what agents propose and people approve.`],
   [html`Agents write things nobody checked, and the next agent believes them.`, html`Agents propose. Nothing becomes canon until a person, or a quorum, approves it.`],
   [html`API keys travel by Slack and email and sit in <code>.env</code> files any agent can read.`, html`Variables live in the vault. <code>reliquary run</code> puts them into one process; no AI tool ever gets a value.`],
-  [html`Memory tools hold no secrets and secret managers hold no context, so a project needs two of each: invites, logs, bills.`, html`Context and credentials in one vault, with one invite and one log.`],
-  [html`Your context lives inside one AI vendor's product, so switching tools means starting over.`, html`Reliquary holds no model. Any MCP client connects, you switch when a better one comes along, and an owner can export everything as plain markdown at any time.`],
+  [html`Every AI vendor wants to be the one place your context lives, and your team already uses three of them.`, html`Built for teams on different systems: Reliquary holds no model and takes any MCP client. Use Claude today and something better tomorrow; the context, the approvals and the log stay, and an owner can export it all as plain markdown at any time.`],
 ];
 
 // Teams first: the people who say this out loud (2026-10-11 research) run
@@ -149,15 +172,16 @@ const audiences: Array<[string, string]> = [
 
 const faq: Array<[string, Raw]> = [
   ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no model, doesn't search your Drive or Slack, and is not a memory that writes itself. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
-  ["What will it cost after the beta?", html`Free stays free during the beta. Per-vault upgrades are coming for vaults that need more people or room; nothing is billed today, and you'll hear from us well before anything is. Export is free.`],
+  ["What will it cost after the alpha?", html`Free stays free during the alpha. The plan is paid vaults for teams that need more room, ways to support the project, and enough to keep the lights on. Nothing is billed today, you'll hear from us well before anything is, and self-hosting stays free.`],
+  ["Is it open source?", html`The code is public. The server is under the Functional Source License: run it yourself for any purpose, except offering it to others as a competing service, and each release becomes Apache 2.0 two years on. The CLI is MIT. <a href="/docs/how-to/self-host">Self-host Reliquary</a>.`],
   ["How do I move an existing .env and CLAUDE.md in?", html`Paste the <code>.env</code> or send it with <code>reliquary env push</code>, then run the project with <code>reliquary run</code> and retire the file: <a href="/docs/how-to/move-env-into-vault">Move a .env into a vault</a>. Put <code>CLAUDE.md</code> and your rules files in the vault as canon and point each tool at the vault: <a href="/docs/how-to/connect-claude-code">Connect Claude Code</a>.`],
   ["How is one client's agent kept out of another client's vault?", html`Give each client their own vault and connect the agent to that vault only; the database refuses everything else, and a hostile test checks it on every push. <a href="/docs/how-to/keep-client-work-separate">Keep client work separate</a>.`],
-  ["Do I need to host anything?", html`No. Reliquary is hosted in the EU, and nothing depends on your machine staying on.`],
+  ["Do I need to host anything?", html`No. Reliquary is hosted for you, and nothing depends on your machine staying on. If you'd rather run it on your own server, you can: <a href="/docs/how-to/self-host">Self-host Reliquary</a>.`],
   ["Which AI provider sees my data?", html`Only the ones you connect, and only what their agent reads through your account. They process it under your own agreement with them. See <a href="/subprocessors">sub-processors</a>.`],
   ["Is it for regulated data?", html`Not yet. Reliquary has no SOC 2 report or SSO today. Don't store health or payment card data in it.`],
   ["Can my agents see my secrets?", html`Not through Reliquary: no MCP tool returns a variable's value, ever. <code>reliquary run</code> puts values into one process, and an agent that can run commands in that process could read them there. Values are encrypted with a key held by the app, not the database, so we, as the operator, could technically decrypt them. The <a href="/security">security page</a> says what that means.`],
   ["How is it different from Claude Projects or ChatGPT memory?", html`It works across vendors, people approve changes before they become fact, and it holds credentials as well as context.`],
-  ["Can I leave?", html`Yes. An owner can export a whole vault as plain markdown files at any time, and delete it for good.`],
+  ["Can I leave?", html`Yes. An owner can export a whole vault as plain markdown files at any time, delete it for good, or move it to a self-hosted Reliquary.`],
 ];
 
 export function landing(theme: Theme): string {
@@ -199,17 +223,11 @@ export function landing(theme: Theme): string {
   <section class="p-wrap p-fold-body" aria-labelledby="hero-title">
     <h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">A secure second brain</span><span class="p-canon">for people and their agents.</span></h1>
     <div class="p-fold-text">
-      <ul class="p-key" aria-label="The three states of everything in a vault">
-        <li class="p-key-open"><strong>Proposed.</strong> An agent wrote it. Nobody has said yes.</li>
-        <li class="p-key-canon"><strong>Canon.</strong> A person approved it, so every tool treats it as true.</li>
-        <li class="p-key-sealed"><strong>Sealed.</strong> A secret your tools can use and never see.</li>
-      </ul>
-      <p class="p-lede">One vault your team and every AI tool read from, so Claude, ChatGPT and Cursor stop remembering three different projects. Agents propose, people approve, and keys reach one process, never a chat.</p>
+      <p class="p-lede">Dead simple context to share across any AI tool. Claude, ChatGPT and Cursor read the same vault, agents propose, people approve, and secrets never reach a model.</p>
       ${cta("Get started")}
-      ${worksWith}
-      <p class="p-small">EU-hosted. Free during the beta.</p>
+      <p class="p-small">Works with any MCP client. The code is public and it's free for everyone during the alpha. Self-host it if you'd rather.</p>
     </div>
-    ${mark}
+    ${hub}
   </section>
 </header>
 
@@ -295,7 +313,7 @@ ${PRICING.show
   <section class="p-wrap p-fold-body" aria-labelledby="closing-title">
     <h2 class="p-close-h2 p-fold-head" id="closing-title"><b>Try it on</b> your next project.</h2>
     <div class="p-fold-text">
-      <p class="p-lede">Reliquary is an open pre-alpha: sign up with your email and create a vault. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
+      <p class="p-lede">Reliquary is in open alpha: sign up with your email and create a vault. It's free while we build, the code is public, and you can self-host. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
       ${cta("Get started")}
       ${preAlphaNote()}
       <p class="who-builds">Reliquary is built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>. It came out of running one vault per client as a consultant, with several AI tools and no way to keep them all honest.</p>
@@ -312,7 +330,7 @@ ${PRICING.show
   return sitePage({
     title: "A secure second brain for people and their agents.",
     description:
-      "One vault your team and every AI tool read from. What an agent proposes waits; what a person approves is canon; secrets stay sealed and reach one process, never a chat. EU-hosted.",
+      "Dead simple context to share across any AI tool. Claude, ChatGPT and Cursor read the same vault; agents propose, people approve, and secrets never reach a model. Free during the alpha, and you can self-host.",
     path,
     body,
     theme,
