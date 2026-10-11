@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.17.1](https://github.com/andersthemagi/reliquary/compare/v0.17.0...v0.17.1) (2026-10-11)
+
+
+### Security
+
+* **ratelimit:** on Netlify only Netlify's client-address header counts, and a self-hosted proxy ignores it ([#257](https://github.com/andersthemagi/reliquary/issues/257)) ([6ad4599](https://github.com/andersthemagi/reliquary/commit/6ad45998d34f261da24d24d3fee873776c7869ad))
+
 ## [0.17.0](https://github.com/andersthemagi/reliquary/compare/v0.16.2...v0.17.0) (2026-10-11)
 
 
