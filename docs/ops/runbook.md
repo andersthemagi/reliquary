@@ -380,7 +380,10 @@ what shipped is `CHANGELOG.md`, and what was built and why is
   `updateProjectV2View` GraphQL mutation.
 - **Status** is Considering, Planned or In progress, and the issue carries the
   matching label (`status: considering`, `status: planned`,
-  `status: in progress`); set both together. **Being on the board commits
+  `status: in progress`). Set the label; `scripts/roadmap-sync.sh --fix`
+  copies it to the board, and without `--fix` reports drift (a missing or
+  doubled label, a board Status that disagrees, a sub-issue with a label).
+  **Being on the board commits
   nothing:** every new issue lands as Considering (the issue template adds the
   label), and only the owner moves one to Planned, because that is the
   decision to build it. In progress means someone is definitively working on
@@ -399,7 +402,8 @@ what shipped is `CHANGELOG.md`, and what was built and why is
   settings; on 2026-10-09 an issue labelled `type: feature` landed on the
   board by itself and one labelled only `documentation` did not, so label a
   new issue and look.
-- **When a status is wrong,** set it by hand. `item-add` is safe to repeat and
+- **When a status is wrong** and the script can't say which is true (no
+  label, or two), set the label, or the board by hand. `item-add` is safe to repeat and
   prints the item id with `--format json --jq .id`:
 
   ```bash
