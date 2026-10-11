@@ -9,6 +9,9 @@
 #   scripts/roadmap-sync.sh --fix   also set the board from the label, and
 #                                   take status labels off sub-issues
 #
+# Exits 0 when in step, 1 on drift (report mode), 2 when the board can't be
+# read (usually gh without the project scope).
+#
 # Open issues only. A top-level issue needs exactly one `status:` label; one
 # with none or several is reported, never guessed at, since choosing a status
 # can be the owner's decision. A sub-issue carries no status label: its
@@ -48,7 +51,7 @@ set_status() { # issue number, status name
 # the "status: " prefix dropped and the first letter capitalised to match the
 # board's option names), board Status ("-" when not on the board).
 # shellcheck disable=SC2016 # $endCursor is GraphQL's, not the shell's
-rows=$(gh api graphql --paginate -f query='
+if ! rows=$(gh api graphql --paginate -f query='
 query($endCursor: String) {
   repository(owner: "andersthemagi", name: "reliquary") {
     issues(states: OPEN, first: 100, after: $endCursor) {
@@ -74,7 +77,14 @@ query($endCursor: String) {
   ([.labels.nodes[].name | select(startswith("status: ")) | ltrimstr("status: ")
     | (.[:1] | ascii_upcase) + .[1:]] | join(",")),
   ([.projectItems.nodes[] | select(.project.number == 3) | .fieldValueByName.name // "none"][0] // "-")
-] | map(tostring) | join("|")')
+] | map(tostring) | join("|")'); then
+  # Exit 2, not 1: an agent without access must say the board is unsynced,
+  # not mistake this for drift it could fix.
+  echo "roadmap-sync: couldn't read the roadmap board through gh (above: gh's reason)." >&2
+  echo "  Usually gh lacks the project scope: run 'gh auth refresh -s project'." >&2
+  echo "  Without access, say in the PR or on the issue: 'Roadmap not synced: run scripts/roadmap-sync.sh --fix'." >&2
+  exit 2
+fi
 
 drift=0
 while IFS="|" read -r n parent labels board; do

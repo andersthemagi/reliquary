@@ -191,9 +191,13 @@ issue; these rules make the PR carry that, and CI checks what it can.
   label: `status: considering` (the issue template's default, and the status of
   anything not definitively being worked), `status: planned` (the owner
   committed to it), `status: in progress` (someone is working on it now). Set
-  the label only, then run `scripts/roadmap-sync.sh --fix`, which copies it to
-  the board; run it whenever you file, attach, start or stop an issue (without
-  `--fix` it only reports, and exits 1 on drift). A tracking issue's sub-issues
+  the label only, then run `scripts/roadmap-sync.sh --fix` yourself, without
+  asking, whenever you file, attach, start or stop an issue: it copies labels
+  to the board and touches nothing else (without `--fix` it only reports, and
+  exits 1 on drift). If it exits 2 or your permissions refuse it, you can't
+  reach the board: put `Roadmap not synced: run scripts/roadmap-sync.sh --fix`
+  in the PR description, or on the issue when there is no PR, and tell your
+  person, so whoever has access runs it. A tracking issue's sub-issues
   carry neither, their parent does, and a PR for one names the sub-issue
   (`Closes #224`), not the parent: `Part of #218` leaves the finished child
   open. Closing takes an issue off the roadmap: done is
