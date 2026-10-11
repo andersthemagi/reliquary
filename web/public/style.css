@@ -1248,20 +1248,9 @@ body.site { font-variant-numeric: normal; }
 .wordmark-by { color: var(--fg-muted); font-weight: 400; margin-left: -4px; }
 .site-signin { margin-left: auto; flex: none; }
 .site-main { padding-top: var(--space-8); }
-.site-section[id] { scroll-margin-top: var(--space-6); }
 .site-footer { align-items: center; }
 .site-footer-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 500; }
 
-/* Hero */
-.hero { display: grid; gap: var(--space-8); align-items: center; }
-.eyebrow {
-  display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-5);
-  font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: 600; color: var(--fg-muted);
-}
-.hero h1 { font-size: clamp(2rem, 1.4rem + 3vw, 3.25rem); line-height: 1.08; letter-spacing: -0.025em; max-width: 16ch; }
-.hero-sub { font-size: var(--text-xl); line-height: var(--lh-xl); font-weight: 600; margin: var(--space-5) 0 var(--space-4); }
-.hero-lede { color: var(--fg-muted); font-size: var(--text-lg); line-height: var(--lh-lg); margin: 0 0 var(--space-6); }
-.hero-small { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-4) 0 0; }
 .site-cta { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .site-cta .button { min-height: 44px; padding: 0 20px; font-size: var(--text-md); }
 
@@ -1306,21 +1295,6 @@ body.site { font-variant-numeric: normal; }
 .hero-canon, .hero-log, .hero-note { animation: demo-in 200ms ease-out; }
 @keyframes demo-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .hero-canon, .hero-log, .hero-note { animation: none; } }
-.hero-works { margin: var(--space-5) 0 0; font-weight: 500; }
-
-/* The hero's right column: what an agent can't do, large. The caption's
-   filled diamond is the canon mark: the limits are facts, not promises. */
-.hero-ceiling { margin: 0; padding: var(--space-6); display: grid; gap: var(--space-5); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.hero-ceiling-title { margin: 0; font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.hero-ceiling .cant-list { margin: 0; gap: var(--space-3); grid-template-columns: none; }
-.hero-ceiling .cant-list li { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; }
-.hero-ceiling .cant-mark { font-size: var(--text-md); }
-.canon-line { position: relative; padding-left: var(--space-5); color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
-.canon-line::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 7px; height: 7px; transform: rotate(45deg); background: var(--brand); }
-
-/* How it works: the drawn proposal card sits above the steps. */
-#how .hero-card { max-width: 32rem; margin-bottom: var(--space-6); }
-
 /* A secret's value is a row of filled diamonds: a value nobody reads. */
 .term { margin: var(--space-4) 0 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); font: 400 var(--text-sm)/1.7 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .term-muted { color: var(--fg-muted); }
@@ -1328,58 +1302,12 @@ body.site { font-variant-numeric: normal; }
 
 .who-builds { margin: var(--space-7) 0 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); max-width: 60ch; }
 
-/* Sections */
-.site-section { margin-top: var(--space-10); padding-top: var(--space-8); border-top: 1px solid var(--border); }
-.site-section > h2 { font-size: var(--text-2xl); line-height: var(--lh-2xl); letter-spacing: -0.01em; margin: 0 0 var(--space-6); }
-.site-section h3 { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; margin: 0 0 var(--space-2); }
-.site-section .feature p, .steps p { color: var(--fg-muted); margin: 0; }
-
-/* The problem as rows: the pain (hollow diamond, open) and what Reliquary
-   does about it (filled, canon) side by side from 640px. */
-.problem-rows { margin: 0; display: grid; gap: var(--space-5); }
-.problem-row { display: grid; gap: var(--space-3); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
-.problem-row:last-child { border-bottom: 0; padding-bottom: 0; }
-.problem-row dt, .problem-row dd { position: relative; margin: 0; padding-left: var(--space-6); line-height: var(--lh-md); }
-.problem-row dt { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 500; }
-.problem-row dd { color: var(--fg-muted); }
-.problem-row dt::before, .problem-row dd::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 8px; height: 8px; transform: rotate(45deg); }
-.problem-row dt::before { box-shadow: inset 0 0 0 1.5px var(--brand); }
-.problem-row dd::before { background: var(--brand); }
-
-.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); counter-reset: step; }
-.steps li { counter-increment: step; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-5); background: var(--bg-subtle); }
-.steps li::before {
-  content: counter(step); display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; margin-bottom: var(--space-4); border-radius: var(--radius-full);
-  background: var(--primary-bg); color: var(--primary-fg); font-size: var(--text-sm); font-weight: 600;
-}
-.steps code { overflow-wrap: anywhere; }
-
-.grid-2, .grid-3 { display: grid; gap: var(--space-6) var(--space-7); }
-.feature { padding-left: var(--space-5); border-left: 2px solid var(--border); }
-.not-for { margin: var(--space-7) 0 var(--space-3); }
-
-.ceiling { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.ceiling li {
-  display: inline-flex; align-items: center; padding: var(--space-3) 14px;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: 500;
-}
-
 /* Pricing */
-.beta-banner { font-size: var(--text-md); line-height: var(--lh-md); }
-.tiers { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid; gap: var(--space-5); }
-.tier { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; }
-.tier-highlight { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
-.tier h3 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .tier-for { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: 0 0 var(--space-5); }
 .tier-price { margin: 0; }
 .tier-price .amount { font-size: var(--text-2xl); line-height: var(--lh-2xl); font-weight: 600; letter-spacing: -0.01em; }
 .tier-price .per, .tier-yearly { color: var(--fg-muted); font-size: var(--text-sm); }
 .tier-yearly { margin: 0 0 var(--space-5); line-height: var(--lh-sm); }
-.tier ul { margin: 0; padding: var(--space-5) 0 0; border-top: 1px solid var(--border); list-style: none; display: grid; gap: var(--space-3); font-size: var(--text-sm); line-height: var(--lh-sm); }
-.tier ul li { display: flex; gap: var(--space-3); }
-.tier ul li::before { content: ""; flex: none; width: 6px; height: 6px; margin-top: 7px; transform: rotate(45deg); background: var(--fg-muted); }
-
 /* FAQ */
 .faq { max-width: 48rem; border-top: 1px solid var(--border); }
 .faq details { border-bottom: 1px solid var(--border); }
@@ -1410,22 +1338,8 @@ body.site { font-variant-numeric: normal; }
 .legal .caveats li { margin-top: var(--space-3); }
 mark.placeholder { background: none; color: var(--attention); font-weight: 500; text-decoration: underline dashed; text-underline-offset: 0.2em; }
 
-@media (min-width: 640px) {
-  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .problem-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-7); }
-  .tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 900px) {
-  .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: var(--space-9); }
-  .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (min-width: 1100px) {
-  .tiers { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
 @media (max-width: 640px) {
   .site-main { padding-top: var(--space-6); }
-  .site-section { margin-top: var(--space-9); padding-top: var(--space-7); }
   .wordmark-by { display: none; }
   .legal th[scope="row"] { width: 7rem; }
   /* The sub-processor table stacks: one bordered block per provider. */
@@ -1564,11 +1478,6 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Package I: signed-out and error pages */
-/* Landing: what an agent can't do, as a plain list with a mark (landing.ts). */
-.cant-list { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: var(--space-3) var(--space-7); }
-.cant-list li { display: flex; align-items: baseline; gap: var(--space-3); font-weight: 500; }
-.cant-mark { flex: none; color: var(--danger); font-size: var(--text-sm); }
-@media (min-width: 700px) { .cant-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Error pages (errorpage.ts): the lines to copy into a report, folded away. */
 .failure-details { margin: 0 0 var(--space-6); max-width: 80ch; }
 .failure-details > summary { cursor: pointer; width: fit-content; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
