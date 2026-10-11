@@ -244,7 +244,7 @@ test("split both: canonical, Open Graph, sitemap, robots and security.txt use SI
 test("split both: the site's Sign up goes to the app host; the app's docs, roadmap and legal links go to the site host", async () => {
   const landing = (await site("/")).body;
   assert.match(landing, new RegExp(`<a class="button site-signin" href="${APP}/signin">`));
-  assert.match(landing, new RegExp(`<a class="button primary" href="${APP}/signin">Sign up</a>`));
+  assert.match(landing, new RegExp(`<a class="button primary" href="${APP}/signin">Create your first vault</a>`));
   assert.match(landing, /<a href="\/docs">Docs<\/a>/);
   const home = (await app("/", { headers: { cookie: ana.header } })).body;
   assert.match(home, new RegExp(`<p class="menu-links"><a href="${SITE}/docs">Docs</a><a href="${SITE}/roadmap">Roadmap</a></p>`));

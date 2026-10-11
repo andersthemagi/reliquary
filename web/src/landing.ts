@@ -6,9 +6,12 @@ import { appHref } from "./hosts.js";
 import { footerLinks, html, preAlphaNote, raw, stageBadge, versionLink, type Raw, type Theme } from "./html.js";
 import { OPERATOR, PRICING, requestAccessHref, siteNav, sitePage } from "./site.js";
 
+// One filled button: the secondary is a link, so the primary reads as the
+// primary (the 2026-10-11 review: two bordered buttons of equal weight
+// made Sign up look like the second choice).
 const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
-  <a class="button primary" href="${appHref("/signin")}">Sign up</a>
-  <a class="button" href="#how">See how approval works</a>
+  <a class="button primary" href="${appHref("/signin")}">Create your first vault</a>
+  <a class="site-cta-link" href="#how">See how approval works</a>
 </div>`;
 
 // The AI tools people scan for, likeliest first. Names only: logos would
@@ -111,21 +114,18 @@ const problems: Array<[Raw, Raw]> = [
   [html`Every person and every tool has its own AI memory, so three people get three versions of the project.`, html`One vault of approved context that every tool and every person reads, kept current by what agents propose and people approve.`],
   [html`Agents write things nobody checked, and the next agent believes them.`, html`Agents propose. Nothing becomes canon until a person, or a quorum, approves it.`],
   [html`API keys travel by Slack and email and sit in <code>.env</code> files any agent can read.`, html`Variables live in the vault. <code>reliquary run</code> puts them into one process; no AI tool ever gets a value.`],
-  [html`Bet everything on one AI vendor, and their risk becomes yours: pricing, outages, even who they're allowed to serve.`, html`Reliquary holds no model and resells no inference, so your provider is your choice. Any MCP client connects; switch when a better one comes along, and the context and the log stay.`],
+  [html`Memory tools hold no secrets and secret managers hold no context, so a project needs two of each: invites, logs, bills.`, html`Context and credentials in one vault, with one invite and one log.`],
+  [html`Your context lives inside one AI vendor's product, so switching tools means starting over.`, html`Reliquary holds no model. Any MCP client connects, you switch when a better one comes along, and an owner can export everything as plain markdown at any time.`],
 ];
 
-const differentiators: Array<[string, string]> = [
-  [
-    "Context and credentials in one vault",
-    "Memory tools don't hold secrets and secret managers don't hold context. A project needs both, with one invite and one access log.",
-  ],
-  [
-    "Never locked into one AI vendor",
-    "Use whichever AI is best for the job today, and switch when a better one comes along. Reliquary holds no model of its own and resells no inference, so your provider is always your choice, not ours. Data sits in Frankfurt.",
-  ],
-];
-
+// Teams first: the people who say this out loud (2026-10-11 research) run
+// Claude Code or Cursor together at five to twenty people. Agencies are a
+// segment to test, so they stay second with their own reason.
 const audiences: Array<[string, string]> = [
+  [
+    "Teams on several AI tools",
+    "Some people use Claude, some ChatGPT, some Cursor, and every CLAUDE.md and rules file drifts on its own. Give everyone the same reviewed context, scoped to what they need, and keep keys out of chat messages.",
+  ],
   [
     "Agencies and consultancies",
     "One vault per client: everyone on your team only sees what they're scoped to, approvals on anything that becomes fact, credentials used without being pasted, and one log to show the client.",
@@ -134,19 +134,18 @@ const audiences: Array<[string, string]> = [
     "Solo builders",
     "Several AI tools and machines, one source of truth. Stop copying CLAUDE.md between tools and keeping .env files where any coding agent can read them. You approve your own agents' changes, or mark a folder open and let them write.",
   ],
-  [
-    "Small product teams",
-    "Some people use Claude, some ChatGPT, some Cursor. Give everyone the same reviewed context, scoped to what they need, and keep keys out of chat messages.",
-  ],
 ];
 
 
 const faq: Array<[string, Raw]> = [
-  ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no model. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
+  ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no model, doesn't search your Drive or Slack, and is not a memory that writes itself. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
+  ["What will it cost after the beta?", html`Free stays free during the beta. Per-vault upgrades are coming for vaults that need more people or room; nothing is billed today, and you'll hear from us well before anything is. Export is free.`],
+  ["How do I move an existing .env and CLAUDE.md in?", html`Paste the <code>.env</code> or send it with <code>reliquary env push</code>, then run the project with <code>reliquary run</code> and retire the file: <a href="/docs/how-to/move-env-into-vault">Move a .env into a vault</a>. Put <code>CLAUDE.md</code> and your rules files in the vault as canon and point each tool at the vault: <a href="/docs/how-to/connect-claude-code">Connect Claude Code</a>.`],
+  ["How is one client's agent kept out of another client's vault?", html`Give each client their own vault and connect the agent to that vault only; the database refuses everything else, and a hostile test checks it on every push. <a href="/docs/how-to/keep-client-work-separate">Keep client work separate</a>.`],
   ["Do I need to host anything?", html`No. Reliquary is hosted in the EU, and nothing depends on your machine staying on.`],
   ["Which AI provider sees my data?", html`Only the ones you connect, and only what their agent reads through your account. They process it under your own agreement with them. See <a href="/subprocessors">sub-processors</a>.`],
   ["Is it for regulated data?", html`Not yet. Reliquary has no SOC 2 report or SSO today. Don't store health or payment card data in it.`],
-  ["Can my agents see my secrets?", html`Not through Reliquary: no MCP tool returns a variable's value. <code>reliquary run</code> puts values into one process, and an agent that can run commands in that process could read them there. The <a href="/security">security page</a> says what that means.`],
+  ["Can my agents see my secrets?", html`Not through Reliquary: no MCP tool returns a variable's value, ever. <code>reliquary run</code> puts values into one process, and an agent that can run commands in that process could read them there. Values are encrypted with a key held by the app, not the database, so we, as the operator, could technically decrypt them. The <a href="/security">security page</a> says what that means.`],
   ["How is it different from Claude Projects or ChatGPT memory?", html`It works across vendors, people approve changes before they become fact, and it holds credentials as well as context.`],
   ["Can I leave?", html`Yes. An owner can export a whole vault as plain markdown files at any time, and delete it for good.`],
 ];
@@ -188,14 +187,12 @@ export function landing(theme: Theme): string {
     <a class="button site-signin" href="${appHref("/signin")}">Sign in</a>
   </div>
   <section class="p-wrap p-fold-body" aria-labelledby="hero-title">
-    <h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">Agents propose.</span><span class="p-canon">People approve.</span><span class="p-sealed">Secrets stay in the vault.</span></h1>
+    <h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">Your agents can propose anything.</span><span class="p-canon">There are five things they can never do.</span></h1>
     <div class="p-fold-text">
-      <p class="p-sub">One shared vault of context and credentials for your team and every AI tool you use.</p>
-      <p class="p-lede">Your agents read the approved context, called canon, and propose changes to it. Nothing becomes canon until a person says so. People and agents alike only see what they're scoped to, and secrets stay out of the chat.</p>
+      <p class="p-sub">One vault of reviewed context and credentials that your team and every AI tool read from. Nothing becomes fact until a person approves it.</p>
+      <p class="p-lede">Shared context drifts when every person and every tool keeps its own copy. Here, every tool you connect reads the same reviewed files, proposes changes, and waits for a person. API keys stay in the vault and reach one process, never a chat.</p>
       ${cta("Get started")}
-      <p class="p-works">Works with ${clients.map((c, i) => html`${i ? ", " : ""}<strong>${c}</strong>`)} and any MCP client.</p>
-      <p class="p-small">EU-hosted. Bring your own model. Open pre-alpha: sign up with your email. We're letting people in steadily as usage grows.</p>
-      ${preAlphaNote()}
+      <p class="p-works">Works with ${clients.map((c, i) => html`${i ? ", " : ""}<strong>${c}</strong>`)} and any MCP client. EU-hosted. Free during the beta.</p>
     </div>
     ${mark}
   </section>
@@ -208,7 +205,8 @@ export function landing(theme: Theme): string {
   <ul class="p-ceiling">
     ${ceiling.map((c) => html`<li><span class="p-x" aria-hidden="true"></span>${c}</li>`)}
   </ul>
-  <p class="p-note">Enforced in the database, not the prompt. Tested on every push. <a href="/security">How security works</a></p>
+  <p class="p-note">Enforced as row-level security in Postgres, not in a prompt. Each rule has a test that tries to break it, and they run on every push. <a href="/security">How security works</a></p>
+  <p class="p-note p-note-who">Built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>, out of running one vault per client as a consultant.</p>
 </section>
 
 <section class="p-sec" aria-labelledby="problem-title">
@@ -224,7 +222,6 @@ export function landing(theme: Theme): string {
   <div class="p-rows">
     ${audiences.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p></div>`)}
   </div>
-  <p class="p-not"><strong>What Reliquary is not:</strong> an AI model or chatbot, search over your Drive and Slack, or a memory that writes itself.</p>
 </section>
 
 <section class="p-sec" id="how" aria-labelledby="how-title">
@@ -232,11 +229,11 @@ export function landing(theme: Theme): string {
   <div class="p-frames">
     <figure class="p-frame" aria-labelledby="frame-review-cap">
       <div class="p-frame-art">${proposalCard}</div>
-      <figcaption id="frame-review-cap">A drawing standing in for a screenshot of the Review page in a demo vault.</figcaption>
+      <figcaption id="frame-review-cap">The Review page, drawn. Try it: approve or request changes. Nothing is saved.</figcaption>
     </figure>
     <figure class="p-frame" aria-labelledby="frame-term-cap">
       <div class="p-frame-art">${terminal}</div>
-      <figcaption id="frame-term-cap">A drawing standing in for a screenshot of a terminal run in a demo vault. The variable's name is shown; its value reaches one process and no one else.</figcaption>
+      <figcaption id="frame-term-cap">A run, drawn. The variable's name is shown; its value reaches one process and no one else.</figcaption>
     </figure>
   </div>
   <ol class="p-steps">
@@ -250,18 +247,6 @@ export function landing(theme: Theme): string {
   </div>
 </section>
 
-<section class="p-sec" aria-labelledby="why-title">
-  <h2 id="why-title">What makes it different</h2>
-  <div class="p-rows">
-    ${differentiators.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p></div>`)}
-  </div>
-</section>
-
-<section class="p-sec" aria-labelledby="trust-title">
-  <h2 id="trust-title" class="p-light">What we can and can't promise</h2>
-  <p class="p-quote">Data is hosted in the EU; variable values are encrypted with a key held by the app, not the database. <strong>No MCP tool returns a value, ever.</strong> But an agent can read what reaches its process, and we, as the operator, could technically decrypt values. <a href="/security">Read how security works</a>.</p>
-</section>
-
 ${PRICING.show
     ? html`<section class="p-sec" id="pricing" aria-labelledby="pricing-title">
   <h2 id="pricing-title">Pricing</h2>
@@ -271,13 +256,14 @@ ${PRICING.show
       (t) => html`<li>
       <h3>${t.name}${t.badge ? html` <span class="badge">${t.badge}</span>` : ""}</h3>
       <p class="tier-for">${t.for}</p>
-      <p class="tier-price"><span class="amount">${t.price}</span>${t.period ? html` <span class="per">${t.period}</span>` : ""}</p>
+      <p class="tier-price"><span class="${t.price.startsWith("$") ? "amount" : "amount amount-word"}">${t.price}</span>${t.period ? html` <span class="per">${t.period}</span>` : ""}</p>
       ${t.yearly ? html`<p class="tier-yearly">${t.yearly}</p>` : ""}
       <ul>${t.features.map((f) => html`<li>${f}</li>`)}</ul>
     </li>`,
     )}
   </ul>
   <p class="p-tiers-note">${PRICING.everyPlan}</p>
+  ${cta("Start free")}
 </section>`
     : ""}
 
@@ -296,6 +282,7 @@ ${PRICING.show
     <div class="p-fold-text">
       <p class="p-lede">Reliquary is an open pre-alpha: sign up with your email and create a vault. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
       ${cta("Get started")}
+      ${preAlphaNote()}
       <p class="who-builds">Reliquary is built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>. It came out of running one vault per client as a consultant, with several AI tools and no way to keep them all honest.</p>
     </div>
     ${mark}
@@ -308,9 +295,9 @@ ${PRICING.show
   </div>
 </footer>`;
   return sitePage({
-    title: "Agents propose. People approve. Secrets stay in the vault.",
+    title: "Your agents can propose anything. There are five things they can never do.",
     description:
-      "One shared vault of context and credentials for your team and every AI tool you use. Agents propose changes to canon, people approve them, and no AI tool ever sees a secret's value. EU-hosted.",
+      "One vault of reviewed context and credentials that your team and every AI tool read from. Agents propose changes, people approve them, and no AI tool ever sees a secret's value. EU-hosted.",
     path,
     body,
     theme,

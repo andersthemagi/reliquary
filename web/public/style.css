@@ -2048,16 +2048,16 @@ body.p-site { display: block; }
 /* Open is light, canon is heavy: the weight is the mark's meaning again. */
 .p-h1 .p-open { font-weight: 200; }
 .p-h1 .p-canon { font-weight: 800; }
-.p-h1 .p-sealed { font-weight: 800; margin-top: 0.06em; }
 .p-h1 > span::before { content: ""; position: absolute; left: 0.08em; top: 0.33em; width: 0.3em; height: 0.3em; transform: rotate(45deg); }
 .p-h1 .p-open::before { box-shadow: inset 0 0 0 0.035em var(--ibrand); }
 .p-h1 .p-canon::before { background: var(--ibrand); }
 /* Three filled diamonds in a row, one element: the shadows are offset along
    the rotated axes, which lands them on a horizontal line on screen. */
-.p-h1 .p-sealed::before { left: 0.04em; top: 0.42em; width: 0.13em; height: 0.13em; background: var(--ibrand); box-shadow: 0.16em -0.16em 0 0 var(--ibrand), 0.32em -0.32em 0 0 var(--ibrand); }
 .p-sub { margin: 0; max-width: 32rem; font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem); line-height: 1.4; font-weight: 500; }
 .p-lede { margin: 16px 0 0; max-width: 36rem; color: var(--ifm); font-size: var(--text-md); line-height: var(--lh-md); }
-.p-fold .site-cta { margin-top: 32px; }
+.p-fold .site-cta { margin-top: 32px; align-items: center; }
+.site-cta-link, .p-inv .site-cta-link { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 0.25em; text-decoration-color: var(--ibds, var(--border-strong)); }
+.site-cta-link:hover { text-decoration-color: currentColor; }
 .p-works { margin: 32px 0 0; font-size: var(--text-sm); color: var(--ifm); }
 .p-works strong { color: var(--if); font-weight: 600; }
 .p-small { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
@@ -2068,7 +2068,8 @@ body.p-site { display: block; }
 /* The mark: the logo masked in the band's brand colour. Below 900px it
    closes the band under the text; above, it is the right column and runs
    past the band's edge, cropped, the way a poster crops its image. */
-.p-mark { position: relative; min-height: 240px; margin-top: 24px; }
+.p-mark { position: relative; min-height: 160px; margin: 0; order: -1; }
+@media (min-width: 900px) { .p-mark { order: 0; } }
 .p-mark::before {
   content: ""; position: absolute; inset: 0; background: var(--ibrand);
   -webkit-mask: url(/logo.svg) no-repeat center / contain; mask: url(/logo.svg) no-repeat center / contain;
@@ -2083,7 +2084,7 @@ body.p-site { display: block; }
   .p-fold-body { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); grid-template-areas: "head field" "text field"; align-items: center; }
   /* The H1 runs across both columns; the mark's left edge is far enough
      right that the longest line clears it at every width. */
-  .p-fold-head { grid-area: head; grid-column: 1 / -1; position: relative; z-index: 1; }
+  .p-fold-head { grid-area: head; grid-column: 1 / -1; position: relative; z-index: 1; max-width: 17em; }
   .p-fold-text { grid-area: text; }
   .p-fold { overflow: hidden; }
   .p-fold-body .p-mark { grid-area: field; align-self: stretch; margin: 0; }
@@ -2116,19 +2117,20 @@ body.p-site { display: block; }
 .p-sec { padding: clamp(80px, 10vw, 144px) 0 0; }
 .p-sec[id] { scroll-margin-top: 24px; }
 .p-sec h2 { margin: 0 0 40px; font-size: clamp(1.75rem, 1.2rem + 2.2vw, 3rem); line-height: 1.05; letter-spacing: -0.03em; font-weight: 800; max-width: 22ch; text-wrap: balance; }
-.p-sec h2.p-light { font-weight: 200; }
 .p-sec h3 { margin: 0; font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; letter-spacing: -0.01em; }
 .p-sec p { max-width: 60ch; }
 
 /* The ceiling: five lines, each at display size, with a drawn cross. */
 .p-ceiling { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--fg); }
-.p-ceiling li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: clamp(1.5rem, 1rem + 2.4vw, 3.25rem); line-height: 1.05; letter-spacing: -0.03em; font-weight: 800; }
+.p-ceiling li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: clamp(1.375rem, 1rem + 1.4vw, 2.25rem); line-height: 1.1; letter-spacing: -0.025em; font-weight: 800; }
 .p-x { position: relative; width: 0.45em; height: 0.45em; justify-self: center; }
 .p-x::before, .p-x::after { content: ""; position: absolute; left: 50%; top: 0; width: 0.055em; height: 100%; margin-left: -0.0275em; background: var(--fg); transform: rotate(45deg); }
 .p-x::after { transform: rotate(-45deg); }
-.p-note { margin: 32px 0 0; max-width: 48rem; display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: 12px; color: var(--fg-muted); }
-.p-note::before { content: ""; width: 9px; height: 9px; margin-top: 8px; transform: rotate(45deg); background: var(--brand); }
+.p-note { margin: 24px 0 0; max-width: 48rem; position: relative; padding-left: calc(1.25rem + 12px); color: var(--fg-muted); }
+.p-note::before { content: ""; position: absolute; left: 5px; top: 8px; width: 9px; height: 9px; transform: rotate(45deg); background: var(--brand); }
 .p-note a { white-space: nowrap; }
+.p-note-who { margin-top: 12px; }
+.p-note-who::before { background: none; box-shadow: inset 0 0 0 1.5px var(--brand); }
 
 /* The ledger: a hairline grid, pains hollow and fixes filled. */
 .p-ledger-head { display: grid; border-top: 1px solid var(--fg); }
@@ -2153,8 +2155,6 @@ body.p-site { display: block; }
 .p-rows > div { display: grid; gap: 8px 48px; padding: 24px 0; border-bottom: 1px solid var(--border); }
 .p-rows > div p { margin: 0; color: var(--fg-muted); }
 @media (min-width: 720px) { .p-rows > div { grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr); } }
-.p-not { margin: 32px 0 0; max-width: 60ch; color: var(--fg-muted); }
-.p-not strong { color: var(--fg); }
 
 /* How it works: two reserved frames, then the steps. */
 .p-frames { display: grid; gap: 24px; margin: 0 0 64px; }
@@ -2181,13 +2181,10 @@ body.p-site { display: block; }
 .p-log-track span.p-o::before { background: none; box-shadow: inset 0 0 0 1.5px var(--brand); }
 .p-log-track b { color: var(--fg); font-weight: 600; }
 
-/* The promise, as a pull quote at the light weight. */
-.p-quote { margin: 0; position: relative; padding-left: clamp(28px, 4vw, 56px); font-size: clamp(1.375rem, 1rem + 1.6vw, 2.25rem); line-height: 1.3; letter-spacing: -0.02em; font-weight: 300; max-width: 30em; }
-.p-quote::before { content: ""; position: absolute; left: 0; top: 0.5em; width: 0.5em; height: 0.5em; transform: rotate(45deg); background: var(--brand); }
-.p-quote strong { font-weight: 600; }
-.p-quote a { white-space: nowrap; }
 
 /* Pricing as a three-cell ledger. */
+.tier-price .amount-word { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 400; color: var(--fg-muted); }
+#pricing .site-cta { margin-top: 32px; }
 .p-beta { margin: 0 0 32px; max-width: 60ch; color: var(--fg-muted); display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: 12px; }
 .p-beta::before { content: ""; width: 9px; height: 9px; margin-top: 8px; transform: rotate(45deg); background: var(--brand); }
 .p-beta strong { color: var(--fg); }
@@ -2203,7 +2200,7 @@ body.p-site { display: block; }
 .p-tiers ul li { display: flex; gap: 10px; padding: 0; }
 .p-tiers ul li::before { content: ""; flex: none; width: 6px; height: 6px; margin-top: 7px; transform: rotate(45deg); background: var(--fg-muted); }
 @media (min-width: 720px) {
-  .p-tiers { grid-template-columns: repeat(3, 1fr); }
+  .p-tiers { grid-template-columns: repeat(2, 1fr); max-width: 56rem; }
   .p-tiers > li { padding: 24px; }
   .p-tiers > li + li { border-left: 1px solid var(--border); }
   .p-tiers > li:first-child { padding-left: 0; }

@@ -77,15 +77,6 @@ export const PRICING = {
       features: ["Upgrade a single vault; the others stay as they are", "Up to 50 people", "5 GB"],
       badge: "",
     },
-    {
-      name: "Alpha tester",
-      price: "By invitation",
-      period: "",
-      yearly: "",
-      for: "People testing Reliquary with us",
-      features: ["25 vaults you own", "Up to 25 people in each vault", "1 GB in each vault"],
-      badge: "",
-    },
   ],
   everyPlan: "Every plan: unlimited agents and AI tools, approvals and quorum, the agent ceiling enforced in the database, the activity log, and export. Storage counts every version of every file and your variables.",
 };

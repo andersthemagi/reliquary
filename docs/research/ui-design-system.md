@@ -417,9 +417,17 @@ same meanings for the diamond, and three devices of its own:
 
 | Device | Rule |
 |---|---|
-| One typeface at two extremes | Inter 200 is what is open or provisional (the first H1 line, "What we can and can't promise", prices); 800 is what is canon (the other H1 lines, section headings, the ceiling). Display size caps at 4.75rem, tracking at -0.035em |
+| One typeface at two extremes | Inter 200 is what is open or provisional (the first H1 line, prices); 800 is what is canon (the second H1 line, section headings, the ceiling). Display size caps at 4.75rem, tracking at -0.035em; the ceiling's lines cap at 2.25rem so they read as the H1's proof, not a second hero |
 | Inverted bands | The first and last screens carry the other theme's palette (`.p-inv`: dark values on the light page, light on the dark), with muted text dimmed from the band's own foreground, never a grey from the other theme. Vermilion stays on the marks only |
 | The mark | The one picture: the logo, masked from `/logo.svg` in the band's brand colour, as the first band's right column cropped by the band's edge, and smaller in the closing. It settles once on load. A rail of fourteen diamonds, its silhouette, down the left margin fills with scroll (scroll-driven animation, a static fallback where unsupported). A grid of diamonds came first and read as a dot grid, not a brand |
+
+The copy follows the 2026-10-11 review (design roast, positioning and
+competitor research, demand research; notes in `private/research/`): the H1
+carries a stake ("There are five things they can never do"), the sub and
+lede use the reader's words (shared context, drift, review, keys) and keep
+"canon" and "proposal" off the first screen, one filled button per band,
+proof beside the ceiling, one ledger instead of three, and the honest
+limits in the FAQ rather than as a pull quote.
 
 Everything else is hairlines: ledgers for the problem and the pricing,
 rows for who it's for and the steps, no cards, no shadows, no labels above
