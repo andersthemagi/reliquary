@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds the public docs into web/docs-build/ (gitignored), which the web
 // app serves at /docs (src/docs.ts). Runs first in `npm run build`, so on
-// Vercel and in web/test.sh; it reads outside web/, so it runs from a full
+// the deploy workflow and in web/test.sh; it reads outside web/, so it runs from a full
 // checkout.
 //
 // Sources: docs/public/*.md (hand-written; the sidebar is SUMMARY.md) and,

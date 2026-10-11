@@ -1,0 +1,26 @@
+# The web app on Netlify (docs/ops/runbook.md, "Deploy"). The site is not
+# connected to the repository: .github/workflows/deploy.yml builds the tagged
+# commit and uploads it with the Netlify CLI, so nothing goes live outside a
+# release. `command` is for `netlify dev` and a build by hand.
+[build]
+  command = "npm run build"
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+  # The function imports dist/server.js by a URL the bundler can't follow
+  # (netlify/functions/index.mjs says why), so nothing is traced: the built
+  # app, its production dependencies (the deploy workflow prunes the dev ones
+  # first) and the files it reads at run time all ship as included files.
+  included_files = ["dist/**", "node_modules/**", "docs-build/**", "emails/vault-invite.html", "emails/manifest.tsv", "supabase-ca.crt", "public/**"]
+
+# Pages link /style.css?v=<its hash>, and fonts never change under a name.
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    cache-control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/style.css"
+  [headers.values]
+    cache-control = "public, max-age=31536000, immutable"

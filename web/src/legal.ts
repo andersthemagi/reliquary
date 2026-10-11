@@ -132,7 +132,7 @@ ${operatorBlock()}
 </table></div>
 
 <h2>Where it's stored, and who processes it</h2>
-<p>The database is in the EU (Frankfurt), and the app runs in Frankfurt. Some providers are US companies whose networks and logs are global; the <a href="/subprocessors">sub-processor list</a> names each one, what it does and where.</p>
+<p>The database is in the EU (Frankfurt). The app itself runs in the United States (Netlify), so your requests and what they carry are processed there. Some providers are US companies whose networks and logs are global; the <a href="/subprocessors">sub-processor list</a> names each one, what it does and where.</p>
 <p>Email (sign-in codes and links, account notices and vault invitations) is sent through Resend, a US company: it receives the recipient's address and the message, sends it from the EU, and keeps delivery records in the US for 30 days.</p>
 <p>AI tools you connect (Claude, ChatGPT, Cursor and others) receive what their agent reads through your account. They are not our sub-processors: you choose them, and they process that data under your agreement with them.</p>
 
@@ -193,7 +193,7 @@ ${operatorBlock()}
 </ul>
 
 <h2>Transfers outside the EU</h2>
-<p>The database and app run in the EU. Where a sub-processor may access data from outside the EU, the transfer relies on ${fill("transferSafeguard", "transfer safeguard, e.g. the provider's Standard Contractual Clauses")}. The <a href="/subprocessors">sub-processor list</a> names each provider and its location.</p>`);
+<p>The database is in the EU; the app runs in the United States, and other sub-processors may access data from outside the EU. Each such transfer relies on ${fill("transferSafeguard", "transfer safeguard, e.g. the provider's Standard Contractual Clauses")}. The <a href="/subprocessors">sub-processor list</a> names each provider and its location.</p>`);
 }
 
 // Sub-processors ----------------------------------------------------------------
@@ -208,11 +208,11 @@ const SUBPROCESSORS: Sub[] = [
     link: ["https://supabase.com/privacy", "Supabase privacy policy"],
   },
   {
-    name: "Vercel",
+    name: "Netlify",
     what: "Hosting and CDN for the web app and MCP endpoint",
-    where: "Functions in Frankfurt (fra1); CDN and request logs global (US company)",
+    where: "Functions in the United States (AWS US East); CDN and request logs global (US company)",
     data: "Requests in transit, request logs with IP addresses",
-    link: ["https://vercel.com/legal/privacy-policy", "Vercel privacy policy"],
+    link: ["https://www.netlify.com/privacy/", "Netlify privacy policy"],
   },
   {
     name: "Resend",
@@ -278,7 +278,7 @@ function security(theme: Theme): string {
 </ul>
 
 <h2>Hosting</h2>
-<p>The database is in the EU (Frankfurt), and the app runs in Frankfurt. See the <a href="/subprocessors">sub-processors</a>. Backups: ${fill("backupRetention", "backup schedule and retention")}.</p>
+<p>The database is in the EU (Frankfurt); the app runs in the United States (Netlify). See the <a href="/subprocessors">sub-processors</a>. Backups: ${fill("backupRetention", "backup schedule and retention")}.</p>
 
 <h2>What we can't promise</h2>
 <ul class="caveats">

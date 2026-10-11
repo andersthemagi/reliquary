@@ -10,7 +10,7 @@
 #                                          no password, and its file removed
 #
 # - generates a random password per role into supabase/.<role>-db-password
-#   (mode 600, gitignored) for the Vercel env vars or the rotation script,
+#   (mode 600, gitignored) for the Netlify env vars or the rotation script,
 #   unless the file exists;
 # - sends Postgres only a SCRAM-SHA-256 verifier computed here, so the
 #   plain password never reaches the server or its logs;

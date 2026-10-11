@@ -31,8 +31,8 @@ const PORT = Number(process.env.PORT ?? 8787);
 // The database takes 1 MiB of text in a file or proposal, and JSON makes a
 // newline or a quote two bytes and a client that escapes non-ASCII sends a
 // UTF-8 byte as up to three, so 3 MiB plus 64 KiB for the rest of the call
-// holds 1 MiB of any text, as the web app's file forms do. Vercel's own
-// ceiling for a function's request body is 4.5 MB.
+// holds 1 MiB of any text, as the web app's file forms do. Netlify's own
+// ceiling for a function's request body is 6 MB.
 const MAX_BODY = 3 * 1024 * 1024 + 64 * 1024;
 // A JSON-RPC batch runs one transaction per message: without a ceiling, one
 // 1 MB POST could queue thousands of database calls.
@@ -41,10 +41,10 @@ const MAX_BATCH = 10;
 // OAuth (docs/research/hosting.md, section 4). MCP_RESOURCE is this server's
 // canonical URL, byte for byte what the authorization server binds tokens to
 // (the web app reads the same value); AUTH_ISSUER is the web app. Both are
-// required on Vercel and self-hosted (SELF_HOSTED=1); locally they default
+// required on Netlify and self-hosted (SELF_HOSTED=1); locally they default
 // to the dev.sh addresses.
 function oauthConfig() {
-  const strict = process.env.VERCEL ? "VERCEL" : process.env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
+  const strict = process.env.NETLIFY ? "NETLIFY" : process.env.SELF_HOSTED === "1" ? "SELF_HOSTED" : "";
   if (strict && (!process.env.MCP_RESOURCE || !process.env.AUTH_ISSUER)) {
     console.error(`Refusing to start: ${strict} is set but MCP_RESOURCE or AUTH_ISSUER is not`);
     process.exit(1);
@@ -382,17 +382,17 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
   }
 }
 
-// On Vercel the app runs as one function (api/index.js) that hands every
-// request to this handler; the platform owns the socket. Locally, listen on
+// On Netlify the app runs as one function (netlify/functions/index.mjs) that
+// hands every request to this handler; the platform owns the socket. Locally, listen on
 // loopback as before.
 export const handle: http.RequestListener = (req, res) => {
   httpServer.emit("request", req, res);
 };
 // Locally, a client that trickles its headers or body can't hold a socket
-// for Node's default five minutes. (On Vercel the platform owns the socket,
-// and maxDuration in vercel.json bounds a request.)
+// for Node's default five minutes. (On Netlify the platform owns the socket,
+// and its 60 s execution limit bounds a request.)
 httpServer.headersTimeout = 10_000;
 httpServer.requestTimeout = 30_000;
-if (!process.env.VERCEL) {
+if (!process.env.NETLIFY) {
   httpServer.listen(PORT, HOST, () => console.info(`reliquary mcp on http://${HOST}:${PORT}/mcp`));
 }

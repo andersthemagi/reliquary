@@ -27,7 +27,7 @@ import { fail, withRequest } from "./failure.js";
 // web/test/db_tls.test.mjs pins that.
 const DEFAULT_POOL_MAX = 3;
 
-// Pool settings from the environment. Hosted (Vercel sets VERCEL), the
+// Pool settings from the environment. Hosted (Netlify sets NETLIFY), the
 // database is Supabase's shared pooler in transaction mode, so:
 //  - TLS is verified against the CA in DATABASE_CA_FILE (the app's
 //    supabase-ca.crt; see README). Without it the server refuses to start,
@@ -40,7 +40,7 @@ const DEFAULT_POOL_MAX = 3;
 // DATABASE_TLS=system (verified against Node's built-in CAs), or
 // DATABASE_TLS=off (plain, for a database on the same private network, as
 // in deploy/compose). Neither, and the server refuses to start. `off` is
-// refused on Vercel.
+// refused on Netlify.
 // Errors name the variable, never its value: DATABASE_URL holds a password.
 // Never pass `name` to a query (no named prepared statements in transaction
 // mode) and never a session-level SET.
@@ -78,10 +78,10 @@ export function poolConfig(env: NodeJS.ProcessEnv = process.env, appDir = APP_DI
   } else if (tls === "system") {
     config.ssl = { rejectUnauthorized: true };
   } else if (tls === "off") {
-    if (env.VERCEL) throw new Error("Refusing to start: DATABASE_TLS=off is for a database on the same private network, never on Vercel");
+    if (env.NETLIFY) throw new Error("Refusing to start: DATABASE_TLS=off is for a database on the same private network, never on Netlify");
     config.ssl = false;
-  } else if (env.VERCEL) {
-    throw new Error("Refusing to start: VERCEL is set but DATABASE_CA_FILE is not, so DATABASE_URL has no verified TLS");
+  } else if (env.NETLIFY) {
+    throw new Error("Refusing to start: NETLIFY is set but DATABASE_CA_FILE is not, so DATABASE_URL has no verified TLS");
   } else if (env.SELF_HOSTED === "1") {
     throw new Error(
       "Refusing to start: SELF_HOSTED is set but neither DATABASE_CA_FILE nor DATABASE_TLS is. Set DATABASE_CA_FILE to verify the database's certificate against a CA, DATABASE_TLS=system to verify it against the system's CAs, or DATABASE_TLS=off for a database on the same private network",

@@ -5,7 +5,7 @@
 # format, mode 600) and keeps the newest 14.
 #
 # Variable values are in the dump only as ciphertext; the key (VARIABLES_KEY)
-# lives in Vercel and your password manager, never here, so a stolen backup
+# lives in Netlify and your password manager, never here, so a stolen backup
 # can't reveal secrets. File contents are plaintext: keep the folder private.
 #
 # Uses supabase/.db-password (never printed). Verify a backup restores with

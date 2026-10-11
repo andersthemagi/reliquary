@@ -1,6 +1,6 @@
 // The web server as hosted (docs/research/hosting.md, chunk A): a second
 // instance that web/test.sh starts with PUBLIC_URL=https://... and without
-// public/ (on Vercel the CDN serves it). It is reached over plain http on
+// public/ (on Netlify the CDN serves it). It is reached over plain http on
 // loopback, so the Origin it expects is PUBLIC_URL, not the address used.
 
 import assert from "node:assert/strict";

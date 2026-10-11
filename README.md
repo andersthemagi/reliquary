@@ -79,7 +79,7 @@ TypeScript on Node with no web framework: `web/` (server-rendered HTML, the
 OAuth server, the environment API) and `mcp/` (the MCP endpoint) are small
 `node:http` servers that reach Postgres through `pg`. Postgres 17 enforces
 access with row-level security, Supabase Auth signs people in, and `pg_cron`
-runs housekeeping where it is installed. Hosted on Vercel and Supabase, or
+runs housekeeping where it is installed. Hosted on Netlify and Supabase, or
 self-hosted with Docker Compose. The CLI has no runtime dependencies.
 
 ## Contributing

@@ -141,7 +141,7 @@ caller's own token), `private.valid_variable_name(name)`.
   `VARIABLES_KEY_ID`, default `k1`) still works. Alone it is the current
   key; beside `VARIABLES_KEYS` it is one more key for opening, and giving its
   id a different key there refuses to start.
-- On Vercel the web app refuses to start without a key; locally it starts,
+- On Netlify the web app refuses to start without a key; locally it starts,
   and value routes answer 503 `not_configured`. With keys, it also refuses to
   start while a stored value (or a pending import's) names a key id it
   doesn't hold (`private.stored_key_ids()`, ids only), naming the id.
@@ -160,7 +160,7 @@ piece does:
 - **Keys file.** `scripts/variables-keys.sh` keeps the keys in
   `supabase/.variables-keys-secret` (gitignored, mode 600, one `id:key` per
   line, current first): `new` adds `k<n+1>` as the current key, `drop <id>`
-  forgets an old one, `list` prints ids. `scripts/vercel-env.sh web` turns
+  forgets an old one, `list` prints ids. `scripts/netlify-env.sh web` turns
   the file into `VARIABLES_KEYS`; an older `supabase/.variables-secret` is
   taken over as `k1`, the id its values carry. Neither prints a key.
 - **The operator's role.** `reliquary_ops` exists only for this: it can't
@@ -172,7 +172,7 @@ piece does:
 - **Re-encryption.** `scripts/rotate-variables-key.sh [--check]` runs
   `web/src/rekey.ts` in a container against the database, as the
   operator's role, with the `DATABASE_URL` and `VARIABLES_KEYS` of
-  `supabase/.vercel-web.env` and the password in
+  `supabase/.netlify-web.env` and the password in
   `supabase/.ops-db-password` (`rekey.ts` logs in as `reliquary_ops` to the
   database the web app's `DATABASE_URL` names, keeping the pooler's
   `.project-ref` suffix, from `OPS_DB_PASSWORD`). Vault by vault, in one transaction each, it
@@ -397,7 +397,7 @@ reads a value, and the database refuses agents anyway.
 Bringing a whole `.env` in at once, two ways. Both end in a **pending
 import** that a person applies in the web UI; nothing else sets a value.
 
-- **Paste** (the Variables page, like Vercel's): Import .env, paste the file,
+- **Paste** (the Variables page, like Netlify's): Import .env, paste the file,
   tick environments. The web app parses it (`web/src/dotenv.ts`), seals every
   value for every ticked environment and stores a **draft** (30 minutes, its
   author's alone), then redirects to a preview. The preview names each

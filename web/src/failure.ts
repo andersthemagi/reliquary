@@ -430,7 +430,7 @@ export function classify(err: unknown, where = "web app"): Classified {
 // The failure, logged
 
 // Builds the failure for the current request and logs it, one line that
-// starts with `failure ref=<ref>` (searchable in Vercel's logs), then the
+// starts with `failure ref=<ref>` (searchable in Netlify's logs), then the
 // detail as JSON. 5xx at error level, the rest at info.
 export function fail(err: unknown, o: { where?: string; what?: string; status?: number } = {}): Failure {
   const c = current();

@@ -70,7 +70,7 @@ section() {
   echo
   echo "### Deploy"
   echo
-  echo "Publishing this release starts the [deploy workflow]($repo_url/actions/workflows/deploy.yml) for \`$tag\` (commit \`${sha:0:12}\`): migrations, then both Vercel projects built from exactly this commit, then smoke checks that \`/version\` on both apps answers \`$version\`. To redeploy it, or to roll back to it later: Actions > deploy > Run workflow on \`main\`, tag \`$tag\`."
+  echo "Publishing this release starts the [deploy workflow]($repo_url/actions/workflows/deploy.yml) for \`$tag\` (commit \`${sha:0:12}\`): migrations, then both Netlify sites built from exactly this commit, then smoke checks that \`/version\` on both apps answers \`$version\`. To redeploy it, or to roll back to it later: Actions > deploy > Run workflow on \`main\`, tag \`$tag\`."
 }
 
 if [ $apply = 0 ]; then

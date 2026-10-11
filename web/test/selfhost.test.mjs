@@ -49,7 +49,7 @@ test("self-hosted db: an unknown DATABASE_TLS, both settings, or TLS parameters 
     [{ DATABASE_TLS: "on" }, /DATABASE_TLS must be off or system/],
     [{ DATABASE_TLS: "off", DATABASE_CA_FILE: "supabase-ca.crt" }, /not both/],
     [{ DATABASE_TLS: "system", DATABASE_URL: `${DB_URL}?sslmode=require` }, /must not carry sslmode/],
-    [{ DATABASE_TLS: "off", VERCEL: "1" }, /never on Vercel/],
+    [{ DATABASE_TLS: "off", NETLIFY: "1" }, /never on Netlify/],
   ]) {
     try {
       poolConfig({ SELF_HOSTED: "1", DATABASE_URL: DB_URL, ...env });
@@ -61,9 +61,9 @@ test("self-hosted db: an unknown DATABASE_TLS, both settings, or TLS parameters 
   }
 });
 
-test("self-hosted db: without SELF_HOSTED or DATABASE_TLS, nothing changes (local: no TLS object; Vercel: CA required)", () => {
+test("self-hosted db: without SELF_HOSTED or DATABASE_TLS, nothing changes (local: no TLS object; Netlify: CA required)", () => {
   assert.equal(poolConfig({ DATABASE_URL: DB_URL }).ssl, undefined);
-  assert.throws(() => poolConfig({ VERCEL: "1", DATABASE_URL: DB_URL }), /VERCEL is set but DATABASE_CA_FILE is not/);
+  assert.throws(() => poolConfig({ NETLIFY: "1", DATABASE_URL: DB_URL }), /NETLIFY is set but DATABASE_CA_FILE is not/);
 });
 
 // Auth ------------------------------------------------------------------------
@@ -77,7 +77,7 @@ test("self-hosted auth: AUTH_URL points sign-in at a self-hosted Supabase Auth, 
 test("self-hosted auth: bad AUTH_URL settings are refused, naming the variable and never a value", () => {
   for (const [env, message] of [
     [{ SELF_HOSTED: undefined }, /AUTH_URL must be https/],
-    [{ VERCEL: "1" }, /AUTH_URL must be https/],
+    [{ NETLIFY: "1" }, /AUTH_URL must be https/],
     [{ AUTH_URL: "not a url" }, /AUTH_URL must be the Auth server's URL/],
     [{ AUTH_URL: "http://auth:9999/?x=1" }, /no query, fragment or credentials/],
     [{ AUTH_URL: "http://user:pw@auth:9999" }, /no query, fragment or credentials/],

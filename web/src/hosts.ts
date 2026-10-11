@@ -12,12 +12,12 @@
 //    to the same path and query on the app host. `/` is the landing page.
 //    Nothing there reads or sets a cookie.
 //  - on the app host (and any other host name, e.g. a deployment's own
-//    *.vercel.app address) the app is served, and public-only paths are a
+//    *.netlify.app address) the app is served, and public-only paths are a
 //    308 to the site host; `/` stays: Home, or sign-in.
 //  - static files (style, icon, og.png, fonts) are served on both.
 // Not split (SITE_URL unset, or the same origin): one host, as before.
 //
-// The host is the Host header: on Vercel that is the domain the client
+// The host is the Host header: on Netlify that is the domain the client
 // asked for (x-forwarded-host carries the same). Redirects only ever go to
 // one of the two configured origins, with a path that starts with exactly
 // one "/", so no request can make this an open redirect.
@@ -53,7 +53,7 @@ export function hostsConfigError(env: NodeJS.ProcessEnv): string | null {
     return "SITE_URL must be a bare origin, with no path, query or fragment";
   }
   if (!env.PUBLIC_URL) return "SITE_URL is set but PUBLIC_URL (the app's origin) is not";
-  if (env.VERCEL && u.protocol !== "https:") return "Refusing to start: on Vercel, SITE_URL must be https";
+  if (env.NETLIFY && u.protocol !== "https:") return "Refusing to start: on Netlify, SITE_URL must be https";
   return null;
 }
 

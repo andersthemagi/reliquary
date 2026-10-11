@@ -81,10 +81,10 @@ test("version: without version.txt the build stamp takes package.json's version"
   assert.deepEqual(r.json, { version: PKG_VERSION, commit: "unknown" });
 });
 
-test("version: the build stamp takes the commit from VERCEL_GIT_COMMIT_SHA, and anything but hex is unknown", () => {
+test("version: the build stamp takes the commit from COMMIT_REF, and anything but hex is unknown", () => {
   const sha = "0123456789abcdef0123456789abcdef01234567";
-  assert.equal(stamp(() => ({ VERCEL_GIT_COMMIT_SHA: sha })).json.commit, sha);
+  assert.equal(stamp(() => ({ COMMIT_REF: sha })).json.commit, sha);
   assert.equal(stamp(() => ({ GITHUB_SHA: sha })).json.commit, sha);
-  assert.equal(stamp(() => ({ VERCEL_GIT_COMMIT_SHA: "main; rm -rf /" })).json.commit, "unknown");
-  assert.equal(stamp(() => ({ VERCEL_GIT_COMMIT_SHA: "<script>" })).json.commit, "unknown");
+  assert.equal(stamp(() => ({ COMMIT_REF: "main; rm -rf /" })).json.commit, "unknown");
+  assert.equal(stamp(() => ({ COMMIT_REF: "<script>" })).json.commit, "unknown");
 });

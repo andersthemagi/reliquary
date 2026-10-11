@@ -91,7 +91,7 @@ async function start(env, user = FERN) {
   const origin = `http://127.0.0.1:${port}`;
   const loginFile = `/tmp/feedback-login-${process.pid}-${port}`;
   const base = { ...process.env };
-  for (const k of ["RESEND_API_KEY", "EMAIL_FROM", "RESEND_API_URL", "FEEDBACK_EMAIL", "VERCEL", "SELF_HOSTED"]) delete base[k];
+  for (const k of ["RESEND_API_KEY", "EMAIL_FROM", "RESEND_API_URL", "FEEDBACK_EMAIL", "NETLIFY", "SELF_HOSTED"]) delete base[k];
   const child = spawn(process.execPath, ["dist/server.js"], {
     env: { ...base, DATABASE_URL: WEB_DB, LOCAL_USER_ID: user, LOGIN_FILE: loginFile, HOST: "127.0.0.1", PORT: String(port), PUBLIC_URL: "", ...env },
     stdio: ["ignore", "pipe", "pipe"],
@@ -370,10 +370,10 @@ test("feedback notices: where they go: FEEDBACK_EMAIL; else the hosted service's
   const { noticeTarget } = await import("../dist/feedback.js");
   const { OPERATOR } = await import("../dist/site.js");
   assert.deepEqual(noticeTarget({ FEEDBACK_EMAIL: " ops@x.example " }), { to: "ops@x.example" });
-  assert.deepEqual(noticeTarget({ VERCEL: "1" }), { to: OPERATOR.contactEmail });
-  assert.deepEqual(noticeTarget({ VERCEL: "1", FEEDBACK_EMAIL: "ops@x.example" }), { to: "ops@x.example" });
+  assert.deepEqual(noticeTarget({ NETLIFY: "1" }), { to: OPERATOR.contactEmail });
+  assert.deepEqual(noticeTarget({ NETLIFY: "1", FEEDBACK_EMAIL: "ops@x.example" }), { to: "ops@x.example" });
   assert.ok("off" in noticeTarget({ SELF_HOSTED: "1" }));
-  assert.ok("off" in noticeTarget({ SELF_HOSTED: "1", VERCEL: "1" }), "a self-hosted instance never falls back to Red Mage");
+  assert.ok("off" in noticeTarget({ SELF_HOSTED: "1", NETLIFY: "1" }), "a self-hosted instance never falls back to Red Mage");
   assert.deepEqual(noticeTarget({ SELF_HOSTED: "1", FEEDBACK_EMAIL: "me@selfhost.example" }), { to: "me@selfhost.example" });
   assert.ok("off" in noticeTarget({}));
   assert.match(noticeTarget({ FEEDBACK_EMAIL: "not an address" }).off, /FEEDBACK_EMAIL isn’t an email address/);

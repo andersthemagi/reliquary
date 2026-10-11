@@ -1,7 +1,7 @@
 // The public site and the app on two hosts (web/src/hosts.ts): web/test.sh
 // starts one AUTH_MODE=supabase instance with PUBLIC_URL (the app) and
 // SITE_URL (the site). Both names reach the same loopback port; the server
-// tells them apart by the Host header, as on Vercel (where Host is the domain
+// tells them apart by the Host header, as on Netlify (where Host is the domain
 // the client asked for). Signs Ana in against the fake Supabase Auth.
 
 import assert from "node:assert/strict";
@@ -291,7 +291,7 @@ test("split config: a bad SITE_URL refuses to start, naming the variable and nev
     [{ SITE_URL: "https://secret-site.example/docs" }, /SITE_URL must be a bare origin/],
     [{ SITE_URL: "https://secret-site.example/?a=1" }, /SITE_URL must be a bare origin/],
     [{ SITE_URL: "https://secret-site.example", PUBLIC_URL: undefined }, /PUBLIC_URL/],
-    [{ SITE_URL: "http://secret-site.example", VERCEL: "1", DATABASE_CA_FILE: "supabase-ca.crt" }, /on Vercel, SITE_URL must be https/],
+    [{ SITE_URL: "http://secret-site.example", NETLIFY: "1", DATABASE_CA_FILE: "supabase-ca.crt" }, /on Netlify, SITE_URL must be https/],
   ];
   for (const [env, msg] of cases) {
     const e = { ...base, ...env };

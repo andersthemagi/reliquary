@@ -15,7 +15,7 @@
 // - the document's client_id must equal the URL.
 // Tests need a fixture on loopback: CIMD_ALLOW_LOOPBACK=1 allows loopback
 // addresses and plain http to them, nothing else, and the web server refuses
-// to start with it when VERCEL is set.
+// to start with it when NETLIFY is set.
 //
 // Errors carry our own fixed messages, never the document's content.
 

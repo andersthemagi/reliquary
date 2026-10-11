@@ -7,7 +7,7 @@
 # app uses, with the keys the web app has, as the operator's database role
 # (reliquary_ops: only it may read and swap stored ciphertext; the web app's
 # role may not). It reads DATABASE_URL, DATABASE_CA_FILE and VARIABLES_KEYS
-# from supabase/.vercel-web.env (written by `scripts/vercel-env.sh web ...`)
+# from supabase/.netlify-web.env (written by `scripts/netlify-env.sh web ...`)
 # and the operator's password from supabase/.ops-db-password (written by
 # `scripts/set-role-passwords.sh ops`); rekey.ts logs in as reliquary_ops to
 # the database DATABASE_URL names. Those reach the container through a
@@ -35,14 +35,14 @@ case $arg in
   *) echo "usage: scripts/rotate-variables-key.sh [--check]"; exit 2 ;;
 esac
 
-src=supabase/.vercel-web.env
+src=supabase/.netlify-web.env
 ops=supabase/.ops-db-password
 if [[ ! -s $src ]]; then
-  echo "No $src: run scripts/vercel-env.sh web <web-origin> <mcp-origin> first."
+  echo "No $src: run scripts/netlify-env.sh web <web-origin> <mcp-origin> first."
   exit 2
 fi
 if ! grep -q '^VARIABLES_KEYS=' "$src"; then
-  echo "$src has no VARIABLES_KEYS (it predates key rotation): run scripts/vercel-env.sh web <web-origin> <mcp-origin> again."
+  echo "$src has no VARIABLES_KEYS (it predates key rotation): run scripts/netlify-env.sh web <web-origin> <mcp-origin> again."
   exit 2
 fi
 if [[ ! -s $ops ]]; then
@@ -60,7 +60,7 @@ root=$PWD
 
 # Only what the re-encryption needs, in a gitignored mode-600 file that is
 # removed on exit. printf is a builtin: the password is on no command line.
-envfile=$(mktemp --suffix=.env supabase/.vercel-rotate-XXXXXX)
+envfile=$(mktemp --suffix=.env supabase/.netlify-rotate-XXXXXX)
 trap 'rm -f "$envfile"' EXIT
 grep -E '^(DATABASE_URL|DATABASE_CA_FILE|VARIABLES_KEYS)=' "$src" > "$envfile"
 printf 'OPS_DB_PASSWORD=%s\n' "$(tr -d '[:space:]' < "$ops")" >> "$envfile"

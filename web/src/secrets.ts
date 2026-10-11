@@ -20,7 +20,7 @@
 //                     key for opening (current only if it's alone), and must
 //                     not contradict VARIABLES_KEYS.
 //
-// Hosted (VERCEL set) or self-hosted (SELF_HOSTED=1), the web app refuses to
+// Hosted (NETLIFY set) or self-hosted (SELF_HOSTED=1), the web app refuses to
 // start without a key. Locally
 // it starts without one, and every value route answers 503. The server also
 // refuses to start when a stored value names a key id it doesn't have
@@ -51,7 +51,7 @@ export function configureVariables(env: NodeJS.ProcessEnv = process.env): boolea
   const list = (env.VARIABLES_KEYS ?? "").trim();
   const single = env.VARIABLES_KEY ?? "";
   if (!list && !single) {
-    if (env.VERCEL) throw new Error("Refusing to start: VERCEL is set but VARIABLES_KEY is not");
+    if (env.NETLIFY) throw new Error("Refusing to start: NETLIFY is set but VARIABLES_KEY is not");
     if (env.SELF_HOSTED === "1") throw new Error("Refusing to start: SELF_HOSTED is set but neither VARIABLES_KEYS nor VARIABLES_KEY is");
     KEYS = new Map();
     CURRENT = null;

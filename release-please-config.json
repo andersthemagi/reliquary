@@ -70,7 +70,7 @@
       "include-component-in-tag": false,
       "prerelease": true,
       "changelog-path": "CHANGELOG.md",
-      "pull-request-header": "Merging this pull request tags this version, publishes its GitHub Release and deploys exactly this commit to production (migrations, both Vercel projects, smoke checks). Until then nothing below is live.",
+      "pull-request-header": "Merging this pull request tags this version, publishes its GitHub Release and deploys exactly this commit to production (migrations, both Netlify sites, smoke checks). Until then nothing below is live.",
       "extra-files": [
         {
           "type": "json",
