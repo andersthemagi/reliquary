@@ -1284,6 +1284,27 @@ body.site { font-variant-numeric: normal; }
 .hero-card-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .hero-card-actions .button { pointer-events: none; cursor: default; }
 .hero-card figcaption { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); border-top: 1px solid var(--border); padding-top: var(--space-4); }
+.hero-works { margin: var(--space-5) 0 0; font-weight: 500; }
+
+/* The hero's right column: what an agent can't do, large. The caption's
+   filled diamond is the canon mark: the limits are facts, not promises. */
+.hero-ceiling { margin: 0; padding: var(--space-6); display: grid; gap: var(--space-5); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.hero-ceiling-title { margin: 0; font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.hero-ceiling .cant-list { margin: 0; gap: var(--space-3); grid-template-columns: none; }
+.hero-ceiling .cant-list li { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; }
+.hero-ceiling .cant-mark { font-size: var(--text-md); }
+.canon-line { position: relative; padding-left: var(--space-5); color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.canon-line::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 7px; height: 7px; transform: rotate(45deg); background: var(--brand); }
+
+/* How it works: the drawn proposal card sits above the steps. */
+#how .hero-card { max-width: 32rem; margin-bottom: var(--space-6); }
+
+/* A secret's value is a row of filled diamonds: a value nobody reads. */
+.term { margin: var(--space-4) 0 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); font: 400 var(--text-sm)/1.7 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.term-muted { color: var(--fg-muted); }
+.term-value { color: var(--brand); letter-spacing: 0.1em; }
+
+.who-builds { margin: var(--space-7) 0 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); max-width: 60ch; }
 
 /* Sections */
 .site-section { margin-top: var(--space-10); padding-top: var(--space-8); border-top: 1px solid var(--border); }
@@ -1291,9 +1312,17 @@ body.site { font-variant-numeric: normal; }
 .site-section h3 { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; margin: 0 0 var(--space-2); }
 .site-section .feature p, .steps p { color: var(--fg-muted); margin: 0; }
 
-.problem-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); max-width: 44rem; }
-.problem-list li { position: relative; padding-left: var(--space-6); font-size: var(--text-lg); line-height: var(--lh-lg); }
-.problem-list li::before { content: ""; position: absolute; left: 2px; top: 10px; width: 8px; height: 8px; transform: rotate(45deg); box-shadow: inset 0 0 0 1.5px var(--brand); }
+/* The problem as rows: the pain (hollow diamond, open) and what Reliquary
+   does about it (filled, canon) side by side from 640px. */
+.problem-rows { margin: 0; display: grid; gap: var(--space-5); }
+.problem-row { display: grid; gap: var(--space-3); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
+.problem-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.problem-row dt, .problem-row dd { position: relative; margin: 0; padding-left: var(--space-6); line-height: var(--lh-md); }
+.problem-row dt { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 500; }
+.problem-row dd { color: var(--fg-muted); }
+.problem-row dt::before, .problem-row dd::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 8px; height: 8px; transform: rotate(45deg); }
+.problem-row dt::before { box-shadow: inset 0 0 0 1.5px var(--brand); }
+.problem-row dd::before { background: var(--brand); }
 
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); counter-reset: step; }
 .steps li { counter-increment: step; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-5); background: var(--bg-subtle); }
@@ -1361,6 +1390,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 
 @media (min-width: 640px) {
   .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .problem-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-7); }
   .tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 900px) {

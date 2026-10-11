@@ -14,7 +14,7 @@ const ORIGIN = PUBLIC_URL ? new URL(PUBLIC_URL).origin : "";
 const LEGAL = ["/terms", "/privacy", "/dpa", "/subprocessors", "/security"];
 // The only other sites a public page may link to (links, never loaded):
 // the sub-processors' own privacy policies.
-const DOCUMENTED_LINKS = ["https://supabase.com/privacy", "https://www.netlify.com/privacy/", "https://resend.com/legal/privacy-policy"];
+const DOCUMENTED_LINKS = ["https://redmage.cc", "https://supabase.com/privacy", "https://www.netlify.com/privacy/", "https://resend.com/legal/privacy-policy"];
 const CONTACT = "mailto:andres@redmage.cc";
 
 let localCookie = "";
@@ -69,28 +69,36 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   const r = await fetchAs(A, "/");
   assert.equal(r.status, 200);
   const h = await r.text();
-  assert.match(h, /<h1 id="hero-title">The canon for humans and agents\.<\/h1>/);
-  assert.match(h, /<p class="hero-sub">Your agents propose changes to canon\. You approve them\.<\/p>/);
+  assert.match(h, /<h1 id="hero-title">Agents propose\. People approve\. Secrets stay in the vault\.<\/h1>/);
+  assert.match(h, /<p class="eyebrow">.*Shared context and credentials for humans and agents<\/p>/);
   assert.match(h, /Reliquary by Red Mage/);
   assert.match(h, /<h2 id="how-title">How it works<\/h2>/);
   assert.equal((h.match(/<ol class="steps">[\s\S]*?<\/ol>/)[0].match(/<li>/g) ?? []).length, 3, "three steps");
-  for (const section of ["What makes it different", "Who it's for", "What your agent can't do", "Pricing", "Questions"]) {
+  for (const section of ["The problem, and what Reliquary does about it", "Who it's for", "What makes it different", "What we can and can't promise", "Pricing", "Questions"]) {
     assert.match(h, new RegExp(`<h2 id="[a-z]+-title">${section}</h2>`), section);
   }
+  // Order (#252, #256): hero, problem rows, who, how, different, promise, pricing, questions, closing.
+  const ids = [...h.matchAll(/<h2 id="([a-z]+)-title">/g)].map((m) => m[1]);
+  assert.deepEqual(ids, ["problem", "who", "how", "why", "trust", "pricing", "faq", "closing"]);
   assert.match(h, /href="\/security"/);
   assert.doesNotMatch(h, /<script/i);
 });
 
-test("site landing: what an agent can't do is a plain list with a mark, not button-like pills", async () => {
+test("site landing: the hero opens with what an agent can't do, a plain list with a mark, not button-like pills", async () => {
   const h = await text(A, "/");
-  const list = /<ul class="cant-list">([\s\S]*?)<\/ul>/.exec(h)?.[1] ?? "";
+  const hero = /<section class="hero"[\s\S]*?<\/section>/.exec(h)[0];
+  assert.match(hero, /<figure class="hero-ceiling"/);
+  assert.match(hero, /Enforced in the database, not the prompt\. Tested on every push\./);
+  const list = /<ul class="cant-list">([\s\S]*?)<\/ul>/.exec(hero)?.[1] ?? "";
   const items = [...list.matchAll(/<li><span class="cant-mark" aria-hidden="true">✕<\/span>([^<]+)<\/li>/g)].map((m) => m[1]);
-  assert.deepEqual(items, ["Approve its own change", "Change the rules", "Add or remove people", "Reveal a secret&#39;s value", "Export or delete a vault"]);
+  assert.deepEqual(items, ["Approve its own change", "Change who approves what", "Add or remove people", "Reveal a secret&#39;s value", "Export or delete a vault"]);
   assert.doesNotMatch(h, /<ul class="ceiling">/);
+  assert.match(hero, /<figcaption class="canon-line">[^<]*<a href="\/security">How security works<\/a><\/figcaption>/);
 });
 
 test("site landing: the demo card's buttons can't be focused or reached by assistive tech", async () => {
   const h = await text(A, "/");
+  assert.match(h, /<section class="site-section" id="how"[\s\S]*?<figure class="hero-card"/, "the card sits in How it works");
   const actions = /<div class="hero-card-actions"([^>]*)>([\s\S]*?)<\/div>/.exec(h);
   assert.ok(actions, "the demo card has its buttons");
   assert.match(actions[1], /aria-hidden="true"/);
@@ -98,11 +106,35 @@ test("site landing: the demo card's buttons can't be focused or reached by assis
   assert.doesNotMatch(actions[2], /<button|<a /);
 });
 
-test("site landing: calls to action are Sign up, to the sign-in page that makes accounts, and Talk to us by email with a subject", async () => {
+test("site landing: calls to action are Sign up, to the sign-in page that makes accounts, and See how approval works; the email ask stays in the closing", async () => {
   const h = await text(A, "/");
   assert.match(h, /<a class="button primary" href="\/signin">Sign up<\/a>/);
-  assert.match(h, /<a class="button" href="mailto:andres@redmage\.cc\?subject=Reliquary%20early%20access">Talk to us<\/a>/);
+  assert.match(h, /<a class="button" href="#how">See how approval works<\/a>/);
+  assert.match(h, /<a href="mailto:andres@redmage\.cc\?subject=Reliquary%20early%20access">Tell us about your team<\/a>/);
   assert.doesNotMatch(h, /invite-only/i);
+});
+
+test("site landing: the AI tools it works with sit under the hero's buttons as text, once, no logos", async () => {
+  const h = await text(A, "/");
+  const hero = /<section class="hero"[\s\S]*?<\/section>/.exec(h)[0];
+  assert.match(hero, /<div class="site-cta"[\s\S]*?<\/div>\s*<p class="hero-works">Works with Claude, Claude Code, ChatGPT, Cursor and any MCP client\.<\/p>/);
+  assert.equal(h.match(/Works with Claude/g).length, 1);
+  assert.doesNotMatch(h, /<img/);
+});
+
+test("site landing: each problem is paired with what Reliquary does about it, in four rows", async () => {
+  const h = await text(A, "/");
+  const rows = [...h.matchAll(/<div class="problem-row"><dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd><\/div>/g)];
+  assert.equal(rows.length, 4);
+  assert.match(rows[1][1], /nobody checked/);
+  assert.match(rows[1][2], /a person, or a quorum, approves/);
+  assert.match(rows[2][2], /no AI tool ever gets a value/);
+});
+
+test("site landing: a secret's value is drawn as filled diamonds, never a value, and the page says who builds it", async () => {
+  const h = await text(A, "/");
+  assert.match(h, /<pre class="term"[^>]*>\$ reliquary run --env development -- npm start\n<span class="term-muted">DATABASE_URL<\/span> <span class="term-value" aria-hidden="true">◆◆◆◆◆◆◆◆<\/span>/);
+  assert.match(h, /<p class="who-builds">Reliquary is built in Barcelona by Andrés of <a href="https:\/\/redmage\.cc">Red Mage<\/a>\./);
 });
 
 test("site landing: pricing shows the plans and their limits, clearly marked free while in beta", async () => {
@@ -119,7 +151,7 @@ test("site landing: pricing shows the plans and their limits, clearly marked fre
 
 test("site landing: a title, a description, Open Graph tags and the icon; indexable", async () => {
   const h = await text(A, "/");
-  assert.match(h, /<title>Reliquary by Red Mage: The canon for humans and agents\.<\/title>/);
+  assert.match(h, /<title>Reliquary by Red Mage: Agents propose\. People approve\. Secrets stay in the vault\.<\/title>/);
   assert.match(h, /<meta name="description" content="[^"]{50,}">/);
   for (const p of ["og:title", "og:description", "og:type", "og:site_name"]) assert.match(h, new RegExp(`<meta property="${p}" content="[^"]+">`), p);
   assert.match(h, new RegExp(`<meta property="og:url" content="${ORIGIN}/">`));
