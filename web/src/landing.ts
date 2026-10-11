@@ -1,9 +1,10 @@
 // The landing page: what signed-out visitors see at `/` (signed-in people
-// get Home). Kept to what is built today; later work is marked "coming".
+// get Home). Kept to what is built today. It brings its own frame (the
+// inverted bands carry the nav and the footer), so sitePage renders none.
 
 import { appHref } from "./hosts.js";
-import { html, preAlphaNote, type Raw, type Theme } from "./html.js";
-import { OPERATOR, PRICING, requestAccessHref, sitePage } from "./site.js";
+import { footerLinks, html, preAlphaNote, raw, stageBadge, versionLink, type Raw, type Theme } from "./html.js";
+import { OPERATOR, PRICING, requestAccessHref, siteNav, sitePage } from "./site.js";
 
 const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
   <a class="button primary" href="${appHref("/signin")}">Sign up</a>
@@ -16,16 +17,16 @@ const clients = ["Claude", "Claude Code", "ChatGPT", "Cursor"];
 
 const ceiling = ["Approve its own change", "Change who approves what", "Add or remove people", "Reveal a secret's value", "Export or delete a vault"];
 
-// The hero opens with what an agent can't do (#256, direction A): every AI
-// page promises what agents can do, so the ceiling is the one thing a
-// visitor hasn't read elsewhere, and it is the trust argument.
-const ceilingFigure = html`<figure class="hero-ceiling" aria-labelledby="ceiling-cap">
-  <p class="hero-ceiling-title" id="ceiling-cap">What your agent can't do</p>
-  <ul class="cant-list">
-    ${ceiling.map((c) => html`<li><span class="cant-mark" aria-hidden="true">✕</span>${c}</li>`)}
-  </ul>
-  <figcaption class="canon-line">Enforced in the database, not the prompt. Tested on every push. <a href="/security">How security works</a></figcaption>
-</figure>`;
+// The field: 12 columns of diamonds, hollow at the left turning filled at
+// the right. Which are filled is decided by column in the stylesheet, so
+// the scatter is the same on every load. Fourteen rows fill the band's
+// height; phones show six.
+const field = html`<div class="p-field" aria-hidden="true">${raw("<i></i>".repeat(12 * 14))}</div>`;
+
+// The rail: the field continues down the left margin, hollow at the top and
+// filling as the reader passes the approval sections (scroll-driven in the
+// stylesheet, static where that isn't supported).
+const rail = html`<div class="p-rail" aria-hidden="true">${raw("<i></i>".repeat(14))}</div>`;
 
 // The product's core loop, drawn in HTML, and workable without a script
 // (#256, direction B): three radios in one group hold the state, and the
@@ -84,14 +85,31 @@ const steps: Array<[string, Raw]> = [
   ],
   [
     "Run with secrets, never show them",
-    html`<p><code>reliquary run --env development -- npm start</code> puts variables into one process. No AI tool ever receives a value.</p><pre class="term" aria-label="A terminal: reliquary run starts the app with DATABASE_URL set, and the value is never shown">$ reliquary run --env development -- npm start
-<span class="term-muted">DATABASE_URL</span> <span class="term-value" aria-hidden="true">◆◆◆◆◆◆◆◆</span><span class="sr-only">(value hidden)</span>
-<span class="term-muted">1 variable into 1 process. Shown to no one.</span></pre>`,
+    html`<p><code>reliquary run --env development -- npm start</code> puts variables into one process. No AI tool is ever handed a value; only the process you start sees it.</p>`,
   ],
 ];
 
+// The run, drawn: the variable's name shows, its value is a row of filled
+// diamonds, a value nobody reads.
+const terminal = html`<pre class="term" aria-label="A terminal: reliquary run starts the app with DATABASE_URL set, and the value is never shown">$ reliquary run --env development -- npm start
+<span class="term-muted">DATABASE_URL</span> <span class="term-value" aria-hidden="true">◆◆◆◆◆◆◆◆</span><span class="sr-only">(value hidden)</span>
+<span class="term-muted">1 variable into 1 process. Shown to no one.</span></pre>`;
+
+// An example of the append-only log, with invented names; the caption says
+// so in visible text. Hollow marks are agents writing, filled are people.
+const logLines: Array<[boolean, string, string]> = [
+  [true, "Claude Code", "proposed a change to brief.md for Ana"],
+  [false, "Ana", "approved brief.md, now canon"],
+  [true, "Cursor", "wrote notes/standup.md in an open folder"],
+  [false, "Marc", "added DATABASE_URL to development"],
+  [false, "reliquary run", "put 1 variable into 1 process for Marc"],
+  [true, "ChatGPT", "proposed a change to onboarding.md for Steph"],
+  [false, "Steph", "requested changes on onboarding.md"],
+  [false, "Ana", "exported the vault as markdown"],
+];
+
 const problems: Array<[Raw, Raw]> = [
-  [html`Every person has their own AI memory, so the project's truth drifts.`, html`One vault of approved context that every tool and every person reads, kept current by what agents propose and people approve.`],
+  [html`Every person and every tool has its own AI memory, so three people get three versions of the project.`, html`One vault of approved context that every tool and every person reads, kept current by what agents propose and people approve.`],
   [html`Agents write things nobody checked, and the next agent believes them.`, html`Agents propose. Nothing becomes canon until a person, or a quorum, approves it.`],
   [html`API keys travel by Slack and email and sit in <code>.env</code> files any agent can read.`, html`Variables live in the vault. <code>reliquary run</code> puts them into one process; no AI tool ever gets a value.`],
   [html`Bet everything on one AI vendor, and their risk becomes yours: pricing, outages, even who they're allowed to serve.`, html`Reliquary holds no model and resells no inference, so your provider is your choice. Any MCP client connects; switch when a better one comes along, and the context and the log stay.`],
@@ -135,128 +153,168 @@ const faq: Array<[string, Raw]> = [
 ];
 
 export function landing(theme: Theme): string {
-  // Headline "The canon for humans and agents." (2026-09-29): kept. It's
-  // distinctive and the H1 shouldn't just repeat what "How it works"
-  // explains a few scrolls down. But three independent read-throughs
-  // (synthetic ICP reader-check, 2026-09-30) all misread "canon" as a
-  // wiki/fandom term until several sections in, because the sub-line never
-  // actually named it. Fixed narrowly: the sub-line now says "canon"
-  // itself instead of leaving the reader to connect the two, and "Who it's
-  // for" (previously after "What makes it different") moved up next to the
-  // Problem section, since all three reads recognized themselves in their
-  // own audience card and had to scroll past two sections to reach it.
+  // Reader-check of the poster (2026-10-11, three synthetic ICP readers):
+  // all three got the mechanism from the first band alone and found the
+  // framed drawings honest because their captions say what they are; the
+  // one overclaim all three found was the absolute "never receives a
+  // value" against the FAQ's own caveat, so step 3 now says who does see
+  // it, and the promise names where the key is held.
   //
-  // Vendor lock-in, stated as a problem and a differentiator (2026-09-30,
-  // owner's call): the earlier copy leaned on "works with Claude, ChatGPT,
-  // Cursor" three times as if listing vendors were the differentiator on
-  // its own -- research says that's close to table stakes now. The actual
-  // argument is sharper than the vendor list: betting on one AI vendor
-  // means inheriting their risk (pricing, outages, who they're allowed to
-  // serve), and the fix is being able to switch, not just being told the
-  // product happens to work with several tools today.
+  // The poster (2026-10-11, owner's call after the copy pass of #276 read
+  // as "barebones"): one typeface at two extremes, 200 for what is open and
+  // 800 for what is canon, hairlines, no cards, the diamond as the only
+  // picture. The first and last screens are bands inverted against the
+  // page; a field of diamonds, hollow turning filled, is the first band's
+  // ground and continues down the margin as a rail that fills with scroll.
+  // Built with the impeccable process: a concept roll (seed 19e81c4a, the
+  // owner locked "the field"), two review rounds, and every finding closed;
+  // the mock and its captures lived in /tmp, not the repo.
   //
-  // H1 carries the claim (2026-10-11, #250, #251, #252, #255, #256 A): the
-  // old H1 was a label and the mechanism only arrived in the sub-line.
-  // Three synthetic ICP read-throughs of this version (agency owner, solo
-  // builder, security-minded product lead) all got "propose" from the H1
-  // alone. Two of three preferred the "one vault your team and every AI
-  // tool share" candidate for saying what it is, one preferred this one
-  // for naming the control; kept this one, with "every AI tool" in the
-  // sub-line. All three found "canon" opaque while it was the eyebrow and
-  // only settled at the lede's "called canon", so the eyebrow says what the
-  // vault holds instead. All three found "Change the rules" vague: now
-  // "Change who approves what". "Secrets stay in the vault" reads a shade
-  // stronger than the FAQ's in-process caveat, so the promise section
-  // stays, and the ceiling figure links to /security from the hero.
-  const body = html`
-<section class="hero" aria-labelledby="hero-title">
-  <div class="hero-text">
-    <p class="eyebrow"><span class="logo" aria-hidden="true"></span>Shared context and credentials for humans and agents</p>
-    <h1 id="hero-title">Agents propose. People approve. Secrets stay in the vault.</h1>
-    <p class="hero-sub">One shared vault of context and credentials for your team and every AI tool you use.</p>
-    <p class="hero-lede">Your agents read the approved context, called canon, and propose changes to it. Nothing becomes canon until a person says so. People and agents alike only see what they're scoped to, and secrets stay out of the chat.</p>
-    ${cta("Get started")}
-    <p class="hero-works">Works with ${clients.join(", ")} and any MCP client.</p>
-    <p class="hero-small">EU-hosted. Bring your own model. Open pre-alpha: sign up with your email. We're letting people in steadily as usage grows.</p>
-    ${preAlphaNote()}
+  // Copy history, kept because the words didn't change: the H1 states the
+  // mechanism (#250) after three synthetic ICP read-throughs on 2026-10-11
+  // all got "propose" from it alone and found "canon" opaque until the lede
+  // names it; "Change the rules" was vague to all three and is "Change who
+  // approves what". The works-with line sits under the buttons, said once
+  // (#251); the problem is a ledger of pains and fixes (#252); the closing
+  // says who builds it (#255). Vendor lock-in stays a pain and a
+  // differentiator (2026-09-30, owner's call).
+  const path = "/";
+  const body = html`${rail}
+<header class="p-inv p-fold">
+  <div class="p-wrap p-top">
+    <a class="wordmark" href="/" aria-label="Reliquary by Red Mage, home"><span class="logo" aria-hidden="true"></span>Reliquary</a>
+    ${stageBadge()}
+    ${siteNav(path)}
+    <a class="button site-signin" href="${appHref("/signin")}">Sign in</a>
   </div>
-  ${ceilingFigure}
+  <section class="p-wrap p-fold-body" aria-labelledby="hero-title">
+    <h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">Agents propose.</span><span class="p-canon">People approve.</span><span class="p-sealed">Secrets stay in the vault.</span></h1>
+    <div class="p-fold-text">
+      <p class="p-sub">One shared vault of context and credentials for your team and every AI tool you use.</p>
+      <p class="p-lede">Your agents read the approved context, called canon, and propose changes to it. Nothing becomes canon until a person says so. People and agents alike only see what they're scoped to, and secrets stay out of the chat.</p>
+      ${cta("Get started")}
+      <p class="p-works">Works with ${clients.map((c, i) => html`${i ? ", " : ""}<strong>${c}</strong>`)} and any MCP client.</p>
+      <p class="p-small">EU-hosted. Bring your own model. Open pre-alpha: sign up with your email. We're letting people in steadily as usage grows.</p>
+      ${preAlphaNote()}
+    </div>
+    ${field}
+  </section>
+</header>
+
+<main id="main" class="p-wrap">
+
+<section class="p-sec" aria-labelledby="ceiling-title">
+  <h2 id="ceiling-title">What your agent can't do</h2>
+  <ul class="p-ceiling">
+    ${ceiling.map((c) => html`<li><span class="p-x" aria-hidden="true"></span>${c}</li>`)}
+  </ul>
+  <p class="p-note">Enforced in the database, not the prompt. Tested on every push. <a href="/security">How security works</a></p>
 </section>
 
-<section class="site-section problem" aria-labelledby="problem-title">
+<section class="p-sec" aria-labelledby="problem-title">
   <h2 id="problem-title">The problem, and what Reliquary does about it</h2>
-  <dl class="problem-rows">
-    ${problems.map(([pain, fix]) => html`<div class="problem-row"><dt>${pain}</dt><dd>${fix}</dd></div>`)}
+  <div class="p-ledger-head" aria-hidden="true"><span>Today</span><span>With Reliquary</span></div>
+  <dl class="p-ledger">
+    ${problems.map(([pain, fix]) => html`<div><dt>${pain}</dt><dd>${fix}</dd></div>`)}
   </dl>
 </section>
 
-<section class="site-section" aria-labelledby="who-title">
+<section class="p-sec" aria-labelledby="who-title">
   <h2 id="who-title">Who it's for</h2>
-  <div class="grid-3">
-    ${audiences.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
+  <div class="p-rows">
+    ${audiences.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p></div>`)}
   </div>
-  <p class="not-for"><strong>What Reliquary is not:</strong> an AI model or chatbot, search over your Drive and Slack, or a memory that writes itself.</p>
+  <p class="p-not"><strong>What Reliquary is not:</strong> an AI model or chatbot, search over your Drive and Slack, or a memory that writes itself.</p>
 </section>
 
-<section class="site-section" id="how" aria-labelledby="how-title">
+<section class="p-sec" id="how" aria-labelledby="how-title">
   <h2 id="how-title">How it works</h2>
-  ${proposalCard}
-  <ol class="steps">
+  <div class="p-frames">
+    <figure class="p-frame" aria-labelledby="frame-review-cap">
+      <div class="p-frame-art">${proposalCard}</div>
+      <figcaption id="frame-review-cap">A drawing standing in for a screenshot of the Review page in a demo vault.</figcaption>
+    </figure>
+    <figure class="p-frame" aria-labelledby="frame-term-cap">
+      <div class="p-frame-art">${terminal}</div>
+      <figcaption id="frame-term-cap">A drawing standing in for a screenshot of a terminal run in a demo vault. The variable's name is shown; its value reaches one process and no one else.</figcaption>
+    </figure>
+  </div>
+  <ol class="p-steps">
     ${steps.map(([t, d]) => html`<li><h3>${t}</h3>${d}</li>`)}
   </ol>
-</section>
-
-<section class="site-section" aria-labelledby="why-title">
-  <h2 id="why-title">What makes it different</h2>
-  <div class="grid-2">
-    ${differentiators.map(([t, d]) => html`<div class="feature"><h3>${t}</h3><p>${d}</p></div>`)}
+  <div class="p-log" aria-label="An example of the append-only activity log">
+    <p class="p-log-cap">The log, append-only. An example, with invented names.</p>
+    <div class="p-log-track">
+      ${logLines.map(([open, who, what]) => html`<span${open ? raw(' class="p-o"') : ""}><b>${who}</b> ${what}</span>`)}
+    </div>
   </div>
 </section>
 
-<section class="site-section trust" aria-labelledby="trust-title">
-  <h2 id="trust-title">What we can and can't promise</h2>
-  <p>Data is hosted in the EU; variable values are encrypted with a key the database never holds. No MCP tool returns a value, ever. But an agent can read what reaches its process, and we, as the operator, could technically decrypt values. <a href="/security">Read how security works</a>.</p>
+<section class="p-sec" aria-labelledby="why-title">
+  <h2 id="why-title">What makes it different</h2>
+  <div class="p-rows">
+    ${differentiators.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p></div>`)}
+  </div>
+</section>
+
+<section class="p-sec" aria-labelledby="trust-title">
+  <h2 id="trust-title" class="p-light">What we can and can't promise</h2>
+  <p class="p-quote">Data is hosted in the EU; variable values are encrypted with a key held by the app, not the database. <strong>No MCP tool returns a value, ever.</strong> But an agent can read what reaches its process, and we, as the operator, could technically decrypt values. <a href="/security">Read how security works</a>.</p>
 </section>
 
 ${PRICING.show
-    ? html`<section class="site-section" id="pricing" aria-labelledby="pricing-title">
+    ? html`<section class="p-sec" id="pricing" aria-labelledby="pricing-title">
   <h2 id="pricing-title">Pricing</h2>
-  <p class="callout success beta-banner"><strong>${PRICING.banner}.</strong> ${PRICING.note}</p>
-  <ul class="tiers">
+  <p class="p-beta"><span><strong>${PRICING.banner}.</strong> ${PRICING.note}</span></p>
+  <ul class="p-tiers">
     ${PRICING.tiers.map(
-      (t) => html`<li class="tier${t.badge ? " tier-highlight" : ""}">
+      (t) => html`<li>
       <h3>${t.name}${t.badge ? html` <span class="badge">${t.badge}</span>` : ""}</h3>
       <p class="tier-for">${t.for}</p>
       <p class="tier-price"><span class="amount">${t.price}</span>${t.period ? html` <span class="per">${t.period}</span>` : ""}</p>
-      <p class="tier-yearly">${t.yearly || " "}</p>
+      ${t.yearly ? html`<p class="tier-yearly">${t.yearly}</p>` : ""}
       <ul>${t.features.map((f) => html`<li>${f}</li>`)}</ul>
     </li>`,
     )}
   </ul>
-  <p class="muted small">${PRICING.everyPlan}</p>
+  <p class="p-tiers-note">${PRICING.everyPlan}</p>
 </section>`
     : ""}
 
-<section class="site-section" id="faq" aria-labelledby="faq-title">
+<section class="p-sec" id="faq" aria-labelledby="faq-title">
   <h2 id="faq-title">Questions</h2>
   <div class="faq">
     ${faq.map(([q, a]) => html`<details><summary>${q}</summary><p>${a}</p></details>`)}
   </div>
 </section>
 
-<section class="site-section closing" aria-labelledby="closing-title">
-  <h2 id="closing-title">Try it on your next project</h2>
-  <p>Reliquary is an open pre-alpha: sign up with your email and create a vault. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
-  ${cta("Get started")}
-  <p class="who-builds">Reliquary is built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>. It came out of running one vault per client as a consultant, with several AI tools and no way to keep them all honest.</p>
-</section>`;
+</main>
+
+<footer class="p-inv p-fold p-close">
+  <section class="p-wrap p-fold-body" aria-labelledby="closing-title">
+    <h2 class="p-close-h2 p-fold-head" id="closing-title"><b>Try it on</b> your next project.</h2>
+    <div class="p-fold-text">
+      <p class="p-lede">Reliquary is an open pre-alpha: sign up with your email and create a vault. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
+      ${cta("Get started")}
+      <p class="who-builds">Reliquary is built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>. It came out of running one vault per client as a consultant, with several AI tools and no way to keep them all honest.</p>
+    </div>
+    ${field}
+  </section>
+  <div class="p-wrap p-footer">
+    <span class="site-footer-brand"><span class="logo" aria-hidden="true"></span>${OPERATOR.brand}</span>
+    ${footerLinks()}
+    <a href="${requestAccessHref()}">Contact</a>
+    ${versionLink()}
+  </div>
+</footer>`;
   return sitePage({
     title: "Agents propose. People approve. Secrets stay in the vault.",
     description:
-      "One shared vault of context and credentials for your team and every AI tool you use. Agents propose, people approve, and no AI tool ever receives a secret's value. EU-hosted.",
-    path: "/",
+      "One shared vault of context and credentials for your team and every AI tool you use. Agents propose changes to canon, people approve them, and no AI tool ever sees a secret's value. EU-hosted.",
+    path,
     body,
     theme,
     home: true,
+    frame: "poster",
   });
 }

@@ -409,6 +409,26 @@ button. Filtered-to-zero shows "No results match these filters" and a
 Dropped: Bebas Neue, Barlow, uppercase labels, cut corners, the arrow on
 primary buttons, parchment backgrounds.
 
+### The public site: the poster (2026-10-11)
+
+The landing page (`web/src/landing.ts`, the `.p-` rules at the end of
+`style.css`) is the app's sibling, not its twin. Same tokens, same font,
+same meanings for the diamond, and three devices of its own:
+
+| Device | Rule |
+|---|---|
+| One typeface at two extremes | Inter 200 is what is open or provisional (the first H1 line, "What we can and can't promise", prices); 800 is what is canon (the other H1 lines, section headings, the ceiling). Display size caps at 4.75rem, tracking at -0.035em |
+| Inverted bands | The first and last screens carry the other theme's palette (`.p-inv`: dark values on the light page, light on the dark), with muted text dimmed from the band's own foreground, never a grey from the other theme. Vermilion stays on the marks only |
+| The field | The one picture: a grid of diamonds, hollow at the left turning filled at the right, as the first band's ground, mirrored in position (not in fill) in the closing. It settles once on load, the page's one motion moment. A rail of fourteen down the left margin fills with scroll (scroll-driven animation, a static fallback where unsupported) |
+
+Everything else is hairlines: ledgers for the problem and the pricing,
+rows for who it's for and the steps, no cards, no shadows, no labels above
+headings, no section numbers, nothing moving on its own. The two
+"How it works" frames hold drawings standing in for product screenshots
+(#253) and say so. Built with the impeccable skill's process (a concept
+roll, a direction contract, two review rounds); the mock and its captures
+stayed out of the repo.
+
 ## 4. Migration plan
 
 Other work is in flight in `web/src`, so each step is a small, separate

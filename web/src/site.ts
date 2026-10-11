@@ -112,7 +112,20 @@ export const draftNote = () =>
 // meta a search engine and a link preview need, and the footer with the
 // legal links. Indexable, unlike the app's pages.
 // `alternate`: the page as Markdown (docs pages), for agents.
-export function sitePage(o: { title: string; description: string; path: string; body: Raw; theme: Theme; home?: boolean; alternate?: string }): string {
+// The site's nav, the same list on every public page (the landing draws it
+// inside its own top bar).
+export const siteNav = (path: string) => html`<nav aria-label="Site">
+    <a href="/#how">How it works</a>
+    ${PRICING.show ? html`<a href="/#pricing">Pricing</a>` : ""}
+    <a href="/security"${path === "/security" ? raw(' aria-current="page"') : ""}>Security</a>
+    <a href="/#faq">FAQ</a>
+    <a href="/docs"${path === "/docs" || path.startsWith("/docs/") ? raw(' aria-current="page"') : ""}>Docs</a>
+    <a href="/roadmap">Roadmap</a>
+  </nav>`;
+
+// `frame: "poster"`: the body brings its own header and footer (the landing's
+// inverted bands), so the page renders neither.
+export function sitePage(o: { title: string; description: string; path: string; body: Raw; theme: Theme; home?: boolean; alternate?: string; frame?: "poster" }): string {
   const url = siteOrigin + o.path;
   const fullTitle = o.home ? `${OPERATOR.brand}: ${o.title}` : `${o.title} · ${OPERATOR.brand}`;
   return html`<!doctype html>
@@ -139,20 +152,15 @@ ${o.alternate ? html`<link rel="alternate" type="text/markdown" href="${o.altern
 <link rel="preload" href="/fonts/inter-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${styleHref()}">
 </head>
-<body class="site">
+<body class="site${o.frame === "poster" ? " p-site" : ""}">
 <a class="skip" href="#main">Skip to content</a>
-<header class="top site-top">
+${o.frame === "poster"
+    ? o.body
+    : html`<header class="top site-top">
   <div class="top-inner">
   <a class="wordmark" href="/" aria-label="Reliquary by Red Mage, home"><span class="logo" aria-hidden="true"></span>Reliquary<span class="wordmark-by" aria-hidden="true">by Red Mage</span></a>
   ${stageBadge()}
-  <nav aria-label="Site">
-    <a href="/#how">How it works</a>
-    ${PRICING.show ? html`<a href="/#pricing">Pricing</a>` : ""}
-    <a href="/security"${o.path === "/security" ? raw(' aria-current="page"') : ""}>Security</a>
-    <a href="/#faq">FAQ</a>
-    <a href="/docs"${o.path === "/docs" || o.path.startsWith("/docs/") ? raw(' aria-current="page"') : ""}>Docs</a>
-    <a href="/roadmap">Roadmap</a>
-  </nav>
+  ${siteNav(o.path)}
   <a class="button site-signin" href="${appHref("/signin")}">Sign in</a>
   </div>
 </header>
@@ -164,7 +172,7 @@ ${o.body}
   ${footerLinks()}
   <a href="${requestAccessHref()}">Contact</a>
   ${versionLink()}
-</footer>
+</footer>`}
 </body>
 </html>`.html;
 }
