@@ -6,7 +6,7 @@
 [![cli on npm](https://img.shields.io/npm/v/%40reliquary-ai%2Fcli.svg?label=cli)](https://www.npmjs.com/package/@reliquary-ai/cli)
 [![server license: FSL-1.1-ALv2](https://img.shields.io/badge/server%20license-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
 [![status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](https://reliquary.redmage.cc/roadmap)
-[![Netlify Status](https://api.netlify.com/api/v1/badges/a81d7df3-cb13-44d7-b8f9-b625e643c123/deploy-status)](https://app.netlify.com/projects/reliquary-web/deploys)
+[![deploy](https://github.com/andersthemagi/reliquary/actions/workflows/deploy.yml/badge.svg)](https://github.com/andersthemagi/reliquary/actions/workflows/deploy.yml)
 
 > The canon for humans and agents.
 
