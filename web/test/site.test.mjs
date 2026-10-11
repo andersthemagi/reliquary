@@ -69,7 +69,7 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   const r = await fetchAs(A, "/");
   assert.equal(r.status, 200);
   const h = await r.text();
-  assert.match(h, /<h1 id="hero-title">Agents propose\. People approve\. Secrets stay in the vault\.<\/h1>/);
+  assert.match(h, /<h1 id="hero-title"><span class="h1-open">Agents propose\.<\/span> <span class="h1-canon">People approve\.<\/span> <span class="h1-sealed">Secrets stay in the vault\.<\/span><\/h1>/);
   assert.match(h, /<p class="eyebrow">.*Shared context and credentials for humans and agents<\/p>/);
   assert.match(h, /Reliquary by Red Mage/);
   assert.match(h, /<h2 id="how-title">How it works<\/h2>/);

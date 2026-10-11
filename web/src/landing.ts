@@ -144,11 +144,16 @@ export function landing(theme: Theme): string {
   // "Change who approves what". "Secrets stay in the vault" reads a shade
   // stronger than the FAQ's in-process caveat, so the promise section
   // stays, and the ceiling figure links to /security from the hero.
+  //
+  // The H1's three lines carry the page's one visual code (2026-10-11): a
+  // hollow diamond is open, a filled one is canon, and a row of filled ones
+  // is a value nobody reads. The marks are CSS, empty for assistive tech,
+  // so the heading still reads as the three sentences.
   const body = html`
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">
     <p class="eyebrow"><span class="logo" aria-hidden="true"></span>Shared context and credentials for humans and agents</p>
-    <h1 id="hero-title">Agents propose. People approve. Secrets stay in the vault.</h1>
+    <h1 id="hero-title"><span class="h1-open">Agents propose.</span> <span class="h1-canon">People approve.</span> <span class="h1-sealed">Secrets stay in the vault.</span></h1>
     <p class="hero-sub">One shared vault of context and credentials for your team and every AI tool you use.</p>
     <p class="hero-lede">Your agents read the approved context, called canon, and propose changes to it. Nothing becomes canon until a person says so. People and agents alike only see what they're scoped to, and secrets stay out of the chat.</p>
     ${cta("Get started")}
