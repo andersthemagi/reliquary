@@ -132,6 +132,9 @@ change only bumps the minor while below 1.0).
    the release and its commit), **published** (`scripts/netlify-publish.sh`:
    production now serves them), and smoke-checked once more on the live
    hostnames. A failing check fails the run: read it, then fix forward.
+   Each run shows on the repository as a deployment to the `production`
+   environment, green or red with the run; in Netlify the published deploy
+   stays labelled a draft, so look for **Published** in the site's Deploys.
 
    An upload succeeding says nothing about whether the app actually boots (a
    missing required env var is a runtime failure, not a build one; see

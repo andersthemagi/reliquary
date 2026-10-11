@@ -86,6 +86,12 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v'))
+    # Records each run as a GitHub deployment, the repo's only one now that
+    # the Netlify sites aren't connected to it. A protection rule added to
+    # this environment would hold every release deploy until it passes.
+    environment:
+      name: production
+      url: ${{ vars.WEB_URL }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
