@@ -12,13 +12,14 @@
 // fetched once per instance), of the kind and the value. A token is keyed
 // by its grant, in the database.
 //
-// Client IP: on Netlify (NETLIFY set) or with TRUST_PROXY_IP=1, the address
-// Netlify's edge puts in x-nf-client-connection-ip, else x-real-ip (a
-// self-hosted reverse proxy), else the first x-forwarded-for entry. Netlify
-// sets its header itself and overwrites what the client sent, so it can't be
-// forged from outside; that holds only while requests reach the function
-// through Netlify alone (a proxy in front would make every request its
-// address). Anywhere else, the socket's address. IPv6 addresses count by
+// Client IP: on Netlify (NETLIFY set), only the address Netlify's edge puts
+// in x-nf-client-connection-ip. Netlify sets that header itself and
+// overwrites what the client sent, so it can't be forged from outside; that
+// holds only while requests reach the function through Netlify alone (a
+// proxy in front would make every request its address). With
+// TRUST_PROXY_IP=1 (a self-hosted reverse proxy), x-real-ip, else the first
+// x-forwarded-for entry. Anywhere else, or when that header is missing, the
+// socket's address. IPv6 addresses count by
 // their /64, which one household or server usually holds whole.
 //
 // When the counter can't be reached: sign-in (asking for a code, entering
@@ -69,7 +70,9 @@ export const DEFAULT_LIMITS = {
 
 export type LimitName = keyof typeof DEFAULT_LIMITS;
 let LIMITS: Record<LimitName, Limit> = { ...DEFAULT_LIMITS };
-let TRUST_PROXY = false;
+// Which forwarding headers name the client: Netlify's own, a self-hosted
+// proxy's, or none (the socket's address).
+let PROXY: "netlify" | "self" | undefined;
 
 // Reads RATE_LIMITS, RATE_LIMIT_SCALE and TRUST_PROXY_IP once, at start.
 // Throws an Error naming the variable; the server prints it and exits.
@@ -87,7 +90,7 @@ export function configureRateLimits(env: NodeJS.ProcessEnv): void {
   }
   if (env.TRUST_PROXY_IP !== undefined && env.TRUST_PROXY_IP !== "1" && env.TRUST_PROXY_IP !== "0") throw new Error("TRUST_PROXY_IP must be 1, 0 or unset");
   LIMITS = limits;
-  TRUST_PROXY = !!env.NETLIFY || env.TRUST_PROXY_IP === "1";
+  PROXY = env.NETLIFY ? "netlify" : env.TRUST_PROXY_IP === "1" ? "self" : undefined;
 }
 export const limitOf = (name: LimitName): Limit => LIMITS[name];
 
@@ -111,17 +114,18 @@ function normalizeIp(raw: string | undefined): string | undefined {
 }
 
 export function clientIp(req: http.IncomingMessage): string {
-  if (TRUST_PROXY) {
-    for (const name of ["x-nf-client-connection-ip", "x-real-ip"]) {
-      const v = req.headers[name];
-      const ip = normalizeIp(typeof v === "string" ? v : undefined);
-      if (ip) return ip;
-    }
-    const xff = req.headers["x-forwarded-for"];
-    const first = (Array.isArray(xff) ? xff[0] : xff)?.split(",")[0];
-    const fromXff = normalizeIp(first);
-    if (fromXff) return fromXff;
-  }
+  const header = (name: string) => {
+    const v = req.headers[name];
+    return normalizeIp((Array.isArray(v) ? v[0] : v)?.split(",")[0]);
+  };
+  // Netlify passes x-real-ip and x-forwarded-for through from the client
+  // (checked on a deployed function, #221), so on Netlify only its own header
+  // counts; a self-hosted proxy doesn't set Netlify's, so there it's ignored.
+  const ip =
+    PROXY === "netlify" ? header("x-nf-client-connection-ip")
+    : PROXY === "self" ? header("x-real-ip") ?? header("x-forwarded-for")
+    : undefined;
+  if (ip) return ip;
   return normalizeIp(req.socket.remoteAddress) ?? "unknown";
 }
 
