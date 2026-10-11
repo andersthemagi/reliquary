@@ -162,19 +162,31 @@ test("rate limits: counters hold no token, hash or address: every key is 64 hex 
 });
 
 // Which header names the client when hosted (NETLIFY) or behind a proxy of
-// one's own (TRUST_PROXY_IP=1): Netlify's header first, since its edge sets
-// and overwrites it; the others are a self-hosted proxy's. Unit tests on
+// one's own (TRUST_PROXY_IP=1): on Netlify only its header, since its edge
+// sets and overwrites it but passes the others through from the client; a
+// self-hosted proxy's are the others. Unit tests on
 // clientIp itself, against a request shaped like node:http's.
 const reqFrom = (headers, remoteAddress = "203.0.113.9") => ({ headers, socket: { remoteAddress } });
 
-test("rate limit ip: hosted, x-nf-client-connection-ip wins over x-real-ip and x-forwarded-for, and an IPv6 address counts by its /64", () => {
+test("rate limit ip: on Netlify only x-nf-client-connection-ip counts, a forged x-real-ip or x-forwarded-for is ignored, and an IPv6 address counts by its /64", () => {
   configureRateLimits({ NETLIFY: "true" });
   try {
     const all = { "x-nf-client-connection-ip": "198.51.100.1", "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3, 198.51.100.4" };
     assert.equal(clientIp(reqFrom(all)), "198.51.100.1");
-    assert.equal(clientIp(reqFrom({ "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3" })), "198.51.100.2");
-    assert.equal(clientIp(reqFrom({ "x-forwarded-for": "198.51.100.3, 198.51.100.4" })), "198.51.100.3");
+    assert.equal(clientIp(reqFrom({ "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3" })), "203.0.113.9");
     assert.equal(clientIp(reqFrom({ "x-nf-client-connection-ip": "2001:db8:1:2:3:4:5:6" })), "2001:db8:1:2::/64");
+  } finally {
+    configureRateLimits({});
+  }
+});
+
+test("rate limit ip: behind a proxy of one's own (TRUST_PROXY_IP=1) x-real-ip counts, else the first x-forwarded-for entry, and a forged x-nf-client-connection-ip is ignored", () => {
+  configureRateLimits({ TRUST_PROXY_IP: "1" });
+  try {
+    const all = { "x-nf-client-connection-ip": "198.51.100.1", "x-real-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.3, 198.51.100.4" };
+    assert.equal(clientIp(reqFrom(all)), "198.51.100.2");
+    assert.equal(clientIp(reqFrom({ "x-nf-client-connection-ip": "198.51.100.1", "x-forwarded-for": "198.51.100.3, 198.51.100.4" })), "198.51.100.3");
+    assert.equal(clientIp(reqFrom({ "x-nf-client-connection-ip": "198.51.100.1" })), "203.0.113.9");
   } finally {
     configureRateLimits({});
   }
