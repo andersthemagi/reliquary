@@ -17,13 +17,12 @@ const clients = ["Claude", "Claude Code", "ChatGPT", "Cursor"];
 
 const ceiling = ["Approve its own change", "Change who approves what", "Add or remove people", "Reveal a secret's value", "Export or delete a vault"];
 
-// The field: 12 columns of diamonds, hollow at the left turning filled at
-// the right. Which are filled is decided by column in the stylesheet, so
-// the scatter is the same on every load. Fourteen rows fill the band's
-// height; phones show six.
-const field = html`<div class="p-field" aria-hidden="true">${raw("<i></i>".repeat(12 * 14))}</div>`;
+// The mark: the logo, masked from /logo.svg so it takes the band's brand
+// colour, as the first band's picture and, smaller, the closing's. It is
+// the one shape every small diamond on the page descends from.
+const mark = html`<div class="p-mark" aria-hidden="true"></div>`;
 
-// The rail: the field continues down the left margin, hollow at the top and
+// The rail: the mark's silhouette repeats down the left margin, hollow at the top and
 // filling as the reader passes the approval sections (scroll-driven in the
 // stylesheet, static where that isn't supported).
 const rail = html`<div class="p-rail" aria-hidden="true">${raw("<i></i>".repeat(14))}</div>`;
@@ -164,10 +163,11 @@ export function landing(theme: Theme): string {
   // as "barebones"): one typeface at two extremes, 200 for what is open and
   // 800 for what is canon, hairlines, no cards, the diamond as the only
   // picture. The first and last screens are bands inverted against the
-  // page; a field of diamonds, hollow turning filled, is the first band's
-  // ground and continues down the margin as a rail that fills with scroll.
-  // Built with the impeccable process: a concept roll (seed 19e81c4a, the
-  // owner locked "the field"), two review rounds, and every finding closed;
+  // page; the mark, big, is the first band's picture (it replaced a field
+  // of diamonds that read as a dot grid, not as a brand) and its silhouette
+  // repeats down the margin as a rail that fills with scroll.
+  // Built with the impeccable process: a concept roll (seed 19e81c4a), two
+  // review rounds, and every finding closed;
   // the mock and its captures lived in /tmp, not the repo.
   //
   // Copy history, kept because the words didn't change: the H1 states the
@@ -197,7 +197,7 @@ export function landing(theme: Theme): string {
       <p class="p-small">EU-hosted. Bring your own model. Open pre-alpha: sign up with your email. We're letting people in steadily as usage grows.</p>
       ${preAlphaNote()}
     </div>
-    ${field}
+    ${mark}
   </section>
 </header>
 
@@ -298,7 +298,7 @@ ${PRICING.show
       ${cta("Get started")}
       <p class="who-builds">Reliquary is built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>. It came out of running one vault per client as a consultant, with several AI tools and no way to keep them all honest.</p>
     </div>
-    ${field}
+    ${mark}
   </section>
   <div class="p-wrap p-footer">
     <span class="site-footer-brand"><span class="logo" aria-hidden="true"></span>${OPERATOR.brand}</span>

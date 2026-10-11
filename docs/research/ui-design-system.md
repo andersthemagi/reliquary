@@ -419,7 +419,7 @@ same meanings for the diamond, and three devices of its own:
 |---|---|
 | One typeface at two extremes | Inter 200 is what is open or provisional (the first H1 line, "What we can and can't promise", prices); 800 is what is canon (the other H1 lines, section headings, the ceiling). Display size caps at 4.75rem, tracking at -0.035em |
 | Inverted bands | The first and last screens carry the other theme's palette (`.p-inv`: dark values on the light page, light on the dark), with muted text dimmed from the band's own foreground, never a grey from the other theme. Vermilion stays on the marks only |
-| The field | The one picture: a grid of diamonds, hollow at the left turning filled at the right, as the first band's ground, mirrored in position (not in fill) in the closing. It settles once on load, the page's one motion moment. A rail of fourteen down the left margin fills with scroll (scroll-driven animation, a static fallback where unsupported) |
+| The mark | The one picture: the logo, masked from `/logo.svg` in the band's brand colour, as the first band's right column cropped by the band's edge, and smaller in the closing. It settles once on load. A rail of fourteen diamonds, its silhouette, down the left margin fills with scroll (scroll-driven animation, a static fallback where unsupported). A grid of diamonds came first and read as a dot grid, not a brand |
 
 Everything else is hairlines: ledgers for the problem and the pricing,
 rows for who it's for and the steps, no cards, no shadows, no labels above

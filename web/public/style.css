@@ -1980,12 +1980,12 @@ table.env-log td[data-label="Environment"] { white-space: nowrap; }
   overflow: hidden;
 }
 
-/* Poster: the field ------------------------------------------------------
+/* Poster: the mark ------------------------------------------------------
    One typeface at two extremes (200 is open, 800 is canon), hairlines, no
    cards, no shadows, the diamond as the only picture. The first and last
-   screens are inverted against the page. A field of diamonds is the ground
-   of the first band, hollow at left turning filled at right; it continues
-   down the page as a margin rail that fills as the reader scrolls. */
+   screens are inverted against the page. The mark, big, is the first band's
+   picture; its silhouette repeats down the page as a margin rail that fills
+   as the reader scrolls. */
 
 /* The inverted band carries its own palette: the dark theme's values when
    the page is light, the light theme's when it is dark. Muted text on it is
@@ -2065,44 +2065,32 @@ body.p-site { display: block; }
 .p-fold .prealpha-note { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
 .p-fold .prealpha-note strong { color: var(--if); }
 
-/* The field: 12 columns of diamonds, hollow on the left turning filled on
-   the right. Which ones are filled is decided by column with nth-child, so
-   the scatter is the same on every load. */
-.p-field { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5%; width: 100%; max-width: 560px; margin: 0 auto; align-self: center; }
-.p-field i { display: block; aspect-ratio: 1; transform: rotate(45deg) scale(0.62); box-shadow: inset 0 0 0 1.5px var(--ifm); opacity: 0.9; }
-.p-field i:nth-child(12n+10), .p-field i:nth-child(12n+11), .p-field i:nth-child(12n+12),
-.p-field i:nth-child(24n+21), .p-field i:nth-child(36n+32), .p-field i:nth-child(24n+8),
-.p-field i:nth-child(36n+19), .p-field i:nth-child(48n+42), .p-field i:nth-child(60n+53), .p-field i:nth-child(48n+30) {
-  box-shadow: none; background: var(--ibrand); opacity: 1;
+/* The mark: the logo masked in the band's brand colour. Below 900px it
+   closes the band under the text; above, it is the right column and runs
+   past the band's edge, cropped, the way a poster crops its image. */
+.p-mark { position: relative; min-height: 240px; margin-top: 24px; }
+.p-mark::before {
+  content: ""; position: absolute; inset: 0; background: var(--ibrand);
+  -webkit-mask: url(/logo.svg) no-repeat center / contain; mask: url(/logo.svg) no-repeat center / contain;
 }
-.p-field i:nth-child(12n+1), .p-field i:nth-child(12n+2) { opacity: 0.45; }
-.p-field i:nth-child(12n+3), .p-field i:nth-child(12n+4) { opacity: 0.65; }
-.p-field i:nth-child(12n+1) { --c: 0; } .p-field i:nth-child(12n+2) { --c: 1; } .p-field i:nth-child(12n+3) { --c: 2; }
-.p-field i:nth-child(12n+4) { --c: 3; } .p-field i:nth-child(12n+5) { --c: 4; } .p-field i:nth-child(12n+6) { --c: 5; }
-.p-field i:nth-child(12n+7) { --c: 6; } .p-field i:nth-child(12n+8) { --c: 7; } .p-field i:nth-child(12n+9) { --c: 8; }
-.p-field i:nth-child(12n+10) { --c: 9; } .p-field i:nth-child(12n+11) { --c: 10; } .p-field i:nth-child(12n+12) { --c: 11; }
-/* The one authored motion moment: the field settles once on load, column by
-   column, from a visible default, on an exponential ease-out. */
 @media (prefers-reduced-motion: no-preference) {
-  /* Only the first band settles: one authored moment, and the closing field
+  /* Only the first band settles: one authored moment, and the closing mark
      is never caught mid-settle when it scrolls into view. */
-  header .p-field i { animation: p-settle 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--c) * 55ms); }
-  @keyframes p-settle { from { opacity: 0.25; transform: rotate(45deg) scale(0.4); } }
+  header .p-mark::before { animation: p-settle 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes p-settle { from { opacity: 0; transform: scale(0.92); } }
 }
-@media (max-width: 899px) { .p-field i:nth-child(n+73) { display: none; } }
 @media (min-width: 900px) {
   .p-fold-body { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); grid-template-areas: "head field" "text field"; align-items: center; }
-  /* The H1 runs across both columns, over the field's faint left edge: the
-     type sits on the ground, which is what makes the field the ground. */
+  /* The H1 runs across both columns; the mark's left edge is far enough
+     right that the longest line clears it at every width. */
   .p-fold-head { grid-area: head; grid-column: 1 / -1; position: relative; z-index: 1; }
   .p-fold-text { grid-area: text; }
-  /* The field spans the band's height: rows share it evenly and the diamonds
-     keep a fixed size, so the grid never squeezes or overflows. */
-  .p-fold-body .p-field { grid-area: field; max-width: none; align-self: stretch; grid-auto-rows: 1fr; gap: 0; }
-  .p-fold-body .p-field i { width: 1.5rem; height: 1.5rem; aspect-ratio: auto; margin: auto; }
+  .p-fold { overflow: hidden; }
+  .p-fold-body .p-mark { grid-area: field; align-self: stretch; margin: 0; }
+  .p-fold-body .p-mark::before { inset: -4% -34% -4% 4%; -webkit-mask-position: right center; mask-position: right center; }
 }
 
-/* The rail: the field continues down the left margin on wide screens,
+/* The rail: the mark's silhouette repeats down the left margin on wide screens,
    hollow at the top and filling as the reader passes the approval sections.
    Scroll-driven where supported; a static hollow-then-filled column where
    not. */
@@ -2237,10 +2225,12 @@ body.p-site { display: block; }
 .p-close-h2 b { display: block; font-weight: 200; }
 .p-close .p-lede { max-width: 44rem; margin-top: 0; }
 .p-close .who-builds { color: var(--ifm); max-width: 44rem; }
-@media (min-width: 900px) { .p-close .p-field { justify-self: end; } }
+.p-close .p-mark { min-height: 160px; }
+@media (min-width: 900px) { .p-close .p-mark::before { inset: 10% 0 10% 30%; } }
 .p-footer { padding-block: 20px 28px; border-top: 1px solid var(--ibd); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; font-size: var(--text-sm); color: var(--ifm); }
 .p-footer .site-footer-brand { color: inherit; margin-right: auto; }
 .p-footer .footer-links { display: contents; }
 .p-footer .footer-version { color: var(--ifm); }
 .p-footer a { color: var(--ifm); padding: 4px 0; transition: color 120ms ease-out; }
 .p-footer a:hover { color: var(--if); }
+

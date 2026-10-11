@@ -100,10 +100,9 @@ test("site landing: the page brings its own frame: the inverted band carries the
   assert.match(foot, /<div class="p-wrap p-footer">[\s\S]*href="\/terms"[\s\S]*href="\/privacy"/);
 });
 
-test("site landing: the field and the rail are drawn, hidden from assistive tech, and the same in both bands", async () => {
+test("site landing: the mark and the rail are drawn and hidden from assistive tech, the mark in both bands", async () => {
   const h = await text(A, "/");
-  const fields = [...h.matchAll(/<div class="p-field" aria-hidden="true">((?:<i><\/i>)+)<\/div>/g)].map((m) => m[1].length / "<i></i>".length);
-  assert.deepEqual(fields, [168, 168], "twelve columns by fourteen rows, in the first band and the closing");
+  assert.equal(h.match(/<div class="p-mark" aria-hidden="true"><\/div>/g)?.length, 2, "the mark in the first band and the closing");
   assert.match(h, /<div class="p-rail" aria-hidden="true">(?:<i><\/i>){14}<\/div>/);
 });
 
