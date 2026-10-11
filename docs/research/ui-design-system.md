@@ -423,9 +423,11 @@ same meanings for the diamond, and three devices of its own:
 
 The copy follows the 2026-10-11 review (design roast, positioning and
 competitor research, demand research; notes in `private/research/`): the H1
-carries a stake ("There are five things they can never do"), the sub and
-lede use the reader's words (shared context, drift, review, keys) and keep
-"canon" and "proposal" off the first screen, one filled button per band,
+is the owner's line ("A secure second brain for people and their agents"),
+the key to the three marks (Proposed, Canon, Sealed) is the first thing
+under it, so every diamond on the page has its legend on the first screen,
+the works-with line is a strip of inline marks (CC0 paths from simple-icons
+where a tool publishes one; ChatGPT is its name alone), one filled button per band,
 proof beside the ceiling, one ledger instead of three, and the honest
 limits in the FAQ rather than as a pull quote.
 

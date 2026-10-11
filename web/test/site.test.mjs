@@ -69,7 +69,8 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   const r = await fetchAs(A, "/");
   assert.equal(r.status, 200);
   const h = await r.text();
-  assert.match(h, /<h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">Your agents can propose anything\.<\/span><span class="p-canon">There are five things they can never do\.<\/span><\/h1>/);
+  assert.match(h, /<h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">A secure second brain<\/span><span class="p-canon">for people and their agents\.<\/span><\/h1>/);
+  assert.match(h, /<ul class="p-key" aria-label="The three states of everything in a vault">\s*<li class="p-key-open"><strong>Proposed\.<\/strong>[^<]*<\/li>\s*<li class="p-key-canon"><strong>Canon\.<\/strong>[^<]*<\/li>\s*<li class="p-key-sealed"><strong>Sealed\.<\/strong>[^<]*<\/li>/, "the key to the three marks sits under the H1");
   assert.match(h, /Reliquary by Red Mage/);
   assert.match(h, /<h2 id="how-title">How it works<\/h2>/);
   assert.equal((h.match(/<ol class="p-steps">[\s\S]*?<\/ol>/)[0].match(/<li>/g) ?? []).length, 3, "three steps");
@@ -169,14 +170,18 @@ test("site landing: the one filled button is Create your first vault, to the sig
   assert.doesNotMatch(h, /invite-only/i);
 });
 
-test("site landing: the AI tools it works with sit under the band's buttons as text, once, no logos", async () => {
+test("site landing: the AI tools it works with sit under the band's buttons as a strip of inline marks and names, once, nothing loaded", async () => {
   const h = await text(A, "/");
-  assert.match(h, /<div class="site-cta"[\s\S]*?<\/div>\s*<p class="p-works">Works with <strong>Claude<\/strong>, <strong>Claude Code<\/strong>, <strong>ChatGPT<\/strong>, <strong>Cursor<\/strong> and any MCP client\. EU-hosted\. Free during the beta\.<\/p>/);
+  const strip = /<div class="site-cta"[\s\S]*?<\/div>\s*<p class="p-works">([\s\S]*?)<\/p>/.exec(h)?.[1] ?? "";
+  const names = [...strip.matchAll(/<span class="p-logo">(?:<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="[^"]+"\/><\/svg>)?([^<]+)<\/span>/g)].map((m) => m[1]);
+  assert.deepEqual(names, ["Claude", "Claude Code", "ChatGPT", "Cursor", "any MCP client"]);
+  assert.equal((strip.match(/<svg /g) ?? []).length, 4, "a mark for each tool that publishes one; ChatGPT is its name alone");
+  assert.match(h, /<p class="p-small">EU-hosted\. Free during the beta\.<\/p>/);
   const band = /<header class="p-inv p-fold">[\s\S]*?<\/header>/.exec(h)?.[0] ?? "";
   // The badge's title attribute carries the sentence; the visible text doesn't repeat it.
   assert.doesNotMatch(band.replace(/<[^>]+>/g, ""), /letting people in steadily|things change and may break/, "the first band says unfinished once, in the badge; the note moved to the closing");
   assert.match(h, /<footer class="p-inv p-fold p-close">[\s\S]*<p class="prealpha-note"><strong>Pre-alpha:<\/strong>/);
-  assert.equal(h.match(/Works with /g).length, 1);
+  assert.equal(h.match(/Works with</g).length, 1);
   assert.doesNotMatch(h, /<img/);
 });
 
@@ -216,7 +221,7 @@ test("site landing: pricing shows the plans and their limits, clearly marked fre
 
 test("site landing: a title, a description, Open Graph tags and the icon; indexable", async () => {
   const h = await text(A, "/");
-  assert.match(h, /<title>Reliquary by Red Mage: Your agents can propose anything\. There are five things they can never do\.<\/title>/);
+  assert.match(h, /<title>Reliquary by Red Mage: A secure second brain for people and their agents\.<\/title>/);
   assert.match(h, /<meta name="description" content="[^"]{50,}">/);
   for (const p of ["og:title", "og:description", "og:type", "og:site_name"]) assert.match(h, new RegExp(`<meta property="${p}" content="[^"]+">`), p);
   assert.match(h, new RegExp(`<meta property="og:url" content="${ORIGIN}/">`));

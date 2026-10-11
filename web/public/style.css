@@ -2055,11 +2055,23 @@ body.p-site { display: block; }
    the rotated axes, which lands them on a horizontal line on screen. */
 .p-sub { margin: 0; max-width: 32rem; font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem); line-height: 1.4; font-weight: 500; }
 .p-lede { margin: 16px 0 0; max-width: 36rem; color: var(--ifm); font-size: var(--text-md); line-height: var(--lh-md); }
+/* The key: the three states, each with its mark, as the first thing under
+   the H1. It is the legend for every diamond on the page. */
+.p-key { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: var(--text-lg); line-height: var(--lh-lg); color: var(--ifm); }
+.p-key li { position: relative; padding-left: 2.25rem; }
+.p-key strong { color: var(--if); font-weight: 600; }
+.p-key li::before { content: ""; position: absolute; left: 0.3rem; top: 0.55em; width: 0.6rem; height: 0.6rem; transform: rotate(45deg); }
+.p-key-open::before { box-shadow: inset 0 0 0 1.5px var(--ibrand); }
+.p-key-canon::before { background: var(--ibrand); }
+.p-key-sealed::before { left: 0.1rem; top: 0.72em; width: 0.28rem; height: 0.28rem; background: var(--ibrand); box-shadow: 0.36rem -0.36rem 0 0 var(--ibrand), 0.72rem -0.72rem 0 0 var(--ibrand); }
 .p-fold .site-cta { margin-top: 32px; align-items: center; }
 .site-cta-link, .p-inv .site-cta-link { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 0.25em; text-decoration-color: var(--ibds, var(--border-strong)); }
 .site-cta-link:hover { text-decoration-color: currentColor; }
-.p-works { margin: 32px 0 0; font-size: var(--text-sm); color: var(--ifm); }
-.p-works strong { color: var(--if); font-weight: 600; }
+/* The strip: each tool's mark in the band's own colour beside its name. */
+.p-works { margin: 32px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; font-size: var(--text-sm); color: var(--ifm); }
+.p-works-lead { margin-right: 0; }
+.p-logo { display: inline-flex; align-items: center; gap: 8px; color: var(--if); font-weight: 600; }
+.p-logo svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
 .p-small { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
 .p-small strong { color: var(--if); }
 .p-fold .prealpha-note { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
