@@ -2234,3 +2234,29 @@ body.p-site { display: block; }
 .p-footer a { color: var(--ifm); padding: 4px 0; transition: color 120ms ease-out; }
 .p-footer a:hover { color: var(--if); }
 
+
+/* Motion: one easing and two durations for the whole poster, so everything
+   moves the same way. Load: the first band's lines, text and mark settle in
+   order, one authored moment. Scroll: each block lifts in over its first
+   240px of entry where scroll-driven animation is supported, and is simply
+   there where not. Hover: colour and border, never size. All of it off
+   under prefers-reduced-motion. */
+.p-site { --ease: cubic-bezier(0.16, 1, 0.3, 1); --quick: 160ms; --slow: 800ms; }
+.p-site :is(a, .button, summary) { transition: color var(--quick) var(--ease), border-color var(--quick) var(--ease), background-color var(--quick) var(--ease); }
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.p-site) { scroll-behavior: smooth; }
+  header .p-h1 > span, header .p-fold-text > * { animation: p-rise var(--slow) var(--ease) both; }
+  header .p-h1 > span:nth-child(2) { animation-delay: 80ms; }
+  header .p-h1 > span:nth-child(3) { animation-delay: 160ms; }
+  header .p-fold-text > :nth-child(1) { animation-delay: 300ms; }
+  header .p-fold-text > :nth-child(2) { animation-delay: 360ms; }
+  header .p-fold-text > :nth-child(3) { animation-delay: 420ms; }
+  header .p-fold-text > :nth-child(4) { animation-delay: 480ms; }
+  header .p-fold-text > :nth-child(5) { animation-delay: 540ms; }
+  header .p-fold-text > :nth-child(6) { animation-delay: 600ms; }
+  header .p-mark::before { animation-delay: 240ms; }
+  @keyframes p-rise { from { opacity: 0; transform: translateY(14px); } }
+  @supports (animation-timeline: view()) {
+    .p-sec > *, .p-close .p-fold-body > * { animation: p-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 240px; }
+  }
+}
