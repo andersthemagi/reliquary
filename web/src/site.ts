@@ -17,6 +17,7 @@ export const OPERATOR = {
   brand: "Reliquary by Red Mage",
   tradingName: "Red Mage",
   person: "Andrés",
+  site: "https://redmage.cc",
   contactEmail: "andres@redmage.cc",
   securityEmail: "andres@redmage.cc",
   // Where the site lives when neither SITE_URL nor PUBLIC_URL is set
