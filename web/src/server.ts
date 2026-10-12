@@ -58,6 +58,7 @@ import { flushSignupNotices } from "./signups.js";
 import { BUILD, versionJson } from "./version.js";
 import { emailTemplate, selfHosted } from "./selfhost.js";
 import { welcomeLanding } from "./welcome.js";
+import { REQUEST_ACCESS, requestAccess } from "./requestaccess.js";
 import { FRESH_SIGNIN, safeNext, signinRoutes, signinUrl, SIGNIN_PATHS } from "./signin.js";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -467,7 +468,8 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     };
 
     // Sign-in pages (AUTH_MODE=supabase): reachable without a session.
-    if (MODE === "supabase" && SIGNIN_PATHS.has(url.pathname)) {
+    // Request access needs no account system, so it is mounted everywhere.
+    if ((MODE === "supabase" && SIGNIN_PATHS.has(url.pathname)) || url.pathname === REQUEST_ACCESS) {
       let signinForm = new URLSearchParams();
       if (req.method === "POST") {
         const o = originAllowed(req);
@@ -480,7 +482,9 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
         if (!posted) return;
         signinForm = posted;
       }
-      const out = await signinRoutes({ req, method: req.method ?? "", url, form: signinForm, theme, session: auth.session, ip: clientIp(req) });
+      const out = url.pathname === REQUEST_ACCESS
+        ? await requestAccess(req, req.method ?? "", signinForm, theme, clientIp(req))
+        : await signinRoutes({ req, method: req.method ?? "", url, form: signinForm, theme, session: auth.session, ip: clientIp(req) });
       if (out) {
         send(res, out.reply, {}, [...auth.cookies, ...out.cookies]);
         console.info(`${req.method} ${url.pathname} ${out.reply.redirect ? 303 : out.reply.status ?? 200}`);

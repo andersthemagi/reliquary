@@ -66,6 +66,14 @@ Invites are emailed when the site has an email sender (the hosted service does).
 
 Signup notices go out on the next page anyone opens, the new account's own first page included, or within a minute on a long-running server. Accounts that existed before signup notices shipped aren't sent.
 
+## Access requests
+
+| Subject | When | What's in it |
+|---|---|---|
+| Reliquary: access request, *address* | Someone sent the **Request access** form (`/request-access`) | Sent to the operator of the site only, at once: the address, the name if given, the country they're based in, and the note. Replying answers the person who asked. It says how to let them in: invite the address to a vault, which makes their account and admits it. |
+
+If the request can't be sent, the form says why, with a reference, keeps what was typed, and gives the operator's address to write to instead.
+
 ## On a self-hosted instance
 
-The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites). Feedback and signup notices go to the address in `FEEDBACK_EMAIL`, the instance's own operator; with none set, none are sent.
+The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites). Feedback and signup notices, and access requests, go to the address in `FEEDBACK_EMAIL`, the instance's own operator; with none set, none are sent.

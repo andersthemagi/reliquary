@@ -133,7 +133,7 @@ after(async () => {
 
 test("sign-in: while invite-only, the page says so, what an invite does, and how to request access", async () => {
   const h = await (await get("/signin", new Jar())).text();
-  assert.match(h, /<p class="hint">Reliquary is invite-only\. Anyone can sign in, but an account creates vaults only after it joins one by invite\. Have an invite\? Open its link\. Otherwise, <a href="mailto:[^"?]+\?subject=Reliquary%20early%20access">request access<\/a>\.<\/p>/);
+  assert.match(h, /<p class="hint">Reliquary is invite-only\. Anyone can sign in, but an account creates vaults only after it joins one by invite\. Have an invite\? Open its link\. Otherwise, <a href="\/request-access">request access<\/a>\.<\/p>/);
   assert.match(h, /<a href="[^"]*\/docs">About Reliquary<\/a>/);
 });
 

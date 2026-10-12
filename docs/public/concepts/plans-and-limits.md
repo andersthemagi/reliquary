@@ -4,14 +4,16 @@ Your account's plan limits how many vaults you own. Each vault's tier limits how
 
 ## Who can create vaults
 
-Reliquary is an open alpha: anyone can make an account by signing in with their email. We're letting people in steadily as usage grows, so a new account may wait a while before it can create vaults. It joins a line once its email address is confirmed (the first time you sign in), and the front of the line is let in a few accounts a day. **New vault** and **Plan and usage** show your place in line. If it's taking too long, email andres@redmage.cc.
+Reliquary is in a closed alpha. To try it, use **Request access** on the website (`/request-access` in the web app): give your email, the country you're based in, and a few words about your team and the AI tools you use, and the operator replies to set up your first vault with you. The request is emailed to the operator and isn't stored. One network can send 5 requests an hour.
+
+An account made by signing in without an invite may wait a while before it can create vaults. It joins a line once its email address is confirmed (the first time you sign in), and the front of the line is let in a few accounts a day. **New vault** and **Plan and usage** show your place in line. If it's taking too long, email andres@redmage.cc.
 
 An account doesn't wait, and can create vaults at once, when:
 
 - it opens an invite link and joins a vault (any invite, from anyone), or
 - the operator puts it on a plan, or admits it.
 
-The operator can make Reliquary invite-only again, for example during a surge. Then sign-in makes new accounts only for invite links, the line stops moving, and an account creates vaults only once it is admitted in one of the ways above. Accounts already let in stay in. The sign-in page says which way Reliquary is working. Without an invite while it's invite-only, use the page's **request access** link to ask the operator.
+The operator can make Reliquary invite-only again, for example during a surge. Then sign-in makes new accounts only for invite links, the line stops moving, and an account creates vaults only once it is admitted in one of the ways above. Accounts already let in stay in. The sign-in page says which way Reliquary is working. Without an invite while it's invite-only, use the page's **request access** link to ask the operator: it opens the same form.
 
 An account that can't create vaults yet belongs to no vault, so it sees nothing. **New vault** and **Plan and usage** say so (New vault shows no form), and creating a vault is refused with the reason (code `RLP02`), for the person and for their agent's `create_vault` alike. Over MCP the refusal reads `Not admitted:` and the message.
 
