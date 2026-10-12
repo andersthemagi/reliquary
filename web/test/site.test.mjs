@@ -106,8 +106,8 @@ test("site landing: the hub, the mark and the rail are drawn; the hub in the fir
   assert.ok(hub, "the hub is in the first band");
   assert.ok(h.indexOf('<figure class="p-hub"') < h.indexOf("</header>"));
   const tools = [...(/<ul class="p-hub-side p-hub-tools" aria-label="AI tools">([\s\S]*?)<\/ul>/.exec(hub)?.[1] ?? "").matchAll(/<li>(?:<svg [^>]*><path d="[^"]+"\/><\/svg>)?([^<]+)<\/li>/g)].map((m) => m[1]);
-  assert.deepEqual(tools, ["Claude", "Claude Code", "ChatGPT", "Cursor", "any MCP client"]);
-  assert.equal((hub.match(/<svg /g) ?? []).length, 4, "a mark for each tool that publishes one; ChatGPT is its name alone");
+  assert.deepEqual(tools, ["Claude", "ChatGPT", "Cursor", "VS Code", "any MCP client"]);
+  assert.equal((hub.match(/<svg /g) ?? []).length, 3, "a mark for each tool that publishes one; ChatGPT and VS Code are names alone");
   assert.match(hub, /<ul class="p-hub-side p-hub-people" aria-label="People">\s*<li>You<\/li><li>Your team<\/li><li>The client<\/li>/);
   assert.match(hub, /<div class="p-hub-link p-hub-propose" aria-hidden="true"><i><\/i><span>propose<\/span><\/div>[\s\S]*<div class="p-hub-vault"><span class="p-hub-mark" aria-hidden="true"><\/span><strong>One vault<\/strong>[\s\S]*<div class="p-hub-link p-hub-approve" aria-hidden="true"><i><\/i><span>approve<\/span><\/div>/, "tools propose into the vault, people approve");
   assert.equal(h.match(/<div class="p-mark" aria-hidden="true"><\/div>/g)?.length, 1, "the mark closes the page");
@@ -184,7 +184,7 @@ test("site landing: the one filled button is Join the alpha test, to the sign-in
 test("site landing: each AI tool is named once, in the hub, and the band says what is free and public without an EU claim", async () => {
   const h = await text(A, "/");
   const band = /<header class="p-inv p-fold">[\s\S]*?<\/header>/.exec(h)?.[0] ?? "";
-  for (const tool of ["Claude Code", "ChatGPT", "Cursor"]) assert.equal(band.match(new RegExp(`>${tool}<`, "g"))?.length, 1, tool);
+  for (const tool of ["Claude", "ChatGPT", "Cursor", "VS Code"]) assert.equal(band.match(new RegExp(`>${tool}<`, "g"))?.length, 1, tool);
   assert.match(band, /<p class="p-small">Works with any MCP client\. The code is public and it's free for everyone during the alpha\. Self-host it if you'd rather\.<\/p>/);
   assert.doesNotMatch(h, /EU-hosted|hosted in the EU|Frankfurt/, "no hosting-region claim: the app runs on Netlify");
   // The badge's title attribute carries the sentence; the visible text doesn't repeat it.

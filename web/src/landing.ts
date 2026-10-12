@@ -16,7 +16,8 @@ const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
 
 // The AI tools people scan for, likeliest first, each with its mark where
 // one is published under CC0 (simple-icons; Claude, Cursor and MCP are).
-// OpenAI publishes no reusable mark, so ChatGPT is its name alone. The
+// OpenAI and Microsoft publish no reusable mark, so ChatGPT and VS Code are
+// names alone. Claude Code isn't listed: naming Claude says it. The
 // marks are inline paths in the band's own colour: nothing loads from
 // elsewhere, and the names stay for anyone who can't see them. They are
 // the hub's left side, so the page names each tool once.
@@ -26,7 +27,7 @@ const marks = {
   cursor: icon("M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"),
   mcp: icon("M13.85 0a4.16 4.16 0 0 0-2.95 1.217L1.456 10.66a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l9.442-9.442a2.49 2.49 0 0 1 3.541 0 2.49 2.49 0 0 1 0 3.541L8.59 12.97l-.1.1a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l.1-.098 7.03-7.034a2.49 2.49 0 0 1 3.542 0l.049.05a2.49 2.49 0 0 1 0 3.54l-8.54 8.54a1.96 1.96 0 0 0 0 2.755l1.753 1.753a.835.835 0 0 0 1.18 0 .835.835 0 0 0 0-1.18l-1.753-1.753a.266.266 0 0 1 0-.394l8.54-8.54a4.185 4.185 0 0 0 0-5.9l-.05-.05a4.16 4.16 0 0 0-2.95-1.218c-.2 0-.401.02-.6.048a4.17 4.17 0 0 0-1.17-3.552A4.16 4.16 0 0 0 13.85 0m0 3.333a.84.84 0 0 0-.59.245L6.275 10.56a4.186 4.186 0 0 0 0 5.902 4.186 4.186 0 0 0 5.902 0L19.16 9.48a.835.835 0 0 0 0-1.18.835.835 0 0 0-1.18 0l-6.985 6.984a2.49 2.49 0 0 1-3.54 0 2.49 2.49 0 0 1 0-3.54l6.983-6.985a.835.835 0 0 0 0-1.18.84.84 0 0 0-.59-.245"),
 };
-const clients: Array<[string, Raw | null]> = [["Claude", marks.claude], ["Claude Code", marks.claude], ["ChatGPT", null], ["Cursor", marks.cursor], ["any MCP client", marks.mcp]];
+const clients: Array<[string, Raw | null]> = [["Claude", marks.claude], ["ChatGPT", null], ["Cursor", marks.cursor], ["VS Code", null], ["any MCP client", marks.mcp]];
 // The hub: what Reliquary is, drawn. AI tools on one side, the people on
 // the other, the vault between them with the mark in it. Hollow diamonds
 // sit on the tools' side (they propose), filled on the people's (they
