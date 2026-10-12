@@ -157,7 +157,7 @@ const TYPES: Record<string, string> = {
 };
 const STATIC = new Map<string, { type: string; body: Buffer }>();
 const fonts = existsSync(join(PUBLIC, "fonts")) ? readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`) : [];
-for (const rel of ["style.css", "favicon.svg", "og.png", ...fonts]) {
+for (const rel of ["style.css", "favicon.svg", "logo.svg", "apple-touch-icon.png", "og.png", ...fonts]) {
   const type = TYPES[rel.split(".").pop() ?? ""];
   if (type && existsSync(join(PUBLIC, rel))) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
 }

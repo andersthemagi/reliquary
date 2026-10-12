@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/brand/logo.svg" alt="" width="120"></p>
+
 # Reliquary
 
 [![test](https://github.com/andersthemagi/reliquary/actions/workflows/test.yml/badge.svg)](https://github.com/andersthemagi/reliquary/actions/workflows/test.yml)
