@@ -1416,23 +1416,6 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 }
 @media (max-width: 400px) { .site-menu-closed, .site-menu[open] .site-menu-opened { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
 
-/* Phones: calls to action stack full width (one thumb, one target each),
-   and the poster's spacing comes down to the screen. */
-@media (max-width: 599px) {
-  .site-cta, .p-fold .site-cta { flex-direction: column; align-items: stretch; gap: 8px; }
-  .site-cta .button { justify-content: center; min-height: 48px; }
-  .site-cta .site-cta-link { display: flex; align-items: center; justify-content: center; min-height: 44px; }
-  .hero-card-actions > span { flex: 1 1 100%; }
-  .hero-card-actions label.button { width: 100%; justify-content: center; min-height: 44px; }
-  .p-fold-body { gap: 32px; padding-block: 24px 40px; }
-  .p-sec { padding-top: 64px; }
-  .p-sec h2 { margin-bottom: 24px; }
-  .p-ceiling li { grid-template-columns: 1.5rem minmax(0, 1fr); gap: 12px; padding: 14px 0; }
-  .p-frame figcaption { padding: 12px 16px; }
-  .p-close { margin-top: 64px; }
-  .p-close .p-fold-body { padding-block: 48px 40px; }
-}
-
 /* Docs (web/src/docs.ts): sidebar, article, on-page contents. No script:
    the phone menu is a <details>, like the vault sidebar. ------------------- */
 
@@ -2346,4 +2329,22 @@ body.p-site { display: block; }
   @supports (animation-timeline: view()) {
     .p-sec > *, .p-close .p-fold-body > * { animation: p-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 240px; }
   }
+}
+
+/* Phones: calls to action stack full width (one thumb, one target each),
+   and the poster's spacing comes down to the screen. Last in the file: these
+   override the poster's own rules above, at the same specificity. */
+@media (max-width: 599px) {
+  .site-cta, .p-fold .site-cta { flex-direction: column; align-items: stretch; gap: 8px; }
+  .site-cta .button { justify-content: center; min-height: 48px; }
+  .site-cta .site-cta-link { display: flex; align-items: center; justify-content: center; min-height: 44px; }
+  .hero-card-actions > span { flex: 1 1 100%; }
+  .hero-card-actions label.button { width: 100%; justify-content: center; min-height: 44px; }
+  .p-fold-body { gap: 32px; padding-block: 24px 40px; }
+  .p-sec { padding-top: 64px; }
+  .p-sec h2 { margin-bottom: 24px; }
+  .p-ceiling li { grid-template-columns: 1.5rem minmax(0, 1fr); gap: 12px; padding: 14px 0; }
+  .p-frame figcaption { padding: 12px 16px; }
+  .p-close { margin-top: 64px; }
+  .p-close .p-fold-body { padding-block: 48px 40px; }
 }
