@@ -9,7 +9,8 @@
 // here: `/` is Home for a signed-in person, so server.ts decides.
 
 import { docsPaths, docsRoute } from "./docs.js";
-import { html, type Raw, type Theme } from "./html.js";
+import { ALPHA, html, type Raw, type Theme } from "./html.js";
+import { BUILD } from "./version.js";
 import { OPERATOR, draftNote, fill, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
 
 const mail = (addr: string) => html`<a href="mailto:${addr}">${addr}</a>`;
@@ -246,8 +247,11 @@ function subprocessors(theme: Theme): string {
 // Security ------------------------------------------------------------------------
 
 function security(theme: Theme): string {
-  return legalPage(theme, "/security", "Security", "How Reliquary by Red Mage protects vaults: access enforced in the database, hostile tests on every push, encrypted variables, EU hosting, and what we can't promise.", html`
+  return legalPage(theme, "/security", "Security", "How Reliquary by Red Mage protects vaults: access enforced in the database, hostile tests on every push, encrypted variables, where it runs, and what we can't promise.", html`
 <p class="lede">What protects your vaults, what doesn't, and how to report a problem.</p>
+
+<h2 id="status">Status</h2>
+<p>${ALPHA} This page is built from the same code as the running release${BUILD.version === "unknown" ? "" : html`, v${BUILD.version}`}, so it changes when a release does. <a href="/docs/changelog">The changelog</a> says what changed in each one.</p>
 
 <h2>The database enforces access</h2>
 <p>Every permission is a Postgres row-level security policy or trigger, not a check in the app that a bug could skip. Among them:</p>

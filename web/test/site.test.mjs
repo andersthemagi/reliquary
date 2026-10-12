@@ -324,6 +324,13 @@ test("site legal: the security page states the caveats plainly and how to report
   assert.match(h, /<h2 id="disclosure">Reporting a vulnerability<\/h2>[\s\S]*?mailto:andres@redmage\.cc/);
 });
 
+test("site legal: the security page states the current stage and the release it describes", async () => {
+  const h = await text(A, "/security");
+  assert.match(h, /<h2 id="status">Status<\/h2>\s*<p>Alpha: things change and may break; data is backed up daily\. This page is built from the same code as the running release(, v\d+\.\d+\.\d+)?, so it changes when a release does\./);
+  assert.match(h, /<a href="\/docs\/changelog">The changelog<\/a>/);
+  assert.doesNotMatch(h, /EU hosting/);
+});
+
 test("site legal: a POST to a legal page is not served as the page", async () => {
   const r = await fetch(A + "/terms", { method: "POST", redirect: "manual", headers: { origin: ORIGIN } });
   assert.notEqual(r.status, 200);
