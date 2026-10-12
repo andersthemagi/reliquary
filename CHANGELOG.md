@@ -8,6 +8,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.19.1](https://github.com/andersthemagi/reliquary/compare/v0.19.0...v0.19.1) (2026-10-12)
 
+On a phone, the landing's hero and closing buttons now stack full width and the section spacing tightens, as 0.19.0 intended. No database changes.
+
 
 ### Bug fixes
 
