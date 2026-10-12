@@ -9,6 +9,18 @@ of a PR that doesn't fit where the project is headed.
 Looking for somewhere to start? Issues labelled
 [good first issue](https://github.com/andersthemagi/reliquary/labels/good%20first%20issue)
 are small and self-contained, each saying where to start and how to check it.
+Comment on one to take it.
+
+## Ideas and reports
+
+Have an idea? Suggest it with the [feature template](https://github.com/andersthemagi/reliquary/issues/new?template=feature.yml).
+Describe the job you're trying to do, not just the solution. A new
+suggestion starts as **Considering** on the [roadmap](https://reliquary.redmage.cc/roadmap).
+The maintainer replies on the issue and either moves it to **Planned** or
+says why not. Once it's Planned, anyone can build it, you included. Say on
+the issue that you're taking it, so two people don't build the same thing.
+Please wait for Planned before writing code: a Considering idea can still
+change shape or be turned down.
 
 Bug reports, feature suggestions and feedback are always welcome, whether
 or not you plan to write code yourself. One issue, one problem: if a
@@ -44,8 +56,10 @@ TEST_SLOT=8 ./test.sh                        # when another run holds your ports
 `TEST_SLOT` moves every container name and port. A run uses its slot and the
 next three, so pick a base at least four away from any run already going
 (two worktrees at once, for example). The `sql`, `web` and `cli` suites have
-no per-file switch, and there is no linter: `tsc` runs inside each suite's
-build and is the only static check.
+no per-file switch. TypeScript has no linter: `tsc` runs inside each suite's
+build and is its only static check. CI's `lint` workflow runs actionlint on
+the workflows and shellcheck on the scripts (settings in `.shellcheckrc`);
+run `git ls-files -z '*.sh' | xargs -0 shellcheck` before pushing a script.
 
 To see a change running, `./mcp/dev.sh up` starts Postgres, the MCP server
 and the web UI (`http://127.0.0.1:8790`); `./mcp/dev.sh ui` opens it signed
