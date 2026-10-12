@@ -2066,6 +2066,18 @@ body.p-site { display: block; }
 .p-top nav a:hover { color: var(--if); border-bottom-color: var(--if); }
 @media (max-width: 719px) { .p-top { gap: 12px; } }
 
+/* The GitHub link: one shape wherever it sits, the stars split off by a hairline. */
+.p-gh { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 1px solid var(--ibds, var(--border-strong)); border-radius: 999px; color: inherit; font-size: var(--text-sm); font-weight: 600; text-decoration: none; transition: border-color 120ms ease-out; }
+.p-site a.p-gh, .p-inv a.p-gh { color: var(--if, var(--fg)); text-decoration: none; }
+.p-gh:hover { border-color: currentColor; }
+.p-gh svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+.p-gh-stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 8px; border-left: 1px solid var(--ibds, var(--border-strong)); font-variant-numeric: tabular-nums; }
+.p-gh-stars svg { width: 13px; height: 13px; }
+.p-fold-text > .p-gh, .p-why .p-gh { margin-top: 16px; }
+.p-top .p-gh { flex: none; }
+/* On a phone the top bar keeps the mark and the count; the name stays for screen readers. */
+@media (max-width: 719px) { .p-top .p-gh > span:not(.p-gh-stars) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
+
 /* First screen ------------------------------------------------------------ */
 .p-fold { min-height: min(100svh, 960px); display: flex; flex-direction: column; position: relative; }
 /* Flex items with auto margins are not stretched, so the wrap says so. */

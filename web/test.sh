@@ -105,14 +105,14 @@ session_secret=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
 for inst in "$auth_a:$auth_a_port" "$auth_b:$auth_b_port"; do
   "$engine" run -d --name "${inst%%:*}" --network host -v "$PWD":/app:Z -w /app \
     -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
-    -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
+    -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e GITHUB_API_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
     -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e RATE_LIMIT_SCALE=1000 -e PORT="${inst##*:}" "$node" node dist/server.js >/dev/null
 done
 wait_until "$auth_a" "supabase-mode server A to answer /healthz" curl -sf "http://127.0.0.1:$auth_a_port/healthz"
 wait_until "$auth_b" "supabase-mode server B to answer /healthz" curl -sf "http://127.0.0.1:$auth_b_port/healthz"
 "$engine" run -d --name "$split" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
-  -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
+  -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e GITHUB_API_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
   -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$split_app_url" -e SITE_URL="$split_site_url" \
   -e RATE_LIMIT_SCALE=1000 -e PORT=$split_port "$node" node dist/server.js >/dev/null
 # Asked as the app host: on the site host /healthz is a redirect.
@@ -126,7 +126,7 @@ rl_limits="$rl_limits,oauth_revoke_ip=2/600,oauth_revoke_client=3/600,cimd_fetch
 rl_limits="$rl_limits,env_grant_minute=2/60,web_write_minute=3/60"
 "$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/ratelimits" \
-  -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
+  -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e GITHUB_API_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
   -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e CIMD_ALLOW_LOOPBACK=1 \
   -e TRUST_PROXY_IP=1 -e RATE_LIMITS="$rl_limits" -e PORT=$rl_port "$node" node dist/server.js >/dev/null
 wait_until "$rl" "the rate-limit server to answer /healthz" curl -sf "http://127.0.0.1:$rl_port/healthz"

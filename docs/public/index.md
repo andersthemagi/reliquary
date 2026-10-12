@@ -24,6 +24,7 @@ Reliquary is in alpha: things change and may break; data is backed up daily. See
 - The web app: `https://app.reliquary.redmage.cc`. Sign in with your email; invites are how people join. Its OAuth sign-in for agents and the CLI lives there too.
 - The website and these docs: `https://reliquary.redmage.cc`, with the docs at `/docs`; `/roadmap` goes to the roadmap board. **Sign in** there takes you to the web app.
 - The MCP URL: `https://mcp.reliquary.redmage.cc/mcp`. Your Connect page in the web app always shows the one to use.
+- The code: `https://github.com/andersthemagi/reliquary`, linked from the website with its star count. The server is under the Functional Source License and the CLI is MIT; to run your own, see [Self-host Reliquary](how-to/self-host.md).
 - The CLI: `npx @reliquary-ai/cli`, or install it with `npm install -g @reliquary-ai/cli` and run `reliquary`.
 - In the web app: what needs you in the **Inbox**, search across your vaults, and your display name, theme and tokens in the account menu, all in the top bar. See [The top bar, inbox and account](concepts/inbox-and-account.md).
 

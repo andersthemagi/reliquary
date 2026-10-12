@@ -135,6 +135,8 @@ http
 
     if (p === "/_last_email") return json(res, 200, lastEmail.get(url.searchParams.get("email")) ?? null);
     if (p === "/_stats") return json(res, 200, stats);
+    // GitHub's API, for the landing page's star count (GITHUB_API_URL).
+    if (p === "/repos/andersthemagi/reliquary") return json(res, 200, { stargazers_count: 1234 });
     if (p === "/_jwks") return json(res, 200, { keys: [JWK] });
     if (p === "/_signups" && req.method === "POST") {
       signups.on = (await readJson(req)).on === true;
