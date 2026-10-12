@@ -6,6 +6,14 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.22.0](https://github.com/andersthemagi/reliquary/compare/v0.21.0...v0.22.0) (2026-10-12)
+
+Reliquary's alpha is closed, and the site now says so. The landing page's button is Request access: a short form (email, country, a note on your team and AI tools) that goes to the operator, who replies with an invite. Sign in stays for people who already have an account or an invite. No database changes.
+
+### Features
+
+* **web:** request access through a form instead of open sign-up ([#313](https://github.com/andersthemagi/reliquary/issues/313)) ([700b247](https://github.com/andersthemagi/reliquary/commit/700b247ef38274b058a0223e631b3a601cf20dcc))
+
 ## [0.21.0](https://github.com/andersthemagi/reliquary/compare/v0.20.0...v0.21.0) (2026-10-12)
 
 The landing page links the code on GitHub, with its star count, in the top bar, the hero, Source available, the closing and the footer; the server reads the count from GitHub and leaves it off when GitHub does not answer. The link preview image shows the current tagline. No database changes.
