@@ -9,9 +9,10 @@ import { OPERATOR, PRICING, requestAccessHref, siteNav, sitePage } from "./site.
 
 // One filled button: the secondary is a link, so the primary reads as the
 // primary (the 2026-10-11 review: two bordered buttons of equal weight
-// made Sign up look like the second choice).
+// made Sign up look like the second choice). Request access, not sign-up:
+// the alpha is closed, so an account made here would only wait (#312).
 const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
-  <a class="button primary" href="${appHref("/signin")}">Join the alpha test</a>
+  <a class="button primary" href="${appHref("/request-access")}">Request access</a>
   <a class="site-cta-link" href="#how">See how it works</a>
 </div>`;
 
@@ -348,7 +349,7 @@ ${PRICING.show
   <section class="p-wrap p-fold-body" aria-labelledby="closing-title">
     <h2 class="p-close-h2 p-fold-head" id="closing-title"><b>Try it on</b> your next project.</h2>
     <div class="p-fold-text">
-      <p class="p-lede">Reliquary is in open alpha: sign up with your email and create a vault. It's free while we build, the code is public, and you can self-host. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
+      <p class="p-lede">Reliquary is in a closed alpha. Request access, tell us about your team and the AI tools you use, and we'll reply to set up your first vault with you. It's free while we build, the code is public, and you can self-host. Already have an account or an invite? <a href="${appHref("/signin")}">Sign in</a>.</p>
       ${cta("Get started")}
       ${github(stars, "Read the code on GitHub")}
       ${alphaNote()}
