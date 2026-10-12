@@ -71,8 +71,11 @@ const rail = html`<div class="p-rail" aria-hidden="true">${raw("<i></i>".repeat(
 // Open to filled Canon and adds the log line; Request changes shows the
 // note field the product shows. The radios stay in the page whatever the
 // state (only their labels come and go), so the group is one Tab stop, the
-// arrow keys move between them and focus never lands on nothing; the caption
-// says which state the card is in, for people who can't see it change. A
+// arrow keys move between them and focus never lands on nothing. Each radio
+// carries its own name and points at its state's caption line, because its
+// visible label may be hidden and a live region whose children CSS shows and
+// hides is announced unreliably; a screen reader reads the result as the
+// arrow key checks the radio. A
 // browser without :has() shows the open state, which is today's card.
 // Nothing is sent anywhere: the page has no script and the card no form.
 const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-cap">
@@ -96,17 +99,17 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
   </div>
   <fieldset class="hero-card-actions">
     <legend class="sr-only">Decide on the proposal. A demo: nothing is saved.</legend>
-    <input type="radio" name="demo" id="demo-approve" value="approve" class="sr-only">
-    <input type="radio" name="demo" id="demo-changes" value="changes" class="sr-only">
-    <input type="radio" name="demo" id="demo-open" value="open" class="sr-only" checked>
+    <input type="radio" name="demo" id="demo-approve" value="approve" class="sr-only" aria-label="Approve" aria-describedby="cap-approved">
+    <input type="radio" name="demo" id="demo-changes" value="changes" class="sr-only" aria-label="Request changes" aria-describedby="cap-changes">
+    <input type="radio" name="demo" id="demo-open" value="open" class="sr-only" aria-label="Start over" aria-describedby="cap-open" checked>
     <span data-when="open changes"><label class="button primary" for="demo-approve">Approve</label></span>
     <span data-when="open"><label class="button" for="demo-changes">Request changes</label></span>
     <span data-when="approved changes"><label class="hero-reset" for="demo-open">Start over</label></span>
   </fieldset>
-  <figcaption id="hero-card-cap" aria-live="polite">
-    <span data-when="open">An agent proposes a change to canon. It lands only when a person approves. Try it: nothing is saved.</span>
-    <span data-when="approved">Approved: <code>brief.md</code> now says "Deploy to: eu-production", and the log records who approved it and when.</span>
-    <span data-when="changes">Changes requested: the proposal stays open, and the agent gets your note.</span>
+  <figcaption id="hero-card-cap">
+    <span id="cap-open" data-when="open">An agent proposes a change to canon. It lands only when a person approves. Try it: nothing is saved.</span>
+    <span id="cap-approved" data-when="approved">Approved: <code>brief.md</code> now says "Deploy to: eu-production", and the log records who approved it and when.</span>
+    <span id="cap-changes" data-when="changes">Changes requested: the proposal stays open, and the agent gets your note.</span>
   </figcaption>
 </figure>`;
 

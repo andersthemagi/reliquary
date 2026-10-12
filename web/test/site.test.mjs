@@ -129,9 +129,11 @@ test("site landing: the demo card works without a script: a radio group decides 
   const card = /<section class="p-sec" id="how"[\s\S]*?<figure class="p-frame" aria-labelledby="frame-review-cap">[\s\S]*?(<figure class="hero-card"[\s\S]*?<\/figure>)/.exec(h)?.[1];
   assert.ok(card, "the card sits in a frame in How it works");
   assert.doesNotMatch(card, /<button|<form|<script|on[a-z]+=/i);
-  const radios = [...card.matchAll(/<input type="radio" name="demo" id="demo-[a-z]+" value="([a-z]+)" class="sr-only"( checked)?>/g)];
+  const radios = [...card.matchAll(/<input type="radio" name="demo" id="demo-[a-z]+" value="([a-z]+)" class="sr-only" aria-label="([^"]+)" aria-describedby="(cap-[a-z]+)"( checked)?>/g)];
   assert.deepEqual(radios.map((m) => m[1]), ["approve", "changes", "open"]);
-  assert.deepEqual(radios.filter((m) => m[2]).map((m) => m[1]), ["open"], "open by default");
+  assert.deepEqual(radios.filter((m) => m[4]).map((m) => m[1]), ["open"], "open by default");
+  // Each radio is named whether or not its visible label is shown, and names the visible label's words.
+  assert.deepEqual(radios.map((m) => m[2]), ["Approve", "Request changes", "Start over"]);
   assert.match(card, /<legend class="sr-only">Decide on the proposal\. A demo: nothing is saved\.<\/legend>/);
   assert.match(card, /<label class="button primary" for="demo-approve">Approve<\/label>/);
   assert.match(card, /<label class="button" for="demo-changes">Request changes<\/label>/);
@@ -145,9 +147,10 @@ test("site landing: the demo card works without a script: a radio group decides 
   assert.match(card, /<p class="hero-log" data-when="approved" aria-hidden="true">Approved by <strong>you<\/strong> · just now<\/p>/);
   // Changes requested: the note field, labelled.
   assert.match(card, /<div class="hero-note" data-when="changes">\s*<label for="demo-note">Note for Claude Code<\/label>\s*<textarea id="demo-note" class="note-field"/);
-  // The caption names the state, for people who can't see it change.
-  const cap = /<figcaption id="hero-card-cap" aria-live="polite">([\s\S]*?)<\/figcaption>/.exec(card)?.[1] ?? "";
-  for (const state of ["open", "approved", "changes"]) assert.match(cap, new RegExp(`<span data-when="${state}">`), state);
+  // The caption names the state, and each radio is described by its state's line, for people who can't see it change.
+  const cap = /<figcaption id="hero-card-cap">([\s\S]*?)<\/figcaption>/.exec(card)?.[1] ?? "";
+  for (const state of ["open", "approved", "changes"]) assert.match(cap, new RegExp(`<span id="cap-${state}" data-when="${state}">`), state);
+  assert.deepEqual(radios.map((m) => m[3]), ["cap-approved", "cap-changes", "cap-open"]);
 });
 
 test("site landing: the two frames say they are drawings, without claiming to be screenshots, and the terminal never shows a value", async () => {
