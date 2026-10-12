@@ -27,26 +27,50 @@ const ceilingFigure = html`<figure class="hero-ceiling" aria-labelledby="ceiling
   <figcaption class="canon-line">Enforced in the database, not the prompt. Tested on every push. <a href="/security">How security works</a></figcaption>
 </figure>`;
 
-// A static picture of the product's core loop, drawn in HTML: an agent's
-// proposal waiting for a person. Decorative; the steps below say the same.
-// Its buttons are spans, hidden from assistive tech and inert, so nothing
-// on it can be focused or mistaken for a control.
+// The product's core loop, drawn in HTML, and workable without a script
+// (#256, direction B): three radios in one group hold the state, and the
+// stylesheet's :has() shows the open, approved or changes-requested view.
+// Approve resolves the diff into canon text, flips the badge from hollow
+// Open to filled Canon and adds the log line; Request changes shows the
+// note field the product shows. The radios stay in the page whatever the
+// state (only their labels come and go), so the group is one Tab stop, the
+// arrow keys move between them and focus never lands on nothing; the caption
+// says which state the card is in, for people who can't see it change. A
+// browser without :has() shows the open state, which is today's card.
+// Nothing is sent anywhere: the page has no script and the card no form.
 const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-cap">
   <div class="hero-card-head">
-    <span class="badge info">Open</span>
+    <span data-when="open changes"><span class="policy open badge">Open</span></span>
+    <span data-when="approved"><span class="policy canon badge">Canon</span></span>
     <span class="hero-card-path">brief.md</span>
-    <span class="policy canon badge">Canon</span>
   </div>
-  <p class="hero-card-meta">Proposed by <strong>Claude Code</strong> for Ana · needs 1 approval</p>
-  <div class="hero-diff" aria-hidden="true">
+  <p class="hero-card-meta">Proposed by <strong>Claude Code</strong> for Ana · <code>brief.md</code> is canon<span data-when="open changes"> · needs 1 approval</span></p>
+  <div class="hero-diff" data-when="open changes" aria-hidden="true">
     <div class="del"><span>−</span>Deploy to: staging</div>
     <div class="add"><span>+</span>Deploy to: eu-production</div>
   </div>
-  <div class="hero-card-actions" aria-hidden="true" inert>
-    <span class="button primary">Approve</span>
-    <span class="button">Request changes</span>
+  <div class="hero-diff hero-canon" data-when="approved" aria-hidden="true">
+    <div><span></span>Deploy to: eu-production</div>
   </div>
-  <figcaption id="hero-card-cap">An agent proposes a change to canon. It lands only when a person approves.</figcaption>
+  <p class="hero-log" data-when="approved" aria-hidden="true">Approved by <strong>you</strong> · just now</p>
+  <div class="hero-note" data-when="changes">
+    <label for="demo-note">Note for Claude Code</label>
+    <textarea id="demo-note" class="note-field" rows="2" placeholder="Staging first; production after the client signs off."></textarea>
+  </div>
+  <fieldset class="hero-card-actions">
+    <legend class="sr-only">Decide on the proposal. A demo: nothing is saved.</legend>
+    <input type="radio" name="demo" id="demo-approve" value="approve" class="sr-only">
+    <input type="radio" name="demo" id="demo-changes" value="changes" class="sr-only">
+    <input type="radio" name="demo" id="demo-open" value="open" class="sr-only" checked>
+    <span data-when="open changes"><label class="button primary" for="demo-approve">Approve</label></span>
+    <span data-when="open"><label class="button" for="demo-changes">Request changes</label></span>
+    <span data-when="approved changes"><label class="hero-reset" for="demo-open">Start over</label></span>
+  </fieldset>
+  <figcaption id="hero-card-cap" aria-live="polite">
+    <span data-when="open">An agent proposes a change to canon. It lands only when a person approves. Try it: nothing is saved.</span>
+    <span data-when="approved">Approved: <code>brief.md</code> now says "Deploy to: eu-production", and the log records who approved it and when.</span>
+    <span data-when="changes">Changes requested: the proposal stays open, and the agent gets your note.</span>
+  </figcaption>
 </figure>`;
 
 const steps: Array<[string, Raw]> = [

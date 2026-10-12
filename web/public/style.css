@@ -1280,9 +1280,31 @@ body.site { font-variant-numeric: normal; }
 .hero-diff span { display: inline-block; width: 1.5ch; color: var(--fg-muted); }
 .hero-diff .del { background: var(--diff-del); }
 .hero-diff .add { background: var(--diff-add); }
-.hero-card-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.hero-card-actions .button { pointer-events: none; cursor: default; }
+.hero-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; padding: 0; border: 0; }
+.hero-card-actions label { cursor: pointer; }
+/* The ring goes on the group, not the label: the checked radio's label may
+   be hidden in the state it just chose, and the group is always there. */
+.hero-card-actions:has(> input:focus-visible) { outline: 2px solid var(--link); outline-offset: 4px; border-radius: var(--radius-md); }
+.hero-reset { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); text-decoration: underline; text-underline-offset: 0.2em; }
 .hero-card figcaption { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); border-top: 1px solid var(--border); padding-top: var(--space-4); }
+/* The card's three states (landing.ts, proposalCard): the checked radio
+   decides which data-when parts show. Open is the default, and what a
+   browser without :has() shows. revert = the element's own display, so
+   the wrapped badges and buttons keep their inline-flex. */
+.hero-card [data-when] { display: none; }
+.hero-card [data-when~="open"] { display: revert; }
+.hero-card:has([value="approve"]:checked) [data-when] { display: none; }
+.hero-card:has([value="approve"]:checked) [data-when~="approved"] { display: revert; }
+.hero-card:has([value="changes"]:checked) [data-when] { display: none; }
+.hero-card:has([value="changes"]:checked) [data-when~="changes"] { display: revert; }
+.hero-canon > div { background: var(--bg-subtle); }
+.hero-log { margin: 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.hero-log strong { color: var(--fg); }
+.hero-note label { display: block; margin: 0 0 var(--space-2); font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: 600; }
+.hero-note textarea { width: 100%; resize: vertical; }
+.hero-canon, .hero-log, .hero-note { animation: demo-in 200ms ease-out; }
+@keyframes demo-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .hero-canon, .hero-log, .hero-note { animation: none; } }
 .hero-works { margin: var(--space-5) 0 0; font-weight: 500; }
 
 /* The hero's right column: what an agent can't do, large. The caption's

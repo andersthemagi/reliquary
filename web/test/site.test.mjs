@@ -96,14 +96,30 @@ test("site landing: the hero opens with what an agent can't do, a plain list wit
   assert.match(hero, /<figcaption class="canon-line">[^<]*<a href="\/security">How security works<\/a><\/figcaption>/);
 });
 
-test("site landing: the demo card's buttons can't be focused or reached by assistive tech", async () => {
+test("site landing: the demo card works without a script: a radio group decides on the proposal, and each state is in the markup", async () => {
   const h = await text(A, "/");
-  assert.match(h, /<section class="site-section" id="how"[\s\S]*?<figure class="hero-card"/, "the card sits in How it works");
-  const actions = /<div class="hero-card-actions"([^>]*)>([\s\S]*?)<\/div>/.exec(h);
-  assert.ok(actions, "the demo card has its buttons");
-  assert.match(actions[1], /aria-hidden="true"/);
-  assert.match(actions[1], /\binert\b/);
-  assert.doesNotMatch(actions[2], /<button|<a /);
+  const card = /<section class="site-section" id="how"[\s\S]*?(<figure class="hero-card"[\s\S]*?<\/figure>)/.exec(h)?.[1];
+  assert.ok(card, "the card sits in How it works");
+  assert.doesNotMatch(card, /<button|<form|<script|on[a-z]+=/i);
+  const radios = [...card.matchAll(/<input type="radio" name="demo" id="demo-[a-z]+" value="([a-z]+)" class="sr-only"( checked)?>/g)];
+  assert.deepEqual(radios.map((m) => m[1]), ["approve", "changes", "open"]);
+  assert.deepEqual(radios.filter((m) => m[2]).map((m) => m[1]), ["open"], "open by default");
+  assert.match(card, /<legend class="sr-only">Decide on the proposal\. A demo: nothing is saved\.<\/legend>/);
+  assert.match(card, /<label class="button primary" for="demo-approve">Approve<\/label>/);
+  assert.match(card, /<label class="button" for="demo-changes">Request changes<\/label>/);
+  assert.match(card, /<label class="hero-reset" for="demo-open">Start over<\/label>/);
+  // The radios come before every label, so a checked one is never inside a hidden part and focus is never lost.
+  assert.ok(card.indexOf('<input type="radio" name="demo" id="demo-open"') < card.indexOf('<label class="button primary"'));
+  // Approved: the badge flips from hollow Open to filled Canon, the diff resolves, the log line appears.
+  assert.match(card, /<span data-when="open changes"><span class="policy open badge">Open<\/span><\/span>/);
+  assert.match(card, /<span data-when="approved"><span class="policy canon badge">Canon<\/span><\/span>/);
+  assert.match(card, /<div class="hero-diff hero-canon" data-when="approved" aria-hidden="true">[\s\S]*?Deploy to: eu-production/);
+  assert.match(card, /<p class="hero-log" data-when="approved" aria-hidden="true">Approved by <strong>you<\/strong> · just now<\/p>/);
+  // Changes requested: the note field, labelled.
+  assert.match(card, /<div class="hero-note" data-when="changes">\s*<label for="demo-note">Note for Claude Code<\/label>\s*<textarea id="demo-note" class="note-field"/);
+  // The caption names the state, for people who can't see it change.
+  const cap = /<figcaption id="hero-card-cap" aria-live="polite">([\s\S]*?)<\/figcaption>/.exec(card)?.[1] ?? "";
+  for (const state of ["open", "approved", "changes"]) assert.match(cap, new RegExp(`<span data-when="${state}">`), state);
 });
 
 test("site landing: calls to action are Sign up, to the sign-in page that makes accounts, and See how approval works; the email ask stays in the closing", async () => {
