@@ -278,6 +278,18 @@ test("docs links: every page in docs/public is in the sidebar, and the sidebar n
 
 // Nav, sitemap and the stage ---------------------------------------------------------------------
 
+test("docs nav: narrow screens get the site's links as a drawer with no script, the same links in the same order", async () => {
+  for (const path of ["/", "/security", "/docs"]) {
+    const page = await (await get(path, A)).text();
+    const links = (nav) => [...nav.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]);
+    const inline = /<nav aria-label="Site">([\s\S]*?)<\/nav>/.exec(page)?.[1] ?? "";
+    const drawer = /<details class="site-menu">\s*<summary><span class="site-menu-icon" aria-hidden="true"><\/span><span class="site-menu-closed">Menu<\/span><span class="site-menu-opened">Close<\/span><\/summary>\s*<nav aria-label="Site menu">([\s\S]*?)<\/nav>\s*<\/details>/.exec(page)?.[1] ?? "";
+    assert.ok(drawer, `${path}: the drawer is there`);
+    assert.deepEqual(links(drawer), links(inline), path);
+    assert.doesNotMatch(page, /<script/i, path);
+  }
+});
+
 test("docs nav: the public site links Docs and Roadmap, and the app's Account menu links both", async () => {
   const site = await (await get("/", A)).text();
   const nav = /<nav aria-label="Site">([\s\S]*?)<\/nav>/.exec(site)[1];
