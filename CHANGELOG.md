@@ -8,6 +8,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.19.0](https://github.com/andersthemagi/reliquary/compare/v0.18.0...v0.19.0) (2026-10-12)
 
+The landing page works properly on a phone: the site's links and Sign in fold into a menu, buttons stack full width, and the spacing fits the screen. It also gains a Why Reliquary section, an Alpha badge that matches its band, and examples that use roles instead of names. No database changes.
+
 
 ### Features
 
