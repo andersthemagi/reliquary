@@ -354,6 +354,10 @@ names and counts only). The model and the numbers are in
   shows who is filling storage; `revoke-admission` stops an abusive account
   creating more. Without pg_cron the line only moves when you run
   `select private.let_in_from_line()` as postgres.
+  Each account that confirms its address is emailed to you once, like
+  feedback notices (`FEEDBACK_EMAIL`, else the operator's address), with
+  its place in line and the `admit` command
+  (`supabase/migrations/20261012120000_signup_notices.sql`).
 - **Drift**: the storage counters are kept by triggers, and pg_cron runs
   `private.log_storage_drift()` Mondays 04:00 UTC, recording any vault whose
   counter differs from a full scan in `private.storage_drift_log` (and a

@@ -75,7 +75,7 @@ Then `docker compose up -d` again. Leave both empty to keep invites by link only
 
 People on your instance can [send feedback](send-feedback.md) from the top bar, and their agents with `send_feedback`. It goes to you, the operator of this instance, never to Red Mage. Read it and answer with `scripts/feedback.sh` (it lists, shows, sets a status and replies), run where you run `scripts/plan.sh`.
 
-To be emailed about each new item, set `FEEDBACK_EMAIL` in `deploy/compose/.env` to your address, beside `RESEND_API_KEY` and `EMAIL_FROM`. Without it nothing is emailed, and the feedback waits for `scripts/feedback.sh list`.
+To be emailed about each new item, set `FEEDBACK_EMAIL` in `deploy/compose/.env` to your address, beside `RESEND_API_KEY` and `EMAIL_FROM`. Without it nothing is emailed, and the feedback waits for `scripts/feedback.sh list`. The same address gets one email for each new account, when it confirms its address: who, when, and whether it's in, in line or waiting on you, with `scripts/plan.sh admit <email>` to let it in. See [Emails](../reference/emails.md#signup-notices).
 
 ## Connect your agents
 

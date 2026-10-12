@@ -264,9 +264,11 @@ async function flush(env: NodeJS.ProcessEnv): Promise<number> {
 }
 
 // At most once a minute per instance, from a signed-in page (server.ts).
+// Says whether it ran, so the signup notices go on the same tick.
 let lastTick = 0;
-export function feedbackTick(now = Date.now()): void {
-  if (now - lastTick < 60_000) return;
+export function feedbackTick(now = Date.now()): boolean {
+  if (now - lastTick < 60_000) return false;
   lastTick = now;
   void flushFeedbackNotices();
+  return true;
 }
