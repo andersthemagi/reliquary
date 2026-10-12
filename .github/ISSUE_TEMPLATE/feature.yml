@@ -17,6 +17,15 @@ body:
     id: idea
     attributes:
       label: What would good look like?
+  - type: dropdown
+    id: build
+    attributes:
+      label: Would you like to build it?
+      description: Optional. If it's a fit, the maintainer moves it to Planned and it's yours.
+      options:
+        - "Yes, I'd like to open the pull request"
+        - "Maybe, with some pointers"
+        - "No, just suggesting"
   - type: markdown
     attributes:
       value: Never paste secrets, tokens or client data here.
