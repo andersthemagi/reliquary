@@ -130,6 +130,7 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 | Renewing a web session | 120 an hour per IP address, and 30 an hour per session |
 | Form posts in the web app | 60 a minute and 1000 an hour per session |
 | Opening or accepting invite links | 30 an hour per IP address |
+| Sending an access request (`/request-access`) | 5 an hour per IP address |
 | OAuth consent page (`/oauth/authorize`) | 60 every 10 minutes per IP address, 600 per app |
 | OAuth token endpoint (`/oauth/token`) | 120 every 10 minutes per IP address, 1200 per app |
 | OAuth revocation (`/oauth/revoke`) | 60 every 10 minutes per IP address, 600 per app |

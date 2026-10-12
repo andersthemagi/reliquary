@@ -99,7 +99,7 @@ export function idempotencyKey(kind: string, unique: string): string {
 
 // `what` names the operation in a failure ("Emailing the invite"); `tag` is
 // the kind, a Resend tag and the log's word for it.
-export type Outgoing = { to: string; subject: string; html: string; idempotencyKey: string; tag: string; what: string };
+export type Outgoing = { to: string; subject: string; html: string; idempotencyKey: string; tag: string; what: string; replyTo?: string };
 export type SendResult = { sent: true; id: string } | { sent: false; failure?: Failure; off?: string };
 
 const WHERE = "email sender (Resend)";
@@ -109,7 +109,7 @@ const WHERE = "email sender (Resend)";
 export async function sendEmail(m: Outgoing): Promise<SendResult> {
   const c = current();
   if (!c.on) return { sent: false, off: c.why };
-  const body = JSON.stringify({ from: c.from, to: [m.to], subject: m.subject, html: m.html, tags: [{ name: "kind", value: m.tag }] });
+  const body = JSON.stringify({ from: c.from, to: [m.to], subject: m.subject, html: m.html, ...(m.replyTo ? { reply_to: m.replyTo } : {}), tags: [{ name: "kind", value: m.tag }] });
   const scrub = (s: string) => s.split(c.key).join("<key>");
   let last: { status: number; why: string; code?: string } | undefined;
   for (let attempt = 1; attempt <= 2; attempt++) {

@@ -104,6 +104,7 @@ ${operatorBlock()}
 <h2>What we hold</h2>
 <ul>
   <li><strong>Account:</strong> your email address and an account id, and the vaults you belong to with your role.</li>
+  <li><strong>Access requests:</strong> the email address, name, country and note you send with Request access. The service emails them to us and doesn't store them; we keep the email while we arrange your access.</li>
   <li><strong>Vault content:</strong> files and their versions, proposals, approvals, comments and notes, which can include personal data your team writes.</li>
   <li><strong>Variables:</strong> names and encrypted values, and who may use them.</li>
   <li><strong>Activity:</strong> the vault's activity log and the variables access log: who (and which agent or client) did what, when. These are part of the product and you can see them.</li>
@@ -121,6 +122,7 @@ ${operatorBlock()}
 <h2>Why, and on what basis</h2>
 <ul>
   <li>To run the service you signed up for: performance of a contract.</li>
+  <li>To answer an access request: steps you asked us to take before a contract.</li>
   <li>To keep it secure and fix faults (server logs, access logs, refused attempts): our legitimate interest in a secure service.</li>
   <li>To tell you about changes that affect you: contract and legitimate interest. No marketing email without your consent.</li>
 </ul>
@@ -134,7 +136,7 @@ ${operatorBlock()}
 
 <h2>Where it's stored, and who processes it</h2>
 <p>The database is in the EU (Frankfurt). The app itself runs in the United States (Netlify), so your requests and what they carry are processed there. Some providers are US companies whose networks and logs are global; the <a href="/subprocessors">sub-processor list</a> names each one, what it does and where.</p>
-<p>Email (sign-in codes and links, account notices and vault invitations) is sent through Resend, a US company: it receives the recipient's address and the message, sends it from the EU, and keeps delivery records in the US for 30 days.</p>
+<p>Email (sign-in codes and links, account notices, vault invitations and access requests) is sent through Resend, a US company: it receives the recipient's address and the message, sends it from the EU, and keeps delivery records in the US for 30 days.</p>
 <p>AI tools you connect (Claude, ChatGPT, Cursor and others) receive what their agent reads through your account. They are not our sub-processors: you choose them, and they process that data under your agreement with them.</p>
 
 <h2>How long we keep it</h2>
@@ -217,9 +219,9 @@ const SUBPROCESSORS: Sub[] = [
   },
   {
     name: "Resend",
-    what: "Sending email: sign-in codes and links, account notices, and vault invitations",
+    what: "Sending email: sign-in codes and links, account notices, vault invitations and access requests",
     where: "Sent from the EU (Ireland, eu-west-1); account data, email metadata and logs stored in the US (US company)",
-    data: "Recipient email addresses and message content (codes, sign-in and invite links, vault names and roles); kept by Resend for 30 days",
+    data: "Recipient email addresses and message content (codes, sign-in and invite links, vault names and roles, access requests); kept by Resend for 30 days",
     link: ["https://resend.com/legal/privacy-policy", "Resend privacy policy"],
   },
 ];

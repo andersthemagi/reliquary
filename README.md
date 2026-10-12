@@ -10,7 +10,7 @@ agents propose, people approve, and secrets never reach a model.
 </p>
 
 <p align="center">
-<a href="https://reliquary.redmage.cc"><strong>Join the alpha test</strong></a> ·
+<a href="https://app.reliquary.redmage.cc/request-access"><strong>Request access</strong></a> ·
 <a href="https://reliquary.redmage.cc/docs">Docs</a> ·
 <a href="docs/public/how-to/self-host.md">Self-host</a> ·
 <a href="https://www.npmjs.com/package/@reliquary-ai/cli">CLI</a> ·

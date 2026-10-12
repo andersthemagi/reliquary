@@ -60,6 +60,7 @@ export const DEFAULT_LIMITS = {
   cimd_fetch_host: { limit: 20, window: 600 }, // client metadata fetches, per client host
   // Invites
   invite_ip: { limit: 30, window: 3600 }, // invite links opened or accepted, per IP
+  request_access_ip: { limit: 5, window: 3600 }, // access requests sent, per IP (requestaccess.ts)
   // The env API (the CLI)
   env_grant_minute: { limit: 60, window: 60 }, // requests per CLI grant
   env_grant_day: { limit: 5000, window: 86400 },

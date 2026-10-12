@@ -95,7 +95,7 @@ test("site landing: the page brings its own frame: the inverted band carries the
   assert.match(top, /<a class="stage" href="\/roadmap"/);
   assert.match(top, /<nav aria-label="Site">[\s\S]*<a href="\/docs">Docs<\/a>[\s\S]*<a href="\/roadmap">Roadmap<\/a>[\s\S]*<\/nav>/);
   assert.match(top, /<a class="button site-signin" href="\/signin">Sign in<\/a>/);
-  assert.equal(h.match(/>Sign in</g).length, 2, "the header's Sign in, and the menu's for narrow screens");
+  assert.equal(h.match(/>Sign in</g).length, 3, "the header's Sign in, the menu's for narrow screens, and the closing's");
   const foot = /<footer class="p-inv p-fold p-close">[\s\S]*<\/footer>/.exec(h)?.[0] ?? "";
   assert.match(foot, /<h2 class="p-close-h2 p-fold-head" id="closing-title"><b>Try it on<\/b> your next project\.<\/h2>/);
   assert.match(foot, /<div class="p-wrap p-footer">[\s\S]*href="\/terms"[\s\S]*href="\/privacy"/);
@@ -199,12 +199,13 @@ test("site landing: the log is an example and says so, eight lines, nothing movi
   assert.doesNotMatch(log, /aria-hidden/);
 });
 
-test("site landing: the one filled button is Join the alpha test, to the sign-in page that makes accounts, with See how approval works as a link; the email ask stays in the closing", async () => {
+test("site landing: the one filled button is Request access, to the request form, with See how approval works as a link; the closing says the alpha is closed and links sign-in", async () => {
   const h = await text(A, "/");
-  assert.equal(h.match(/<a class="button primary" href="\/signin">Join the alpha test<\/a>/g).length, 3, "first band, pricing and closing");
+  assert.equal(h.match(/<a class="button primary" href="\/request-access">Request access<\/a>/g).length, 3, "first band, pricing and closing");
   assert.equal(h.match(/<a class="site-cta-link" href="#how">See how it works<\/a>/g).length, 3);
   assert.doesNotMatch(h, /<a class="button" href="#how"/, "the secondary is a link, not a second button");
-  assert.match(h, /<a href="mailto:andres@redmage\.cc\?subject=Reliquary%20early%20access">Tell us about your team<\/a>/);
+  assert.match(h, /Reliquary is in a closed alpha\. Request access, tell us about your team and the AI tools you use, and we'll reply to set up your first vault with you\. [^<]*Already have an account or an invite\? <a href="\/signin">Sign in<\/a>\./);
+  assert.doesNotMatch(h, /open alpha/i);
   assert.doesNotMatch(h, /invite-only/i);
 });
 
@@ -252,7 +253,7 @@ test("site landing: pricing shows the plans and their limits, clearly marked fre
   }
   assert.match(pricing, /<span class="amount">\$0<\/span>/);
   assert.match(pricing, /<span class="amount amount-word">Coming<\/span>/, "a word is not set like a price");
-  assert.match(pricing, /<a class="button primary" href="\/signin">Join the alpha test<\/a>/, "a button under the plans");
+  assert.match(pricing, /<a class="button primary" href="\/request-access">Request access<\/a>/, "a button under the plans");
   assert.match(pricing, /Nothing is billed today/);
 });
 

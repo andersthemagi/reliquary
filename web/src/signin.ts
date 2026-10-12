@@ -51,7 +51,7 @@ import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure, noteUpstream, Refusal, sqlstateName, upstreamNote } from "./failure.js";
-import { contactEmail, requestAccessHref, waitingHref } from "./site.js";
+import { contactEmail, waitingHref } from "./site.js";
 import { pool } from "./db.js";
 
 // Whether sign-in makes an account for any address: invite-only is off
@@ -127,7 +127,7 @@ const CODE = /^[0-9]{6,10}$/;
 // A field people never see (style.css .trap) and form-filling bots fill:
 // filled, sign-in sends nothing and answers as if it had, so the bot
 // learns nothing. Not a CAPTCHA: nothing asks a person anything.
-const TRAP = "website";
+export const TRAP = "website";
 const TOKEN_HASH = /^[A-Za-z0-9_-]{16,256}$/;
 
 type In = {
@@ -141,12 +141,12 @@ type In = {
 };
 type Out = { reply: Reply; cookies: string[] };
 
-const hidden = (name: string, value: string) => html`<input type="hidden" name="${name}" value="${value}">`;
+export const hidden = (name: string, value: string) => html`<input type="hidden" name="${name}" value="${value}">`;
 
 // A refused form: the reason in the danger tone, announced, and tied to the
 // field it is about (aria-describedby on the field, aria-invalid).
-const formError = (id: string, error?: string) => (error ? html`<p class="callout danger" role="alert" id="${id}">${error}</p>` : "");
-const invalid = (id: string, error?: string) => (error ? html` aria-invalid="true" aria-describedby="${id}"` : "");
+export const formError = (id: string, error?: string) => (error ? html`<p class="callout danger" role="alert" id="${id}">${error}</p>` : "");
+export const invalid = (id: string, error?: string) => (error ? html` aria-invalid="true" aria-describedby="${id}"` : "");
 
 function emailForm(csrf: string, next: string, theme: Theme, open: boolean, error?: string, invite?: Peek): string {
   const openInvite = invite !== undefined && invite.email === null;
@@ -176,7 +176,7 @@ function emailForm(csrf: string, next: string, theme: Theme, open: boolean, erro
         ? ""
         : open
           ? html`<p class="hint">New to Reliquary? The same step makes your account. We’re letting people in steadily as usage grows, so it may take a while before you can create a vault. If it’s taking too long, email <a href="${waitingHref()}">${contactEmail()}</a>. Have an invite? Open its link to get in now.</p>`
-          : html`<p class="hint">Reliquary is invite-only. Anyone can sign in, but an account creates vaults only after it joins one by invite. Have an invite? Open its link. Otherwise, <a href="${requestAccessHref()}">request access</a>.</p>`}
+          : html`<p class="hint">Reliquary is invite-only. Anyone can sign in, but an account creates vaults only after it joins one by invite. Have an invite? Open its link. Otherwise, <a href="/request-access">request access</a>.</p>`}
       <p class="hint"><a href="${siteHref("/docs")}">About Reliquary</a></p>
     </div>`,
     { theme },
