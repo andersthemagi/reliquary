@@ -56,8 +56,10 @@ TEST_SLOT=8 ./test.sh                        # when another run holds your ports
 `TEST_SLOT` moves every container name and port. A run uses its slot and the
 next three, so pick a base at least four away from any run already going
 (two worktrees at once, for example). The `sql`, `web` and `cli` suites have
-no per-file switch, and there is no linter: `tsc` runs inside each suite's
-build and is the only static check.
+no per-file switch. TypeScript has no linter: `tsc` runs inside each suite's
+build and is its only static check. CI's `lint` workflow runs actionlint on
+the workflows and shellcheck on the scripts (settings in `.shellcheckrc`);
+run `git ls-files -z '*.sh' | xargs -0 shellcheck` before pushing a script.
 
 To see a change running, `./mcp/dev.sh up` starts Postgres, the MCP server
 and the web UI (`http://127.0.0.1:8790`); `./mcp/dev.sh ui` opens it signed
