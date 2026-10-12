@@ -118,7 +118,7 @@ test("site landing: what an agent can't do is the first section, five lines with
   const h = await text(A, "/");
   const list = /<ul class="p-ceiling">([\s\S]*?)<\/ul>/.exec(h)?.[1] ?? "";
   const items = [...list.matchAll(/<li><span class="p-x" aria-hidden="true"><\/span>([^<]+)<\/li>/g)].map((m) => m[1]);
-  assert.deepEqual(items, ["Approve its own change", "Change who approves what", "Add or remove people", "Reveal a secret&#39;s value", "Export or delete a vault"]);
+  assert.deepEqual(items, ["Approve any change", "Change who approves what", "Add or remove people", "Reveal a secret&#39;s value", "Export or delete a vault"]);
   assert.doesNotMatch(list, /✕|<span class="cant-mark"/);
   assert.match(h, /<p class="p-note">Enforced as row-level security in Postgres, not in a prompt\. Each rule has a test that tries to break it, and they run on every push\. <a href="\/security">How security works<\/a><\/p>/);
   assert.match(h, /<p class="p-note p-note-who">Built in Barcelona by Andrés of <a href="https:\/\/redmage\.cc">Red Mage<\/a>, out of running one vault per client/);

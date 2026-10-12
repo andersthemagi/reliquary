@@ -52,7 +52,7 @@ const hub = html`<figure class="p-hub" aria-labelledby="hub-cap">
   </figcaption>
 </figure>`;
 
-const ceiling = ["Approve its own change", "Change who approves what", "Add or remove people", "Reveal a secret's value", "Export or delete a vault"];
+const ceiling = ["Approve any change", "Change who approves what", "Add or remove people", "Reveal a secret's value", "Export or delete a vault"];
 
 // The mark: the logo, masked from /logo.svg so it takes the band's brand
 // colour, as the first band's picture and, smaller, the closing's. It is
