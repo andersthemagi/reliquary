@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.19.0](https://github.com/andersthemagi/reliquary/compare/v0.18.0...v0.19.0) (2026-10-12)
+
+
+### Features
+
+* **web:** the landing says why Reliquary, with a menu drawer and a badge that fits the band ([#284](https://github.com/andersthemagi/reliquary/issues/284)) ([a79a89f](https://github.com/andersthemagi/reliquary/commit/a79a89f33d1f97be6ebfa204648f920c2c4e7a9d))
+
 ## [0.18.0](https://github.com/andersthemagi/reliquary/compare/v0.17.1...v0.18.0) (2026-10-12)
 
 Reliquary is now in alpha, and says so everywhere: the badge, the docs, the terms and a new Status section on the security page that always names the running release. The landing page is redesigned: it shows how agents, a vault and people fit together, lists what an agent can never do, and lets you try approving a proposal with no script. The real logo replaces the placeholder in the top bar, the favicon and link previews. No database changes.
