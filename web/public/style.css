@@ -2027,7 +2027,9 @@ body.p-site { display: block; }
 .p-top { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 72px; }
 .p-top .wordmark { color: inherit; }
 .p-top .site-signin { margin-left: 0; flex: none; }
-.p-top .stage { flex: none; }
+/* The badge takes the band's palette: the page's attention tokens belong to the
+   other theme here, and the band's link colour would win over its text. */
+.p-top .stage { flex: none; background: transparent; color: var(--if); border-color: var(--ibds); }
 .p-top nav { display: flex; gap: 8px 24px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; font-size: var(--text-sm); font-weight: 500; }
 .p-top nav a { color: var(--ifm); text-decoration: none; padding: 6px 0; border-bottom: 1px solid transparent; transition: color 120ms ease-out, border-color 120ms ease-out; }
 .p-top nav a:hover { color: var(--if); border-bottom-color: var(--if); }
