@@ -53,6 +53,7 @@ import { inSession, pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { configureMailer } from "./mailer.js";
 import { feedbackTick, flushFeedbackNotices, noticeTarget } from "./feedback.js";
+import { flushSignupNotices } from "./signups.js";
 import { BUILD, versionJson } from "./version.js";
 import { emailTemplate, selfHosted } from "./selfhost.js";
 import { welcomeLanding } from "./welcome.js";
@@ -613,9 +614,10 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     const landed = ctx.fresh && req.method === "GET" && welcomeLanding(url.pathname);
     send(res, reply, landed ? { "set-cookie": clearCookie(FRESH_SIGNIN) } : {}, auth.cookies);
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
-    // Feedback notices waiting (an agent's, or one whose email failed):
-    // at most once a minute per instance, after the page has gone out.
-    if (req.method === "GET") feedbackTick();
+    // Feedback notices waiting (an agent's, or one whose email failed),
+    // and new accounts (signups.ts): at most once a minute per instance,
+    // after the page has gone out.
+    if (req.method === "GET" && feedbackTick()) void flushSignupNotices();
   } catch (err) {
     // What was being done, where it broke, why, and the reference, which
     // is also in the log with the detail (failure.ts).
@@ -635,8 +637,11 @@ export const handle: http.RequestListener = (req, res) => {
 };
 if (!process.env.NETLIFY) {
   server.listen(PORT, HOST, () => console.info(`reliquary web on http://${HOST}:${PORT}`));
-  // A long-running server also sends feedback notices on a timer, so an
-  // agent's feedback is emailed within a minute or two even when nobody
-  // opens a page (feedback.ts).
-  setInterval(() => void flushFeedbackNotices(), 60_000).unref();
+  // A long-running server also sends feedback and signup notices on a
+  // timer, so an agent's feedback is emailed within a minute or two even
+  // when nobody opens a page (feedback.ts, signups.ts).
+  setInterval(() => {
+    void flushFeedbackNotices();
+    void flushSignupNotices();
+  }, 60_000).unref();
 }

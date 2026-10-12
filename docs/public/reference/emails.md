@@ -58,6 +58,14 @@ Invites are emailed when the site has an email sender (the hosted service does).
 |---|---|---|
 | Reliquary feedback (*kind*): *first line* | Someone sent [feedback](../how-to/send-feedback.md) | Sent to the operator of the site only, never to you: the kind, who sent it and how (the web app or which agent), the vault and page if given, and the start of the message. |
 
+## Signup notices
+
+| Subject | When | What's in it |
+|---|---|---|
+| Reliquary: new account, *address* | An account confirmed its address (its first sign-in) | Sent to the operator of the site only, once per account: the address, when it was confirmed (UTC), and where it stands: let in (and how), its place in line and how many a day the line lets in, or waiting because the site is invite-only. Unless it's already in, the command to let it in now, `scripts/plan.sh admit <address>`. |
+
+Signup notices go out on the next page anyone opens, the new account's own first page included, or within a minute on a long-running server. Accounts that existed before signup notices shipped aren't sent.
+
 ## On a self-hosted instance
 
-The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites). Feedback notices go to the address in `FEEDBACK_EMAIL`, the instance's own operator; with none set, none are sent.
+The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites). Feedback and signup notices go to the address in `FEEDBACK_EMAIL`, the instance's own operator; with none set, none are sent.

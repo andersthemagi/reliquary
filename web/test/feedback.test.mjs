@@ -134,6 +134,8 @@ before(async () => {
   await new Promise((r) => fake.listen(0, "127.0.0.1", r));
   const api = `http://127.0.0.1:${fake.address().port}`;
   await sql(`insert into auth.users (id, email) values ($1, 'fern@example.test'), ($2, 'oona@example.test') on conflict (id) do nothing`, [FERN, OONA]);
+  // Signup notices (signup_notices.test.mjs) would share the fake Resend and its queue of answers: none here.
+  await sql("insert into private.signup_notices (user_id, notified_at) select id, now() from auth.users on conflict (user_id) do update set notified_at = now()");
   vault = (await asUser(FERN, "select public.create_vault($1) as id", [VAULT_NAME]))[0].id;
   otherVault = (await asUser(OONA, "select public.create_vault('Oona only') as id"))[0].id;
   S.mail = await start({ RESEND_API_KEY: KEY, EMAIL_FROM: FROM, RESEND_API_URL: api, FEEDBACK_EMAIL: TO });
