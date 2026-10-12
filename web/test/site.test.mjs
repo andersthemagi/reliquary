@@ -94,7 +94,7 @@ test("site landing: the page brings its own frame: the inverted band carries the
   assert.match(top, /<a class="stage" href="\/roadmap"/);
   assert.match(top, /<nav aria-label="Site">[\s\S]*<a href="\/docs">Docs<\/a>[\s\S]*<a href="\/roadmap">Roadmap<\/a>[\s\S]*<\/nav>/);
   assert.match(top, /<a class="button site-signin" href="\/signin">Sign in<\/a>/);
-  assert.equal(h.match(/>Sign in</g).length, 1, "the nav's Sign in only");
+  assert.equal(h.match(/>Sign in</g).length, 2, "the header's Sign in, and the menu's for narrow screens");
   const foot = /<footer class="p-inv p-fold p-close">[\s\S]*<\/footer>/.exec(h)?.[0] ?? "";
   assert.match(foot, /<h2 class="p-close-h2 p-fold-head" id="closing-title"><b>Try it on<\/b> your next project\.<\/h2>/);
   assert.match(foot, /<div class="p-wrap p-footer">[\s\S]*href="\/terms"[\s\S]*href="\/privacy"/);

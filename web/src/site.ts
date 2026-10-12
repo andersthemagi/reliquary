@@ -108,6 +108,7 @@ export const draftNote = () =>
 // <details>, since the public site has no script, rendered beside the inline
 // nav because a closed <details> can't be shown open by CSS everywhere. Its
 // summary covers the page while open, so a tap outside the panel closes it.
+// Sign in moves into it too, so the header keeps one row on a phone.
 const siteLinks = (path: string) => html`<a href="/#how">How it works</a>
     ${PRICING.show ? html`<a href="/#pricing">Pricing</a>` : ""}
     <a href="/security"${path === "/security" ? raw(' aria-current="page"') : ""}>Security</a>
@@ -121,6 +122,7 @@ export const siteNav = (path: string) => html`<nav aria-label="Site">
     <summary><span class="site-menu-icon" aria-hidden="true"></span><span class="site-menu-closed">Menu</span><span class="site-menu-opened">Close</span></summary>
     <nav aria-label="Site menu">
     ${siteLinks(path)}
+    <a class="button primary site-menu-signin" href="${appHref("/signin")}">Sign in</a>
     </nav>
   </details>`;
 
