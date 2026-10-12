@@ -29,7 +29,7 @@ agents propose, people approve, and secrets never reach a model.
 
 ```mermaid
 flowchart LR
-  tools["Claude · Claude Code · ChatGPT · Cursor · any MCP client"]
+  tools["Claude · ChatGPT · Cursor · VS Code · any MCP client"]
   vault[("One vault<br>canon, proposals and sealed secrets")]
   people["You · your team · the client"]
   tools -- "◇ propose" --> vault
@@ -40,6 +40,24 @@ flowchart LR
 **◇ Proposed:** an agent wrote it and nobody has said yes.
 **◆ Canon:** a person approved it, so every tool treats it as true.
 **◆◆◆ Sealed:** a secret your tools can use and never see.
+
+## Why Reliquary
+
+- **Every AI tool, one vault.** Claude, ChatGPT, Cursor, VS Code and any MCP
+  client read the same context. Reliquary holds no model, so switching tools
+  loses nothing.
+- **Built for agents and people together.** Agents read, take notes and
+  propose. People review, approve and talk it through in threads. Every
+  change lands in one append-only log.
+- **Secrets stay secret.** No MCP tool, log line or error message returns a
+  value. `reliquary run` puts it into one process and nowhere else.
+- **Guarded by the database.** Every permission is a Postgres row-level
+  security rule with a test that tries to break it on every push. A prompt
+  can't talk its way past it.
+- **Source available.** The code is public. Read it, run it, self-host it for
+  free. Each release turns Apache 2.0 two years on, and the CLI is MIT.
+- **Yours to take with you.** Export a whole vault as plain markdown any time,
+  or delete it for good. No lock-in to us or to any AI vendor.
 
 ## What your agent can't do
 
@@ -78,11 +96,11 @@ folders change only when a person approves, with a quorum if you want one.
 Every change lands in an append-only log:
 
 ```text
-◇ Claude Code    proposed a change to brief.md for Ana
-◆ Ana            approved brief.md, now canon
-◇ Cursor         wrote notes/standup.md in an open folder
-◆ Marc           added DATABASE_URL to development
-◆ reliquary run  put 1 variable into 1 process for Marc
+◇ Your agent          proposed a change to brief.md
+◆ You                 approved brief.md, now canon
+◇ A teammate's agent  wrote notes/standup.md in an open folder
+◆ A teammate          added DATABASE_URL to development
+◆ reliquary run       put 1 variable into 1 process for a teammate
 ```
 
 **3. Run with secrets, never show them.** The CLI puts a vault's variables
