@@ -1375,7 +1375,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 @media (max-width: 960px) {
   .top-inner > nav[aria-label="Site"], .p-top > nav[aria-label="Site"] { display: none; }
   .site-menu { display: block; flex: none; margin-left: auto; }
-  .site-menu + .site-signin { margin-left: 0; }
+  .site-menu + .site-signin { display: none; }
   .top-inner, .p-top { position: relative; }
 }
 .site-menu > summary {
@@ -1403,7 +1403,10 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   display: flex; align-items: center; min-height: 52px; padding: 0 4px;
   color: var(--menu-fg); text-decoration: none; border-bottom: 1px solid var(--menu-line);
 }
-.top .site-menu > nav a:last-child, .p-top .site-menu > nav a:last-child { border-bottom: 0; }
+.top .site-menu > nav a:nth-last-child(2), .p-top .site-menu > nav a:nth-last-child(2) { border-bottom: 0; }
+.top .site-menu > nav .site-menu-signin, .p-top .site-menu > nav .site-menu-signin { justify-content: center; margin-top: 12px; min-height: 48px; border: 0; }
+.p-top .site-menu > nav .site-menu-signin { background: var(--ipb); color: var(--ipf); }
+.p-top .site-menu > nav .site-menu-signin:hover { background: var(--iph); color: var(--ipf); }
 .top .site-menu > nav a[aria-current="page"], .p-top .site-menu > nav a[aria-current="page"] { color: var(--menu-fg); box-shadow: inset 3px 0 0 var(--brand); padding-left: 12px; }
 .top .site-menu > nav a[aria-current="page"]::after { content: none; }
 .top .site-menu > nav a:hover, .p-top .site-menu > nav a:hover { color: var(--menu-muted); }
@@ -1412,6 +1415,23 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   @keyframes site-menu-in { from { opacity: 0; transform: translateY(-6px); } }
 }
 @media (max-width: 400px) { .site-menu-closed, .site-menu[open] .site-menu-opened { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
+
+/* Phones: calls to action stack full width (one thumb, one target each),
+   and the poster's spacing comes down to the screen. */
+@media (max-width: 599px) {
+  .site-cta, .p-fold .site-cta { flex-direction: column; align-items: stretch; gap: 8px; }
+  .site-cta .button { justify-content: center; min-height: 48px; }
+  .site-cta .site-cta-link { display: flex; align-items: center; justify-content: center; min-height: 44px; }
+  .hero-card-actions > span { flex: 1 1 100%; }
+  .hero-card-actions label.button { width: 100%; justify-content: center; min-height: 44px; }
+  .p-fold-body { gap: 32px; padding-block: 24px 40px; }
+  .p-sec { padding-top: 64px; }
+  .p-sec h2 { margin-bottom: 24px; }
+  .p-ceiling li { grid-template-columns: 1.5rem minmax(0, 1fr); gap: 12px; padding: 14px 0; }
+  .p-frame figcaption { padding: 12px 16px; }
+  .p-close { margin-top: 64px; }
+  .p-close .p-fold-body { padding-block: 48px 40px; }
+}
 
 /* Docs (web/src/docs.ts): sidebar, article, on-page contents. No script:
    the phone menu is a <details>, like the vault sidebar. ------------------- */
