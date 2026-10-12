@@ -134,10 +134,10 @@ test("self-hosted plan: Plan and usage never mentions billing on a self-hosted s
   const own = { plan: "self_hosted", planName: "Self-hosted", vaultsOwned: 3, maxVaults: 2147483647 };
   for (const [p, self] of [[free, true], [own, true], [own, false]]) {
     const h = planNote(p, self).html;
-    assert.doesNotMatch(h, /billed|beta/i);
+    assert.doesNotMatch(h, /billed|during the alpha/i);
     assert.match(h, /This Reliquary is self-hosted: its operator sets plans and tiers\./);
   }
-  assert.match(planNote(free, false).html, /Nothing is billed during the beta\./);
+  assert.match(planNote(free, false).html, /Nothing is billed during the alpha\./);
 });
 
 // Email templates -----------------------------------------------------------------
