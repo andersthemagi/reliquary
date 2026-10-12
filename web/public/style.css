@@ -2187,6 +2187,13 @@ body.p-site { display: block; }
 @media (max-width: 719px) { .p-ledger-head span:last-child { display: none; } .p-ledger dd { padding-top: 0; } .p-ledger dd::before { top: 9px; } }
 
 /* Rows: a heading on the left, its text on the right, a hairline between. */
+/* Why Reliquary: six reasons on a hairline grid, one column on a phone. */
+.p-why { display: grid; border-top: 1px solid var(--fg); }
+.p-why > div { padding: 24px 0; border-bottom: 1px solid var(--border); }
+.p-why h3 { margin: 0 0 8px; font-size: var(--text-lg); line-height: 1.2; letter-spacing: -0.015em; font-weight: 800; }
+.p-why p { margin: 0; color: var(--fg-muted); max-width: 40ch; }
+@media (min-width: 720px) { .p-why { grid-template-columns: 1fr 1fr; column-gap: 48px; } }
+@media (min-width: 1100px) { .p-why { grid-template-columns: repeat(3, 1fr); } }
 .p-rows { display: grid; border-top: 1px solid var(--fg); }
 .p-rows > div { display: grid; gap: 8px 48px; padding: 24px 0; border-bottom: 1px solid var(--border); }
 .p-rows > div p { margin: 0; color: var(--fg-muted); }

@@ -85,7 +85,7 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
     <span data-when="approved"><span class="policy canon badge">Canon</span></span>
     <span class="hero-card-path">brief.md</span>
   </div>
-  <p class="hero-card-meta">Proposed by <strong>Claude Code</strong> for Ana · <code>brief.md</code> is canon<span data-when="open changes"> · needs 1 approval</span></p>
+  <p class="hero-card-meta">Proposed by <strong>your agent</strong> · <code>brief.md</code> is canon<span data-when="open changes"> · needs 1 approval</span></p>
   <div class="hero-diff" data-when="open changes" aria-hidden="true">
     <div class="del"><span>−</span>Deploy to: staging</div>
     <div class="add"><span>+</span>Deploy to: eu-production</div>
@@ -95,7 +95,7 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
   </div>
   <p class="hero-log" data-when="approved" aria-hidden="true">Approved by <strong>you</strong> · just now</p>
   <div class="hero-note" data-when="changes">
-    <label for="demo-note">Note for Claude Code</label>
+    <label for="demo-note">Note for your agent</label>
     <textarea id="demo-note" class="note-field" rows="2" placeholder="Staging first; production after the client signs off."></textarea>
   </div>
   <fieldset class="hero-card-actions">
@@ -135,17 +135,28 @@ const terminal = html`<pre class="term" aria-label="A terminal: reliquary run st
 <span class="term-muted">DATABASE_URL</span> <span class="term-value" aria-hidden="true">◆◆◆◆◆◆◆◆</span><span class="sr-only">(value hidden)</span>
 <span class="term-muted">1 variable into 1 process. Shown to no one.</span></pre>`;
 
-// An example of the append-only log, with invented names; the caption says
-// so in visible text. Hollow marks are agents writing, filled are people.
+// An example of the append-only log; the caption says so in visible text.
+// Roles, not names: a first name reads as a real person. Hollow marks are
+// agents writing, filled are people.
 const logLines: Array<[boolean, string, string]> = [
-  [true, "Claude Code", "proposed a change to brief.md for Ana"],
-  [false, "Ana", "approved brief.md, now canon"],
-  [true, "Cursor", "wrote notes/standup.md in an open folder"],
-  [false, "Marc", "added DATABASE_URL to development"],
-  [false, "reliquary run", "put 1 variable into 1 process for Marc"],
-  [true, "ChatGPT", "proposed a change to onboarding.md for Steph"],
-  [false, "Steph", "requested changes on onboarding.md"],
-  [false, "Ana", "exported the vault as markdown"],
+  [true, "Your agent", "proposed a change to brief.md"],
+  [false, "You", "approved brief.md, now canon"],
+  [true, "A teammate's agent", "wrote notes/standup.md in an open folder"],
+  [false, "A teammate", "added DATABASE_URL to development"],
+  [false, "reliquary run", "put 1 variable into 1 process for a teammate"],
+  [true, "Another agent", "proposed a change to onboarding.md"],
+  [false, "A teammate", "requested changes on onboarding.md"],
+  [false, "You", "exported the vault as markdown"],
+];
+
+// Why Reliquary: the six reasons, each one something the code does today.
+const why: Array<[string, Raw]> = [
+  ["Every AI tool, one vault", html`Claude, ChatGPT, Cursor, VS Code and any MCP client read the same context. Reliquary holds no model, so switching tools loses nothing.`],
+  ["Built for agents and people together", html`Agents read, take notes and propose. People review, approve and talk it through in threads. Every change lands in one append-only log.`],
+  ["Secrets stay secret", html`No MCP tool, log line or error message returns a value. <code>reliquary run</code> puts it into one process and nowhere else.`],
+  ["Guarded by the database", html`Every permission is a Postgres row-level security rule with a test that tries to break it on every push. A prompt can't talk its way past it.`],
+  ["Source available", html`The code is public. Read it, run it, self-host it for free. Each release turns Apache 2.0 two years on, and the CLI is MIT.`],
+  ["Yours to take with you", html`Export a whole vault as plain markdown any time, or delete it for good. No lock-in to us or to any AI vendor.`],
 ];
 
 const problems: Array<[Raw, Raw]> = [
@@ -237,6 +248,13 @@ export function landing(theme: Theme): string {
 
 <main id="main" class="p-wrap">
 
+<section class="p-sec" id="why" aria-labelledby="why-title">
+  <h2 id="why-title">Why Reliquary</h2>
+  <div class="p-why">
+    ${why.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p></div>`)}
+  </div>
+</section>
+
 <section class="p-sec" aria-labelledby="ceiling-title">
   <h2 id="ceiling-title">What your agent can't do</h2>
   <ul class="p-ceiling">
@@ -277,7 +295,7 @@ export function landing(theme: Theme): string {
     ${steps.map(([t, d]) => html`<li><h3>${t}</h3>${d}</li>`)}
   </ol>
   <div class="p-log" aria-label="An example of the append-only activity log">
-    <p class="p-log-cap">The log, append-only. An example, with invented names.</p>
+    <p class="p-log-cap">The log, append-only. An example.</p>
     <div class="p-log-track">
       ${logLines.map(([open, who, what]) => html`<span${open ? raw(' class="p-o"') : ""}><b>${who}</b> ${what}</span>`)}
     </div>
