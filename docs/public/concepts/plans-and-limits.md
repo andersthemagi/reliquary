@@ -4,7 +4,7 @@ Your account's plan limits how many vaults you own. Each vault's tier limits how
 
 ## Who can create vaults
 
-Reliquary is an open pre-alpha: anyone can make an account by signing in with their email. We're letting people in steadily as usage grows, so a new account may wait a while before it can create vaults. It joins a line once its email address is confirmed (the first time you sign in), and the front of the line is let in a few accounts a day. **New vault** and **Plan and usage** show your place in line. If it's taking too long, email andres@redmage.cc.
+Reliquary is an open alpha: anyone can make an account by signing in with their email. We're letting people in steadily as usage grows, so a new account may wait a while before it can create vaults. It joins a line once its email address is confirmed (the first time you sign in), and the front of the line is let in a few accounts a day. **New vault** and **Plan and usage** show your place in line. If it's taking too long, email andres@redmage.cc.
 
 An account doesn't wait, and can create vaults at once, when:
 

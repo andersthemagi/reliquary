@@ -357,7 +357,7 @@ test("invite sign-in: a signed-out open link explains Reliquary instead of namin
   const page = await (await get(r.headers.get("location"), jar)).text();
   assert.match(page, /<h1>Join Invite Signin Open<\/h1>/);
   assert.match(page, /You’ve been invited to collaborate on <strong>Invite Signin Open<\/strong> on Reliquary/);
-  assert.match(page, /Reliquary is pre-alpha/);
+  assert.match(page, /Reliquary is in alpha/);
   assert.doesNotMatch(page, /the address the invite was sent to/);
   assert.doesNotMatch(page, /Reliquary is invite-only/);
 });

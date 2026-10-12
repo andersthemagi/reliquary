@@ -72,10 +72,10 @@ export const versionLink = () =>
 // and the public site's) linking to the roadmap, and the sentence itself
 // where there is room (the landing page, the docs, the roadmap, the
 // Account menu).
-export const PRE_ALPHA = "Pre-alpha: things change and may break; data is backed up daily.";
-export const stageBadge = () => html`<a class="stage" href="${siteHref("/roadmap")}" title="${PRE_ALPHA}">Pre-alpha</a>`;
-export const preAlphaNote = () =>
-  html`<p class="prealpha-note"><strong>Pre-alpha:</strong> things change and may break; data is backed up daily. <a href="${siteHref("/roadmap")}">See the roadmap</a>.</p>`;
+export const ALPHA = "Alpha: things change and may break; data is backed up daily.";
+export const stageBadge = () => html`<a class="stage" href="${siteHref("/roadmap")}" title="${ALPHA}">Alpha</a>`;
+export const alphaNote = () =>
+  html`<p class="alpha-note"><strong>Alpha:</strong> things change and may break; data is backed up daily. <a href="${siteHref("/roadmap")}">See the roadmap</a>.</p>`;
 
 export type Nav =
   | "home"
@@ -240,7 +240,7 @@ function appBar(opts: PageOpts, theme: Theme): Raw {
           <li><a href="/welcome"${current("welcome")}>Welcome tour</a></li>
         </ul>
         <p class="menu-links"><a href="${siteHref("/docs")}">Docs</a><a href="${siteHref("/roadmap")}">Roadmap</a></p>
-        <p class="menu-meta">${PRE_ALPHA}</p>
+        <p class="menu-meta">${ALPHA}</p>
         <form method="post" action="/theme" class="theme" aria-label="Theme">
           ${csrfField(opts.csrf)}<input type="hidden" name="back" value="${path}">
           <span class="menu-label">Theme</span>

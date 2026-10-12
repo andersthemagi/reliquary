@@ -53,6 +53,6 @@ The database (Supabase) is in Frankfurt (AWS eu-central-1); the app itself runs 
 
 - **Agents can read what reaches them.** An agent that can run commands in a process holding a variable can read that variable. `reliquary run` limits exposure to one process; it doesn't stop that process.
 - **The operator can decrypt.** Someone with both the database and the web app's key, which means Reliquary's operator, could technically decrypt variable values. We don't, and access is limited to running the service.
-- **No certification yet.** No SOC 2 report, ISO certificate or SSO. Reliquary is built and run by one person, and is pre-alpha: things change and may break.
+- **No certification yet.** No SOC 2 report, ISO certificate or SSO. Reliquary is built and run by one person, and is in alpha: things change and may break.
 
 To report a vulnerability, see the [security page](/security#disclosure).

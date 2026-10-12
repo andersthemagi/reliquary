@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PRE_ALPHA, html, preAlphaNote, raw, type Raw, type Theme } from "./html.js";
+import { ALPHA, html, alphaNote, raw, type Raw, type Theme } from "./html.js";
 import { renderDocMarkdown } from "./markdown.js";
 import { siteOrigin, sitePage } from "./site.js";
 
@@ -100,7 +100,7 @@ function sidebar(d: Docs, current: string): Raw {
 
 function frame(d: Docs, current: string, article: Raw, aside: Raw | ""): Raw {
   return html`<div class="docs">
-    <div class="docs-side"><nav aria-label="Docs">${sidebar(d, current)}</nav>${preAlphaNote()}</div>
+    <div class="docs-side"><nav aria-label="Docs">${sidebar(d, current)}</nav>${alphaNote()}</div>
     <details class="docs-menu"><summary>Docs menu</summary><nav aria-label="Docs menu">${sidebar(d, current)}</nav></details>
     <article class="docs-article">${article}</article>
     ${aside}
@@ -170,7 +170,7 @@ function llmsFullTxt(d: Docs): string {
 
 // The roadmap is the GitHub project board, not a page of ours: two copies
 // meant every feature was moved twice. /roadmap stays as the stable URL (the
-// Pre-alpha badge, the README, old links) and sends people there.
+// Alpha badge, the README, old links) and sends people there.
 export const ROADMAP_URL = "https://github.com/users/andersthemagi/projects/3";
 
 export type DocsReply = { status?: number; type: string; body: string; location?: string };

@@ -1111,7 +1111,7 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
 
 /* Figures line up only where numbers are compared: tables, counts, times,
    diff stats. Elsewhere Inter's tabular hyphen would put a wide gap in
-   "read-only" or "Pre-alpha". */
+   "read-only" or "Alpha". */
 td, th, .num, time, .count, .diff-stat, .meter { font-variant-numeric: tabular-nums; }
 time { white-space: nowrap; }
 
@@ -1247,20 +1247,9 @@ body.site { font-variant-numeric: normal; }
 .wordmark-by { color: var(--fg-muted); font-weight: 400; margin-left: -4px; }
 .site-signin { margin-left: auto; flex: none; }
 .site-main { padding-top: var(--space-8); }
-.site-section[id] { scroll-margin-top: var(--space-6); }
 .site-footer { align-items: center; }
 .site-footer-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 500; }
 
-/* Hero */
-.hero { display: grid; gap: var(--space-8); align-items: center; }
-.eyebrow {
-  display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-5);
-  font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: 600; color: var(--fg-muted);
-}
-.hero h1 { font-size: clamp(2rem, 1.4rem + 3vw, 3.25rem); line-height: 1.08; letter-spacing: -0.025em; max-width: 16ch; }
-.hero-sub { font-size: var(--text-xl); line-height: var(--lh-xl); font-weight: 600; margin: var(--space-5) 0 var(--space-4); }
-.hero-lede { color: var(--fg-muted); font-size: var(--text-lg); line-height: var(--lh-lg); margin: 0 0 var(--space-6); }
-.hero-small { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-4) 0 0; }
 .site-cta { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .site-cta .button { min-height: 44px; padding: 0 20px; font-size: var(--text-md); }
 
@@ -1305,21 +1294,6 @@ body.site { font-variant-numeric: normal; }
 .hero-canon, .hero-log, .hero-note { animation: demo-in 200ms ease-out; }
 @keyframes demo-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .hero-canon, .hero-log, .hero-note { animation: none; } }
-.hero-works { margin: var(--space-5) 0 0; font-weight: 500; }
-
-/* The hero's right column: what an agent can't do, large. The caption's
-   filled diamond is the canon mark: the limits are facts, not promises. */
-.hero-ceiling { margin: 0; padding: var(--space-6); display: grid; gap: var(--space-5); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.hero-ceiling-title { margin: 0; font-size: var(--text-sm); line-height: var(--lh-sm); font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.hero-ceiling .cant-list { margin: 0; gap: var(--space-3); grid-template-columns: none; }
-.hero-ceiling .cant-list li { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; }
-.hero-ceiling .cant-mark { font-size: var(--text-md); }
-.canon-line { position: relative; padding-left: var(--space-5); color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
-.canon-line::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 7px; height: 7px; transform: rotate(45deg); background: var(--brand); }
-
-/* How it works: the drawn proposal card sits above the steps. */
-#how .hero-card { max-width: 32rem; margin-bottom: var(--space-6); }
-
 /* A secret's value is a row of filled diamonds: a value nobody reads. */
 .term { margin: var(--space-4) 0 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg); font: 400 var(--text-sm)/1.7 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .term-muted { color: var(--fg-muted); }
@@ -1327,58 +1301,12 @@ body.site { font-variant-numeric: normal; }
 
 .who-builds { margin: var(--space-7) 0 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); max-width: 60ch; }
 
-/* Sections */
-.site-section { margin-top: var(--space-10); padding-top: var(--space-8); border-top: 1px solid var(--border); }
-.site-section > h2 { font-size: var(--text-2xl); line-height: var(--lh-2xl); letter-spacing: -0.01em; margin: 0 0 var(--space-6); }
-.site-section h3 { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; margin: 0 0 var(--space-2); }
-.site-section .feature p, .steps p { color: var(--fg-muted); margin: 0; }
-
-/* The problem as rows: the pain (hollow diamond, open) and what Reliquary
-   does about it (filled, canon) side by side from 640px. */
-.problem-rows { margin: 0; display: grid; gap: var(--space-5); }
-.problem-row { display: grid; gap: var(--space-3); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
-.problem-row:last-child { border-bottom: 0; padding-bottom: 0; }
-.problem-row dt, .problem-row dd { position: relative; margin: 0; padding-left: var(--space-6); line-height: var(--lh-md); }
-.problem-row dt { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 500; }
-.problem-row dd { color: var(--fg-muted); }
-.problem-row dt::before, .problem-row dd::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 8px; height: 8px; transform: rotate(45deg); }
-.problem-row dt::before { box-shadow: inset 0 0 0 1.5px var(--brand); }
-.problem-row dd::before { background: var(--brand); }
-
-.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); counter-reset: step; }
-.steps li { counter-increment: step; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-5); background: var(--bg-subtle); }
-.steps li::before {
-  content: counter(step); display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; margin-bottom: var(--space-4); border-radius: var(--radius-full);
-  background: var(--primary-bg); color: var(--primary-fg); font-size: var(--text-sm); font-weight: 600;
-}
-.steps code { overflow-wrap: anywhere; }
-
-.grid-2, .grid-3 { display: grid; gap: var(--space-6) var(--space-7); }
-.feature { padding-left: var(--space-5); border-left: 2px solid var(--border); }
-.not-for { margin: var(--space-7) 0 var(--space-3); }
-
-.ceiling { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.ceiling li {
-  display: inline-flex; align-items: center; padding: var(--space-3) 14px;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: 500;
-}
-
 /* Pricing */
-.beta-banner { font-size: var(--text-md); line-height: var(--lh-md); }
-.tiers { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid; gap: var(--space-5); }
-.tier { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; }
-.tier-highlight { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
-.tier h3 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .tier-for { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: 0 0 var(--space-5); }
 .tier-price { margin: 0; }
 .tier-price .amount { font-size: var(--text-2xl); line-height: var(--lh-2xl); font-weight: 600; letter-spacing: -0.01em; }
 .tier-price .per, .tier-yearly { color: var(--fg-muted); font-size: var(--text-sm); }
 .tier-yearly { margin: 0 0 var(--space-5); line-height: var(--lh-sm); }
-.tier ul { margin: 0; padding: var(--space-5) 0 0; border-top: 1px solid var(--border); list-style: none; display: grid; gap: var(--space-3); font-size: var(--text-sm); line-height: var(--lh-sm); }
-.tier ul li { display: flex; gap: var(--space-3); }
-.tier ul li::before { content: ""; flex: none; width: 6px; height: 6px; margin-top: 7px; transform: rotate(45deg); background: var(--fg-muted); }
-
 /* FAQ */
 .faq { max-width: 48rem; border-top: 1px solid var(--border); }
 .faq details { border-bottom: 1px solid var(--border); }
@@ -1409,22 +1337,8 @@ body.site { font-variant-numeric: normal; }
 .legal .caveats li { margin-top: var(--space-3); }
 mark.placeholder { background: none; color: var(--attention); font-weight: 500; text-decoration: underline dashed; text-underline-offset: 0.2em; }
 
-@media (min-width: 640px) {
-  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .problem-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-7); }
-  .tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 900px) {
-  .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: var(--space-9); }
-  .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (min-width: 1100px) {
-  .tiers { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
 @media (max-width: 640px) {
   .site-main { padding-top: var(--space-6); }
-  .site-section { margin-top: var(--space-9); padding-top: var(--space-7); }
   .wordmark-by { display: none; }
   .legal th[scope="row"] { width: 7rem; }
   /* The sub-processor table stacks: one bordered block per provider. */
@@ -1438,7 +1352,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   .subprocessors tr:hover > td { background: none; }
 }
 
-/* Stage: the pre-alpha badge in every top bar, and its sentence (html.ts). */
+/* Stage: the alpha badge in every top bar, and its sentence (html.ts). */
 .stage {
   display: inline-flex; align-items: center; flex: none; min-height: 22px; padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--attention) 35%, transparent); border-radius: var(--radius-full);
@@ -1447,8 +1361,8 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 }
 .top-inner .stage { margin-left: calc(-1 * var(--space-5)); }
 .stage:hover { text-decoration: underline; }
-.prealpha-note { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-3) 0 0; }
-.prealpha-note strong { color: var(--attention); }
+.alpha-note { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-3) 0 0; }
+.alpha-note strong { color: var(--attention); }
 .menu-links { display: flex; gap: var(--space-5); margin: 0; font-size: var(--text-sm); }
 /* The public site's nav (with Docs and Roadmap) gets its own row before it
    would crowd the header; phones already do this (the 640px rules). */
@@ -1488,7 +1402,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .docs-nav-section a[aria-current="page"]::before {
   content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--brand);
 }
-.docs-side .prealpha-note { margin-top: var(--space-6); padding: var(--space-4) var(--space-3) 0; border-top: 1px solid var(--border); }
+.docs-side .alpha-note { margin-top: var(--space-6); padding: var(--space-4) var(--space-3) 0; border-top: 1px solid var(--border); }
 
 .docs-menu > summary {
   display: inline-flex; align-items: center; gap: var(--space-3); list-style: none; cursor: pointer;
@@ -1563,11 +1477,6 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Package I: signed-out and error pages */
-/* Landing: what an agent can't do, as a plain list with a mark (landing.ts). */
-.cant-list { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: var(--space-3) var(--space-7); }
-.cant-list li { display: flex; align-items: baseline; gap: var(--space-3); font-weight: 500; }
-.cant-mark { flex: none; color: var(--danger); font-size: var(--text-sm); }
-@media (min-width: 700px) { .cant-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Error pages (errorpage.ts): the lines to copy into a report, folded away. */
 .failure-details { margin: 0 0 var(--space-6); max-width: 80ch; }
 .failure-details > summary { cursor: pointer; width: fit-content; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
@@ -2068,4 +1977,317 @@ table.env-log td[data-label="Environment"] { white-space: nowrap; }
   width: 1px;
   height: 1px;
   overflow: hidden;
+}
+
+/* Poster: the mark ------------------------------------------------------
+   One typeface at two extremes (200 is open, 800 is canon), hairlines, no
+   cards, no shadows, the diamond as the only picture. The first and last
+   screens are inverted against the page. The mark, big, is the first band's
+   picture; its silhouette repeats down the page as a margin rail that fills
+   as the reader scrolls. */
+
+/* The inverted band carries its own palette: the dark theme's values when
+   the page is light, the light theme's when it is dark. Muted text on it is
+   the band's own foreground, dimmed, never a grey from the other theme. */
+.p-inv {
+  --ib: #141312; --ibs: #1c1a19; --ibd: #34302e; --ibds: #6f6863;
+  --if: #edebe9; --ifm: #a8a19c; --ilink: #6cb6ff; --ibrand: #ff5f57;
+  --ipb: #edebe9; --ipf: #141312; --iph: #d3cfcc;
+  background: var(--ib); color: var(--if);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .p-inv {
+    --ib: #ffffff; --ibs: #f7f6f5; --ibd: #e2dfdc; --ibds: #8c8580;
+    --if: #1c1917; --ifm: #5c5652; --ilink: #0a58ca; --ibrand: #e8393a;
+    --ipb: #1c1917; --ipf: #ffffff; --iph: #3b3633;
+  }
+}
+:root[data-theme="dark"] .p-inv {
+  --ib: #ffffff; --ibs: #f7f6f5; --ibd: #e2dfdc; --ibds: #8c8580;
+  --if: #1c1917; --ifm: #5c5652; --ilink: #0a58ca; --ibrand: #e8393a;
+  --ipb: #1c1917; --ipf: #ffffff; --iph: #3b3633;
+}
+.p-inv a { color: var(--ilink); }
+.p-inv ::selection { background: color-mix(in srgb, var(--ibrand) 25%, transparent); color: var(--if); }
+.p-inv :focus-visible { outline: 2px solid var(--ilink); outline-offset: 3px; }
+.p-inv .button { background: transparent; color: var(--if); border-color: var(--ibds); }
+.p-inv .button:hover { background: var(--ibs); border-color: var(--if); }
+.p-inv .button.primary { background: var(--ipb); color: var(--ipf); border-color: var(--ipb); }
+.p-inv .button.primary:hover { background: var(--iph); border-color: var(--iph); }
+.p-inv .logo { background: var(--ibrand); }
+
+/* Browser surfaces carry the palette too. */
+:root:has(.p-site) { scrollbar-color: var(--border-strong) var(--bg); scrollbar-width: thin; }
+body.p-site { display: block; }
+.p-site :focus-visible { outline-offset: 3px; }
+.p-wrap { max-width: 1280px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 56px); }
+.p-site a { text-underline-offset: 0.2em; }
+
+/* Top bar at the band's own grid edges. */
+.p-top { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 72px; }
+.p-top .wordmark { color: inherit; }
+.p-top .site-signin { margin-left: 0; flex: none; }
+.p-top .stage { flex: none; }
+.p-top nav { display: flex; gap: 8px 24px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; font-size: var(--text-sm); font-weight: 500; }
+.p-top nav a { color: var(--ifm); text-decoration: none; padding: 6px 0; border-bottom: 1px solid transparent; transition: color 120ms ease-out, border-color 120ms ease-out; }
+.p-top nav a:hover { color: var(--if); border-bottom-color: var(--if); }
+/* On a phone the links take their own row under the wordmark instead of wrapping one by one. */
+@media (max-width: 719px) { .p-top { flex-wrap: wrap; gap: 8px 12px; padding-block: 8px; } .p-top .site-signin { order: 1; } .p-top nav { width: 100%; justify-content: flex-start; gap: 2px 14px; order: 2; } }
+
+/* First screen ------------------------------------------------------------ */
+.p-fold { min-height: min(100svh, 960px); display: flex; flex-direction: column; position: relative; }
+/* Flex items with auto margins are not stretched, so the wrap says so. */
+.p-fold > .p-wrap { width: 100%; box-sizing: border-box; }
+.p-fold-body { flex: 1; display: grid; gap: 40px 64px; padding-block: 32px 48px; align-content: center; }
+.p-fold-text { max-width: 44rem; }
+/* Sized so each of the three lines stays one line across the band at 1280
+   and 1440; below 900px the longest wraps once. */
+.p-h1 { margin: 0; font-size: clamp(2.5rem, 1rem + 3.9vw, 4.75rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; }
+.p-h1 > span { display: block; position: relative; padding-left: 0.78em; }
+/* Open is light, canon is heavy: the weight is the mark's meaning again. */
+.p-h1 .p-open { font-weight: 200; }
+.p-h1 .p-canon { font-weight: 800; }
+.p-h1 > span::before { content: ""; position: absolute; left: 0.08em; top: 0.33em; width: 0.3em; height: 0.3em; transform: rotate(45deg); }
+.p-h1 .p-open::before { box-shadow: inset 0 0 0 0.035em var(--ibrand); }
+.p-h1 .p-canon::before { background: var(--ibrand); }
+/* Three filled diamonds in a row, one element: the shadows are offset along
+   the rotated axes, which lands them on a horizontal line on screen. */
+.p-sub { margin: 0; max-width: 32rem; font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem); line-height: 1.4; font-weight: 500; }
+.p-lede { margin: 16px 0 0; max-width: 36rem; color: var(--ifm); font-size: var(--text-md); line-height: var(--lh-md); }
+/* The key: the three states, each with its mark, as the first thing under
+   the H1. It is the legend for every diamond on the page. */
+.p-key { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); }
+.p-key li { position: relative; padding-left: 2rem; }
+.p-key strong { color: var(--if); font-weight: 600; }
+.p-key li::before { content: ""; position: absolute; left: 0.3rem; top: 0.45em; width: 0.5rem; height: 0.5rem; transform: rotate(45deg); }
+.p-key-open::before { box-shadow: inset 0 0 0 1.5px var(--ibrand); }
+.p-key-canon::before { background: var(--ibrand); }
+.p-key-sealed::before { left: 0.1rem; top: 0.62em; width: 0.24rem; height: 0.24rem; background: var(--ibrand); box-shadow: 0.32rem -0.32rem 0 0 var(--ibrand), 0.64rem -0.64rem 0 0 var(--ibrand); }
+
+/* The hub: tools, a link, the vault, a link, people; the key under it.
+   Phones stack it; from 900px it runs left to right. Chips and hairlines
+   only, in the band's own colours. */
+.p-hub { margin: 0; display: grid; gap: 0; justify-items: center; grid-template-areas: "tools" "l1" "vault" "l2" "people" "cap"; }
+.p-hub-side { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.p-hub-side li { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--ibds); color: var(--if); font-size: var(--text-sm); font-weight: 600; line-height: 1.2; }
+.p-hub-side svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+.p-hub-tools { grid-area: tools; }
+.p-hub-people { grid-area: people; }
+.p-hub-vault { grid-area: vault; display: grid; justify-items: center; gap: 4px; padding: 20px 24px; border: 1px solid var(--if); text-align: center; max-width: 16rem; }
+.p-hub-vault strong { font-weight: 800; letter-spacing: -0.02em; font-size: var(--text-lg); }
+.p-hub-vault span:last-child { font-size: var(--text-sm); color: var(--ifm); }
+.p-hub-mark { width: 56px; height: 56px; margin-bottom: 6px; background: var(--ibrand); -webkit-mask: url(/logo.svg) no-repeat center / contain; mask: url(/logo.svg) no-repeat center / contain; }
+.p-hub-link { position: relative; display: grid; place-items: center; width: 100%; height: 56px; }
+.p-hub-propose { grid-area: l1; }
+.p-hub-approve { grid-area: l2; }
+.p-hub-link::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px solid var(--ibds); }
+.p-hub-link i { position: relative; width: 10px; height: 10px; transform: rotate(45deg); background: var(--ib); }
+.p-hub-propose i { box-shadow: inset 0 0 0 1.5px var(--ibrand); }
+.p-hub-approve i { background: var(--ibrand); }
+.p-hub-link span { position: absolute; left: calc(50% + 16px); top: 50%; transform: translateY(-50%); font-size: var(--text-sm); color: var(--ifm); }
+.p-hub figcaption { grid-area: cap; margin-top: 24px; justify-self: stretch; }
+@media (min-width: 900px) {
+  .p-hub { grid-template-columns: auto minmax(40px, 1fr) auto minmax(40px, 1fr) auto; grid-template-areas: "tools l1 vault l2 people" "cap cap cap cap cap"; align-items: center; }
+  .p-hub-side { flex-direction: column; align-items: stretch; }
+  .p-hub-link { height: auto; align-self: stretch; }
+  .p-hub-link::before { left: 0; right: 0; top: 50%; bottom: auto; border-left: 0; border-top: 1px solid var(--ibds); }
+  .p-hub-link span { left: 50%; top: calc(50% + 12px); transform: translateX(-50%); }
+}
+.p-fold .site-cta { margin-top: 32px; align-items: center; }
+.site-cta-link, .p-inv .site-cta-link { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 0.25em; text-decoration-color: var(--ibds, var(--border-strong)); }
+.site-cta-link:hover { text-decoration-color: currentColor; }
+.p-small { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
+.p-small strong { color: var(--if); }
+.p-fold .alpha-note { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
+.p-fold .alpha-note strong { color: var(--if); }
+
+/* The mark: the logo masked in the band's brand colour. Below 900px it
+   closes the band under the text; above, it is the right column and runs
+   past the band's edge, cropped, the way a poster crops its image. */
+.p-mark { position: relative; min-height: 160px; margin: 0; }
+.p-mark::before {
+  content: ""; position: absolute; inset: 0; background: var(--ibrand);
+  -webkit-mask: url(/logo.svg) no-repeat center / contain; mask: url(/logo.svg) no-repeat center / contain;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Only the first band settles: one authored moment, and the closing mark
+     is never caught mid-settle when it scrolls into view. */
+  header .p-hub { animation: p-settle 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes p-settle { from { opacity: 0; transform: scale(0.92); } }
+}
+@media (min-width: 900px) {
+  .p-fold-body { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-areas: "head head" "text field"; align-items: center; }
+  /* The H1 runs across both columns; the mark's left edge is far enough
+     right that the longest line clears it at every width. */
+  .p-fold-head { grid-area: head; position: relative; z-index: 1; }
+  .p-fold-text { grid-area: text; }
+  .p-fold { overflow: hidden; }
+  .p-fold-body .p-hub { grid-area: field; }
+}
+
+/* The rail: the mark's silhouette repeats down the left margin on wide screens,
+   hollow at the top and filling as the reader passes the approval sections.
+   Scroll-driven where supported and motion is welcome; a static
+   hollow-then-filled column otherwise. */
+.p-rail { display: none; }
+@media (min-width: 1100px) {
+  .p-rail { display: grid; gap: 16px; position: fixed; top: 50%; transform: translateY(-50%); left: 16px; z-index: 1; pointer-events: none; }
+  .p-rail i { display: block; width: 8px; height: 8px; transform: rotate(45deg); box-shadow: inset 0 0 0 1.5px var(--brand); }
+  .p-rail i:nth-child(n+8) { box-shadow: none; background: var(--brand); }
+  @supports (animation-timeline: scroll()) { @media (prefers-reduced-motion: no-preference) {
+    .p-rail i { box-shadow: inset 0 0 0 1.5px var(--brand); background: none; animation: p-fill linear both; animation-timeline: scroll(root); }
+    .p-rail i:nth-child(1) { animation-range: 4% 8%; }   .p-rail i:nth-child(2) { animation-range: 8% 12%; }
+    .p-rail i:nth-child(3) { animation-range: 12% 16%; } .p-rail i:nth-child(4) { animation-range: 16% 20%; }
+    .p-rail i:nth-child(5) { animation-range: 20% 24%; } .p-rail i:nth-child(6) { animation-range: 24% 28%; }
+    .p-rail i:nth-child(7) { animation-range: 28% 32%; } .p-rail i:nth-child(8) { animation-range: 32% 36%; }
+    .p-rail i:nth-child(9) { animation-range: 36% 40%; } .p-rail i:nth-child(10) { animation-range: 40% 44%; }
+    .p-rail i:nth-child(11) { animation-range: 44% 48%; } .p-rail i:nth-child(12) { animation-range: 48% 52%; }
+    .p-rail i:nth-child(13) { animation-range: 52% 56%; } .p-rail i:nth-child(14) { animation-range: 56% 60%; }
+    @keyframes p-fill { to { background: var(--brand); box-shadow: inset 0 0 0 1.5px var(--brand); } }
+  } }
+}
+
+/* Sections ---------------------------------------------------------------- */
+.p-sec { padding: clamp(80px, 10vw, 144px) 0 0; }
+.p-sec[id] { scroll-margin-top: 24px; }
+.p-sec h2 { margin: 0 0 40px; font-size: clamp(1.75rem, 1.2rem + 2.2vw, 3rem); line-height: 1.05; letter-spacing: -0.03em; font-weight: 800; max-width: 22ch; text-wrap: balance; }
+.p-sec h3 { margin: 0; font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; letter-spacing: -0.01em; }
+.p-sec p { max-width: 60ch; }
+
+/* The ceiling: five lines, each at display size, with a drawn cross. */
+.p-ceiling { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--fg); }
+.p-ceiling li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: clamp(1.375rem, 1rem + 1.4vw, 2.25rem); line-height: 1.1; letter-spacing: -0.025em; font-weight: 800; }
+.p-x { position: relative; width: 0.45em; height: 0.45em; justify-self: center; }
+.p-x::before, .p-x::after { content: ""; position: absolute; left: 50%; top: 0; width: 0.055em; height: 100%; margin-left: -0.0275em; background: var(--fg); transform: rotate(45deg); }
+.p-x::after { transform: rotate(-45deg); }
+.p-note { margin: 24px 0 0; max-width: 48rem; position: relative; padding-left: calc(1.25rem + 12px); color: var(--fg-muted); }
+.p-note::before { content: ""; position: absolute; left: 5px; top: 8px; width: 9px; height: 9px; transform: rotate(45deg); background: var(--brand); }
+.p-note a { white-space: nowrap; }
+.p-note-who { margin-top: 12px; }
+.p-note-who::before { background: none; box-shadow: inset 0 0 0 1.5px var(--brand); }
+
+/* The ledger: a hairline grid, pains hollow and fixes filled. */
+.p-ledger-head { display: grid; border-top: 1px solid var(--fg); }
+.p-ledger-head span { padding: 12px 24px 12px 48px; font-size: var(--text-sm); font-weight: 600; color: var(--fg-muted); }
+.p-ledger { margin: 0; display: grid; }
+.p-ledger > div { display: grid; border-top: 1px solid var(--border); }
+.p-ledger > div:last-child { border-bottom: 1px solid var(--border); }
+.p-ledger dt, .p-ledger dd { margin: 0; padding: 24px 24px 24px 48px; position: relative; }
+.p-ledger dt { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; letter-spacing: -0.01em; }
+.p-ledger dd { color: var(--fg-muted); max-width: 60ch; }
+.p-ledger dt::before, .p-ledger dd::before { content: ""; position: absolute; left: 22px; top: 33px; width: 9px; height: 9px; transform: rotate(45deg); }
+.p-ledger dt::before { box-shadow: inset 0 0 0 1.5px var(--brand); }
+.p-ledger dd::before { background: var(--brand); }
+@media (min-width: 720px) {
+  .p-ledger > div, .p-ledger-head { grid-template-columns: 1fr 1fr; }
+  .p-ledger dd, .p-ledger-head span:last-child { border-left: 1px solid var(--border); }
+}
+@media (max-width: 719px) { .p-ledger-head span:last-child { display: none; } .p-ledger dd { padding-top: 0; } .p-ledger dd::before { top: 9px; } }
+
+/* Rows: a heading on the left, its text on the right, a hairline between. */
+.p-rows { display: grid; border-top: 1px solid var(--fg); }
+.p-rows > div { display: grid; gap: 8px 48px; padding: 24px 0; border-bottom: 1px solid var(--border); }
+.p-rows > div p { margin: 0; color: var(--fg-muted); }
+@media (min-width: 720px) { .p-rows > div { grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr); } }
+
+/* How it works: two reserved frames, then the steps. */
+.p-frames { display: grid; gap: 24px; margin: 0 0 64px; }
+@media (min-width: 900px) { .p-frames { grid-template-columns: 1fr 1fr; align-items: start; } }
+.p-frame { margin: 0; display: grid; grid-template-rows: 1fr auto; border: 1px solid var(--border-strong); }
+.p-frame-art { padding: 0; display: grid; align-content: center; }
+.p-frame figcaption { padding: 12px 24px 14px; border-top: 1px solid var(--border-strong); font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--fg-muted); }
+.p-frame .hero-card { max-width: none; margin: 0; width: 100%; border: 0; border-radius: 0; padding: 24px; background: var(--bg); }
+.p-frame .term { margin: 0; max-width: none; width: 100%; border: 0; border-radius: 0; padding: 24px; background: var(--bg); }
+.p-steps { list-style: none; margin: 0; padding: 0; counter-reset: p; display: grid; border-top: 1px solid var(--fg); }
+.p-steps li { counter-increment: p; display: grid; gap: 8px 48px; padding: 24px 0; border-bottom: 1px solid var(--border); }
+.p-steps h3::before { content: counter(p) "  "; font-weight: 200; font-variant-numeric: tabular-nums; white-space: pre; }
+.p-steps p { margin: 0; color: var(--fg-muted); }
+@media (min-width: 720px) { .p-steps li { grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr); } }
+
+/* The log, running: one line per entry, repeated so the strip has no end.
+   It pauses under the pointer, and under reduced motion it is a row you
+   scroll by hand. */
+.p-log { margin: 64px 0 0; border-top: 1px solid var(--fg); border-bottom: 1px solid var(--border); }
+.p-log-cap { margin: 0; padding: 12px 0 0; font-size: var(--text-sm); font-weight: 600; color: var(--fg-muted); }
+.p-log-track { display: flex; flex-wrap: wrap; gap: 8px 48px; padding: 12px 0 16px; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--fg-muted); }
+.p-log-track span { max-width: 100%; }
+.p-log-track span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 12px 1px 0; transform: rotate(45deg); background: var(--brand); }
+.p-log-track span.p-o::before { background: none; box-shadow: inset 0 0 0 1.5px var(--brand); }
+.p-log-track b { color: var(--fg); font-weight: 600; }
+
+
+/* Pricing as a three-cell ledger. */
+.tier-price .amount-word { font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 400; color: var(--fg-muted); }
+#pricing .site-cta { margin-top: 32px; }
+.p-beta { margin: 0 0 32px; max-width: 60ch; color: var(--fg-muted); display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: 12px; }
+.p-beta::before { content: ""; width: 9px; height: 9px; margin-top: 8px; transform: rotate(45deg); background: var(--brand); }
+.p-beta strong { color: var(--fg); }
+.p-tiers { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px solid var(--fg); }
+.p-tiers > li { padding: 24px 0; display: grid; gap: 8px; align-content: start; border-bottom: 1px solid var(--border); }
+.p-tiers > li p { margin: 0; }
+.p-tiers h3 { display: flex; align-items: center; gap: 10px; }
+.p-tiers .tier-for { color: var(--fg-muted); }
+.p-tiers .tier-price { margin-top: 8px; }
+.p-tiers .tier-price .amount { font-size: clamp(2rem, 1.5rem + 1.5vw, 3rem); font-weight: 200; letter-spacing: -0.03em; line-height: 1; }
+.p-tiers .tier-yearly { color: var(--fg-muted); font-size: var(--text-sm); }
+.p-tiers ul { margin: 16px 0 0; padding: 16px 0 0; border-top: 1px solid var(--border); list-style: none; display: grid; gap: 8px; font-size: var(--text-sm); color: var(--fg-muted); }
+.p-tiers ul li { display: flex; gap: 10px; padding: 0; }
+.p-tiers ul li::before { content: ""; flex: none; width: 6px; height: 6px; margin-top: 7px; transform: rotate(45deg); background: var(--fg-muted); }
+@media (min-width: 720px) {
+  .p-tiers { grid-template-columns: repeat(2, 1fr); max-width: 56rem; }
+  .p-tiers > li { padding: 24px; }
+  .p-tiers > li + li { border-left: 1px solid var(--border); }
+  .p-tiers > li:first-child { padding-left: 0; }
+}
+.p-tiers-note { margin: 24px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--fg-muted); max-width: 60ch; }
+
+/* Questions: the existing disclosure list, wider. */
+.p-sec .faq { max-width: 56rem; border-top-color: var(--fg); }
+.p-sec .faq { padding-top: 8px; }
+.p-sec .faq summary { font-size: var(--text-lg); min-height: 60px; transition: color 120ms ease-out; }
+.p-sec .faq summary:hover { color: var(--link); }
+.p-sec .faq details p { max-width: 60ch; }
+
+/* Closing band: mirrors the first. */
+/* footer in style.css is a centred 1280px block; the band is full-bleed like the first. */
+.p-close { margin: clamp(80px, 10vw, 144px) 0 0; max-width: none; width: 100%; padding: 0; border-top: 0; min-height: min(80svh, 760px); }
+.p-close .p-fold-body { padding-block: 64px 48px; }
+.p-close-h2 { margin: 0; font-size: clamp(2.5rem, 1rem + 3.9vw, 4.75rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; }
+.p-close-h2 b { display: block; font-weight: 200; }
+.p-close .p-lede { max-width: 44rem; margin-top: 0; }
+.p-close .who-builds { color: var(--ifm); max-width: 44rem; }
+.p-close .p-mark { min-height: 160px; }
+@media (min-width: 900px) { .p-close .p-mark::before { inset: 10% 0 10% 30%; } }
+.p-footer { padding-block: 20px 28px; border-top: 1px solid var(--ibd); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; font-size: var(--text-sm); color: var(--ifm); }
+.p-footer .site-footer-brand { color: inherit; margin-right: auto; }
+.p-footer .footer-links { display: contents; }
+.p-footer .footer-version { color: var(--ifm); }
+.p-footer a { color: var(--ifm); padding: 4px 0; transition: color 120ms ease-out; }
+.p-footer a:hover { color: var(--if); }
+
+
+/* Motion: one easing and two durations for the whole poster, so everything
+   moves the same way. Load: the first band's lines, text and mark settle in
+   order, one authored moment. Scroll: each block lifts in over its first
+   240px of entry where scroll-driven animation is supported, and is simply
+   there where not. Hover: colour and border, never size. All of it off
+   under prefers-reduced-motion. */
+.p-site { --ease: cubic-bezier(0.16, 1, 0.3, 1); --quick: 160ms; --slow: 800ms; }
+.p-site :is(a, .button, summary) { transition: color var(--quick) var(--ease), border-color var(--quick) var(--ease), background-color var(--quick) var(--ease); }
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.p-site) { scroll-behavior: smooth; }
+  header .p-h1 > span, header .p-fold-text > * { animation: p-rise var(--slow) var(--ease) both; }
+  header .p-h1 > span:nth-child(2) { animation-delay: 80ms; }
+  header .p-h1 > span:nth-child(3) { animation-delay: 160ms; }
+  header .p-fold-text > :nth-child(1) { animation-delay: 300ms; }
+  header .p-fold-text > :nth-child(2) { animation-delay: 360ms; }
+  header .p-fold-text > :nth-child(3) { animation-delay: 420ms; }
+  header .p-fold-text > :nth-child(4) { animation-delay: 480ms; }
+  header .p-fold-text > :nth-child(5) { animation-delay: 540ms; }
+  header .p-fold-text > :nth-child(6) { animation-delay: 600ms; }
+  header .p-hub { animation-delay: 240ms; }
+  @keyframes p-rise { from { opacity: 0; transform: translateY(14px); } }
+  @supports (animation-timeline: view()) {
+    .p-sec > *, .p-close .p-fold-body > * { animation: p-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 240px; }
+  }
 }

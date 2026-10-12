@@ -49,7 +49,7 @@ export const SLIDES: Slide[] = [
   },
   {
     title: "Tell us what you think",
-    body: html`<p>Reliquary is pre-alpha, so things change and some will break. Use the <strong>Feedback</strong> button in the top bar for bugs and ideas, or ask your agent to send feedback for you.</p>
+    body: html`<p>Reliquary is in alpha, so things change and some will break. Use the <strong>Feedback</strong> button in the top bar for bugs and ideas, or ask your agent to send feedback for you.</p>
       <p>The <a href="/docs">docs</a> explain each of these in more detail. You can open this tour again from the account menu, under <strong>Welcome tour</strong>.</p>`,
   },
 ];
