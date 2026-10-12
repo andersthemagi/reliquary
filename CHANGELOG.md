@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.20.0](https://github.com/andersthemagi/reliquary/compare/v0.19.1...v0.20.0) (2026-10-12)
+
+
+### Features
+
+* **web:** email the operator when someone joins ([#289](https://github.com/andersthemagi/reliquary/issues/289)) ([be3b2e3](https://github.com/andersthemagi/reliquary/commit/be3b2e365de0352dc7e6c8544af62e03775ca6b4))
+
 ## [0.19.1](https://github.com/andersthemagi/reliquary/compare/v0.19.0...v0.19.1) (2026-10-12)
 
 On a phone, the landing's hero and closing buttons now stack full width and the section spacing tightens, as 0.19.0 intended. No database changes.
