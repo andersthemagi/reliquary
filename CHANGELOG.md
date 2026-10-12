@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.19.1](https://github.com/andersthemagi/reliquary/compare/v0.19.0...v0.19.1) (2026-10-12)
+
+
+### Bug fixes
+
+* **web:** the phone layout's rules apply to the landing's hero and closing ([#286](https://github.com/andersthemagi/reliquary/issues/286)) ([136c2a2](https://github.com/andersthemagi/reliquary/commit/136c2a20eb8cfaa6e99afe844543708d3668e333))
+
 ## [0.19.0](https://github.com/andersthemagi/reliquary/compare/v0.18.0...v0.19.0) (2026-10-12)
 
 The landing page works properly on a phone: the site's links and Sign in fold into a menu, buttons stack full width, and the spacing fits the screen. It also gains a Why Reliquary section, an Alpha badge that matches its band, and examples that use roles instead of names. No database changes.
