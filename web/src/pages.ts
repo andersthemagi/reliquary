@@ -327,7 +327,7 @@ async function newVault(ctx: Ctx, d?: VaultDraft): Promise<Reply> {
     : callout(
         "warning",
         html`<p>You own ${plan.vaultsOwned} of the ${plan.maxVaults} ${vaultWord(plan.maxVaults)} the ${plan.planName} plan allows, so a new one can’t be created.</p>
-          <p>To make room, delete a vault you no longer need from its <strong>Settings</strong>. For more vaults, ask the operator for a bigger plan: nothing is billed during the beta.</p>
+          <p>To make room, delete a vault you no longer need from its <strong>Settings</strong>. For more vaults, ask the operator for a bigger plan: nothing is billed during the alpha.</p>
           ${ref ? refusedLine(ref) : ""}
           <p class="callout-actions"><a class="button" href="/account">Plan and usage</a><a class="button ghost" href="${biggerPlanHref()}">Ask for a bigger plan</a></p>`,
         { title: "You’re at your plan’s vault limit" },

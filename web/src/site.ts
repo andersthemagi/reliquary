@@ -53,7 +53,7 @@ export function fill(key: keyof typeof OPERATOR, what: string): Raw {
 // account plan limits the vaults a person owns; each vault's tier limits
 // its people and storage, and one vault can be upgraded on its own. The
 // limits are enforced (20260925230000_plans.sql); nothing is billed during
-// the beta.
+// the alpha.
 export const PRICING = {
   show: true,
   banner: "Alpha test: free for everyone",
@@ -64,7 +64,7 @@ export const PRICING = {
       price: "$0",
       period: "",
       yearly: "",
-      for: "Everyone, during the beta",
+      for: "Everyone, during the alpha",
       features: ["5 vaults you own", "Up to 10 people in each vault", "100 MB in each vault", "Unlimited agents and AI tools"],
       badge: "Now",
     },

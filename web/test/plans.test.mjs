@@ -205,11 +205,11 @@ test("full vault: an editor sees no invite button or note meant for owners", asy
   assert.doesNotMatch(h, /Invite someone|No places left/);
 });
 
-test("plan note: hosted, Plan and usage says nothing is billed during the beta and how to get more", async () => {
+test("plan note: hosted, Plan and usage says nothing is billed during the alpha and how to get more", async () => {
   const h = await page("pia", "/account");
   assert.match(h, /<p class="page-desc">The Web small plan: up to 2 vaults you own, each with its tier’s limits on people and storage\.<\/p>/);
   assert.match(h, /<meter class="usage-meter" min="0" max="2" low="1" high="2" optimum="0" value="1" aria-label="1 of 2 vaults owned">/);
-  assert.match(h, /Nothing is billed during the beta\. For a bigger plan, or the Pro tier for one vault, ask the operator: upgrades are given by hand\./);
+  assert.match(h, /Nothing is billed during the alpha\. For a bigger plan, or the Pro tier for one vault, ask the operator: upgrades are given by hand\./);
 });
 
 test("plan note: hosted, Plan and usage links to ask the operator for a bigger plan, at the operator's address", async () => {

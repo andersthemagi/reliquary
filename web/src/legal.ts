@@ -9,7 +9,8 @@
 // here: `/` is Home for a signed-in person, so server.ts decides.
 
 import { docsPaths, docsRoute } from "./docs.js";
-import { html, type Raw, type Theme } from "./html.js";
+import { ALPHA, html, type Raw, type Theme } from "./html.js";
+import { BUILD } from "./version.js";
 import { OPERATOR, draftNote, fill, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
 
 const mail = (addr: string) => html`<a href="mailto:${addr}">${addr}</a>`;
@@ -34,14 +35,14 @@ const operatorBlock = () => html`<p>Reliquary is run by ${OPERATOR.tradingName} 
 // Terms ---------------------------------------------------------------------
 
 function terms(theme: Theme): string {
-  return legalPage(theme, "/terms", "Terms of service", "The terms for using Reliquary by Red Mage during its beta.", html`
+  return legalPage(theme, "/terms", "Terms of service", "The terms for using Reliquary by Red Mage during its alpha.", html`
 <h2>Who we are</h2>
 ${operatorBlock()}
 <p>"We" means ${OPERATOR.tradingName}. "You" means the person or organisation that uses Reliquary, and "your team" the people you invite. These terms apply to the hosted service at ${OPERATOR.defaultOrigin.replace("https://", "")} and its MCP endpoint.</p>
 
 <h2>The service</h2>
 <p>Reliquary holds shared context (files, proposals, comments, an activity log) and environment variables for your team and the AI tools you connect. It runs no AI model: the tools you connect are yours, under your own agreements with their providers.</p>
-<p>Reliquary is in beta. Features change, and we may make mistakes. Access is by invitation.</p>
+<p>Reliquary is in alpha. Features change, and we may make mistakes.</p>
 
 <h2>Your account and your team</h2>
 <ul>
@@ -58,7 +59,7 @@ ${operatorBlock()}
 <p>Don't use Reliquary to break the law, to store content you have no right to, to attack or probe the service or other customers (except under our <a href="/security#disclosure">disclosure policy</a>), or to get around its limits. Don't store health data or payment card data: Reliquary isn't built or certified for them.</p>
 
 <h2>Fees</h2>
-<p>Reliquary is free while in beta. Before any fee applies to you, we'll tell you the price and give you ${fill("feeNoticeDays", "notice period")} to decide; you can export and leave at any time.</p>
+<p>Reliquary is free while in alpha. Before any fee applies to you, we'll tell you the price and give you ${fill("feeNoticeDays", "notice period")} to decide; you can export and leave at any time.</p>
 <p>Your plan sets how many vaults you own, and each vault's tier how many people and how much storage it holds (<a href="/docs/concepts/plans-and-limits">Plans and limits</a>). If a plan gets smaller, nothing is deleted: a vault over a limit keeps everything and takes nothing new until it is under.</p>
 
 <h2>Leaving, suspension and deletion</h2>
@@ -70,7 +71,7 @@ ${operatorBlock()}
 </ul>
 
 <h2>No warranty</h2>
-<p>During the beta the service is provided as it is, without warranties of availability or fitness for a purpose, to the extent the law allows. Keep your own copy of anything you can't lose; export makes that easy.</p>
+<p>During the alpha the service is provided as it is, without warranties of availability or fitness for a purpose, to the extent the law allows. Keep your own copy of anything you can't lose; export makes that easy.</p>
 
 <h2>Liability</h2>
 <p>Nothing in these terms limits liability that the law doesn't allow to be limited. Otherwise, each side's total liability is limited to ${fill("liabilityCap", "liability cap")}, and neither side is liable for indirect or consequential loss.</p>
@@ -232,7 +233,7 @@ function subprocessors(theme: Theme): string {
     ${SUBPROCESSORS.map(
       (s) => html`<tr><td><strong>${s.name}</strong>${s.link ? html`<br><a href="${s.link[0]}">${s.link[1]}</a>` : ""}</td><td data-label="What it does">${s.what}</td><td data-label="Where">${s.where}</td><td data-label="Data">${s.data}</td></tr>`,
     )}
-    <tr><td><strong>Payment provider</strong></td><td data-label="What it does">Billing, once plans are paid</td><td colspan="2" data-label="Where and data">None yet: nothing is billed during the beta. Added here before billing starts.</td></tr>
+    <tr><td><strong>Payment provider</strong></td><td data-label="What it does">Billing, once plans are paid</td><td colspan="2" data-label="Where and data">None yet: nothing is billed during the alpha. Added here before billing starts.</td></tr>
   </tbody>
 </table></div>
 
@@ -246,8 +247,11 @@ function subprocessors(theme: Theme): string {
 // Security ------------------------------------------------------------------------
 
 function security(theme: Theme): string {
-  return legalPage(theme, "/security", "Security", "How Reliquary by Red Mage protects vaults: access enforced in the database, hostile tests on every push, encrypted variables, EU hosting, and what we can't promise.", html`
+  return legalPage(theme, "/security", "Security", "How Reliquary by Red Mage protects vaults: access enforced in the database, hostile tests on every push, encrypted variables, where it runs, and what we can't promise.", html`
 <p class="lede">What protects your vaults, what doesn't, and how to report a problem.</p>
+
+<h2 id="status">Status</h2>
+<p>${ALPHA} This page is built from the same code as the running release${BUILD.version === "unknown" ? "" : html`, v${BUILD.version}`}, so it changes when a release does. <a href="/docs/changelog">The changelog</a> says what changed in each one.</p>
 
 <h2>The database enforces access</h2>
 <p>Every permission is a Postgres row-level security policy or trigger, not a check in the app that a bug could skip. Among them:</p>
