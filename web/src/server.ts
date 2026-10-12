@@ -42,6 +42,7 @@ import { signinUnavailablePage } from "./signin.js";
 import { envApi } from "./envapi.js";
 import { configureLinkProxy, linkProxyApi } from "./linkproxy.js";
 import { crossHost, hostKind, hostsConfigError, isSitePath } from "./hosts.js";
+import { githubStars } from "./github.js";
 import { landing } from "./landing.js";
 import { publicRoute } from "./legal.js";
 import { configureOAuth, oauthPublic } from "./oauth.js";
@@ -376,7 +377,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
         return;
       }
       const pub = url.pathname === "/"
-        ? { status: 200, type: "text/html; charset=utf-8", body: landing(theme) }
+        ? { status: 200, type: "text/html; charset=utf-8", body: landing(theme, await githubStars()) }
         : publicRoute(url.pathname, theme);
       if (pub) res.writeHead(pub.status ?? 200, { ...SECURITY_HEADERS, "content-type": pub.type, ...(pub.location ? { location: pub.location } : {}) }).end(pub.body);
       else {
@@ -495,7 +496,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
         // session cookies at all is a visitor: the landing page (landing.ts).
         // On the app host of a split site (hosts.ts), `/` is sign-in: the
         // landing page lives on the site host.
-        if (req.method === "GET" && url.pathname === "/" && !auth.cookies.length && host !== "app") send(res, { html: landing(theme) });
+        if (req.method === "GET" && url.pathname === "/" && !auth.cookies.length && host !== "app") send(res, { html: landing(theme, await githubStars()) });
         else if (req.method === "GET") send(res, { redirect: signinUrl(url.pathname + url.search) }, {}, auth.cookies);
         else send(res, { status: 401, html: notice("Signed out", html`Your session ended. <a href="/signin">Sign in</a> and try again.`, theme) }, {}, auth.cookies);
         console.info(`${req.method} ${url.pathname} ${res.statusCode}`);

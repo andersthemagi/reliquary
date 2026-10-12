@@ -13,8 +13,9 @@ const LOCAL = process.env.WEB_URL ?? "http://127.0.0.1:8791";
 const ORIGIN = PUBLIC_URL ? new URL(PUBLIC_URL).origin : "";
 const LEGAL = ["/terms", "/privacy", "/dpa", "/subprocessors", "/security"];
 // The only other sites a public page may link to (links, never loaded):
-// the sub-processors' own privacy policies.
-const DOCUMENTED_LINKS = ["https://redmage.cc", "https://supabase.com/privacy", "https://www.netlify.com/privacy/", "https://resend.com/legal/privacy-policy"];
+// the code on GitHub and the sub-processors' own privacy policies.
+const REPO = "https://github.com/andersthemagi/reliquary";
+const DOCUMENTED_LINKS = ["https://redmage.cc", REPO, "https://supabase.com/privacy", "https://www.netlify.com/privacy/", "https://resend.com/legal/privacy-policy"];
 const CONTACT = "mailto:andres@redmage.cc";
 
 let localCookie = "";
@@ -107,6 +108,23 @@ test("site landing: why Reliquary follows the hero with six reasons, source avai
   const reasons = [...why.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1]);
   assert.deepEqual(reasons, ["Every AI tool, one vault", "Built for agents and people together", "Secrets stay secret", "Guarded by the database", "Source available", "Yours to take with you"]);
   assert.match(why, /The code is public\. Read it, run it, self-host it for free\. Each release turns Apache 2\.0 two years on, and the CLI is MIT\./);
+});
+
+test("site landing: the GitHub link with its star count is in the top band, the hero, Source available and the closing, and the footer and FAQ link the code", async () => {
+  const h = await text(A, "/");
+  // The fake GitHub API (web/test/fake-auth.mjs) answers 1234 stars.
+  const badge = new RegExp(`<a class="p-gh" href="${REPO}">[\\s\\S]*?<span class="p-gh-stars">[\\s\\S]*?1\\.2K<span class="sr-only"> stars</span></span></a>`, "g");
+  const top = /<div class="p-wrap p-top">[\s\S]*?<\/div>/.exec(h)[0];
+  assert.equal(top.match(badge).length, 1, "the top band");
+  const hero = /<section class="p-wrap p-fold-body" aria-labelledby="hero-title">[\s\S]*?<figure/.exec(h)[0];
+  assert.match(hero, /Read the code on GitHub/, "the hero");
+  const why = /<section class="p-sec" id="why"[\s\S]*?<\/section>/.exec(h)[0];
+  assert.match(why, /Source available<\/h3>[\s\S]*?Star it on GitHub/, "Source available");
+  const closing = /<footer class="p-inv p-fold p-close">[\s\S]*?<\/footer>/.exec(h)[0];
+  assert.equal(closing.match(badge).length, 1, "the closing band");
+  assert.match(closing, new RegExp(`<div class="p-wrap p-footer">[\\s\\S]*<a href="${REPO}">GitHub</a>`), "the footer");
+  assert.match(h, new RegExp(`The code is public <a href="${REPO}">on GitHub</a>`), "the FAQ");
+  assert.equal(h.match(badge).length, 4);
 });
 
 test("site landing: the hub, the mark and the rail are drawn; the hub in the first band, the mark in the closing", async () => {

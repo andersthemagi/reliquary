@@ -2,6 +2,7 @@
 // get Home). Kept to what is built today. It brings its own frame (the
 // inverted bands carry the nav and the footer), so sitePage renders none.
 
+import { REPO_URL } from "./github.js";
 import { appHref } from "./hosts.js";
 import { footerLinks, html, alphaNote, raw, stageBadge, versionLink, type Raw, type Theme } from "./html.js";
 import { OPERATOR, PRICING, requestAccessHref, siteNav, sitePage } from "./site.js";
@@ -27,6 +28,16 @@ const marks = {
   cursor: icon("M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"),
   mcp: icon("M13.85 0a4.16 4.16 0 0 0-2.95 1.217L1.456 10.66a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l9.442-9.442a2.49 2.49 0 0 1 3.541 0 2.49 2.49 0 0 1 0 3.541L8.59 12.97l-.1.1a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l.1-.098 7.03-7.034a2.49 2.49 0 0 1 3.542 0l.049.05a2.49 2.49 0 0 1 0 3.54l-8.54 8.54a1.96 1.96 0 0 0 0 2.755l1.753 1.753a.835.835 0 0 0 1.18 0 .835.835 0 0 0 0-1.18l-1.753-1.753a.266.266 0 0 1 0-.394l8.54-8.54a4.185 4.185 0 0 0 0-5.9l-.05-.05a4.16 4.16 0 0 0-2.95-1.218c-.2 0-.401.02-.6.048a4.17 4.17 0 0 0-1.17-3.552A4.16 4.16 0 0 0 13.85 0m0 3.333a.84.84 0 0 0-.59.245L6.275 10.56a4.186 4.186 0 0 0 0 5.902 4.186 4.186 0 0 0 5.902 0L19.16 9.48a.835.835 0 0 0 0-1.18.835.835 0 0 0-1.18 0l-6.985 6.984a2.49 2.49 0 0 1-3.54 0 2.49 2.49 0 0 1 0-3.54l6.983-6.985a.835.835 0 0 0 0-1.18.84.84 0 0 0-.59-.245"),
 };
+// The way to the code, with its stars when GitHub answered: in the top
+// band, under the first call to action, in Source available and in the
+// closing, so nobody has to take "the code is public" on trust.
+const ghMark = icon("M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12");
+const starMark = icon("M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z");
+const github = (stars: number | null, label = "GitHub") =>
+  html`<a class="p-gh" href="${REPO_URL}">${ghMark}<span>${label}</span>${stars === null
+    ? ""
+    : html`<span class="p-gh-stars">${starMark}${new Intl.NumberFormat("en", { notation: "compact" }).format(stars)}<span class="sr-only"> ${stars === 1 ? "star" : "stars"}</span></span>`}</a>`;
+
 const clients: Array<[string, Raw | null]> = [["Claude", marks.claude], ["ChatGPT", null], ["Cursor", marks.cursor], ["VS Code", null], ["any MCP client", marks.mcp]];
 // The hub: what Reliquary is, drawn. AI tools on one side, the people on
 // the other, the vault between them with the mark in it. Hollow diamonds
@@ -188,7 +199,7 @@ const audiences: Array<[string, string]> = [
 const faq: Array<[string, Raw]> = [
   ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no model, doesn't search your Drive or Slack, and is not a memory that writes itself. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
   ["What will it cost after the alpha?", html`Free stays free during the alpha. The plan is paid vaults for teams that need more room, ways to support the project, and enough to keep the lights on. Nothing is billed today, you'll hear from us well before anything is, and self-hosting stays free.`],
-  ["Is it open source?", html`The code is public. The server is under the Functional Source License: run it yourself for any purpose, except offering it to others as a competing service, and each release becomes Apache 2.0 two years on. The CLI is MIT. <a href="/docs/how-to/self-host">Self-host Reliquary</a>.`],
+  ["Is it open source?", html`The code is public <a href="${REPO_URL}">on GitHub</a>. The server is under the Functional Source License: run it yourself for any purpose, except offering it to others as a competing service, and each release becomes Apache 2.0 two years on. The CLI is MIT. <a href="/docs/how-to/self-host">Self-host Reliquary</a>.`],
   ["How do I move an existing .env and CLAUDE.md in?", html`Paste the <code>.env</code> or send it with <code>reliquary env push</code>, then run the project with <code>reliquary run</code> and retire the file: <a href="/docs/how-to/move-env-into-vault">Move a .env into a vault</a>. Put <code>CLAUDE.md</code> and your rules files in the vault as canon and point each tool at the vault: <a href="/docs/how-to/connect-claude-code">Connect Claude Code</a>.`],
   ["How is one client's agent kept out of another client's vault?", html`Give each client their own vault and connect the agent to that vault only; the database refuses everything else, and a hostile test checks it on every push. <a href="/docs/how-to/keep-client-work-separate">Keep client work separate</a>.`],
   ["Do I need to host anything?", html`No. Reliquary is hosted for you, and nothing depends on your machine staying on. If you'd rather run it on your own server, you can: <a href="/docs/how-to/self-host">Self-host Reliquary</a>.`],
@@ -199,7 +210,7 @@ const faq: Array<[string, Raw]> = [
   ["Can I leave?", html`Yes. An owner can export a whole vault as plain markdown files at any time, delete it for good, or move it to a self-hosted Reliquary.`],
 ];
 
-export function landing(theme: Theme): string {
+export function landing(theme: Theme, stars: number | null = null): string {
   // Reader-check of the poster (2026-10-11, three synthetic ICP readers):
   // all three got the mechanism from the first band alone and found the
   // framed drawings honest because their captions say what they are; the
@@ -233,6 +244,7 @@ export function landing(theme: Theme): string {
     <a class="wordmark" href="/" aria-label="Reliquary by Red Mage, home"><span class="logo" aria-hidden="true"></span>Reliquary</a>
     ${stageBadge()}
     ${siteNav(path)}
+    ${github(stars)}
     <a class="button site-signin" href="${appHref("/signin")}">Sign in</a>
   </div>
   <section class="p-wrap p-fold-body" aria-labelledby="hero-title">
@@ -241,6 +253,7 @@ export function landing(theme: Theme): string {
       <p class="p-lede">Dead simple context to share across any AI tool. Claude, ChatGPT and Cursor read the same vault, agents propose, people approve, and secrets never reach a model.</p>
       ${cta("Get started")}
       <p class="p-small">Works with any MCP client. The code is public and it's free for everyone during the alpha. Self-host it if you'd rather.</p>
+      ${github(stars, "Read the code on GitHub")}
     </div>
     ${hub}
   </section>
@@ -251,7 +264,7 @@ export function landing(theme: Theme): string {
 <section class="p-sec" id="why" aria-labelledby="why-title">
   <h2 id="why-title">Why Reliquary</h2>
   <div class="p-why">
-    ${why.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p></div>`)}
+    ${why.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p>${t === "Source available" ? github(stars, "Star it on GitHub") : ""}</div>`)}
   </div>
 </section>
 
@@ -337,6 +350,7 @@ ${PRICING.show
     <div class="p-fold-text">
       <p class="p-lede">Reliquary is in open alpha: sign up with your email and create a vault. It's free while we build, the code is public, and you can self-host. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
       ${cta("Get started")}
+      ${github(stars, "Read the code on GitHub")}
       ${alphaNote()}
       <p class="who-builds">Reliquary is built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>. It came out of running one vault per client as a consultant, with several AI tools and no way to keep them all honest.</p>
     </div>
@@ -345,6 +359,7 @@ ${PRICING.show
   <div class="p-wrap p-footer">
     <span class="site-footer-brand"><span class="logo" aria-hidden="true"></span>${OPERATOR.brand}</span>
     ${footerLinks()}
+    <a href="${REPO_URL}">GitHub</a>
     <a href="${requestAccessHref()}">Contact</a>
     ${versionLink()}
   </div>
