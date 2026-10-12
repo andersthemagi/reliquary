@@ -6,6 +6,18 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.21.0](https://github.com/andersthemagi/reliquary/compare/v0.20.0...v0.21.0) (2026-10-12)
+
+
+### Features
+
+* **web:** the landing page links the code on GitHub with its star count ([#294](https://github.com/andersthemagi/reliquary/issues/294)) ([60092be](https://github.com/andersthemagi/reliquary/commit/60092becb2701f4a9c145af030abc697cdfe6cf1)), closes [#293](https://github.com/andersthemagi/reliquary/issues/293)
+
+
+### Bug fixes
+
+* **web:** the link preview image shows the current tagline ([#291](https://github.com/andersthemagi/reliquary/issues/291)) ([18e57ef](https://github.com/andersthemagi/reliquary/commit/18e57ef20febd64ef91497b1ae17312934c0b530))
+
 ## [0.20.0](https://github.com/andersthemagi/reliquary/compare/v0.19.1...v0.20.0) (2026-10-12)
 
 The operator is emailed once when someone new joins: their address, when they confirmed it, and where they stand (let in, their place in line, or held by invite-only), with the command to let them in now. Accounts that already existed are not emailed. One database migration, applied by the deploy.
