@@ -4,7 +4,7 @@ Reliquary is a shared vault of context and environment variables for people and 
 
 Your agents read the same approved files from Claude Code, Claude.ai, ChatGPT, Cursor or any MCP client. They propose changes; people approve them in the web app. Environment variables reach your programs through the `reliquary` CLI and never reach a model. The database enforces every rule, including what an agent can't do.
 
-Reliquary is pre-alpha: things change and may break; data is backed up daily. See the [roadmap](https://github.com/users/andersthemagi/projects/3), which is a GitHub project board, and the [changelog](changelog.md) for what changed in each release.
+Reliquary is in alpha: things change and may break; data is backed up daily. See the [roadmap](https://github.com/users/andersthemagi/projects/3), which is a GitHub project board, and the [changelog](changelog.md) for what changed in each release.
 
 ## Start here
 

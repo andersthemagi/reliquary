@@ -1112,7 +1112,7 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
 
 /* Figures line up only where numbers are compared: tables, counts, times,
    diff stats. Elsewhere Inter's tabular hyphen would put a wide gap in
-   "read-only" or "Pre-alpha". */
+   "read-only" or "Alpha". */
 td, th, .num, time, .count, .diff-stat, .meter { font-variant-numeric: tabular-nums; }
 time { white-space: nowrap; }
 
@@ -1353,7 +1353,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
   .subprocessors tr:hover > td { background: none; }
 }
 
-/* Stage: the pre-alpha badge in every top bar, and its sentence (html.ts). */
+/* Stage: the alpha badge in every top bar, and its sentence (html.ts). */
 .stage {
   display: inline-flex; align-items: center; flex: none; min-height: 22px; padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--attention) 35%, transparent); border-radius: var(--radius-full);
@@ -1362,8 +1362,8 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 }
 .top-inner .stage { margin-left: calc(-1 * var(--space-5)); }
 .stage:hover { text-decoration: underline; }
-.prealpha-note { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-3) 0 0; }
-.prealpha-note strong { color: var(--attention); }
+.alpha-note { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-3) 0 0; }
+.alpha-note strong { color: var(--attention); }
 .menu-links { display: flex; gap: var(--space-5); margin: 0; font-size: var(--text-sm); }
 /* The public site's nav (with Docs and Roadmap) gets its own row before it
    would crowd the header; phones already do this (the 640px rules). */
@@ -1403,7 +1403,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .docs-nav-section a[aria-current="page"]::before {
   content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--brand);
 }
-.docs-side .prealpha-note { margin-top: var(--space-6); padding: var(--space-4) var(--space-3) 0; border-top: 1px solid var(--border); }
+.docs-side .alpha-note { margin-top: var(--space-6); padding: var(--space-4) var(--space-3) 0; border-top: 1px solid var(--border); }
 
 .docs-menu > summary {
   display: inline-flex; align-items: center; gap: var(--space-3); list-style: none; cursor: pointer;
@@ -2099,8 +2099,8 @@ body.p-site { display: block; }
 .site-cta-link:hover { text-decoration-color: currentColor; }
 .p-small { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
 .p-small strong { color: var(--if); }
-.p-fold .prealpha-note { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
-.p-fold .prealpha-note strong { color: var(--if); }
+.p-fold .alpha-note { margin: 8px 0 0; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--ifm); max-width: 44rem; }
+.p-fold .alpha-note strong { color: var(--if); }
 
 /* The mark: the logo masked in the band's brand colour. Below 900px it
    closes the band under the text; above, it is the right column and runs

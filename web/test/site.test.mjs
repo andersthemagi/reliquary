@@ -189,7 +189,7 @@ test("site landing: each AI tool is named once, in the hub, and the band says wh
   assert.doesNotMatch(h, /EU-hosted|hosted in the EU|Frankfurt/, "no hosting-region claim: the app runs on Netlify");
   // The badge's title attribute carries the sentence; the visible text doesn't repeat it.
   assert.doesNotMatch(band.replace(/<[^>]+>/g, ""), /letting people in steadily|things change and may break/, "the first band says unfinished once, in the badge; the note moved to the closing");
-  assert.match(h, /<footer class="p-inv p-fold p-close">[\s\S]*<p class="prealpha-note"><strong>Pre-alpha:<\/strong>/);
+  assert.match(h, /<footer class="p-inv p-fold p-close">[\s\S]*<p class="alpha-note"><strong>Alpha:<\/strong>/);
   assert.doesNotMatch(h, /<img/);
 });
 

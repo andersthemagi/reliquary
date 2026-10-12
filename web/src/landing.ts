@@ -3,7 +3,7 @@
 // inverted bands carry the nav and the footer), so sitePage renders none.
 
 import { appHref } from "./hosts.js";
-import { footerLinks, html, preAlphaNote, raw, stageBadge, versionLink, type Raw, type Theme } from "./html.js";
+import { footerLinks, html, alphaNote, raw, stageBadge, versionLink, type Raw, type Theme } from "./html.js";
 import { OPERATOR, PRICING, requestAccessHref, siteNav, sitePage } from "./site.js";
 
 // One filled button: the secondary is a link, so the primary reads as the
@@ -318,7 +318,7 @@ ${PRICING.show
     <div class="p-fold-text">
       <p class="p-lede">Reliquary is in open alpha: sign up with your email and create a vault. It's free while we build, the code is public, and you can self-host. We're letting people in steadily as usage grows, so it may take a while before you can create one. Want a hand? <a href="${requestAccessHref()}">Tell us about your team</a> and the AI tools you use, and we'll set up your first vault with you.</p>
       ${cta("Get started")}
-      ${preAlphaNote()}
+      ${alphaNote()}
       <p class="who-builds">Reliquary is built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>. It came out of running one vault per client as a consultant, with several AI tools and no way to keep them all honest.</p>
     </div>
     ${mark}

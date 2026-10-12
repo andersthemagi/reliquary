@@ -19,7 +19,7 @@ const BUILD = new URL("../docs-build/", import.meta.url).pathname;
 const SRC = join(REPO, "docs/public");
 // The local instance has no PUBLIC_URL: its absolute links use the default.
 const LOCAL_ORIGIN = "https://reliquary.redmage.cc";
-const PRE_ALPHA = "things change and may break; data is backed up daily.";
+const ALPHA = "things change and may break; data is backed up daily.";
 
 const manifest = JSON.parse(readFileSync(join(BUILD, "manifest.json"), "utf8"));
 const pages = manifest.sections.flatMap((s) => s.pages);
@@ -297,17 +297,17 @@ test("docs nav: the sitemap lists every docs page at PUBLIC_URL, and not the roa
   assert.ok(!locs.includes(origin + "/roadmap"));
 });
 
-test("stage: the landing page, the docs and the app say pre-alpha", async () => {
-  const badge = /<a class="stage" href="\/roadmap" title="Pre-alpha: things change and may break; data is backed up daily\.">Pre-alpha<\/a>/;
+test("stage: the landing page, the docs and the app say alpha", async () => {
+  const badge = /<a class="stage" href="\/roadmap" title="Alpha: things change and may break; data is backed up daily\.">Alpha<\/a>/;
   const landing = await (await get("/", A)).text();
   assert.match(landing, badge);
-  assert.ok(landing.includes(`<strong>Pre-alpha:</strong> ${PRE_ALPHA}`), "the landing page says it in full");
+  assert.ok(landing.includes(`<strong>Alpha:</strong> ${ALPHA}`), "the landing page says it in full");
   const docs = await html("/docs/concepts/vaults-and-files");
   assert.match(docs, badge);
-  assert.ok(docs.includes(`<strong>Pre-alpha:</strong> ${PRE_ALPHA}`), "the docs say it in full");
+  assert.ok(docs.includes(`<strong>Alpha:</strong> ${ALPHA}`), "the docs say it in full");
   const app = await (await get("/inbox", BASE, { cookie })).text();
   assert.match(app, badge);
-  assert.ok(app.includes(`Pre-alpha: ${PRE_ALPHA}`), "the Account menu says it in full");
+  assert.ok(app.includes(`Alpha: ${ALPHA}`), "the Account menu says it in full");
 });
 
 // Changelog -------------------------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 [![CodeQL](https://github.com/andersthemagi/reliquary/actions/workflows/codeql.yml/badge.svg)](https://github.com/andersthemagi/reliquary/actions/workflows/codeql.yml)
 [![cli on npm](https://img.shields.io/npm/v/%40reliquary-ai%2Fcli.svg?label=cli)](https://www.npmjs.com/package/@reliquary-ai/cli)
 [![server license: FSL-1.1-ALv2](https://img.shields.io/badge/server%20license-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
-[![status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](https://reliquary.redmage.cc/roadmap)
+[![status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://reliquary.redmage.cc/roadmap)
 [![deploy](https://github.com/andersthemagi/reliquary/actions/workflows/deploy.yml/badge.svg)](https://github.com/andersthemagi/reliquary/actions/workflows/deploy.yml)
 
 > The canon for humans and agents.
@@ -15,7 +15,7 @@ use. Claude, ChatGPT, Cursor, Claude Code and any other MCP client read the
 same approved context; people review and approve in a web UI. Agents never
 see a variable's value.
 
-**Status:** pre-alpha, invite-only, hosted at
+**Status:** alpha, invite-only, hosted at
 [reliquary.redmage.cc](https://reliquary.redmage.cc). Milestones 1 (core,
 MCP and UI) and 2 (environment variables) are built; milestone 3 (links, an
 MCP proxy to upstream tools like Linear) is built and in its first week of
@@ -48,7 +48,7 @@ what shipped.
 ## Try it
 
 - **Hosted:** [reliquary.redmage.cc](https://reliquary.redmage.cc). Invite-only
-  while in pre-alpha; request access from the site.
+  while in alpha; request access from the site.
 - **Self-hosted:** run it on your own server with Docker Compose, no plan
   limits. See [docs/public/how-to/self-host.md](docs/public/how-to/self-host.md).
 - **CLI:** `npx @reliquary-ai/cli login`, then `reliquary run` or

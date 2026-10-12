@@ -158,7 +158,7 @@ function emailForm(csrf: string, next: string, theme: Theme, open: boolean, erro
           ? html`<h1>Join ${invite.vaultName}</h1>
               <p class="lede">You’ve been invited to collaborate on <strong>${invite.vaultName}</strong> on Reliquary, as ${invite.role === "owner" ? "an" : "a"} ${roleName(invite.role)}.</p>
               <p>One shared vault of context and credentials for a team and every AI tool they use. Claude, ChatGPT, Cursor and Claude Code read the same approved context. Secrets stay out of the chat.</p>
-              <p>Reliquary is pre-alpha: open to feedback and direction as we harden and improve it.</p>
+              <p>Reliquary is in alpha: open to feedback and direction as we harden and improve it.</p>
               <p class="hint">Enter your email: we’ll send a sign-in link and a 6-digit code, and the same step makes your account.</p>`
             : html`<h1>Join ${invite.vaultName}</h1>
               <p class="lede">You’ve been invited to <strong>${invite.vaultName}</strong> on Reliquary. Sign in with the address the invite was sent to, <strong>${maskEmail(invite.email as string)}</strong>: we’ll email it a sign-in link and a 6-digit code. New to Reliquary? The same step makes your account.</p>`
