@@ -74,12 +74,12 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   assert.match(h, /Reliquary by Red Mage/);
   assert.match(h, /<h2 id="how-title">How it works<\/h2>/);
   assert.equal((h.match(/<ol class="p-steps">[\s\S]*?<\/ol>/)[0].match(/<li>/g) ?? []).length, 3, "three steps");
-  for (const section of ["What your agent can't do", "The problem, and what Reliquary does about it", "Who it's for", "Pricing", "Questions"]) {
+  for (const section of ["Why Reliquary", "What your agent can't do", "The problem, and what Reliquary does about it", "Who it's for", "Pricing", "Questions"]) {
     assert.match(h, new RegExp(`<h2 id="[a-z]+-title">${section}</h2>`), section);
   }
-  // Order: the band, the ceiling with its proof, the ledger, who, how, pricing, questions, the closing band.
+  // Order: the band, why Reliquary, the ceiling with its proof, the ledger, who, how, pricing, questions, the closing band.
   const ids = [...h.matchAll(/<h2 [^>]*id="([a-z]+)-title"/g)].map((m) => m[1]);
-  assert.deepEqual(ids, ["ceiling", "problem", "who", "how", "pricing", "faq", "closing"]);
+  assert.deepEqual(ids, ["why", "ceiling", "problem", "who", "how", "pricing", "faq", "closing"]);
   assert.match(h, /href="\/security"/);
   assert.doesNotMatch(h, /<script/i);
   assert.doesNotMatch(h, /<p class="eyebrow">/, "no label above the heading");
@@ -94,10 +94,19 @@ test("site landing: the page brings its own frame: the inverted band carries the
   assert.match(top, /<a class="stage" href="\/roadmap"/);
   assert.match(top, /<nav aria-label="Site">[\s\S]*<a href="\/docs">Docs<\/a>[\s\S]*<a href="\/roadmap">Roadmap<\/a>[\s\S]*<\/nav>/);
   assert.match(top, /<a class="button site-signin" href="\/signin">Sign in<\/a>/);
-  assert.equal(h.match(/>Sign in</g).length, 1, "the nav's Sign in only");
+  assert.equal(h.match(/>Sign in</g).length, 2, "the header's Sign in, and the menu's for narrow screens");
   const foot = /<footer class="p-inv p-fold p-close">[\s\S]*<\/footer>/.exec(h)?.[0] ?? "";
   assert.match(foot, /<h2 class="p-close-h2 p-fold-head" id="closing-title"><b>Try it on<\/b> your next project\.<\/h2>/);
   assert.match(foot, /<div class="p-wrap p-footer">[\s\S]*href="\/terms"[\s\S]*href="\/privacy"/);
+});
+
+test("site landing: why Reliquary follows the hero with six reasons, source available among them", async () => {
+  const h = await text(A, "/");
+  const why = /<section class="p-sec" id="why" aria-labelledby="why-title">([\s\S]*?)<\/section>/.exec(h)?.[1] ?? "";
+  assert.ok(h.indexOf('id="why"') > h.indexOf("</header>") && h.indexOf('id="why"') < h.indexOf('id="ceiling-title"'), "right after the first band");
+  const reasons = [...why.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1]);
+  assert.deepEqual(reasons, ["Every AI tool, one vault", "Built for agents and people together", "Secrets stay secret", "Guarded by the database", "Source available", "Yours to take with you"]);
+  assert.match(why, /The code is public\. Read it, run it, self-host it for free\. Each release turns Apache 2\.0 two years on, and the CLI is MIT\./);
 });
 
 test("site landing: the hub, the mark and the rail are drawn; the hub in the first band, the mark in the closing", async () => {
@@ -106,8 +115,8 @@ test("site landing: the hub, the mark and the rail are drawn; the hub in the fir
   assert.ok(hub, "the hub is in the first band");
   assert.ok(h.indexOf('<figure class="p-hub"') < h.indexOf("</header>"));
   const tools = [...(/<ul class="p-hub-side p-hub-tools" aria-label="AI tools">([\s\S]*?)<\/ul>/.exec(hub)?.[1] ?? "").matchAll(/<li>(?:<svg [^>]*><path d="[^"]+"\/><\/svg>)?([^<]+)<\/li>/g)].map((m) => m[1]);
-  assert.deepEqual(tools, ["Claude", "Claude Code", "ChatGPT", "Cursor", "any MCP client"]);
-  assert.equal((hub.match(/<svg /g) ?? []).length, 4, "a mark for each tool that publishes one; ChatGPT is its name alone");
+  assert.deepEqual(tools, ["Claude", "ChatGPT", "Cursor", "VS Code", "any MCP client"]);
+  assert.equal((hub.match(/<svg /g) ?? []).length, 3, "a mark for each tool that publishes one; ChatGPT and VS Code are names alone");
   assert.match(hub, /<ul class="p-hub-side p-hub-people" aria-label="People">\s*<li>You<\/li><li>Your team<\/li><li>The client<\/li>/);
   assert.match(hub, /<div class="p-hub-link p-hub-propose" aria-hidden="true"><i><\/i><span>propose<\/span><\/div>[\s\S]*<div class="p-hub-vault"><span class="p-hub-mark" aria-hidden="true"><\/span><strong>One vault<\/strong>[\s\S]*<div class="p-hub-link p-hub-approve" aria-hidden="true"><i><\/i><span>approve<\/span><\/div>/, "tools propose into the vault, people approve");
   assert.equal(h.match(/<div class="p-mark" aria-hidden="true"><\/div>/g)?.length, 1, "the mark closes the page");
@@ -146,7 +155,7 @@ test("site landing: the demo card works without a script: a radio group decides 
   assert.match(card, /<div class="hero-diff hero-canon" data-when="approved" aria-hidden="true">[\s\S]*?Deploy to: eu-production/);
   assert.match(card, /<p class="hero-log" data-when="approved" aria-hidden="true">Approved by <strong>you<\/strong> · just now<\/p>/);
   // Changes requested: the note field, labelled.
-  assert.match(card, /<div class="hero-note" data-when="changes">\s*<label for="demo-note">Note for Claude Code<\/label>\s*<textarea id="demo-note" class="note-field"/);
+  assert.match(card, /<div class="hero-note" data-when="changes">\s*<label for="demo-note">Note for your agent<\/label>\s*<textarea id="demo-note" class="note-field"/);
   // The caption names the state, and each radio is described by its state's line, for people who can't see it change.
   const cap = /<figcaption id="hero-card-cap">([\s\S]*?)<\/figcaption>/.exec(card)?.[1] ?? "";
   for (const state of ["open", "approved", "changes"]) assert.match(cap, new RegExp(`<span id="cap-${state}" data-when="${state}">`), state);
@@ -167,7 +176,7 @@ test("site landing: the two frames say they are drawings, without claiming to be
 test("site landing: the log is an example and says so, eight lines, nothing moving", async () => {
   const h = await text(A, "/");
   const log = /<div class="p-log" aria-label="An example of the append-only activity log">([\s\S]*?)<\/div>\s*<\/div>/.exec(h)?.[1] ?? "";
-  assert.match(log, /<p class="p-log-cap">The log, append-only\. An example, with invented names\.<\/p>/);
+  assert.match(log, /<p class="p-log-cap">The log, append-only\. An example\.<\/p>/);
   assert.equal((log.match(/<span( class="p-o")?><b>/g) ?? []).length, 8);
   assert.doesNotMatch(log, /aria-hidden/);
 });
@@ -184,7 +193,7 @@ test("site landing: the one filled button is Join the alpha test, to the sign-in
 test("site landing: each AI tool is named once, in the hub, and the band says what is free and public without an EU claim", async () => {
   const h = await text(A, "/");
   const band = /<header class="p-inv p-fold">[\s\S]*?<\/header>/.exec(h)?.[0] ?? "";
-  for (const tool of ["Claude Code", "ChatGPT", "Cursor"]) assert.equal(band.match(new RegExp(`>${tool}<`, "g"))?.length, 1, tool);
+  for (const tool of ["Claude", "ChatGPT", "Cursor", "VS Code"]) assert.equal(band.match(new RegExp(`>${tool}<`, "g"))?.length, 1, tool);
   assert.match(band, /<p class="p-small">Works with any MCP client\. The code is public and it's free for everyone during the alpha\. Self-host it if you'd rather\.<\/p>/);
   assert.doesNotMatch(h, /EU-hosted|hosted in the EU|Frankfurt/, "no hosting-region claim: the app runs on Netlify");
   // The badge's title attribute carries the sentence; the visible text doesn't repeat it.
@@ -200,7 +209,7 @@ test("site landing: each problem is paired with what Reliquary does about it, on
   assert.equal(rows.length, 4);
   assert.match(rows[3][1], /already uses three of them/);
   assert.match(rows[3][2], /Built for teams on different systems[\s\S]*export it all as plain markdown/);
-  assert.doesNotMatch(h, /id="why-title"|id="trust-title"/, "no separate differentiators or promise sections");
+  assert.doesNotMatch(h, /id="trust-title"/, "no separate promise section");
   assert.match(rows[1][1], /nobody checked/);
   assert.match(rows[1][2], /a person, or a quorum, approves/);
   assert.match(rows[2][2], /no AI tool ever gets a value/);

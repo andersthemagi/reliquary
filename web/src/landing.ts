@@ -16,7 +16,8 @@ const cta = (where: string) => html`<div class="site-cta" aria-label="${where}">
 
 // The AI tools people scan for, likeliest first, each with its mark where
 // one is published under CC0 (simple-icons; Claude, Cursor and MCP are).
-// OpenAI publishes no reusable mark, so ChatGPT is its name alone. The
+// OpenAI and Microsoft publish no reusable mark, so ChatGPT and VS Code are
+// names alone. Claude Code isn't listed: naming Claude says it. The
 // marks are inline paths in the band's own colour: nothing loads from
 // elsewhere, and the names stay for anyone who can't see them. They are
 // the hub's left side, so the page names each tool once.
@@ -26,7 +27,7 @@ const marks = {
   cursor: icon("M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"),
   mcp: icon("M13.85 0a4.16 4.16 0 0 0-2.95 1.217L1.456 10.66a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l9.442-9.442a2.49 2.49 0 0 1 3.541 0 2.49 2.49 0 0 1 0 3.541L8.59 12.97l-.1.1a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l.1-.098 7.03-7.034a2.49 2.49 0 0 1 3.542 0l.049.05a2.49 2.49 0 0 1 0 3.54l-8.54 8.54a1.96 1.96 0 0 0 0 2.755l1.753 1.753a.835.835 0 0 0 1.18 0 .835.835 0 0 0 0-1.18l-1.753-1.753a.266.266 0 0 1 0-.394l8.54-8.54a4.185 4.185 0 0 0 0-5.9l-.05-.05a4.16 4.16 0 0 0-2.95-1.218c-.2 0-.401.02-.6.048a4.17 4.17 0 0 0-1.17-3.552A4.16 4.16 0 0 0 13.85 0m0 3.333a.84.84 0 0 0-.59.245L6.275 10.56a4.186 4.186 0 0 0 0 5.902 4.186 4.186 0 0 0 5.902 0L19.16 9.48a.835.835 0 0 0 0-1.18.835.835 0 0 0-1.18 0l-6.985 6.984a2.49 2.49 0 0 1-3.54 0 2.49 2.49 0 0 1 0-3.54l6.983-6.985a.835.835 0 0 0 0-1.18.84.84 0 0 0-.59-.245"),
 };
-const clients: Array<[string, Raw | null]> = [["Claude", marks.claude], ["Claude Code", marks.claude], ["ChatGPT", null], ["Cursor", marks.cursor], ["any MCP client", marks.mcp]];
+const clients: Array<[string, Raw | null]> = [["Claude", marks.claude], ["ChatGPT", null], ["Cursor", marks.cursor], ["VS Code", null], ["any MCP client", marks.mcp]];
 // The hub: what Reliquary is, drawn. AI tools on one side, the people on
 // the other, the vault between them with the mark in it. Hollow diamonds
 // sit on the tools' side (they propose), filled on the people's (they
@@ -84,7 +85,7 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
     <span data-when="approved"><span class="policy canon badge">Canon</span></span>
     <span class="hero-card-path">brief.md</span>
   </div>
-  <p class="hero-card-meta">Proposed by <strong>Claude Code</strong> for Ana · <code>brief.md</code> is canon<span data-when="open changes"> · needs 1 approval</span></p>
+  <p class="hero-card-meta">Proposed by <strong>your agent</strong> · <code>brief.md</code> is canon<span data-when="open changes"> · needs 1 approval</span></p>
   <div class="hero-diff" data-when="open changes" aria-hidden="true">
     <div class="del"><span>−</span>Deploy to: staging</div>
     <div class="add"><span>+</span>Deploy to: eu-production</div>
@@ -94,7 +95,7 @@ const proposalCard = html`<figure class="hero-card" aria-labelledby="hero-card-c
   </div>
   <p class="hero-log" data-when="approved" aria-hidden="true">Approved by <strong>you</strong> · just now</p>
   <div class="hero-note" data-when="changes">
-    <label for="demo-note">Note for Claude Code</label>
+    <label for="demo-note">Note for your agent</label>
     <textarea id="demo-note" class="note-field" rows="2" placeholder="Staging first; production after the client signs off."></textarea>
   </div>
   <fieldset class="hero-card-actions">
@@ -134,17 +135,28 @@ const terminal = html`<pre class="term" aria-label="A terminal: reliquary run st
 <span class="term-muted">DATABASE_URL</span> <span class="term-value" aria-hidden="true">◆◆◆◆◆◆◆◆</span><span class="sr-only">(value hidden)</span>
 <span class="term-muted">1 variable into 1 process. Shown to no one.</span></pre>`;
 
-// An example of the append-only log, with invented names; the caption says
-// so in visible text. Hollow marks are agents writing, filled are people.
+// An example of the append-only log; the caption says so in visible text.
+// Roles, not names: a first name reads as a real person. Hollow marks are
+// agents writing, filled are people.
 const logLines: Array<[boolean, string, string]> = [
-  [true, "Claude Code", "proposed a change to brief.md for Ana"],
-  [false, "Ana", "approved brief.md, now canon"],
-  [true, "Cursor", "wrote notes/standup.md in an open folder"],
-  [false, "Marc", "added DATABASE_URL to development"],
-  [false, "reliquary run", "put 1 variable into 1 process for Marc"],
-  [true, "ChatGPT", "proposed a change to onboarding.md for Steph"],
-  [false, "Steph", "requested changes on onboarding.md"],
-  [false, "Ana", "exported the vault as markdown"],
+  [true, "Your agent", "proposed a change to brief.md"],
+  [false, "You", "approved brief.md, now canon"],
+  [true, "A teammate's agent", "wrote notes/standup.md in an open folder"],
+  [false, "A teammate", "added DATABASE_URL to development"],
+  [false, "reliquary run", "put 1 variable into 1 process for a teammate"],
+  [true, "Another agent", "proposed a change to onboarding.md"],
+  [false, "A teammate", "requested changes on onboarding.md"],
+  [false, "You", "exported the vault as markdown"],
+];
+
+// Why Reliquary: the six reasons, each one something the code does today.
+const why: Array<[string, Raw]> = [
+  ["Every AI tool, one vault", html`Claude, ChatGPT, Cursor, VS Code and any MCP client read the same context. Reliquary holds no model, so switching tools loses nothing.`],
+  ["Built for agents and people together", html`Agents read, take notes and propose. People review, approve and talk it through in threads. Every change lands in one append-only log.`],
+  ["Secrets stay secret", html`No MCP tool, log line or error message returns a value. <code>reliquary run</code> puts it into one process and nowhere else.`],
+  ["Guarded by the database", html`Every permission is a Postgres row-level security rule with a test that tries to break it on every push. A prompt can't talk its way past it.`],
+  ["Source available", html`The code is public. Read it, run it, self-host it for free. Each release turns Apache 2.0 two years on, and the CLI is MIT.`],
+  ["Yours to take with you", html`Export a whole vault as plain markdown any time, or delete it for good. No lock-in to us or to any AI vendor.`],
 ];
 
 const problems: Array<[Raw, Raw]> = [
@@ -236,6 +248,13 @@ export function landing(theme: Theme): string {
 
 <main id="main" class="p-wrap">
 
+<section class="p-sec" id="why" aria-labelledby="why-title">
+  <h2 id="why-title">Why Reliquary</h2>
+  <div class="p-why">
+    ${why.map(([t, d]) => html`<div><h3>${t}</h3><p>${d}</p></div>`)}
+  </div>
+</section>
+
 <section class="p-sec" aria-labelledby="ceiling-title">
   <h2 id="ceiling-title">What your agent can't do</h2>
   <ul class="p-ceiling">
@@ -276,7 +295,7 @@ export function landing(theme: Theme): string {
     ${steps.map(([t, d]) => html`<li><h3>${t}</h3>${d}</li>`)}
   </ol>
   <div class="p-log" aria-label="An example of the append-only activity log">
-    <p class="p-log-cap">The log, append-only. An example, with invented names.</p>
+    <p class="p-log-cap">The log, append-only. An example.</p>
     <div class="p-log-track">
       ${logLines.map(([open, who, what]) => html`<span${open ? raw(' class="p-o"') : ""}><b>${who}</b> ${what}</span>`)}
     </div>

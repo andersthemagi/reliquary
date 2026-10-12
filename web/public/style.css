@@ -1364,25 +1364,73 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .alpha-note { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: var(--space-3) 0 0; }
 .alpha-note strong { color: var(--attention); }
 .menu-links { display: flex; gap: var(--space-5); margin: 0; font-size: var(--text-sm); }
-/* The public site's nav (with Docs and Roadmap) gets its own row before it
-   would crowd the header; phones already do this (the 640px rules). */
-@media (min-width: 641px) and (max-width: 960px) {
-  .site-top .top-inner { flex-wrap: wrap; row-gap: 0; }
-  .site-top nav {
-    order: 3; width: calc(100% + 2 * var(--space-6)); margin: 0 calc(-1 * var(--space-6));
-    padding: 0 var(--space-4); overflow-x: auto; scrollbar-width: none;
-    border-top: 1px solid var(--border); min-height: 44px;
-  }
-  .site-top nav::-webkit-scrollbar { display: none; }
+
+/* The site menu: below 960px the site's links move into a drawer, a
+   <details> (site.ts), instead of wrapping into rows under the header. Open,
+   its summary's ::before dims the page and covers it, so a tap outside the
+   panel lands on the summary and closes it. The landing's band sets its own
+   colours. */
+.site-menu { display: none; --menu-bg: var(--bg); --menu-fg: var(--fg); --menu-muted: var(--fg-muted); --menu-line: var(--border); }
+.p-inv .site-menu { --menu-bg: var(--ib); --menu-fg: var(--if); --menu-muted: var(--ifm); --menu-line: var(--ibd); }
+@media (max-width: 960px) {
+  .top-inner > nav[aria-label="Site"], .p-top > nav[aria-label="Site"] { display: none; }
+  .site-menu { display: block; flex: none; margin-left: auto; }
+  .site-menu + .site-signin { display: none; }
+  .top-inner, .p-top { position: relative; }
 }
-/* On a phone the six site links (446px) scrolled sideways under a header
-   with no scrollbar: Roadmap sat off screen, and the current page's link
-   could too. Three to a row shows every one at 320px. */
-@media (max-width: 479px) {
-  .site-top nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; padding: 0 var(--space-2); }
-  .site-top nav a { min-height: 44px; border-radius: var(--radius-md); }
-  .site-top nav a[aria-current="page"] { background: var(--bg-muted); }
-  .site-top nav a[aria-current="page"]::after { content: none; }
+.site-menu > summary {
+  position: relative; z-index: 41; list-style: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px;
+  color: var(--menu-fg); font-size: var(--text-sm); font-weight: 600; border-radius: var(--radius-md);
+}
+.site-menu > summary::-webkit-details-marker { display: none; }
+.site-menu > summary:hover { background: color-mix(in srgb, var(--menu-fg) 8%, transparent); }
+.site-menu-icon { position: relative; width: 18px; height: 12px; border-block: 2px solid currentColor; }
+.site-menu-icon::before { content: ""; position: absolute; inset: 3px 0 auto; border-top: 2px solid currentColor; }
+.site-menu[open] .site-menu-icon { border-color: transparent; }
+.site-menu[open] .site-menu-icon::before { inset: 3px 0 auto; transform: rotate(45deg); }
+.site-menu[open] .site-menu-icon::after { content: ""; position: absolute; inset: 3px 0 auto; border-top: 2px solid currentColor; transform: rotate(-45deg); }
+.site-menu-opened, .site-menu[open] .site-menu-closed { display: none; }
+.site-menu[open] .site-menu-opened { display: inline; }
+.site-menu[open] > summary::before { content: ""; position: fixed; inset: 0; z-index: -1; background: rgb(0 0 0 / 0.45); cursor: default; }
+.top .site-menu > nav, .p-top .site-menu > nav {
+  position: absolute; z-index: 42; top: 100%; left: 0; right: 0;
+  display: flex; flex-direction: column; gap: 0; margin: 0; padding: 8px 20px 20px; width: auto; min-height: 0; overflow: visible;
+  background: var(--menu-bg); border-block: 1px solid var(--menu-line);
+  font-size: var(--text-lg); font-weight: 600;
+}
+.top .site-menu > nav a, .p-top .site-menu > nav a {
+  display: flex; align-items: center; min-height: 52px; padding: 0 4px;
+  color: var(--menu-fg); text-decoration: none; border-bottom: 1px solid var(--menu-line);
+}
+.top .site-menu > nav a:nth-last-child(2), .p-top .site-menu > nav a:nth-last-child(2) { border-bottom: 0; }
+.top .site-menu > nav .site-menu-signin, .p-top .site-menu > nav .site-menu-signin { justify-content: center; margin-top: 12px; min-height: 48px; border: 0; }
+.p-top .site-menu > nav .site-menu-signin { background: var(--ipb); color: var(--ipf); }
+.p-top .site-menu > nav .site-menu-signin:hover { background: var(--iph); color: var(--ipf); }
+.top .site-menu > nav a[aria-current="page"], .p-top .site-menu > nav a[aria-current="page"] { color: var(--menu-fg); box-shadow: inset 3px 0 0 var(--brand); padding-left: 12px; }
+.top .site-menu > nav a[aria-current="page"]::after { content: none; }
+.top .site-menu > nav a:hover, .p-top .site-menu > nav a:hover { color: var(--menu-muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .site-menu[open] > nav { animation: site-menu-in 160ms ease-out; }
+  @keyframes site-menu-in { from { opacity: 0; transform: translateY(-6px); } }
+}
+@media (max-width: 400px) { .site-menu-closed, .site-menu[open] .site-menu-opened { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
+
+/* Phones: calls to action stack full width (one thumb, one target each),
+   and the poster's spacing comes down to the screen. */
+@media (max-width: 599px) {
+  .site-cta, .p-fold .site-cta { flex-direction: column; align-items: stretch; gap: 8px; }
+  .site-cta .button { justify-content: center; min-height: 48px; }
+  .site-cta .site-cta-link { display: flex; align-items: center; justify-content: center; min-height: 44px; }
+  .hero-card-actions > span { flex: 1 1 100%; }
+  .hero-card-actions label.button { width: 100%; justify-content: center; min-height: 44px; }
+  .p-fold-body { gap: 32px; padding-block: 24px 40px; }
+  .p-sec { padding-top: 64px; }
+  .p-sec h2 { margin-bottom: 24px; }
+  .p-ceiling li { grid-template-columns: 1.5rem minmax(0, 1fr); gap: 12px; padding: 14px 0; }
+  .p-frame figcaption { padding: 12px 16px; }
+  .p-close { margin-top: 64px; }
+  .p-close .p-fold-body { padding-block: 48px 40px; }
 }
 
 /* Docs (web/src/docs.ts): sidebar, article, on-page contents. No script:
@@ -2027,12 +2075,13 @@ body.p-site { display: block; }
 .p-top { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 72px; }
 .p-top .wordmark { color: inherit; }
 .p-top .site-signin { margin-left: 0; flex: none; }
-.p-top .stage { flex: none; }
+/* The badge takes the band's palette: the page's attention tokens belong to the
+   other theme here, and the band's link colour would win over its text. */
+.p-top .stage { flex: none; background: transparent; color: var(--if); border-color: var(--ibds); }
 .p-top nav { display: flex; gap: 8px 24px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; font-size: var(--text-sm); font-weight: 500; }
 .p-top nav a { color: var(--ifm); text-decoration: none; padding: 6px 0; border-bottom: 1px solid transparent; transition: color 120ms ease-out, border-color 120ms ease-out; }
 .p-top nav a:hover { color: var(--if); border-bottom-color: var(--if); }
-/* On a phone the links take their own row under the wordmark instead of wrapping one by one. */
-@media (max-width: 719px) { .p-top { flex-wrap: wrap; gap: 8px 12px; padding-block: 8px; } .p-top .site-signin { order: 1; } .p-top nav { width: 100%; justify-content: flex-start; gap: 2px 14px; order: 2; } }
+@media (max-width: 719px) { .p-top { gap: 12px; } }
 
 /* First screen ------------------------------------------------------------ */
 .p-fold { min-height: min(100svh, 960px); display: flex; flex-direction: column; position: relative; }
@@ -2185,6 +2234,13 @@ body.p-site { display: block; }
 @media (max-width: 719px) { .p-ledger-head span:last-child { display: none; } .p-ledger dd { padding-top: 0; } .p-ledger dd::before { top: 9px; } }
 
 /* Rows: a heading on the left, its text on the right, a hairline between. */
+/* Why Reliquary: six reasons on a hairline grid, one column on a phone. */
+.p-why { display: grid; border-top: 1px solid var(--fg); }
+.p-why > div { padding: 24px 0; border-bottom: 1px solid var(--border); }
+.p-why h3 { margin: 0 0 8px; font-size: var(--text-lg); line-height: 1.2; letter-spacing: -0.015em; font-weight: 800; }
+.p-why p { margin: 0; color: var(--fg-muted); max-width: 40ch; }
+@media (min-width: 720px) { .p-why { grid-template-columns: 1fr 1fr; column-gap: 48px; } }
+@media (min-width: 1100px) { .p-why { grid-template-columns: repeat(3, 1fr); } }
 .p-rows { display: grid; border-top: 1px solid var(--fg); }
 .p-rows > div { display: grid; gap: 8px 48px; padding: 24px 0; border-bottom: 1px solid var(--border); }
 .p-rows > div p { margin: 0; color: var(--fg-muted); }

@@ -104,15 +104,27 @@ export const draftNote = () =>
 // legal links. Indexable, unlike the app's pages.
 // `alternate`: the page as Markdown (docs pages), for agents.
 // The site's nav, the same list on every public page (the landing draws it
-// inside its own top bar).
-export const siteNav = (path: string) => html`<nav aria-label="Site">
-    <a href="/#how">How it works</a>
+// inside its own top bar). Narrow screens get it as a drawer instead: a
+// <details>, since the public site has no script, rendered beside the inline
+// nav because a closed <details> can't be shown open by CSS everywhere. Its
+// summary covers the page while open, so a tap outside the panel closes it.
+// Sign in moves into it too, so the header keeps one row on a phone.
+const siteLinks = (path: string) => html`<a href="/#how">How it works</a>
     ${PRICING.show ? html`<a href="/#pricing">Pricing</a>` : ""}
     <a href="/security"${path === "/security" ? raw(' aria-current="page"') : ""}>Security</a>
     <a href="/#faq">FAQ</a>
     <a href="/docs"${path === "/docs" || path.startsWith("/docs/") ? raw(' aria-current="page"') : ""}>Docs</a>
-    <a href="/roadmap">Roadmap</a>
-  </nav>`;
+    <a href="/roadmap">Roadmap</a>`;
+export const siteNav = (path: string) => html`<nav aria-label="Site">
+    ${siteLinks(path)}
+  </nav>
+  <details class="site-menu">
+    <summary><span class="site-menu-icon" aria-hidden="true"></span><span class="site-menu-closed">Menu</span><span class="site-menu-opened">Close</span></summary>
+    <nav aria-label="Site menu">
+    ${siteLinks(path)}
+    <a class="button primary site-menu-signin" href="${appHref("/signin")}">Sign in</a>
+    </nav>
+  </details>`;
 
 // `frame: "poster"`: the body brings its own header and footer (the landing's
 // inverted bands), so the page renders neither.
