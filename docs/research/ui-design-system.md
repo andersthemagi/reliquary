@@ -485,7 +485,7 @@ Where the build differs from the plan above, and why:
 - **Font files:** `@fontsource-variable/inter` 5.3.0, latin subset. Upright
   is the `opsz` + `wght` file (73 KB), so titles get Inter's display cut
   automatically; italic is `wght` only (52 KB, loaded only when used).
-- **Favicon**: the vermilion diamond, `public/favicon.svg`.
+- **Favicon**: the vermilion diamond mark in its rounded square, `public/favicon.svg` (sources in `docs/brand/`).
 - **Checks:** `web/test/contrast.test.mjs` parses the three token blocks,
   asserts every pair in the tables above (and the diff and callout pairs
   the CSS uses) in both themes, and that the explicit dark theme matches the
