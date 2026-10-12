@@ -6,6 +6,17 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.18.0](https://github.com/andersthemagi/reliquary/compare/v0.17.1...v0.18.0) (2026-10-12)
+
+
+### Features
+
+* **web:** landing opens with the agent ceiling and an H1 that states the mechanism ([#276](https://github.com/andersthemagi/reliquary/issues/276)) ([7c299cc](https://github.com/andersthemagi/reliquary/commit/7c299ccb522abe5ae087a4109ee6dab231cc8ef2))
+* **web:** show the Reliquary logo in the top bar, favicon and link preview ([#274](https://github.com/andersthemagi/reliquary/issues/274)) ([e88fe40](https://github.com/andersthemagi/reliquary/commit/e88fe40fb55a969bfb87cde1459ef751c388053a)), closes [#273](https://github.com/andersthemagi/reliquary/issues/273)
+* **web:** the landing page becomes a poster ([#280](https://github.com/andersthemagi/reliquary/issues/280)) ([8a4bd3e](https://github.com/andersthemagi/reliquary/commit/8a4bd3e4db3c3011cc5e7067338958c4ba97f9cc))
+* **web:** the landing's proposal card can be approved, with no script ([#278](https://github.com/andersthemagi/reliquary/issues/278)) ([4837047](https://github.com/andersthemagi/reliquary/commit/483704704b402ac79518f787a7e957c48f1a9f1c))
+* **web:** the security page says the current stage and release ([#281](https://github.com/andersthemagi/reliquary/issues/281)) ([c16fd8a](https://github.com/andersthemagi/reliquary/commit/c16fd8a255254f28d54f842ea167333dc25d31a0))
+
 ## [0.17.1](https://github.com/andersthemagi/reliquary/compare/v0.17.0...v0.17.1) (2026-10-11)
 
 
