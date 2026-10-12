@@ -8,6 +8,7 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.22.0](https://github.com/andersthemagi/reliquary/compare/v0.21.0...v0.22.0) (2026-10-12)
 
+Reliquary's alpha is closed, and the site now says so. The landing page's button is Request access: a short form (email, country, a note on your team and AI tools) that goes to the operator, who replies with an invite. Sign in stays for people who already have an account or an invite. No database changes.
 
 ### Features
 
