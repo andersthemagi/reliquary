@@ -8,6 +8,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.21.0](https://github.com/andersthemagi/reliquary/compare/v0.20.0...v0.21.0) (2026-10-12)
 
+The landing page links the code on GitHub, with its star count, in the top bar, the hero, Source available, the closing and the footer; the server reads the count from GitHub and leaves it off when GitHub does not answer. The link preview image shows the current tagline. No database changes.
+
 
 ### Features
 
