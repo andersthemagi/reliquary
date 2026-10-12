@@ -8,6 +8,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.20.0](https://github.com/andersthemagi/reliquary/compare/v0.19.1...v0.20.0) (2026-10-12)
 
+The operator is emailed once when someone new joins: their address, when they confirmed it, and where they stand (let in, their place in line, or held by invite-only), with the command to let them in now. Accounts that already existed are not emailed. One database migration, applied by the deploy.
+
 
 ### Features
 
