@@ -8,6 +8,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.18.0](https://github.com/andersthemagi/reliquary/compare/v0.17.1...v0.18.0) (2026-10-12)
 
+Reliquary is now in alpha, and says so everywhere: the badge, the docs, the terms and a new Status section on the security page that always names the running release. The landing page is redesigned: it shows how agents, a vault and people fit together, lists what an agent can never do, and lets you try approving a proposal with no script. The real logo replaces the placeholder in the top bar, the favicon and link previews. No database changes.
+
 
 ### Features
 
