@@ -127,3 +127,11 @@ test("require: a member who hid their email is asked on the vault's pages, and o
   assert.doesNotMatch(await page("vic", `/v/${team}`), /id="email-consent"/);
   assert.match(await members(), /Robert&#39;\); DROP TABLE students;-- \(vic@example\.test\)/);
 });
+
+test("preferences: a member's agreement outlives leaving: added back, they aren't asked again and the others see their email", async () => {
+  await as(VIC, "select public.leave_vault($1)", [team]);
+  assert.ok(!(await members()).includes("vic@example.test"), "a former member's email is shown");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [team, VIC, UMA]);
+  assert.doesNotMatch(await page("vic", `/v/${team}`), /id="email-consent"/);
+  assert.match(await members(), /Robert&#39;\); DROP TABLE students;-- \(vic@example\.test\)/);
+});
