@@ -4,7 +4,7 @@ Every page of the web app has the same bar at the top. From the left: the Reliqu
 
 ## The main links
 
-- **Home**: how many vaults you own of your plan's limit, what needs your review when something does, and your vaults as a table: your role, files, open proposals and when each last changed, the most recently active first. On a phone each vault is a block of labelled lines.
+- **Home**: what needs your review when something does, then your vaults as cards, in two groups: **Your vaults** (the ones you created, with how many your plan allows) and **Shared with you** (with your role). Each card shows the vault's tier, people, storage, open proposals and ready tasks, and when it last changed, the most recently active first. See [Vaults, files and folders](vaults-and-files.md). With no vault yet, Home shows three steps: create a vault, connect an agent, and write or approve a first file.
 - **Vaults**: a menu of the vaults you're in, with your role in each. Inside a vault it shows that vault's name. **New vault** is at the bottom. It appears once you're in a vault.
 - **Activity**: every change across your vaults. See [Changes and the log](activity.md).
 - **Connect**: set up Claude, ChatGPT, Cursor, VS Code or the CLI.

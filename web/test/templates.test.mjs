@@ -122,7 +122,7 @@ test("templates: Home's first-vault empty state mentions templates", async () =>
   const token = (await minted.json()).token;
   const h = await (await fetch(`${A}/`, { headers: { cookie: `__Host-rlq_at=${token}` }, redirect: "manual" })).text();
   assert.match(h, /<div class="empty first-vault"><strong>Create your first vault\.<\/strong>/);
-  assert.match(h, /Start blank, or from a template: a client engagement, personal projects or a product team, with folders, rules and a README that tells agents how to work there\./);
+  assert.match(h, /<li><strong>Create a vault<\/strong> for the files you and your agents share\. Start blank, or from a template\./);
 });
 
 // Each template ------------------------------------------------------------------
