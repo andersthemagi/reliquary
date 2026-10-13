@@ -8,7 +8,7 @@ import type { Session } from "./auth.js";
 import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
-import { callout, csrfField, emptyState, html, page, pageHeader, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
+import { callout, csrfField, emptyState, html, ICON_SEARCH, page, pageHeader, plural, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
 import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, signOutEverywhere } from "./settings.js";
@@ -33,7 +33,7 @@ import { diagnostics, diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inboxInviteRoutes, inviteRoutes } from "./members.js";
 import { applyTemplate, templateById, templateChoices } from "./templates.js";
-import { NO_LIMIT_COUNT, accountPage, myAdmission, myPlan, notAdmittedNote, type Plan } from "./plans.js";
+import { NO_LIMIT_COUNT, accountPage, myAdmission, myPlan, notAdmittedNote, peopleUsage, storageUsage, tierLabel, vaultUsages, type Plan, type VaultUsage } from "./plans.js";
 import { biggerPlanHref } from "./site.js";
 import { NOT_SNOOZED_SQL, postComment, snooze, snoozedList, snoozedSection, unsnooze } from "./thread.js";
 import { editView, fileAction, fileView, folder, newFile, vaultShell } from "./files.js";
@@ -224,46 +224,112 @@ function ownedLine(p: Plan): string {
 }
 const ROLE_LABEL: Record<string, string> = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
 
+type HomeVault = { id: string; name: string; role: string; mine: boolean; open: number; ready: number; updated: Date; usage?: VaultUsage };
+
+// A vault as a card. The name is its one link, stretched over the card
+// (style.css), so the whole card opens the vault and a screen reader hears
+// one link per vault; the proposals and tasks links sit above it.
+const HOME_FILTER_FROM = 6;
+// Recent is the default (the query's own order); Needs attention puts the
+// vaults with proposals open or tasks ready first, most waiting first.
+const HOME_SORTS: { key: string; label: string; compare: (a: HomeVault, b: HomeVault) => number }[] = [
+  { key: "recent", label: "Recent", compare: (a, b) => +b.updated - +a.updated },
+  { key: "name", label: "Name", compare: (a, b) => a.name.localeCompare(b.name) },
+  { key: "attention", label: "Needs attention", compare: (a, b) => b.open + b.ready - (a.open + a.ready) || +b.updated - +a.updated },
+];
+
+function vaultCard(v: HomeVault): Raw {
+  const u = v.usage;
+  // Named with the vault, so a list of links read out of context still
+  // says which vault each count is in.
+  const count = (n: number, what: string, path: string) =>
+    n ? html`<a href="${vaultPath(v.id, path)}" aria-label="${plural(n, what)} in ${v.name}">${plural(n, what)}</a>` : "";
+  const counts = [count(v.open, "open proposal", "/proposals"), count(v.ready, "ready task", "/tasks")].filter(Boolean);
+  // A tile with the vault's first letter, tinted from its id so a vault
+  // keeps its colour across visits; a class, not a style attribute, because
+  // the CSP allows no inline styles. Decoration only: the name says it.
+  const tint = parseInt(v.id.replace(/-/g, "").slice(-4), 16) % 6;
+  return html`<li class="card vault-card">
+    <div class="card-head"><span class="vault-mark tint-${tint}" aria-hidden="true">${Array.from(v.name.trim())[0]?.toUpperCase() ?? "?"}</span><h3 class="card-title"><a class="card-link" href="${vaultPath(v.id)}">${v.name}</a></h3></div>
+    ${v.mine ? "" : html`<p class="card-role">Your role: ${ROLE_LABEL[v.role] ?? v.role}</p>`}
+    ${u ? html`<dl class="card-stats"><div><dt>People</dt><dd>${peopleUsage(u)}</dd></div><div><dt>Storage</dt><dd>${storageUsage(u)}</dd></div></dl>` : ""}
+    ${counts.length ? html`<p class="card-counts">${counts}</p>` : ""}
+    <p class="card-foot"><span>Updated ${time(v.updated)}</span>${u ? html`<span class="badge">${tierLabel(u)}</span>` : ""}</p>
+  </li>`;
+}
+
 async function home(ctx: Ctx): Promise<Reply> {
   const waitingCount = ctx.reviewCount ?? 0;
   const counts = ctx.shell?.counts;
-  const { vaults, waiting, plan, gone } = await asPerson(ctx.userId, async (c) => ({
-    plan: await myPlan(c),
-    // Each vault with what a person compares across them: their role, its
-    // files, the proposals open in it, and when anything last happened
-    // there (its newest log row, from the log's (vault_id, seq) key), most
-    // recently active first.
-    vaults: (
+  const { vaults, waiting, plan, gone } = await asPerson(ctx.userId, async (c) => {
+    // Each vault with what a person compares across them: their role,
+    // whether they created it (what the plan counts), the proposals open
+    // and tasks ready in it, and when anything last happened there (its
+    // newest log row, from the log's (vault_id, seq) key), most recently
+    // active first. Ready comes from list_work_plans, the one definition
+    // of it (tasks.ts), in the same query, so the round trips stay the
+    // same however many vaults there are.
+    const rows = (
       await c.query(
-        `select v.id, v.name, m.role,
-                (select count(*) from public.files f where f.vault_id = v.id and f.deleted_at is null)::int as files,
+        `select v.id, v.name, m.role, v.created_by = $1 as mine,
                 (select count(*) from public.proposals p where p.vault_id = v.id and p.status = 'open')::int as open,
+                (select coalesce(sum(w.o_ready), 0) from public.list_work_plans(v.id) w)::int as ready,
                 coalesce((select l.at from public.log l where l.vault_id = v.id order by l.seq desc limit 1), v.created_at) as updated
            from public.vaults v
            join public.vault_members m on m.vault_id = v.id and m.user_id = $1
           order by updated desc, v.name`,
         [ctx.userId],
       )
-    ).rows as { id: string; name: string; role: string; files: number; open: number; updated: Date }[],
-    // Asked only when the top bar's count says something waits, or there
-    // are notices to show (and so take).
-    waiting: waitingCount > 0 ? (await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows : [],
-    gone: (counts?.notices ?? 1) > 0 ? await deletionNotices(c) : html``,
-  }));
+    ).rows as HomeVault[];
+    const usage = await vaultUsages(c, rows.map((v) => v.id));
+    return {
+      plan: await myPlan(c),
+      vaults: rows.map((v) => ({ ...v, usage: usage.get(v.id) })),
+      // Asked only when the top bar's count says something waits, or there
+      // are notices to show (and so take).
+      waiting: waitingCount > 0 ? (await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows : [],
+      gone: (counts?.notices ?? 1) > 0 ? await deletionNotices(c) : html``,
+    };
+  });
   const invites = counts?.invites ?? 0;
   const full = planFull(plan);
+  // Past six vaults (an alpha host is in one per tester) the cards get a
+  // filter by name and a sort; both are GET parameters, so a filtered Home
+  // is a link, and the cards and the query stay the same.
+  const filterable = vaults.length > HOME_FILTER_FROM;
+  const words = filterable ? (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 100) : "";
+  const sort = filterable ? (HOME_SORTS.find((x) => x.key === ctx.url.searchParams.get("sort")) ?? HOME_SORTS[0]) : HOME_SORTS[0];
+  const shown = vaults
+    .filter((v) => !words || v.name.toLocaleLowerCase().includes(words.toLocaleLowerCase()))
+    .sort(sort.compare);
+  const mine = shown.filter((v) => v.mine);
+  const shared = shown.filter((v) => !v.mine);
+  const sortHref = (key: string) => `/?${new URLSearchParams({ ...(words ? { q: words } : {}), sort: key })}`;
+  const toolbar = filterable
+    ? html`<div class="home-filter">
+        <form class="home-search" method="get" action="/" role="search">
+          <input type="search" name="q" value="${words}" placeholder="Filter vaults by name" aria-label="Filter vaults by name" maxlength="100">
+          ${sort === HOME_SORTS[0] ? "" : html`<input type="hidden" name="sort" value="${sort.key}">`}
+          <button type="submit" aria-label="Filter">${ICON_SEARCH}</button>
+        </form>
+        <ul class="chips" aria-label="Sort vaults">${HOME_SORTS.map(
+          (x) => html`<li><a class="chip" href="${sortHref(x.key)}"${x === sort ? raw(' aria-current="true"') : ""}>${x.label}</a></li>`,
+        )}</ul>
+        <p class="small muted home-count">${words ? html`${shown.length} of ${vaults.length} vaults match “${words}” · <a href="${sort === HOME_SORTS[0] ? "/" : sortHref(sort.key)}">Clear filter</a>` : html`${vaults.length} vaults`}</p>
+      </div>`
+    : "";
   // One primary per page: New vault. Review, when something waits, sits
   // before it as a secondary button. At the plan's limit New vault is a
   // secondary button: it leads to the page that says why and what to do.
   // A section with nothing in it isn't shown: what needs the person is in
-  // the inbox. The title is the nav item's name, Home.
+  // the inbox. The title is the nav item's name, Home. The plan line sits
+  // under Your vaults, the vaults it counts.
   return render(
     ctx,
     "Home",
     html`${pageHeader({
       title: "Home",
       description: "Shared context your agents read and propose to. Changes to canon files wait for your approval.",
-      meta: html`<p class="meta plan-line"><span>${ownedLine(plan)}${full ? html` <span class="badge warning">At the limit</span>` : ""}</span><span><a href="/account">Plan and usage</a></span></p>`,
       secondary: waitingCount > 0 ? html`<a class="button" href="/inbox">Review ${waitingCount} waiting</a>` : "",
       primary: full ? html`<a class="button" href="/vaults/new">New vault</a>` : html`<a class="button primary" href="/vaults/new">New vault</a>`,
     })}
@@ -273,27 +339,25 @@ async function home(ctx: Ctx): Promise<Reply> {
         <ul class="rows">${waiting.map((p) => reviewRow(ctx, p, true))}</ul>
         ${waitingCount > waiting.length ? html`<p class="small"><a href="/inbox">All ${waitingCount} waiting</a></p>` : ""}`
       : ""}
+    ${toolbar}
+    ${words && !shown.length ? emptyState({ title: `No vault matches “${words}”`, body: "Check the spelling, or clear the filter to see every vault.", action: html`<a class="button" href="/">Clear filter</a>` }) : ""}
     <h2>Your vaults</h2>
+    <p class="meta plan-line"><span>${ownedLine(plan)}${full ? html` <span class="badge warning">At the limit</span>` : ""}</span><span><a href="/account">Plan and usage</a></span></p>
     ${vaults.length === 0
       ? html`<div class="empty first-vault"><strong>Create your first vault.</strong>
-          <p>A vault holds the files you and your agents share: notes, briefs, decisions. You choose which of them are canon, so an agent can only propose changes and you approve them.</p>
-          <p>Start blank, or from a template: a client engagement, personal projects or a product team, with folders, rules and a README that tells agents how to work there.</p>
-          <p><a class="button" href="/vaults/new">Create your first vault</a></p>
+          <ol class="first-steps">
+            <li><strong>Create a vault</strong> for the files you and your agents share. Start blank, or from a template. <a class="button" href="/vaults/new">Create your first vault</a></li>
+            <li><strong>Connect an agent</strong>: Claude, Cursor or any MCP client, from <a href="/connect">Connect</a>.</li>
+            <li><strong>Write or approve a first file.</strong> Agents only propose changes to canon files; you approve them.</li>
+          </ol>
           <p class="small">Joining someone else’s vault? Open the invite link they sent you. It works once you’re signed in with the address it was sent to.${
             invites ? html` You have ${invites === 1 ? "an invite" : `${invites} invites`} waiting: <a href="/inbox#invites">see your inbox</a>. Join or decline ${invites === 1 ? "it" : "them"} there, no link needed.` : ""}</p></div>`
-      : html`<div class="table-wrap"><table class="vault-list table-stack">
-        <thead><tr><th>Name</th><th>Your role</th><th class="num">Files</th><th class="num">Open proposals</th><th>Updated</th></tr></thead>
-        <tbody>${vaults.map(
-          (v) => html`<tr>
-            <td data-label="Name" class="vault-name"><a href="${vaultPath(v.id)}">${v.name}</a></td>
-            <td data-label="Your role">${ROLE_LABEL[v.role] ?? v.role}</td>
-            <td data-label="Files" class="num">${v.files}</td>
-            <td data-label="Open proposals" class="num">${v.open
-              ? html`<a href="${vaultPath(v.id, "/proposals")}" aria-label="${v.open} open ${v.open === 1 ? "proposal" : "proposals"} in ${v.name}">${v.open}</a>`
-              : html`<span class="muted">0</span>`}</td>
-            <td data-label="Updated">${time(v.updated)}</td>
-          </tr>`,
-        )}</tbody></table></div>`}`,
+      : mine.length
+        ? html`<ul class="card-grid">${mine.map(vaultCard)}</ul>`
+        : words
+          ? html`<p class="muted">None of yours matches.</p>`
+          : html`<p class="muted">You haven’t created a vault yet. The ones below were shared with you.</p>`}
+    ${shared.length ? html`<h2>Shared with you</h2><ul class="card-grid">${shared.map(vaultCard)}</ul>` : ""}`,
     "home",
   );
 }
