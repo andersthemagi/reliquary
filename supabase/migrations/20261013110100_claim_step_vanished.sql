@@ -1,7 +1,7 @@
 -- claim_step refuses a step that went away while it waited (CL-3.3, issue
 -- #72) the way it refuses one that never existed: 'no such step', P0002.
 -- A claim that queues on a step's row while delete_vault holds it (see
--- 20261013100000_work_plans_lock_order.sql) finds the row gone once the
+-- 20261013110000_work_plans_lock_order.sql) finds the row gone once the
 -- deletion commits; its update then matches nothing, and the re-read
 -- found nothing either, so it fell through to "blocked: <NULL>
 -- blocker(s) not finished". Only that branch is new.
