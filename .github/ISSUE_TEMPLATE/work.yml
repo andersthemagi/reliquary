@@ -1,0 +1,33 @@
+name: Planned work
+description: A piece of work ready to pick up, for maintainers and their agents (AGENTS.md, "How an issue reads")
+labels: ["status: considering"]
+body:
+  - type: textarea
+    id: job
+    attributes:
+      label: The job
+      description: Who needs what and why. The problem, not the solution. Where it showed up, if it did.
+    validations:
+      required: true
+  - type: textarea
+    id: start
+    attributes:
+      label: Where to start
+      description: Files, functions, pages and design sections to read first; the existing pattern to copy.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done looks like
+      description: Observable outcomes, each one a test can check; the docs page that changes; a last line "Check ./test.sh <suites>".
+    validations:
+      required: true
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      description: "Blocked by #N, Part of #N (also set Relationships), owner decisions it waits for, what is out of scope. Leave empty if none."
+  - type: markdown
+    attributes:
+      value: Never paste secrets, tokens, variable values or client data.
