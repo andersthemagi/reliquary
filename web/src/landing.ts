@@ -213,10 +213,8 @@ const shot = (theme: Theme, name: string, alt: string, caption: string, still = 
 };
 
 const screens: Array<[string, string, string]> = [
-  ["inbox", "The Inbox page: two changes to canon files wait for review, each naming the agent and the person it acts for, and one sent back to its proposer.", "Everything that needs you, across your vaults."],
   ["proposal", "A proposal page: the diff of a runbook change from Claude Code, a note field, and the Approve, Request changes and Reject buttons.", "A change to canon: who proposed it, the diff, and the decision."],
   ["variables", "The Variables page: four variable names across development, preview and production, with who set each and when, and never a value.", "Secrets per environment. Names and who set them; the value never shows."],
-  ["changes", "The Changes page: what people and their agents did in the vault, newest first, naming the agent on each line.", "The log: every write, by whom, and through which agent."],
 ];
 
 // Fifteen seconds of the core loop, in both themes. A muted, looping video

@@ -200,10 +200,10 @@ test("site landing: the reel and the screens are real files from this origin, ea
   assert.equal(videos.length, 2, "a light and a dark reel, for the stylesheet to pick from");
   for (const v of videos) for (const a of ["autoplay", "muted", "loop", "playsinline", 'poster="/img/reel-(?:light|dark)-poster.webp"']) assert.match(v, new RegExp(`\\s${a}(\\s|>)`), a);
   const imgs = [...see.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
-  assert.equal(imgs.length, 5, "the reel's still and four screens");
+  assert.equal(imgs.length, 3, "the reel's still and two screens");
   for (const i of imgs) assert.match(i, /\balt="[^"]{40,}"/, i);
   const files = new Set([...see.matchAll(/\b(?:src|srcset|poster)="([^"]+)"/g)].map((m) => m[1]));
-  assert.equal(files.size, 12, "a light and a dark file for the reel, its poster and each screen");
+  assert.equal(files.size, 8, "a light and a dark file for the reel, its poster and each screen");
   for (const f of files) {
     assert.match(f, /^\/img\/[a-z-]+\.(?:webp|webm)$/, f);
     const file = await fetchAs(A, f);
@@ -217,9 +217,9 @@ test("site landing: with the theme chosen, the screens are that theme's files al
   const see = /<section class="p-sec" id="see"[\s\S]*?<\/section>/.exec(dark)[0];
   assert.doesNotMatch(see, /<picture|-light[-.]|class="reel-dark"/);
   assert.equal((see.match(/<video\b/g) ?? []).length, 1);
-  assert.equal((see.match(/-dark(?:-poster)?\.webp/g) ?? []).length, 6, "the poster, the still and four screens");
+  assert.equal((see.match(/-dark(?:-poster)?\.webp/g) ?? []).length, 4, "the poster, the still and two screens");
   const auto = /<section class="p-sec" id="see"[\s\S]*?<\/section>/.exec(await text(A, "/"))[0];
-  assert.equal((auto.match(/<picture><source srcset="\/img\/[a-z]+-dark(?:-poster)?\.webp" media="\(prefers-color-scheme: dark\)"><img src="\/img\/[a-z]+-light(?:-poster)?\.webp"/g) ?? []).length, 5);
+  assert.equal((auto.match(/<picture><source srcset="\/img\/[a-z]+-dark(?:-poster)?\.webp" media="\(prefers-color-scheme: dark\)"><img src="\/img\/[a-z]+-light(?:-poster)?\.webp"/g) ?? []).length, 3);
   assert.match(auto, /<video class="reel-light"[\s\S]*<video class="reel-dark"/);
 });
 

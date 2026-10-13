@@ -2260,7 +2260,6 @@ body.p-site { display: block; }
 }
 .p-reel figcaption, .p-shot figcaption { padding: 12px 24px 14px; border-top: 1px solid var(--border-strong); font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--fg-muted); }
 .p-shots { display: grid; gap: 24px; margin-top: 24px; }
-@media (min-width: 900px) { .p-shots { grid-template-columns: 1fr 1fr; align-items: start; } }
 .p-frame-art { padding: 0; display: grid; align-content: center; }
 .p-frame figcaption { padding: 12px 24px 14px; border-top: 1px solid var(--border-strong); font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--fg-muted); }
 .p-frame .hero-card { max-width: none; margin: 0; width: 100%; border: 0; border-radius: 0; padding: 24px; background: var(--bg); }
