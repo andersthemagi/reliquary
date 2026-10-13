@@ -66,6 +66,15 @@ test("vaults: each person sees only their own", async () => {
   await ana.close();
 });
 
+test("server time: list_vaults starts with the server's current time in UTC, to the second", async () => {
+  const ana = await connect(env.ANA_TOKEN);
+  const r = await call(ana, "list_vaults");
+  const m = r.text.split("\n")[0].match(/^Server time \(UTC\): (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)$/);
+  assert.ok(m, r.text);
+  assert.ok(Math.abs(Date.parse(m[1]) - Date.now()) < 5000, `${m[1]} is not within 5 seconds of now`);
+  await ana.close();
+});
+
 test("read: canon file comes back as marked data with its policy", async () => {
   const cal = await connect(env.CAL_TOKEN);
   const r = await call(cal, "read_file", { vault: "Team", path: "canon/pricing.md" });
