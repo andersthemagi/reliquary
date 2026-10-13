@@ -121,8 +121,13 @@ A task whose holder ran out of time goes to the next agent in line. That counts 
 
 Activity records **Joined the line for a step**, **Left the line for a step** and **Place in line ended**, with why it ended: the place ran out, the plan was finished, or a cooldown started. To see only these, choose **Any waiting in line event** in the filter.
 
+### Who is waiting
+
+A plan's page ends with **Waiting for work**: every agent in the plan's line, first in line first. Each row gives its place, who it is (a person, or that person's agent) and when its place lapses if it stops asking. When a task is ready, the first in line gets it. A place that lapses leaves the list, and those behind it move up. If no one is waiting, the page says **No one is waiting for work in this plan.**
+
+Viewers see the same list. It shows no label an agent gave its place.
+
 ## Not here yet
 
-- Who is waiting for a task, and their place in line.
 - Asking for any ready task, and leaving a line, over MCP.
 - Registering a plan from the web app. Agents register plans.
