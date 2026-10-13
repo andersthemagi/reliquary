@@ -1,7 +1,7 @@
 // How an agent sees people (20261014150000_display_preferences.sql): the
 // "people:" line of a tool's answer names each person by display name and
 // tag, from public.co_member_people, and never an email, whatever the
-// person chose or the vault requires. The rule itself is proved in
+// person chose. The rule itself is proved in
 // supabase/tests/display_preferences_test.sql; this checks what an agent
 // is actually sent.
 //
@@ -60,11 +60,8 @@ test("display: an agent sees a co-member who shows their email by name and tag, 
   assert.ok(!r.text.includes("ivy@example.test"), r.text);
 });
 
-test("display: nor once the vault requires emails and they agree to show it", async () => {
-  const [{ id }] = await as(IVY, "select id from public.vaults where name = 'Shown As'");
-  await as(IVY, "select public.set_require_emails($1, true)", [id]);
+test("display: nor of a member who hides their email", async () => {
   await as(IVY, "select public.set_email_shown(false)");
-  await as(IVY, "select public.consent_to_show_email($1)", [id]);
   const r = await call("changes_since", { vault: "Shown As" });
   assert.match(r.text, new RegExp(`=${IVY} "Ivy · e1000000"`));
   assert.ok(!r.text.includes("ivy@example.test"), r.text);

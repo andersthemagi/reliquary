@@ -16,7 +16,7 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - set or remove rules (canon or open, quorum, [claim rules](claims.md#claim-rules));
 - name or remove a path's owners;
 - invite people, change roles, remove members, or see members' email addresses;
-- choose how people see you, or agree to show your email in a vault that requires it;
+- choose how people see you;
 - create a token or revoke a connection;
 - set, rotate, delete or reveal a variable's value, or apply an import;
 - add, edit or delete a link, or set its tool grants;

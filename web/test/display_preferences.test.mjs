@@ -1,6 +1,6 @@
-// How people see you, in the web UI (20261014150000_display_preferences.sql):
-// "Show me to others as" on Account settings, the vault setting that
-// requires members' emails, and asking a member who hid theirs. The rule
+// How people see you, in the web UI (20261014150000_display_preferences.sql,
+// 20261014160000_drop_vault_email_requirement.sql): "Show me to others as"
+// on Account settings, and what other members' pages show. The rule
 // itself is proved in supabase/tests/display_preferences_test.sql; these
 // check what a person's pages actually hold.
 //
@@ -106,24 +106,4 @@ test("display: a hostile display name is shown escaped and does nothing", async 
   assert.match(h, /&lt;script&gt;alert\(1\)&lt;\/script&gt; \(wes@example\.test\)/);
   assert.ok(!h.includes(WES_NAME), "the name went out as markup");
   assert.equal((await sql("select count(*)::int as n from public.vault_members where vault_id = $1", [team]))[0].n, 3);
-});
-
-test("require: only an owner sets a vault to require emails; an editor is refused", async () => {
-  assert.doesNotMatch(await page("vic", `/v/${team}/config`), /name="require_emails"/);
-  const refused = await post("vic", `/v/${team}/config/emails`, { require_emails: "1" });
-  assert.equal(refused.status, 303);
-  assert.match(await page("vic", refused.headers.get("location")), /only owners decide whether a vault requires members/i);
-  assert.equal((await sql("select require_emails from public.vaults where id = $1", [team]))[0].require_emails, false);
-  assert.match(await page("uma", `/v/${team}/config`), /<legend>Who sees members’ emails<\/legend>/);
-  assert.equal((await post("uma", `/v/${team}/config/emails`, { require_emails: "1" })).status, 303);
-  assert.equal((await sql("select require_emails from public.vaults where id = $1", [team]))[0].require_emails, true);
-});
-
-test("require: a member who hid their email is asked on the vault's pages, and once they agree the others see it", async () => {
-  assert.match(await page("vic", `/v/${team}`), /id="email-consent"/);
-  assert.ok(!(await members()).includes("vic@example.test"), "shown before they agreed");
-  const r = await post("vic", `/v/${team}/config/email-consent`, {});
-  assert.equal(r.status, 303);
-  assert.doesNotMatch(await page("vic", `/v/${team}`), /id="email-consent"/);
-  assert.match(await members(), /Robert&#39;\); DROP TABLE students;-- \(vic@example\.test\)/);
 });

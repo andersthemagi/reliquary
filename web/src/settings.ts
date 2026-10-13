@@ -87,7 +87,7 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
           <label class="choice"><input type="radio" name="show_email" value="1"${showEmail ? html` checked` : ""}>
             <span><strong>Display name and email</strong></span></label>
           <label class="choice"><input type="radio" name="show_email" value="0"${showEmail ? "" : html` checked`}>
-            <span><strong>Display name alone:</strong> others see your name and a short tag from your account id, like “Ana · ${shortId(ctx.userId)}”, never your email. A vault can require members’ emails; it asks you first.</span></label>
+            <span><strong>Display name alone:</strong> others see your name and a short tag from your account id, like “Ana · ${shortId(ctx.userId)}”, never your email.</span></label>
         </fieldset>
         <div class="actions"><button class="primary">Save</button></div>
       </form>
@@ -195,7 +195,7 @@ export async function saveDisplayName(ctx: Ctx): Promise<Reply> {
 export async function saveShownAs(ctx: Ctx): Promise<Reply> {
   const show = ctx.form.get("show_email") !== "0";
   await asPerson(ctx.userId, (c) => c.query(`select public.set_email_shown($1)`, [show]));
-  ctx.setFlash(show ? "Saved. People who share a vault with you see your name and email." : "Saved. People see your name and a short tag, not your email, unless you agree to show it in a vault that requires it.", "success");
+  ctx.setFlash(show ? "Saved. People who share a vault with you see your name and email." : "Saved. People see your name and a short tag, not your email.", "success");
   return { redirect: "/settings" };
 }
 

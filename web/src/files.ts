@@ -163,21 +163,9 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
       waiting ? html`<span class="count" aria-label="${waiting} waiting">${waiting}</span>` : ""}</summary>
       <nav class="side-links" aria-label="Vault (phone)">${groups}</nav>
       <nav class="tree" aria-label="Files (phone)"><span class="side-group side-tree-label">Files</span>${tree}</nav></details>
-    <div class="content">${v.consent_needed ? emailConsent(ctx, v) : ""}${body}</div>
+    <div class="content">${body}</div>
   </div>`;
 }
-
-// A vault that requires members' emails asks a member who hides theirs, on
-// every page of it, to agree or leave; until they agree it stays hidden
-// (public.consent_to_show_email, 20261014150000_display_preferences.sql).
-const emailConsent = (ctx: Ctx, v: Vault): Raw =>
-  callout(
-    "warning",
-    html`<p>${v.name} requires members’ emails to be visible to the other members. You chose to hide yours, so they don’t see it yet. Agree to show it to the people in this vault, or leave the vault.</p>
-      <form method="post" action="${vaultPath(v.id, "/config/email-consent")}" class="actions">${csrfField(ctx.csrf)}<button class="primary">Show my email in this vault</button>
-        <a class="button quiet" href="${vaultPath(v.id, "/config/leave")}">Leave this vault</a></form>`,
-    { title: "This vault requires members’ emails", id: "email-consent" },
-  );
 
 export type RuleInfo = {
   rule?: { path: string; policy: string; quorum: number; set_by: string | null; set_at: Date | null };
