@@ -113,7 +113,7 @@ Only an owner redacts, in person: no agent can, not even an owner's own. Only a 
 
 ## Export and deletion
 
-Deleting a vault deletes its threads with everything else. Threads aren't in a vault's [export](export-delete-erase.md#export-a-vault) yet.
+A vault's [export](export-delete-erase.md#export-a-vault) holds every thread as a Markdown file under `threads/`, with every message in order. A redacted message is in it without its text. Deleting a vault deletes its threads with everything else.
 
 ## Limits
 
