@@ -141,25 +141,25 @@ after(async () => {
 // ---------------------------------------------------------------------------
 // The vault's sections on phones
 
-test("vault tabs: every vault page has the sections as tabs (for phones), the current one marked and the open proposals counted; Claims and the log are under Settings, not here", async () => {
+test("vault menu: every vault page has the sections in one menu (for phones), the current one marked and the open proposals counted; Claims and the log are under Settings, not here", async () => {
   const h = await page(`/v/${V.main}`);
-  const tabs = /<div class="vault-tabs"><nav class="tabs" aria-label="Vault \(phone\)">([\s\S]*?)<\/nav><\/div>/.exec(h)?.[1];
-  assert.ok(tabs, "a tabs row in the vault shell");
+  const tabs = /<details class="vault-menu">[\s\S]*?<nav class="side-links" aria-label="Vault \(phone\)">([\s\S]*?)<\/nav>/.exec(h)?.[1];
+  assert.ok(tabs, "a menu in the vault shell");
   assert.deepEqual([...tabs.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]), [
     `/v/${V.main}`, `/v/${V.main}/files`, `/v/${V.main}/proposals`, `/v/${V.main}/threads`, `/v/${V.main}/tasks`, `/v/${V.main}/changes`, `/v/${V.main}/variables`, `/v/${V.main}/links`,
     `/v/${V.main}/config`,
   ]);
-  assert.match(tabs, new RegExp(`<a href="/v/${V.main}" aria-current="page">Overview</a>`));
-  assert.match(tabs, /Proposals<span class="count">1<\/span>/);
+  assert.match(tabs, new RegExp(`<a href="/v/${V.main}" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Overview</span></a>`));
+  assert.match(tabs, /<span class="side-label">Proposals<\/span><span class="count">1<\/span>/);
   const changes = await page(`/v/${V.main}/changes`);
-  assert.match(changes, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/changes" aria-current="page">Updates</a>`), "Updates is marked on its page");
+  assert.match(changes, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/changes" aria-current="page"><svg`), "Updates is marked on its page");
   assert.doesNotMatch(/<nav class="side-links" aria-label="Vault">[\s\S]*?<\/nav>/.exec(changes)[0], /Activity|\/activity/, "the full log is under Diagnostics, not in the sidebar");
   const rules = await page(`/v/${V.main}/rules`);
-  assert.match(rules, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/config" aria-current="page">Settings</a>`), "Rules is under Settings");
+  assert.match(rules, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/config" aria-current="page"><svg`), "Rules is under Settings");
   // Claims and the log moved under Settings, Diagnostics: they and the landing page mark Settings.
   for (const rest of ["/diagnostics", "/claims", "/activity"]) {
     const d = await page(`/v/${V.main}${rest}`);
-    assert.match(d, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/config" aria-current="page">Settings</a>`), `${rest} is under Settings`);
+    assert.match(d, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/config" aria-current="page"><svg`), `${rest} is under Settings`);
     assert.doesNotMatch(/<nav class="side-links" aria-label="Vault">[\s\S]*?<\/nav>/.exec(d)[0], /\/flags|\/claims/, `${rest}: not in the sidebar`);
   }
 });
@@ -172,12 +172,13 @@ test("vault sidebar: the sections are grouped, each with an icon, Work (Overview
   assert.deepEqual(order, ["[Work]", "Overview", "Files", "Proposals", "Threads", "Tasks", "Updates", "[Setup]", "Variables", "Links", "Settings"]);
 });
 
-test("vault tabs: the phone's Browse files holds only the folder tree, not the sections", async () => {
+test("vault menu: closed, it names the section you're in and counts what waits; open, the folder tree is under the sections", async () => {
   const h = await page(file(V.main, "notes/a.md"));
-  const mobile = /<details class="tree-mobile">([\s\S]*?)<\/details>\s*<div class="content">/.exec(h)?.[1];
-  assert.ok(mobile);
-  assert.match(mobile, /^<summary>Browse files<\/summary>\s*<nav class="tree" aria-label="Files \(phone\)">/);
-  assert.doesNotMatch(mobile, /\/proposals"|\/config"|side-links/);
+  const menu = /<details class="vault-menu">([\s\S]*?)<\/details>\s*<div class="content">/.exec(h)?.[1];
+  assert.ok(menu, "one menu, before the page");
+  assert.match(menu, /^<summary><svg class="icon"[^>]*aria-hidden="true"[\s\S]*?<\/svg><span class="side-label">Files<\/span><span class="count" aria-label="(\d+) waiting">\1<\/span><\/summary>/, "a file page is in Files, and the open proposal shows on the closed menu");
+  assert.ok(menu.indexOf('aria-label="Vault (phone)"') < menu.indexOf('<nav class="tree" aria-label="Files (phone)">'), "sections first, then the files");
+  assert.doesNotMatch(h, /class="vault-tabs"|class="tree-mobile"|Browse files/, "no tab rows and no second disclosure");
 });
 
 // ---------------------------------------------------------------------------

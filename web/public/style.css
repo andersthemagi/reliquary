@@ -826,7 +826,7 @@ a.dir { font-weight: 600; }
 .mark { width: 7px; height: 7px; flex: none; transform: rotate(45deg); }
 .mark.canon { background: var(--fg); }
 .mark.open { box-shadow: inset 0 0 0 1.25px var(--fg-muted); }
-.tree-mobile { display: none; }
+.vault-menu { display: none; }
 
 /* Rule line on file and folder headers */
 .rule { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: 0; }
@@ -1114,25 +1114,26 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
 @media (max-width: 767px) {
   .vault { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
   .side { display: none; }
-  .tree-mobile { display: block; }
-  .tree-mobile > summary {
-    display: inline-flex; align-items: center; gap: var(--space-3); list-style: none; cursor: pointer;
-    min-height: var(--control-md); padding: 0 14px; font-size: var(--text-sm); font-weight: 500;
+  /* One menu names the section you're in; open, it is the sidebar. */
+  .vault-menu { display: block; }
+  .vault-menu > summary {
+    display: flex; align-items: center; gap: var(--space-3); list-style: none; cursor: pointer;
+    min-height: var(--control-md); padding: 0 14px; font-size: var(--text-sm); font-weight: 600;
     border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg);
   }
-  .tree-mobile > summary::-webkit-details-marker { display: none; }
-  .tree-mobile > summary::after {
+  .vault-menu > summary::-webkit-details-marker { display: none; }
+  .vault-menu > summary .side-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vault-menu > summary::after {
     content: ""; width: 6px; height: 6px; margin-top: -3px;
     border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg);
   }
-  .tree-mobile[open] > summary { margin-bottom: var(--space-3); }
-  .tree-mobile .tree summary, .tree-mobile .tree .leaf { min-height: 44px; padding-top: 0; padding-bottom: 0; }
-  .tree-mobile .tree a { align-self: stretch; display: flex; align-items: center; }
-  .tree-mobile .side-links, .tree-mobile .tree {
-    background: var(--bg-subtle); border: 1px solid var(--border); padding: var(--space-3);
+  .vault-menu[open] > summary::after { margin-top: 3px; transform: rotate(-135deg); }
+  .vault-menu .side-links, .vault-menu .tree {
+    background: var(--bg-subtle); border: 1px solid var(--border); border-top: 0; padding: var(--space-3);
   }
-  .tree-mobile .side-links { border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-bottom: 0; }
-  .tree-mobile .tree { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+  .vault-menu .side-links a, .vault-menu .tree summary, .vault-menu .tree .leaf { min-height: 44px; }
+  .vault-menu .tree summary, .vault-menu .tree .leaf { padding-top: 0; padding-bottom: 0; }
+  .vault-menu .tree a { align-self: stretch; display: flex; align-items: center; }
 }
 
 @media (max-width: 640px) {
@@ -1629,18 +1630,11 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure-details[open] > summary { margin-bottom: var(--space-3); }
 
 /* Package B: files and folders */
-/* A vault's sections as tabs on phones (files.ts vaultShell): the sidebar
-   holds them on wide screens, so the row shows only below 768px. The folder
-   tree stays behind "Browse files". */
-.vault-tabs { display: none; min-width: 0; }
-.vault-tabs > .tabs { margin: 0; }
 /* The root's Search button stands in for the sidebar's search box, which is
    hidden on phones. */
 .vault-search-link { display: none; }
 @media (max-width: 767px) {
-  .vault-tabs { display: block; }
   .vault-search-link { display: inline-flex; }
-  .tree-mobile > summary { width: 100%; justify-content: space-between; }
 }
 /* The root's rule line: the default, the rules, what canon means. */
 .root-rule .badge { margin: 0 calc(-1 * var(--space-1)); }

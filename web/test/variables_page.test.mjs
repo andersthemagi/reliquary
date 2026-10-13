@@ -197,7 +197,7 @@ after(async () => {
 test("variables page: the vault sidebar links to Variables, on wide and narrow screens", async () => {
   const h = await page(`/v/${V.own}`);
   assert.equal(h.split(`href="${vp(V.own)}"`).length - 1, 2);
-  assert.match(await page(vp(V.own)), new RegExp(`href="${vp(V.own)}" aria-current="page">Variables`));
+  assert.match(await page(vp(V.own)), new RegExp(`href="${vp(V.own)}" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Variables</span>`));
 });
 
 test("variables page: an owner sees each environment set or not, its version, who set it and when, and never a value", async () => {

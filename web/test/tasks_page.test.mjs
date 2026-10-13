@@ -227,7 +227,7 @@ test("tasks page: a plan's card has a progress bar, and the plan file's first he
 test("tasks page: has its own section in the vault's nav, current on both of its pages", async () => {
   for (const url of [tasksUrl(V.main), planUrl(V.main, "plans/launch.md")]) {
     const h = await page(noa, url);
-    assert.match(h, new RegExp(`<a href="${tasksUrl(V.main)}" aria-current="page">Tasks</a>`), url);
+    assert.match(h, new RegExp(`<a href="${tasksUrl(V.main)}" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Tasks</span></a>`), url);
   }
 });
 
