@@ -53,7 +53,7 @@ import {
 // Vault shell: sidebar with search, links and the folder tree.
 
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
-export type Section = "files" | "proposals" | "threads" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
+export type Section = "overview" | "files" | "proposals" | "threads" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
 // One small stroked icon per section, so the eye finds a section by shape
 // before reading it. Inline SVG because the CSP allows no other script or
@@ -61,6 +61,7 @@ export type Section = "files" | "proposals" | "threads" | "tasks" | "changes" | 
 const sectionIcon = (d: string) =>
   raw(`<svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`);
 const SECTION_ICONS: Record<string, Raw> = {
+  overview: sectionIcon('<rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/>'),
   files: sectionIcon('<path d="M4 1.75h5l3 3v9.5H4z"/><path d="M9 1.75v3h3"/>'),
   proposals: sectionIcon('<circle cx="4" cy="4" r="1.75"/><circle cx="12" cy="12" r="1.75"/><path d="M4 5.75v8.5M12 10.25V6a2 2 0 0 0-2-2H7.5"/><path d="M9 2.5 7.5 4 9 5.5"/>'),
   threads: sectionIcon('<path d="M2 3h12v8H7l-3 2.5V11H2z"/>'),
@@ -125,7 +126,8 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
   // work people do every day and the setup they visit once, so a newcomer
   // reads the first group and can ignore the second.
   const sections: { section: Section; href: string; label: string; count?: number | string; group: "Work" | "Setup" }[] = [
-    { section: "files", href: vaultPath(v.id), label: "Files", group: "Work" },
+    { section: "overview", href: vaultPath(v.id), label: "Overview", group: "Work" },
+    { section: "files", href: treePath(v.id, ""), label: "Files", group: "Work" },
     { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined, group: "Work" },
     { section: "threads", href: vaultPath(v.id, "/threads"), label: "Threads", group: "Work" },
     { section: "tasks", href: vaultPath(v.id, "/tasks"), label: "Tasks", group: "Work" },
@@ -223,17 +225,6 @@ const erasePath = (id: string, path: string) => vaultPath(id, `/erase?path=${q(p
 // ---------------------------------------------------------------------------
 // Folders and files
 
-// A first-run step, not a status: a writer of a young vault who has no
-// connection of any kind yet. The age bound is the dismiss, so someone who
-// never connects an agent isn't pointed at Connect on every visit, forever.
-const NUDGE_DAYS = 14;
-const CONNECT_NUDGE = callout(
-  "info",
-  html`<p>Your agents read and propose to your vaults once they’re connected. It takes about a minute.</p>
-    <p class="callout-actions"><a class="button primary" href="/connect">Connect an agent</a></p>`,
-  { title: "Next: connect an agent" },
-);
-
 export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Reply> {
   const dir = rawDir ? rawDir.replace(/^\/+/, "").replace(/\/*$/, "/") : "";
   const data = await asPerson(ctx.userId, async (c) => {
@@ -282,16 +273,13 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
           await c.query(
             `select v.default_policy,
                     (select count(*)::int from public.path_policies pp where pp.vault_id = v.id) as rules,
-                    (select count(*)::int from public.proposals p where p.vault_id = v.id and p.status = 'open') as open,
-                    exists(select 1 from public.access_tokens) as connected,
-                    v.created_at > now() - interval '${NUDGE_DAYS} days' as young
+                    (select count(*)::int from public.proposals p where p.vault_id = v.id and p.status = 'open') as open
                from public.vaults v where v.id = $1`,
             [id],
           )
-        ).rows[0] as { default_policy: string; rules: number; open: number; connected: boolean; young: boolean });
+        ).rows[0] as { default_policy: string; rules: number; open: number });
     const readme = here.find((f) => /^readme\.md$/i.test(f.path.slice(dir.length)));
     const writer = await writablePath(c, v, dir);
-    const nudge = info && writer && info.young && !info.connected ? CONNECT_NUDGE : "";
     // Any member watches a folder (watching.ts); the vault's root isn't a
     // path that can be watched.
     const watch = dir ? watchControl(ctx, id, dir, await watchState(c, ctx, id, dir)) : undefined;
@@ -311,26 +299,18 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
           })
         : emptyState({ title: "No files yet", body: "Nothing has been shared here yet. Files appear here once a member writes one." });
     };
-    // The way to connect an agent that doesn't expire. The first-run step
-    // below is for a writer of a young vault with nothing connected; an older
-    // vault, a vault you were invited to, a viewer, or someone connecting a
-    // second agent had no way in from here. It stays in the header even
-    // while that step shows (owner, 2026-10-13): the header is where people
-    // look for it, and the step goes once something connects.
-    const connect = !dir ? html` <a class="button" href="/connect">Connect an agent</a>` : "";
     const body = html`
       ${pageHeader({
-        crumb: dir ? crumbs(id, v, dir, true) : undefined,
-        title: dir ? dir.slice(0, -1).split("/").pop()! : v.name,
+        crumb: dir ? crumbs(id, v, dir, true) : [{ label: v.name, href: vaultPath(id) }, { label: "Files" }],
+        title: dir ? dir.slice(0, -1).split("/").pop()! : "Files",
         path: !!dir,
         badge: watch?.badge,
         actions: watch?.action ?? "",
         meta: rule ? ruleLine(ctx, id, rule) : info ? rootRuleLine(id, info.default_policy, info.rules) : undefined,
         // On phones the sidebar's search box is hidden: the header offers it.
-        secondary: !dir ? html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a>${connect}` : "",
+        secondary: !dir ? html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a>` : "",
         primary: writer ? html`<a class="button primary" href="${vaultPath(id, `/new${dir ? `?dir=${q(dir)}` : ""}`)}">New file${dir ? " here" : ""}</a>` : "",
       })}
-      ${nudge}
       ${children.length === 0
         ? empty()
         : html`<div class="table-wrap"><table class="folder-list">
@@ -349,7 +329,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
     return { v, shell: await vaultShell(c, ctx, v, { path: dir, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
-  return render(ctx, dir || data.v.name, data.shell, "vaults");
+  return render(ctx, dir || "Files", data.shell, "vaults");
 }
 
 export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
@@ -717,7 +697,7 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
     });
     if (outcome.kind === "delete") {
       ctx.setFlash(`Deleted ${path}.`, "success");
-      return { redirect: vaultPath(id) };
+      return { redirect: treePath(id, "") };
     }
     if (outcome.kind === "proposed") {
       ctx.setFlash("Proposed. It applies once enough people approve it.", "success");
@@ -742,6 +722,6 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
       if (again.status === 400) return again;
     }
     ctx.setFlash(error);
-    return { redirect: path ? filePath(id, path) : vaultPath(id) };
+    return { redirect: path ? filePath(id, path) : treePath(id, "") };
   }
 }

@@ -27,7 +27,7 @@ import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
 import { callout, confirmPage, csrfField, html, pageHeader, plural, policyBadge, raw, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
-import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
+import { message, notFound, render, treePath, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { crumbs as fileCrumbs, deletePath, vaultShell } from "./files.js";
 import { usagePanel, vaultUsages } from "./plans.js";
 import { watchingRoutes } from "./watching.js";
@@ -424,7 +424,7 @@ async function eraseFile(ctx: Ctx, id: string): Promise<Reply> {
     });
     if (n === null) return notFound(ctx);
     ctx.setFlash(`Erased ${path}: ${plural(n, "version")} blanked.`, "success");
-    return { redirect: vaultPath(id) };
+    return { redirect: treePath(id, "") };
   } catch (err) {
     ctx.setFlash(message(err));
     return { redirect: filePath(id, path) };

@@ -37,8 +37,8 @@ test("delete: an open file is deleted and the vault says so", async () => {
   token = await csrf(`${V}/file?path=${encodeURIComponent(path)}`);
   const r = await post(`${V}/file`, { csrf: token, action: "delete", path });
   assert.equal(r.status, 303);
-  assert.equal(r.headers.get("location"), V);
-  assert.match(await page(V), /Deleted notes\/delete-me\.md\./);
+  assert.equal(r.headers.get("location"), `${V}/files`);
+  assert.match(await page(`${V}/files`), /Deleted notes\/delete-me\.md\./);
   assert.equal((await get(`${V}/file?path=${encodeURIComponent(path)}`)).status, 404);
 });
 

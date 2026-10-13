@@ -180,6 +180,9 @@ function what(id: string, l: Line, live: ReadonlySet<string>): Raw {
   return html`changed ${path}`;
 }
 
+const changeLine = (ctx: Ctx, id: string, l: Line, live: ReadonlySet<string>) =>
+  html`<li class="change"><span class="change-what">${actor(ctx.userId, l)} ${what(id, l, live)}</span><span class="change-when">${time(l.at)}</span></li>`;
+
 function feed(ctx: Ctx, id: string, lines: Line[], live: ReadonlySet<string>): Raw {
   const days: { day: string; lines: Line[] }[] = [];
   for (const l of lines) {
@@ -188,9 +191,7 @@ function feed(ctx: Ctx, id: string, lines: Line[], live: ReadonlySet<string>): R
   }
   return html`${days.map(
     (g) => html`<section class="feed-day" aria-labelledby="d-${g.day}"><h2 id="d-${g.day}">${dayLabel(g.day)}</h2>
-      <ul class="rows feed">${g.lines.map(
-        (l) => html`<li class="change"><span class="change-what">${actor(ctx.userId, l)} ${what(id, l, live)}</span><span class="change-when">${time(l.at)}</span></li>`,
-      )}</ul></section>`,
+      <ul class="rows feed">${g.lines.map((l) => changeLine(ctx, id, l, live))}</ul></section>`,
   )}`;
 }
 
@@ -228,6 +229,27 @@ async function emptyFirst(c: pg.PoolClient, ctx: Ctx, id: string, show: Show): P
   });
 }
 
+// The paths among `lines`' writes still there, so only those are linked.
+async function livePaths(c: pg.PoolClient, id: string, lines: Line[]): Promise<Set<string>> {
+  const paths = [...new Set(lines.filter((l) => l.event === "file.write" && l.path).map((l) => l.path!))];
+  return new Set<string>(
+    paths.length
+      ? (await c.query(`select path from public.files where vault_id = $1 and deleted_at is null and path = any($2::text[])`, [id, paths])).rows.map(
+          (r) => r.path as string,
+        )
+      : [],
+  );
+}
+
+// The newest few lines of the feed, in the same words, for the vault's
+// Overview (overview.ts); null when nothing has changed yet.
+export async function recentChanges(c: pg.PoolClient, ctx: Ctx, id: string, n: number): Promise<Raw | null> {
+  const lines = (await readPage(c, ctx.userId, id)).lines.slice(0, n);
+  if (!lines.length) return null;
+  const live = await livePaths(c, id, lines);
+  return html`<ul class="card-list">${lines.map((l) => changeLine(ctx, id, l, live))}</ul>`;
+}
+
 export async function changes(ctx: Ctx, id: string): Promise<Reply> {
   const before = /^\d{1,18}$/.test(ctx.url.searchParams.get("before") ?? "") ? ctx.url.searchParams.get("before")! : undefined;
   const show = showOf(ctx.url.searchParams.get("show"));
@@ -235,14 +257,7 @@ export async function changes(ctx: Ctx, id: string): Promise<Reply> {
     const v = await vault(c, ctx, id);
     if (!v) return null;
     const { lines, next } = await readPage(c, ctx.userId, id, before, show);
-    const paths = [...new Set(lines.filter((l) => l.event === "file.write" && l.path).map((l) => l.path!))];
-    const live = new Set<string>(
-      paths.length
-        ? (
-            await c.query(`select path from public.files where vault_id = $1 and deleted_at is null and path = any($2::text[])`, [id, paths])
-          ).rows.map((r) => r.path as string)
-        : [],
-    );
+    const live = await livePaths(c, id, lines);
     const body = html`
       ${pageHeader({ title: "Updates", description: "What’s new for you, then what people and their agents changed in this vault, newest first." })}
       ${show === "everyone" && !before ? await newForYou(c, ctx, id) : ""}
