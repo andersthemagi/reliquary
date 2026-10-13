@@ -20,7 +20,7 @@
 // which is what the database checks too.
 //
 //   GET  /v/:id/tasks                          what is open across every plan, then the plans with their progress
-//   GET  /v/:id/tasks/plan?path=               one plan: every task, ready or in progress first
+//   GET  /v/:id/tasks/plan?path=               one plan: every task, ready or in progress first, then who waits in line
 //   GET  /v/:id/tasks/plan?path=&cancel=<key>  confirm cancelling a task
 //   GET  /v/:id/tasks/plan?path=&skip=<key>    confirm skipping a task
 //   GET  /v/:id/tasks/plan?path=&reopen=<key>  confirm reopening a cancelled task
@@ -105,6 +105,23 @@ async function loadTasks(c: pg.PoolClient, id: string, path: string | null): Pro
          join public.work_plan_steps s on s.plan_id = p.id and s.key = st.o_key
         where p.vault_id = $1 and ($2::text is null or p.path = $2)
         order by p.path, s.id`,
+      [id, path],
+    )
+  ).rows;
+}
+
+// Who waits in the plan's line, first first. The order and "live" are
+// request_work's: created_at, id among places that haven't lapsed, so the
+// place shown is the one the agent was told. Only these three columns: a
+// place's label stays off the page.
+type Place = { holder: string; agent: string | null; expires_at: Date };
+async function loadLine(c: pg.PoolClient, id: string, path: string): Promise<Place[]> {
+  return (
+    await c.query(
+      `select pl.holder, pl.agent, pl.expires_at
+         from public.work_plan_places pl join public.work_plans p on p.id = pl.plan_id
+        where p.vault_id = $1 and p.path = $2 and pl.expires_at > now()
+        order by pl.created_at, pl.id`,
       [id, path],
     )
   ).rows;
@@ -309,6 +326,21 @@ function taskRow(ctx: Ctx, id: string, t: Task, o: { plan?: string; canAct?: boo
     ${moved(id, t)}</li>`;
 }
 
+function line(ctx: Ctx, places: Place[]): Raw {
+  const name = (p: Place) =>
+    p.agent ? (p.holder === ctx.userId ? "your agent" : html`${who(ctx, p.holder, null)}’s agent`) : who(ctx, p.holder, null);
+  return html`<section aria-labelledby="g-waiting"><h2 id="g-waiting">Waiting for work <span class="muted">${places.length}</span></h2>${
+    places.length
+      ? html`<div class="table-wrap"><table class="table-stack member-list line-table">
+    <thead><tr><th scope="col">Place in line</th><th scope="col">Waiting</th><th scope="col">Place lapses</th></tr></thead>
+    <tbody>${places.map(
+      (p, i) => html`<tr><td><strong>${i + 1}</strong></td><td class="small" data-label="Waiting">${name(p)}</td><td class="small" data-label="Place lapses">${time(p.expires_at)}, unless it asks again</td></tr>`,
+    )}</tbody></table></div>
+    <p class="hint">When a task is ready, the first in line gets it. A place lapses when its agent stops asking for work, and the next one moves up.</p>`
+      : html`<p class="muted">No one is waiting for work in this plan.</p>`
+  }</section>`;
+}
+
 function fileNote(id: string, p: Plan): Raw | "" {
   if (p.file === "changed")
     return callout(
@@ -330,6 +362,7 @@ export async function plan(ctx: Ctx, id: string): Promise<Reply> {
     if (!p) return { back: tasksPath(id), note: `There’s no plan registered at ${shown(path)}.`, tone: "warning" };
     const rows = await loadTasks(c, id, path);
     const canAct = await writablePath(c, v, path);
+    const places = await loadLine(c, id, path);
     const groups = grouped(GROUPS, rows);
     const done = rows.filter((t) => t.state === "done");
     const body = html`
@@ -345,6 +378,7 @@ export async function plan(ctx: Ctx, id: string): Promise<Reply> {
         (g) => html`<section aria-labelledby="g-${g.id}"><h2 id="g-${g.id}">${g.title} <span class="muted">${g.rows.length}</span></h2>
           <ul class="task-list">${g.rows.map((t) => taskRow(ctx, id, t, { canAct }))}</ul></section>`,
       )}
+      ${line(ctx, places)}
       ${done.length
         ? html`<details class="task-done"><summary><h2 id="g-done">Done <span class="muted">${done.length}</span></h2></summary>
             <ul class="task-list">${done.map((t) => taskRow(ctx, id, t, { canAct }))}</ul></details>`

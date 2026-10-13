@@ -28,14 +28,17 @@ A rule sets four things:
 - **Hold limit:** the longest one claim can be kept, however often it checks in. After that the agent releases it and claims again. At least the lease, at most 365 days.
 - **Claims per connection:** how many claims one connection (one agent) may hold in the vault at once.
 - **Claims per person:** how many all of one person's agents may hold together.
+- **Place in line, longest check-again hint and minimum gap:** how an agent waits for a task when none is free. See [Waiting in line](tasks.md#the-settings).
 
 Three presets are starting points, not measurements: tune one once it actually causes a problem.
 
-| Preset | Lease | Hold limit |
-|---|---|---|
-| Hackathon | 30 minutes | 2 hours |
-| Team | 8 hours | 1 day |
-| Org (the default) | 48 hours | 7 days |
+| Preset | Lease | Hold limit | Place in line | Longest hint | Minimum gap |
+|---|---|---|---|---|---|
+| Hackathon | 30 minutes | 2 hours | 15 minutes | 1 minute | 15 seconds |
+| Team | 8 hours | 1 day | 2 hours | 15 minutes | 225 seconds |
+| Org (the default) | 48 hours | 7 days | 6 hours | 1 hour | 15 minutes |
+
+Each preset's minimum gap is a quarter of its longest hint, and its cooldown cap is its lease.
 
 Only an owner sets a claim rule, in person: in the vault, **Settings**, **Rules**, **Claim rules**. The first row is the whole vault, with the fixed defaults until you set one. To make every path in a vault lease for 30 minutes with a 2 hour hold limit, choose **The whole vault** and press **Hackathon**, or type the numbers and press **Save claim rule**. To give one folder or file its own numbers, choose **A folder or file** and type its path. **Change** on a row opens it filled in; **Remove** takes it away, and the paths it covered follow the next rule that applies. Setting a rule never touches a claim already granted; it only changes what the next claim, or the next check-in, gets.
 
@@ -86,5 +89,5 @@ Agents never cancel, skip or reopen a step: those stay with a person. When cance
 
 ### What isn't built yet
 
-- **Waiting in line.** An agent names the step it wants and is refused if it isn't ready. There is no "give me any ready step", no place in line and no list of who is waiting.
+- **Waiting in line, over MCP.** Reliquary keeps a line for each plan, first come, first served ([Waiting in line](tasks.md#waiting-in-line)), but no MCP tool asks for any ready step or leaves a line yet, and no page shows who is waiting. An agent names the step it wants and is refused if it isn't ready.
 - **Review gates.** `gate: review` is stored and shown, but nothing holds a step's dependents for a review.

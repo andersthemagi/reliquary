@@ -25,7 +25,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 7 | [Context](#context) | Built |
 | 8 | [Path ownership](#path-ownership) | Built |
 | 9 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
-| 10 | [Claims and work plans](#claims-and-work-plans) | Built, except waiting in line |
+| 10 | [Claims and work plans](#claims-and-work-plans) | Built; waiting in line in the database, not yet over MCP or on the Tasks page |
 | 11 | [Threads](#threads) | Built |
 | 12 | [Links](#links) | Built |
 | 13 | [Routines](#routines) | Designed, not built |
@@ -543,8 +543,9 @@ an idle agent: MCP has no push, so an agent learns on its next call.
 Written 2026-09-30, settling CL-0.2 of the claims, waiting and work
 plans effort (tracking issue #52; the exception is logged in
 [progress.md](progress.md#decisions)). Built as of 2026-10-09: phase 1 (compare-and-swap writes), phase 2 (claims)
-and phase 3 (work plans), apart from waiting in line (item 11, CL-3.9, #74);
-[progress.md](progress.md) has what shipped. Validated first in a throwaway
+and phase 3 (work plans); waiting in line (item 11, CL-3.9, #74) built in
+the database on 2026-10-13, with its MCP tools (#75) and the view of who is
+waiting (#76) still to come; [progress.md](progress.md) has what shipped. Validated first in a throwaway
 PostgreSQL 16 model, not Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
 Twelve points, each with the reason it was decided that way.
 
@@ -740,6 +741,40 @@ to stop and return at the suggested time; bringing it back is the
 agent's own harness's job, or a person's, the same limit MCP's
 request/response shape already puts on [Notifications](#notifications).
 
+**As built (2026-10-13, #74;** `20261013170000_waiting_in_line.sql` to
+`20261013170300_leave_queue.sql`). `request_work(vault, path)` and
+`leave_queue(vault, path)`, executable by whoever can write the plan's
+path, identity from the session as `claim_step` takes it. The rule, the
+lapse of a place, the cheap refusal, the hint cap and the strikes are the
+spike's, ported onto `work_plan_steps` and the claim rule's stored
+waiting settings (item 3; with no rule, the Org preset: a place lives 6
+hours, the longest hint is 1 hour, the minimum gap 15 minutes, one free
+lapse, a 48 hour cooldown cap). Where it differs from the spike:
+
+- **The answer to "too many places" is `refused`**, and the 3 places per
+  person in a vault (item 8) is a constant, not a rule column.
+- **Item 12a's "one way in" is the API role's, not a separate agent
+  role:** agents and people share `authenticated`, which writes neither
+  places nor strikes, and reads places (who is waiting) as it reads steps.
+  `claim_step`, the named-step primitive `request_work` wraps, stays
+  executable by agents and ignores the line, the caps and the cooldown,
+  as it did before this; whether that should change is the MCP tools'
+  question (#75), where the caps for `claim_step` already are.
+- **A strike is counted when `request_work` hands a lapsed step on**, not
+  when `claim_step` does.
+- **Lock order.** `request_work` and `leave_queue` take the vault's row
+  first (for key share), the order `post_message` uses, because they
+  insert places and an insert has no row `delete_vault` could lock ahead
+  of it; `delete_vault` is unchanged. One person's requests to a vault
+  take turns on an advisory lock, so two at once leave one place. Other
+  people's lapsed places and the step are taken with SKIP LOCKED.
+- **Events:** `queue.join` when a place is taken, `queue.leave` when its
+  holder leaves, and `queue.expire` when it ends without them, with the
+  reason (`lapsed`, `plan_complete`, `cooling_down`), logged as the
+  holder's. A grant ends the place silently; `step.claim` records the
+  place and the ready count it was granted at.
+- **Not here:** the per-token and per-vault `request_work` rate limits of
+  item 8 are the MCP server's, with the tools (#75).
 ### 12. The agent is not trusted
 
 No rule may depend on an agent behaving, and none needs a model: every
