@@ -657,7 +657,7 @@ advisory lock per plan (20261013160000_work_plan_gains_steps.sql says why).
 
 ### 7. Step states
 
-Stored: `open`, `claimed`, `done`, `cancelled`. Computed, never stored,
+Stored: `open`, `claimed`, `review` (awaiting review, since #78), `done`, `cancelled`. Computed, never stored,
 so nothing can drift out of sync with the graph: `ready` (open, every
 blocker done), `blocked` (open, a blocker not done yet),
 `blocked_by_cancelled` (a blocker is cancelled, so it can never become
@@ -668,7 +668,12 @@ state, not a silent pass-through. A step may carry `gate: review`, which
 holds its dependents until a person approves it directly or its linked
 proposal is applied, for a step whose output needs a person's judgement
 before anything downstream should start, not just before it's marked
-done.
+done. **As built (2026-10-13, #78;** `20261013233000_review_gate.sql`):
+completing a gated step stores `review`; `approve_step` (on the ceiling)
+or the linked proposal being applied makes it `done` and only then
+decrements its dependents. The link is the completing agent's: it names
+a proposal its own person made since claiming the step, still undecided,
+and a trigger on the proposal reaching `applied` approves the step.
 
 ### 8. Limits
 
@@ -704,7 +709,7 @@ One dot each, matching the existing activity-label convention
 `claim.release`, `claim.break`, `claim.expire`, `work_plan.register`,
 `work_plan.update`,
 `step.claim`, `step.complete`, `step.release`, `step.cancel`,
-`step.skip`, `queue.join`, `queue.leave`, `queue.expire`.
+`step.skip`, `step.approve`, `queue.join`, `queue.leave`, `queue.expire`.
 
 ### 10. Export, erasure, deletion
 

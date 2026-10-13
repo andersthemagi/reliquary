@@ -135,4 +135,4 @@ select t.expect('rls: and the other vault lists only its own',
 -- column, so adding one is a deliberate change to this list.
 select t.expect('rls: the function returns only plan facts, counts and the file''s state, never a holder, secret or file text',
   (select array_to_string(proargnames, ',') from pg_proc where oid = 'public.list_work_plans(uuid)'::regprocedure),
-  'p_vault,o_path,o_registered_version,o_registered_at,o_registered_by,o_file,o_current_version,o_ready,o_blocked,o_claimed,o_done,o_cancelled');
+  'p_vault,o_path,o_registered_version,o_registered_at,o_registered_by,o_file,o_current_version,o_ready,o_blocked,o_claimed,o_done,o_cancelled,o_review');

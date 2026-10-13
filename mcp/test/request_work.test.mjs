@@ -135,7 +135,7 @@ test("request work: a finished plan says to stop asking", async () => {
   await plan(t, "work.md", [{ key: "a", title: "Only" }]);
   await sql("select public.skip_step($1, 'work.md', 'a')", [t.id], t.owner);
   const r = await ask(t, t.editorTok, "work.md");
-  assert.deepEqual(r, { isError: false, hint: undefined, text: "Plan complete: every step of work.md is done or cancelled. Stop asking for work here." });
+  assert.deepEqual(r, { isError: false, hint: undefined, text: "Plan complete: no step of work.md is left for an agent: each is done, cancelled or awaiting a person's review. Stop asking for work here." });
 });
 
 test("request work: at capacity, cooling down, and no plan are refused in words that say what to do", async () => {

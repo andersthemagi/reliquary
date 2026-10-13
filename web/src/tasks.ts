@@ -10,13 +10,14 @@
 // readable by every member of the vault (RLS), and a person's own actions
 // are the database's to allow or refuse.
 //
-// Cancel, skip and reopen are a person's only: cancel_step, skip_step and
-// reopen_step are require_human, so an agent is refused by the database
-// whatever this page does. Each goes through a confirm page, like Break on
-// the Claims page (claimspage.ts): a cancel blocks what waits on the task,
-// a skip frees it, and a reopen puts back work someone dropped, when a new
-// task naming the old one is often the better way (the owner's call on
-// issue #76). The buttons are shown to whoever can write the plan's path,
+// Cancel, skip, reopen and approve are a person's only: cancel_step,
+// skip_step, reopen_step and approve_step are require_human, so an agent is
+// refused by the database whatever this page does. Each goes through a
+// confirm page, like Break on the Claims page (claimspage.ts): a cancel
+// blocks what waits on the task, a skip frees it, a reopen puts back work
+// someone dropped, when a new task naming the old one is often the better
+// way (the owner's call on issue #76), and an approve passes a review-gated
+// task's review (issue #78). The buttons are shown to whoever can write the plan's path,
 // which is what the database checks too.
 //
 //   GET  /v/:id/tasks                          the plans, with counts and a marker when a plan file changed
@@ -24,13 +25,14 @@
 //   GET  /v/:id/tasks/plan?path=&cancel=<key>  confirm cancelling a task
 //   GET  /v/:id/tasks/plan?path=&skip=<key>    confirm skipping a task
 //   GET  /v/:id/tasks/plan?path=&reopen=<key>  confirm reopening a cancelled task
-//   POST /v/:id/tasks/plan                     action=cancel|skip|reopen, path, key, confirm=1
+//   GET  /v/:id/tasks/plan?path=&approve=<key> confirm approving a task awaiting review
+//   POST /v/:id/tasks/plan                     action=cancel|skip|reopen|approve, path, key, confirm=1
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { callout, confirmPage, emptyState, html, pageHeader, plural, time, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
-import { filePath, message, notFound, q, render, vault, vaultPath, who, writablePath, type Ctx, type Reply, type Vault } from "./pages.js";
+import { filePath, message, notFound, proposalPath, q, render, vault, vaultPath, who, writablePath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
 
 export const tasksPath = (id: string) => vaultPath(id, "/tasks");
@@ -46,18 +48,20 @@ type Plan = {
   claimed: number;
   done: number;
   cancelled: number;
+  review: number;
 };
 
 type Blocker = { key: string; title: string; status: string };
 type Task = {
   key: string;
   title: string;
-  state: "ready" | "blocked" | "blocked_by_cancelled" | "claimed" | "done" | "cancelled";
+  state: "ready" | "blocked" | "blocked_by_cancelled" | "claimed" | "awaiting_review" | "done" | "cancelled";
   status: string;
   holder: string | null;
   holder_label: string | null;
   expires_at: Date | null;
   done_at: Date | null;
+  proposal_id: string | null;
   blockers: Blocker[];
   moved: string[];
 };
@@ -66,7 +70,8 @@ async function loadPlans(c: pg.PoolClient, id: string): Promise<Plan[]> {
   return (
     await c.query(
       `select o_path as path, o_registered_at as registered_at, o_registered_by as registered_by, o_file as file,
-              o_ready as ready, o_blocked as blocked, o_claimed as claimed, o_done as done, o_cancelled as cancelled
+              o_ready as ready, o_blocked as blocked, o_claimed as claimed, o_done as done, o_cancelled as cancelled,
+              o_review as review
          from public.list_work_plans($1)`,
       [id],
     )
@@ -79,7 +84,7 @@ async function loadTasks(c: pg.PoolClient, id: string, path: string): Promise<Ta
   return (
     await c.query(
       `select st.o_key as key, st.o_title as title, st.o_state as state, s.status, s.holder,
-              st.o_holder_label as holder_label, st.o_expires_at as expires_at, s.done_at, st.o_moved as moved,
+              st.o_holder_label as holder_label, st.o_expires_at as expires_at, s.done_at, st.o_moved as moved, s.proposal_id,
               coalesce((select json_agg(json_build_object('key', b.key, 'title', b.title, 'status', b.status) order by b.id)
                           from public.work_plan_step_blockers d join public.work_plan_steps b on b.id = d.blocker_id
                          where d.step_id = s.id), '[]') as blockers
@@ -112,11 +117,11 @@ async function loadLine(c: pg.PoolClient, id: string, path: string): Promise<Pla
 // A path typed into a URL, said back only when it's plain (as claimspage.ts does).
 const shown = (path: string) => (/^[^\u0000-\u001f\u007f]{1,200}$/.test(path) ? path : "that path");
 
-const total = (p: Plan) => p.ready + p.blocked + p.claimed + p.done + p.cancelled;
+const total = (p: Plan) => p.ready + p.blocked + p.claimed + p.review + p.done + p.cancelled;
 
 // The words, never only a colour: "2 in progress · 1 ready · 3 blocked".
 function counts(p: Plan): string {
-  const parts: [number, string][] = [[p.claimed, "in progress"], [p.ready, "ready"], [p.blocked, "blocked"], [p.cancelled, "cancelled"]];
+  const parts: [number, string][] = [[p.claimed, "in progress"], [p.review, "awaiting review"], [p.ready, "ready"], [p.blocked, "blocked"], [p.cancelled, "cancelled"]];
   return parts.filter(([n]) => n > 0).map(([n, word]) => `${n} ${word}`).join(" · ");
 }
 
@@ -184,6 +189,7 @@ export async function tasks(ctx: Ctx, id: string): Promise<Reply> {
 // What a person sees a task as, and the order the page groups them in: what
 // can be worked on right now first, what is finished last.
 const STATE_LABEL: Record<Task["state"], string> = {
+  awaiting_review: "Awaiting review",
   claimed: "In progress",
   ready: "Ready",
   blocked: "Blocked",
@@ -192,6 +198,7 @@ const STATE_LABEL: Record<Task["state"], string> = {
   done: "Done",
 };
 const STATE_TONE: Record<Task["state"], string> = {
+  awaiting_review: "warning",
   claimed: "info",
   ready: "success",
   blocked: "warning",
@@ -200,6 +207,7 @@ const STATE_TONE: Record<Task["state"], string> = {
   done: "",
 };
 const GROUPS: { id: string; title: string; states: Task["state"][] }[] = [
+  { id: "awaiting-review", title: "Awaiting review", states: ["awaiting_review"] },
   { id: "in-progress", title: "In progress", states: ["claimed"] },
   { id: "ready", title: "Ready", states: ["ready"] },
   { id: "blocked", title: "Blocked", states: ["blocked_by_cancelled", "blocked"] },
@@ -208,13 +216,18 @@ const GROUPS: { id: string; title: string; states: Task["state"][] }[] = [
 ];
 
 const taskName = (t: Pick<Blocker, "key" | "title">) => html`${t.title} <code>${t.key}</code>`;
-const nameList = (list: Pick<Blocker, "key" | "title">[]) => list.map((b, i) => html`${i ? ", " : ""}${taskName(b)}`);
+const nameList = (list: Blocker[]) =>
+  list.map((b, i) => html`${i ? ", " : ""}${taskName(b)}${b.status === "review" ? " (awaiting review)" : ""}`);
 
 // What a task is waiting on, or who has it, in words. Its cell holds one
 // element (the caller's div): a stacked row on a phone is a grid, and loose
 // text and <code> would each become a grid item of their own.
-function detail(ctx: Ctx, t: Task): Raw {
+function detail(ctx: Ctx, id: string, t: Task, canAct: boolean): Raw {
   switch (t.state) {
+    case "awaiting_review":
+      return html`Finished by ${who(ctx, t.holder, null)}, and waiting for a person who can write the plan’s file to approve it. The tasks waiting on it start only then.${
+        t.proposal_id ? html`<span class="token-client">Applying <a href="${proposalPath(id, t.proposal_id)}">its proposal</a> also approves it.</span>` : ""
+      }${canAct ? html`<span class="token-client">You can approve it.</span>` : ""}`;
     case "claimed":
       return html`Held by ${who(ctx, t.holder, null)}
         ${t.holder_label ? html`<span class="token-client">“${t.holder_label}”</span>` : ""}
@@ -250,7 +263,7 @@ function moved(id: string, t: Task): Raw | "" {
 // Cancel and skip are offered on a task that isn't finished either way,
 // reopen on a cancelled one.
 const unfinished = (t: Task) => t.state !== "done" && t.state !== "cancelled";
-const VERBS = ["cancel", "skip", "reopen"] as const;
+const VERBS = ["cancel", "skip", "reopen", "approve"] as const;
 type Verb = (typeof VERBS)[number];
 
 function taskTable(ctx: Ctx, id: string, path: string, rows: Task[], canAct: boolean): Raw {
@@ -263,10 +276,12 @@ function taskTable(ctx: Ctx, id: string, path: string, rows: Task[], canAct: boo
       (t) => html`<tr><td><strong>${t.title}</strong><span class="token-client"><code>${t.key}</code></span></td>
         <td class="small" data-label="State"><span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span>${
           t.moved.length ? html` <span class="badge warning">Context moved</span>` : ""}</td>
-        <td class="small" data-label="Details"><div>${detail(ctx, t)}${moved(id, t)}</div></td>
+        <td class="small" data-label="Details"><div>${detail(ctx, id, t, canAct)}${moved(id, t)}</div></td>
         ${canAct
           ? unfinished(t)
-            ? html`<td class="row-actions"><a class="button quiet" href="${href("cancel", t)}" aria-label="Cancel the task ${t.title}">Cancel</a> <a class="button quiet" href="${href("skip", t)}" aria-label="Skip the task ${t.title}">Skip</a></td>`
+            ? html`<td class="row-actions">${
+                t.state === "awaiting_review" ? html`<a class="button" href="${href("approve", t)}" aria-label="Approve the task ${t.title}">Approve</a> ` : ""
+              }<a class="button quiet" href="${href("cancel", t)}" aria-label="Cancel the task ${t.title}">Cancel</a> <a class="button quiet" href="${href("skip", t)}" aria-label="Skip the task ${t.title}">Skip</a></td>`
             : t.state === "cancelled"
               ? html`<td class="row-actions"><a class="button quiet" href="${href("reopen", t)}" aria-label="Reopen the task ${t.title}">Reopen</a></td>`
               : html`<td class="row-actions"></td>`
@@ -326,7 +341,7 @@ export async function plan(ctx: Ctx, id: string): Promise<Reply> {
       ${fileNote(id, p)}
       ${groups.map((g) => html`<section aria-labelledby="g-${g.id}"><h2 id="g-${g.id}">${g.title} <span class="muted">${g.rows.length}</span></h2>${taskTable(ctx, id, path, g.rows, canAct)}</section>`)}
       ${line(ctx, places)}
-      <p class="hint">${canAct ? "Cancel drops a task, and Reopen puts a cancelled one back. Skip marks a task done without anyone doing it, and can’t be undone from here. Each asks you to confirm first. " : ""}<a href="/docs/concepts/tasks">About tasks</a></p>`;
+      <p class="hint">${canAct ? "Approve passes a finished task’s review, so the tasks waiting on it can start. Cancel drops a task, and Reopen puts a cancelled one back. Skip marks a task done without anyone doing it, and can’t be undone from here. Each asks you to confirm first. " : ""}<a href="/docs/concepts/tasks">About tasks</a></p>`;
     return { body, title: path };
   });
 }
@@ -339,6 +354,7 @@ const LABEL: Record<Verb, { title: string; button: string }> = {
   cancel: { title: "Cancel a task", button: "Cancel" },
   skip: { title: "Skip a task", button: "Skip" },
   reopen: { title: "Reopen a task", button: "Reopen" },
+  approve: { title: "Approve a task", button: "Approve" },
 };
 
 async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: string): Promise<Reply> {
@@ -346,19 +362,31 @@ async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: 
     const back = planPath(id, path);
     if (!(await loadPlans(c, id)).some((x) => x.path === path)) return { back: tasksPath(id), note: `There’s no plan registered at ${shown(path)}.`, tone: "warning" };
     if (!(await writablePath(c, v, path)))
-      return { back, note: `Only someone who can write this plan’s file ${verb === "reopen" ? "reopens" : "cancels or skips"} its tasks.`, tone: "warning" };
+      return { back, note: `Only someone who can write this plan’s file ${verb === "reopen" ? "reopens" : verb === "approve" ? "approves" : "cancels or skips"} its tasks.`, tone: "warning" };
     const rows = await loadTasks(c, id, path);
     const t = rows.find((r) => r.key === key);
     if (!t) return { back, note: `There’s no task ${shown(key)} in this plan.`, tone: "warning" };
     if (verb === "reopen" && t.state !== "cancelled") return { back, note: `“${t.title}” isn’t cancelled, so there’s nothing to reopen.`, tone: "warning" };
-    if (verb !== "reopen" && !unfinished(t)) return { back, note: `“${t.title}” is already ${t.state === "done" ? "done" : "cancelled"}, so there’s nothing to ${verb}.`, tone: "warning" };
+    if (verb === "approve" && t.state !== "awaiting_review") return { back, note: `“${t.title}” isn’t awaiting review, so there’s nothing to approve.`, tone: "warning" };
+    if ((verb === "cancel" || verb === "skip") && !unfinished(t)) return { back, note: `“${t.title}” is already ${t.state === "done" ? "done" : "cancelled"}, so there’s nothing to ${verb}.`, tone: "warning" };
 
     // What waits on it: a task that lists it as a blocker and isn't finished either way.
     const waiting = rows.filter((r) => unfinished(r) && r.blockers.some((b) => b.key === key));
     const holder = t.state === "claimed" ? html`${who(ctx, t.holder, null)}${t.holder_label ? html` (“${t.holder_label}”)` : ""} holds it now and loses it. If their agent tries to finish it, that is refused.` : "";
     const blockers = t.blockers.filter((b) => b.status !== "done");
     const consequences: (Raw | string)[] =
-      verb === "reopen"
+      verb === "approve"
+        ? [
+            "Approve only once you’ve checked the work: the plan counts it as done from then on.",
+            waiting.length
+              ? html`These tasks stop waiting on it, and any with nothing else left to wait for become ready for an agent to take: ${nameList(waiting)}.`
+              : "No other task is waiting on it.",
+            t.proposal_id
+              ? html`Its agent linked <a href="${proposalPath(id, t.proposal_id)}">a proposal</a> as its work. Approving the task here leaves that proposal waiting for its own review.`
+              : "",
+            "It’s logged in the activity log as approved by you.",
+          ]
+        : verb === "reopen"
         ? [
             html`If the work has changed since it was cancelled, a new task that names this one (<code>${t.key}</code>) is usually better than reopening it: an agent adds it to the plan file and registers it again, and the history reads plainly. Reopen when the work really is the same task.`,
             blockers.length
@@ -390,7 +418,9 @@ async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: 
       title: `${LABEL[verb].button} “${t.title}”?`,
       crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Tasks", href: tasksPath(id) }, { label: path.split("/").pop()!, href: back }, { label: LABEL[verb].title }],
       lede:
-        verb === "reopen"
+        verb === "approve"
+          ? html`Approving <strong>${t.title}</strong> <code>${t.key}</code> passes its review. It was finished by ${who(ctx, t.holder, null)}, and has waited for a person to check the work.`
+          : verb === "reopen"
           ? html`Reopening <strong>${t.title}</strong> <code>${t.key}</code> puts it back in the plan as open work, for an agent to take once what it waits on is done.`
           : verb === "cancel"
           ? html`Cancelling <strong>${t.title}</strong> <code>${t.key}</code> drops it from the plan. A cancelled task never counts as done.`
@@ -401,14 +431,14 @@ async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: 
       fields: { path, key, action: verb, confirm: "1" },
       button: `${LABEL[verb].button} “${t.title}”`,
       cancel: back,
-      ...(verb === "cancel" ? { cancelLabel: "Keep the task" } : verb === "reopen" ? { cancelLabel: "Keep it cancelled" } : {}),
+      ...(verb === "cancel" ? { cancelLabel: "Keep the task" } : verb === "reopen" ? { cancelLabel: "Keep it cancelled" } : verb === "approve" ? { cancelLabel: "Not yet" } : {}),
     });
     return { body, title: LABEL[verb].title };
   });
 }
 
 // ---------------------------------------------------------------------------
-// POST: cancel, skip or reopen, once confirmed. The database refuses anyone who can't
+// POST: cancel, skip, reopen or approve, once confirmed. The database refuses anyone who can't
 // write the path, an agent, a task already finished, and an unknown one; its
 // refusal comes back as a flash with its reference.
 
@@ -434,7 +464,9 @@ export async function taskAction(ctx: Ctx, id: string): Promise<Reply> {
     });
     if (done === null) return notFound(ctx);
     ctx.setFlash(
-      action === "reopen"
+      action === "approve"
+        ? `“${done}” is approved and counts as done. Tasks that were waiting only on it are ready now.`
+        : action === "reopen"
         ? `“${done}” is reopened. Tasks that waited on it now wait for it to be done.`
         : action === "cancel"
         ? `“${done}” is cancelled. Tasks waiting on it stay blocked until a person cancels or skips them.`

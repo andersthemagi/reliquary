@@ -25,6 +25,7 @@ import {
 import { byWhom, latestFeedback, person, rowSnooze, snoozeControl, threadSection, type Commented } from "./thread.js";
 import { Refusal } from "./failure.js";
 import { risks } from "./risk.js";
+import { planPath } from "./tasks.js";
 
 export { risks } from "./risk.js";
 
@@ -263,6 +264,18 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     // never the proposer here regardless.
     const revisable = canWrite(v) && live && p.kind === "write" && p.body !== null && p.proposed_by === ctx.userId;
     const thread = await threadSection(c, ctx, { vaultId: id, p, canWrite: writable, comment });
+    // A review-gated task its agent finished with this as its work
+    // (20261013233000_review_gate.sql): applying this approves the task, so
+    // whoever reviews it is told before they do.
+    const gated = live
+      ? (
+          await c.query(
+            `select s.key, s.title, w.path from public.work_plan_steps s join public.work_plans w on w.id = s.plan_id
+              where s.proposal_id = $1 and s.status = 'review' order by s.id`,
+            [pid],
+          )
+        ).rows
+      : [];
     const feedback = await latestFeedback(c, ctx, p);
     const snooze = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
 
@@ -339,6 +352,10 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
         ${p.proposed_by === ctx.userId && p.agent
           ? html`<p class="callout info">You’re reviewing a change your own agent (${p.agent}) proposed. That’s allowed: the agent can’t approve, you can.</p>`
           : ""}
+        ${gated.map(
+          (g) =>
+            html`<p class="callout info">This is the work of the task ${g.title} <code>${g.key}</code> in <a href="${planPath(id, g.path)}">${g.path}</a>, which waits for a person’s review. Applying this proposal also approves the task, and the tasks waiting on it can start.</p>`,
+        )}
         ${snooze.note}
         ${feedback}
         ${flags.length

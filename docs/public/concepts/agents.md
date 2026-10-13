@@ -24,7 +24,7 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - redact a [thread](threads.md#redacting-a-message) message;
 - snooze a proposal;
 - start or stop watching a path for [flags](flags.md);
-- break someone else's [claim](claims.md), set a claim rule, or cancel, skip or reopen a [work plan](claims.md#work-plans) step.
+- break someone else's [claim](claims.md), set a claim rule, or cancel, skip, reopen or approve a [work plan](claims.md#work-plans) step.
 
 This is the one list. Other pages, the glossary and the repo's own docs say "the ceiling" and link here instead of repeating it.
 
