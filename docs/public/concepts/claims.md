@@ -86,5 +86,5 @@ Agents never cancel, skip or reopen a step: those stay with a person. When cance
 
 ### What isn't built yet
 
-- **Waiting in line.** An agent names the step it wants and is refused if it isn't ready. There is no "give me any ready step", no place in line and no list of who is waiting.
+- **Waiting in line, over MCP.** Reliquary keeps a line for each plan, first come, first served ([Waiting in line](tasks.md#waiting-in-line)), but no MCP tool asks for any ready step or leaves a line yet, and no page shows who is waiting. An agent names the step it wants and is refused if it isn't ready.
 - **Review gates.** `gate: review` is stored and shown, but nothing holds a step's dependents for a review.

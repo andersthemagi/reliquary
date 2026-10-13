@@ -76,7 +76,53 @@ To get a plan moving again after cancelling a task that others wait on, reopen i
 
 When cancelled work needs doing after all, prefer a new task that names the old one by its key (for example, "redo of `draft` in plans/launch.md"), added to the same plan file, which an agent then registers again ([Adding tasks to a plan](#adding-tasks-to-a-plan)). The old task stays cancelled, and the history reads plainly: what was dropped, and what replaced it. Reopen only when the work really is the same task, so the tasks that waited on it should wait on it again. The reopen page says the same before you confirm, and agents are told the same.
 
+## Waiting in line
+
+When a plan has more agents than ready tasks, the agents wait in line for them, first come, first served. Reliquary keeps the line itself; the MCP tools that ask for work and leave a line are not here yet (see [Not here yet](#not-here-yet)), so today an agent claims a task by name.
+
+An agent asks for any ready task of a plan and gets an answer at once. Nothing is held open while it waits.
+
+| Answer | What it means |
+|---|---|
+| Granted | The agent now holds a task, the same as if it had claimed it by name: a lease, a secret and a fence. |
+| Wait | Nothing is free for it yet. The answer gives its place in line, how many tasks are ready, and how many seconds until it should ask again. |
+| At capacity | The agent, or all of its person's agents together, already hold as many tasks in the vault as the [claim rule](claims.md#claim-rules) allows. Finish or give one back first. |
+| Cooling down | Its person's agents let tasks run out of time unfinished, so its person waits before getting more. The answer says how many seconds. |
+| Blocked by a cancelled task | Nothing in the plan can move until a person reopens, cancels or skips a task. Stop asking. |
+| Plan complete | Every task is done or cancelled. Stop asking. |
+| Refused | Its person already waits in 3 lines in this vault. |
+| No such plan | No plan is registered at that path. |
+
+Who may ask is who may claim a task: whoever can write the plan's file. A read-only connection or a viewer can't.
+
+### How the line moves
+
+- Each person has one place in a plan's line, however many agents or connections they use. Their agents share it.
+- The oldest place goes first. With one task ready, only the first in line gets it; with two ready, the first two do. Nobody behind them can take a task ahead of them.
+- A place lasts while its agent keeps asking, each time within the rule's place-in-line time. An agent that stops asking drops out, and the next in line is served. If it comes back later, it starts at the back.
+- The time to ask again is when the earliest task in progress runs out of time, and never more than the rule's longest hint. A task can free up sooner. Asking again before the rule's minimum gap only gets the last answer back.
+- Reliquary can't wake an agent up. Bringing it back at the suggested time is up to whatever runs the agent.
+- An agent can leave the line at any time. When a plan is finished, every place in its line ends.
+
+### Running out of time
+
+A task whose holder ran out of time goes to the next agent in line. That counts against the person whose agent let it run out, in that vault. The first time costs nothing. After that, each time starts a cooldown: the rule's lease, then twice the last one, never more than the rule's cooldown cap. During a cooldown the person's agents get no task from the line, and give up every place they hold in the vault's lines. Finishing a task clears the count.
+
+### The settings
+
+| Setting | With no claim rule | With a claim rule set on the Rules page |
+|---|---|---|
+| Place in line lasts | 6 hours | the rule's lease |
+| Longest hint | 1 hour | the rule's lease |
+| Minimum gap | 15 minutes | 10 seconds |
+| Free times a task runs out | 1 | 1 |
+| Cooldown cap | 48 hours | the rule's lease |
+| Tasks per agent and per person | 1 and 5 | the rule's |
+
+Activity records **Joined the line for a step**, **Left the line for a step** and **Place in line ended**, with why it ended: the place ran out, the plan was finished, or a cooldown started. To see only these, choose **Any waiting in line event** in the filter.
+
 ## Not here yet
 
 - Who is waiting for a task, and their place in line.
+- Asking for any ready task, and leaving a line, over MCP.
 - Registering a plan from the web app. Agents register plans.
