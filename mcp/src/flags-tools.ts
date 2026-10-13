@@ -165,7 +165,7 @@ export function registerFlagsTools(
         const out = [
           `watermark was ${r.watermark}; ${r.flags.length} flag${r.flags.length === 1 ? "" : "s"}` +
             `${r.more ? " (more waiting; call again after advancing)" : ""}:`,
-          summary(),
+          await summary(c),
           ...fenced("Flag lines", lines),
           ...(r.flags.some((f) => f.thread_id) ? ["read_thread shows a thread's messages, quoted as data."] : []),
           ...(r.flags.some((f) => f.reason === "step_review")
