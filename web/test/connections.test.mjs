@@ -244,6 +244,17 @@ test("connect: no primary action; the connections list is a secondary link", asy
   assert.match(h, /<a class="button" href="\/connections">Your connections<\/a>/);
 });
 
+test("connect once: every tab says what an agent can't do and how to keep a token safe once, after the client's steps", async () => {
+  for (const c of ["claude-code", "chat", "cursor", "vscode", "other", "cli"]) {
+    const h = await page(`/connect?client=${c}`);
+    assert.equal(h.split("can’t approve, change rules, manage members or read variable values").length, 2, c);
+    assert.equal(h.split("keep it out of config files and chats").length, 2, c);
+    const section = h.slice(h.indexOf(`<section id="${c}">`), h.indexOf("</section>", h.indexOf(`<section id="${c}">`)));
+    assert.doesNotMatch(section, /class="callout/, `${c}: the section holds only its own steps`);
+    assert.ok(h.indexOf("can’t approve") > h.indexOf("</section>", h.indexOf(`<section id="${c}">`)), `${c}: after the steps`);
+  }
+});
+
 // Moved from /tokens ------------------------------------------------------------
 
 test("moved: every old /tokens URL is a permanent redirect to its /connections URL, keeping the query", async () => {
