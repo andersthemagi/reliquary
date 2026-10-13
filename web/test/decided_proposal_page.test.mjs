@@ -78,8 +78,8 @@ test("decided diff: an applied proposal that created a file says Create, with th
 
 test("decided diff: the Applied tab calls a proposal that created a file Create, not Change", async () => {
   const h = await page(ines, `/v/${V}/proposals?status=applied`);
-  assert.match(h, /Create canon\/new\.md<\/a>/);
-  assert.doesNotMatch(h, /Change canon\/new\.md/);
+  assert.match(h, /Create new\.md<\/a>\s*<span class="review-meta small"><span class="path-chip">canon\/new\.md<\/span>/);
+  assert.doesNotMatch(h, /Change new\.md/);
 });
 
 test("decided diff: an applied delete shows the lines it removed", async () => {

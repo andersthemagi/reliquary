@@ -198,7 +198,7 @@ test("shell: my proposal sent back with changes requested is in my inbox, linkin
   assert.equal(badge(h), "1");
   assert.match(inboxMenu(h), new RegExp(`<a href="/v/${V.studio}/proposals/${plan}"><span class="menu-item-title">Revise canon/plan\\.md</span><span class="menu-item-meta">Changes requested · Shell Studio · `));
   assert.match(h, /<h2 id="revise">Changes requested on your proposals<\/h2>/);
-  assert.match(h, new RegExp(`<a class="name" href="/v/${V.studio}/proposals/${plan}">Create canon/plan\\.md</a>`));
+  assert.match(h, new RegExp(`<a class="name" href="/v/${V.studio}/proposals/${plan}">Create plan\\.md</a>`));
   assert.equal(badge(await page("dora", "/")), "0", "no longer waiting on the reviewer");
 });
 
