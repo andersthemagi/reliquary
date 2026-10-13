@@ -638,6 +638,22 @@ the file's *current* version and refuses anything but an approved
 draft still awaiting review, or from a version a concurrent edit already
 superseded.
 
+A registered plan only gains steps (issue #262, the owner's choice of
+2026-10-13). Registering the path again from a newer version adds the
+steps whose keys are new and keeps every registered step as it is, state
+included; a registered step missing from the file, or with a different
+title, gate, `blocked_by` or `cites`, is refused by name and nothing
+changes. That one rule keeps the graph's invariants: no done or claimed
+step gains a blocker, nothing held disappears, a new step can't block an
+old one (so a cycle can only form among new steps, which the full-plan
+check finds), and a new step's stored count is its blockers not yet done.
+The plan records the version and who added steps last, and the log has
+`work_plan.update`. Registering again from the version already registered
+is refused; a newer version with no new steps is recorded, which is how
+"changed since registered" is cleared after an edit that adds nothing.
+New steps' counts and `complete_step`/`skip_step` serialize on one
+advisory lock per plan (20261013160000_work_plan_gains_steps.sql says why).
+
 ### 7. Step states
 
 Stored: `open`, `claimed`, `done`, `cancelled`. Computed, never stored,
@@ -685,6 +701,7 @@ vault.
 One dot each, matching the existing activity-label convention
 (`file.write`, `proposal.approve`): `claim.grant`, `claim.renew`,
 `claim.release`, `claim.break`, `claim.expire`, `work_plan.register`,
+`work_plan.update`,
 `step.claim`, `step.complete`, `step.release`, `step.cancel`,
 `step.skip`, `queue.join`, `queue.leave`, `queue.expire`.
 

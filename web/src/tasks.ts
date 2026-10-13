@@ -261,7 +261,7 @@ function fileNote(id: string, p: Plan): Raw | "" {
   if (p.file === "changed")
     return callout(
       "warning",
-      html`<p>This plan’s file has changed since the plan was registered. The tasks below come from the version it was registered from, and that is what agents work from. A plan is registered once, so they don’t follow the change. <a href="${filePath(id, p.path, "history")}">See the file’s history</a></p>`,
+      html`<p>This plan’s file has changed since the plan was registered. The tasks below come from the version last registered, and that is what agents work from. If the change adds tasks, an agent registers the file again to add them; tasks already here keep their state. <a href="${filePath(id, p.path, "history")}">See the file’s history</a></p>`,
     );
   if (p.file === "deleted") return callout("warning", "This plan’s file has been deleted. The tasks below stay, and agents can still work from them.");
   return "";
@@ -326,7 +326,7 @@ async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: 
     const consequences: (Raw | string)[] =
       verb === "reopen"
         ? [
-            html`If the work has changed since it was cancelled, a new task that names this one (<code>${t.key}</code>) is usually better than reopening it: an agent adds it in a new plan file, and the history reads plainly. Reopen when the work really is the same task.`,
+            html`If the work has changed since it was cancelled, a new task that names this one (<code>${t.key}</code>) is usually better than reopening it: an agent adds it to the plan file and registers it again, and the history reads plainly. Reopen when the work really is the same task.`,
             blockers.length
               ? html`It waits on ${nameList(blockers)} again before anyone can take it.`
               : "Nothing it waits on is unfinished, so it is ready for an agent to take.",

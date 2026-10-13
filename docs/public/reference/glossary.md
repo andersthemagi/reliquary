@@ -84,4 +84,4 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Watch.** Asking to be flagged about changes on a folder or file in a vault. Yours only, set in person, and private to you. See [Flags](../concepts/flags.md#watching-a-path).
 
-**Work plan.** A plan file in a vault with a `work_plan` block, registered once by an agent, so its steps are taken in order and nobody gets a step before the steps it waits on are done. See [Work plans](../concepts/claims.md#work-plans).
+**Work plan.** A plan file in a vault with a `work_plan` block, registered by an agent (and registered again to gain new steps), so its steps are taken in order and nobody gets a step before the steps it waits on are done. See [Work plans](../concepts/claims.md#work-plans).

@@ -6,7 +6,7 @@ Plans, and the rules a task follows, are described under [Work plans](claims.md#
 
 ## Where a plan comes from
 
-A plan is a file in the vault with a `work_plan` block in it. It becomes a plan when an agent registers it, once, from one version of the file. The web app doesn't create plans: if the Tasks page says **No plans yet**, no agent has registered one in this vault.
+A plan is a file in the vault with a `work_plan` block in it. It becomes a plan when an agent registers it from the file's current version. The web app doesn't create plans: if the Tasks page says **No plans yet**, no agent has registered one in this vault.
 
 Anyone who can read the vault can read its plans, viewers included.
 
@@ -21,7 +21,17 @@ Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). Each row
 
 ### When the plan file has changed
 
-A plan is registered once, from one version of its file, and never registered again. If the file is edited later, its row says **Changed since registered**. The tasks you see, and the ones agents work from, are still the ones from the registered version. Open the file's **History** tab to see what changed. If the file is deleted, the row says **File deleted**, and its tasks stay.
+If the plan file is edited after it was registered, its row says **Changed since registered**. The tasks you see, and the ones agents work from, are still the ones from the version last registered. Open the file's **History** tab to see what changed. If the file is deleted, the row says **File deleted**, and its tasks stay.
+
+### Adding tasks to a plan
+
+A plan can gain tasks, never lose or change them. Add the new steps to the plan file's `work_plan` block, each with a key the plan doesn't have yet, then have an agent register the file again (`register_work_plan`, the same as the first time). The new steps become tasks at the end of the plan, and **Changed since registered** goes away.
+
+- Tasks already in the plan keep their state: a done task stays done, a task someone holds stays theirs, a cancelled one stays cancelled.
+- A new step may wait on any task in the plan. If that task is already done, the new one doesn't wait for it. If it was cancelled, the new one is blocked by a cancelled task.
+- A task already in the plan must stay in the file exactly as it was registered: the same title, gate, `blocked_by` and `cites`. If one is missing or different, nothing is added, and the agent is told which steps to put back. So an old task can't be made to wait on a new one.
+- Registering again with no new steps, after an edit to the rest of the file, adds nothing and clears **Changed since registered**.
+- Who may do it is the same as for registering: whoever can write the plan file. The Activity log records it as **Updated a work plan**.
 
 ## One plan
 
@@ -64,7 +74,7 @@ To get a plan moving again after cancelling a task that others wait on, reopen i
 
 ### A new task or a reopened one
 
-When cancelled work needs doing after all, prefer a new task that names the old one by its key (for example, "redo of `draft` in plans/launch.md"), in a new plan file an agent registers. The old task stays cancelled, and the history reads plainly: what was dropped, and what replaced it. Reopen only when the work really is the same task, so the tasks that waited on it should wait on it again. The reopen page says the same before you confirm, and agents are told the same.
+When cancelled work needs doing after all, prefer a new task that names the old one by its key (for example, "redo of `draft` in plans/launch.md"), added to the same plan file, which an agent then registers again ([Adding tasks to a plan](#adding-tasks-to-a-plan)). The old task stays cancelled, and the history reads plainly: what was dropped, and what replaced it. Reopen only when the work really is the same task, so the tasks that waited on it should wait on it again. The reopen page says the same before you confirm, and agents are told the same.
 
 ## Not here yet
 
