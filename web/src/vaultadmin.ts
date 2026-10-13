@@ -1,8 +1,8 @@
-// Vault settings at /v/:id/config (docs/parity.md), as tabs: General (rename
-// and default policy), Members (members.ts), Rules (rules.ts, /v/:id/rules),
-// Usage, Watching (watching.ts, the person's own), Diagnostics (diagnostics.ts,
-// /v/:id/diagnostics: Flags and Claims), Export and Danger zone
-// (leave, delete); and erasing a file, reached from the file. (Not
+// Vault settings at /v/:id/config (docs/parity.md), a grouped sub-nav:
+// Vault (General, with the Danger zone of leave and delete at its foot;
+// Members, members.ts; Rules, rules.ts at /v/:id/rules; Usage), You
+// (Watching, watching.ts) and Advanced (Diagnostics, diagnostics.ts at
+// /v/:id/diagnostics; Export); and erasing a file, reached from the file. (Not
 // /settings: a viewer's Variables page must hold no "/set" link.) Every
 // action here is an owner's, in person, except leaving and watching, which
 // are any member's own: the database refuses anyone else
@@ -18,14 +18,14 @@
 //   GET  /v/:id/config/usage    the vault's tier, people and storage
 //   GET  /v/:id/config/watching what you watch here (watching.ts); POST watches or stops
 //   GET  /v/:id/config/export   what an export holds; POST downloads it
-//   GET  /v/:id/config/danger   Leave and Delete
+//   GET  /v/:id/config/danger   the old Danger zone tab: to General's Danger zone
 //   GET  /v/:id/config/delete   confirm; POST deletes
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
-import { callout, confirmPage, csrfField, html, pageHeader, plural, policyBadge, type CrumbPart, type Raw, type Tab } from "./html.js";
+import { callout, confirmPage, csrfField, html, pageHeader, plural, policyBadge, raw, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { crumbs as fileCrumbs, deletePath, vaultShell } from "./files.js";
@@ -37,32 +37,43 @@ const settingsPath = (id: string, rest = "") => vaultPath(id, `/config${rest}`);
 const filePath = (id: string, path: string) => vaultPath(id, `/file?path=${q(path)}`);
 
 // ---------------------------------------------------------------------------
-// The Settings tabs, shared with members.ts (and for rules.ts to adopt):
-// every tab page has the title "Settings", the tabs flush under it, and a
-// breadcrumb vault / Settings / tab. Export is an owner's only, so only
-// owners see its tab; Danger zone holds Leave, which is everyone's.
+// The Settings frame, shared with members.ts, rules.ts, watching.ts and
+// diagnostics.ts: every page in it is titled "Settings", with a breadcrumb
+// vault / Settings / section and a sub-nav beside the content. The groups
+// keep the vault's own settings, the person's own, and the rarely needed
+// apart. Export is an owner's only, so only owners see it.
 
-export type SettingsTab = "general" | "members" | "rules" | "usage" | "watching" | "diagnostics" | "export" | "danger";
-const TABS: [SettingsTab, string, (id: string) => string][] = [
-  ["general", "General", (id) => settingsPath(id)],
-  ["members", "Members", (id) => settingsPath(id, "/members")],
-  ["rules", "Rules", (id) => vaultPath(id, "/rules")],
-  ["usage", "Usage", (id) => settingsPath(id, "/usage")],
-  // The person's own, for every member (watching.ts).
-  ["watching", "Watching", (id) => settingsPath(id, "/watching")],
-  // Flags and Claims, for working out why something happened (diagnostics.ts).
-  ["diagnostics", "Diagnostics", (id) => vaultPath(id, "/diagnostics")],
-  ["export", "Export", (id) => settingsPath(id, "/export")],
-  ["danger", "Danger zone", (id) => settingsPath(id, "/danger")],
+export type SettingsTab = "general" | "members" | "rules" | "usage" | "watching" | "diagnostics" | "export";
+type NavItem = [SettingsTab, string, (id: string) => string];
+const NAV: [string, NavItem[]][] = [
+  [
+    "Vault",
+    [
+      ["general", "General", (id) => settingsPath(id)],
+      ["members", "Members", (id) => settingsPath(id, "/members")],
+      ["rules", "Rules", (id) => vaultPath(id, "/rules")],
+      ["usage", "Usage", (id) => settingsPath(id, "/usage")],
+    ],
+  ],
+  ["You", [["watching", "Watching", (id) => settingsPath(id, "/watching")]]],
+  [
+    "Advanced",
+    [
+      ["diagnostics", "Diagnostics", (id) => vaultPath(id, "/diagnostics")],
+      ["export", "Export", (id) => settingsPath(id, "/export")],
+    ],
+  ],
 ];
-export const settingsTabLabel = (t: SettingsTab) => TABS.find(([k]) => k === t)![1];
+export const settingsTabLabel = (t: SettingsTab) => NAV.flatMap(([, items]) => items).find(([k]) => k === t)![1];
+// Leave and Delete sit at the foot of General; their confirm pages come back here.
+export const dangerPath = (id: string) => `${settingsPath(id)}#danger`;
 
-export function settingsTabs(id: string, role: string, current?: SettingsTab): Tab[] {
-  return TABS.filter(([k]) => k !== "export" || role === "owner").map(([k, label, href]) => ({
-    href: href(id),
-    label,
-    current: k === current,
-  }));
+function settingsNav(id: string, role: string, current: SettingsTab): Raw {
+  return html`<nav class="settings-nav" aria-label="Settings">${NAV.map(
+    ([group, items]) => html`<div class="settings-nav-group"><p class="settings-nav-label">${group}</p><ul>${items
+      .filter(([k]) => k !== "export" || role === "owner")
+      .map(([k, label, href]) => html`<li><a href="${href(id)}"${k === current ? raw(' aria-current="page"') : ""}>${label}</a></li>`)}</ul></div>`,
+  )}</nav>`;
 }
 
 // Breadcrumb parts for a page under Settings: vault / Settings / ...rest.
@@ -70,21 +81,22 @@ export function settingsCrumb(id: string, v: Vault, ...rest: CrumbPart[]): Crumb
   return [{ label: v.name, href: vaultPath(id) }, { label: "Settings", href: settingsPath(id) }, ...rest];
 }
 
-export function settingsHeader(
+// A Settings page: the header across the top, so the flash and the primary
+// action keep their usual place, then the sub-nav beside the section's body.
+export function settingsPage(
   id: string,
   v: Vault,
   tab: SettingsTab,
-  o: { description?: Raw | string; primary?: Raw | ""; meta?: Raw } = {},
+  o: { description?: Raw | string; primary?: Raw | ""; meta?: Raw },
+  body: Raw,
 ): Raw {
-  return pageHeader({
+  return html`${pageHeader({
     crumb: tab === "general" ? [{ label: v.name, href: vaultPath(id) }, { label: "Settings" }] : settingsCrumb(id, v, { label: settingsTabLabel(tab) }),
     title: "Settings",
     description: o.description,
     meta: o.meta,
     primary: o.primary,
-    tabs: settingsTabs(id, v.role, tab),
-    tabsLabel: "Settings",
-  });
+  })}<div class="settings-layout">${settingsNav(id, v.role, tab)}<div class="settings-main">${body}</div></div>`;
 }
 
 async function page(ctx: Ctx, id: string, title: string, build: (c: pg.PoolClient, v: Vault & { default_policy: string }) => Promise<Raw | null>, status?: number): Promise<Reply> {
@@ -110,13 +122,13 @@ const ownerCount = async (c: pg.PoolClient, id: string) =>
 type GeneralForm = { name: string; policy: string; error: string };
 
 async function settings(ctx: Ctx, id: string, d?: GeneralForm): Promise<Reply> {
-  return page(ctx, id, "Settings", async (_c, v) => {
+  return page(ctx, id, "Settings", async (c, v) => {
     const owner = v.role === "owner";
     const policy = d?.policy ?? v.default_policy;
-    return html`
-      ${settingsHeader(id, v, "general", {
+    const soleOwner = owner && (await ownerCount(c, id)) <= 1;
+    return settingsPage(id, v, "general", {
         description: owner ? `The vault’s name, and what its files are when no rule covers them.` : `${v.name}’s name and default policy.`,
-      })}
+      }, html`
       ${owner
         ? html`<form method="post" action="${settingsPath(id)}" class="panel choice-form" id="general">
             ${csrfField(ctx.csrf)}
@@ -138,7 +150,8 @@ async function settings(ctx: Ctx, id: string, d?: GeneralForm): Promise<Reply> {
             <div><dt>Default policy</dt><dd>${policyBadge(v.default_policy)} <span class="muted">unless a rule says otherwise</span></dd></div>
             <div><dt>Your role</dt><dd>${v.role === "editor" ? "Editor" : "Viewer"}</dd></div>
           </dl>
-          <p class="hint">Only owners rename a vault or change its default.</p>`}`;
+          <p class="hint">Only owners rename a vault or change its default.</p>`}
+      ${dangerZone(id, v, owner, soleOwner)}`);
   }, d ? 400 : undefined);
 }
 
@@ -208,8 +221,7 @@ async function usagePage(ctx: Ctx, id: string): Promise<Reply> {
   return page(ctx, id, "Usage", async (c, v) => {
     const u = (await vaultUsages(c, [id])).get(id);
     if (!u) return null;
-    return html`${settingsHeader(id, v, "usage", { description: `What ${v.name} holds, against its tier’s limits.` })}
-      ${usagePanel(u, v.name)}`;
+    return settingsPage(id, v, "usage", { description: `What ${v.name} holds, against its tier’s limits.` }, usagePanel(u, v.name));
   });
 }
 
@@ -219,14 +231,13 @@ async function usagePage(ctx: Ctx, id: string): Promise<Reply> {
 async function exportPage(ctx: Ctx, id: string): Promise<Reply> {
   return page(ctx, id, "Export", async (c, v) => {
     if (v.role !== "owner") {
-      return html`${settingsHeader(id, v, "export")}${callout("info", "Only owners export a vault.")}`;
+      return settingsPage(id, v, "export", {}, callout("info", "Only owners export a vault."));
     }
     const n = (await c.query(`select count(*)::int as n from public.files where vault_id = $1 and deleted_at is null`, [id])).rows[0].n as number;
-    return html`
-      ${settingsHeader(id, v, "export", {
+    return settingsPage(id, v, "export", {
         description: html`A <code>.tar.gz</code> of ${plural(n, "file")}, each at its path under <code>files/</code>, the vault’s threads under <code>threads/</code>, and a <code>${MANIFEST}</code> manifest.`,
         primary: html`<button class="primary" form="export">Download export</button>`,
-      })}
+      }, html`
       <form method="post" action="${settingsPath(id, "/export")}" id="export">${csrfField(ctx.csrf)}</form>
       <ul class="export-facts">
         <li>The manifest lists the vault’s name and default policy, its rules, and every file with its SHA-256, size and when it was last written.</li>
@@ -234,7 +245,7 @@ async function exportPage(ctx: Ctx, id: string): Promise<Reply> {
         <li>Each thread is a Markdown file with every message in order, its author, agent and time. A redacted message keeps its place, without its text.</li>
         <li>Deleted and erased files, earlier versions, proposals and their comments, tasks and the activity log are not included.</li>
         <li>The export is recorded in the vault’s activity. A vault can be exported 10 times an hour.</li>
-      </ul>`;
+      </ul>`);
   });
 }
 
@@ -256,17 +267,16 @@ async function exportDownload(ctx: Ctx, id: string): Promise<Reply> {
 }
 
 // ---------------------------------------------------------------------------
-// Danger zone: leaving (every member but the only owner) and deleting (an
-// owner). Each is a link to its confirm page.
+// Danger zone, at the foot of General: leaving (every member but the only
+// owner) and deleting (an owner). Each is a link to its confirm page.
 
-async function dangerPage(ctx: Ctx, id: string): Promise<Reply> {
-  return page(ctx, id, "Danger zone", async (c, v) => {
-    const owner = v.role === "owner";
-    const soleOwner = owner && (await ownerCount(c, id)) <= 1;
-    return html`${settingsHeader(id, v, "danger", { description: "Actions that take access away at once, or can’t be undone." })}
+function dangerZone(id: string, v: Vault, owner: boolean, soleOwner: boolean): Raw {
+  return html`<section class="settings-danger" id="danger" aria-labelledby="danger-title">
+      <h2 id="danger-title">Danger zone</h2>
+      <p class="section-lede">Actions that take access away at once, or can’t be undone.</p>
       <div class="danger-rows">
         <div class="danger-row">
-          <div><h2>Leave this vault</h2>
+          <div><h3>Leave this vault</h3>
             ${soleOwner
               ? html`<p>You’re the only owner, so you can’t leave. Make someone else an owner on <a href="${settingsPath(id, "/members")}">Members</a> first, or delete the vault.</p>`
               : html`<p>You and your agents lose access to ${v.name} at once. To come back, an owner invites you again.</p>`}</div>
@@ -274,14 +284,14 @@ async function dangerPage(ctx: Ctx, id: string): Promise<Reply> {
         </div>
         ${owner
           ? html`<div class="danger-row">
-              <div><h2>Delete this vault</h2>
+              <div><h3>Delete this vault</h3>
                 <p>Its files, history, proposals and variables are deleted at once, for every member. This can’t be undone.</p></div>
               <a class="button danger" href="${settingsPath(id, "/delete")}">Delete vault</a>
             </div>`
           : ""}
       </div>
-      ${owner ? "" : html`<p class="hint">Only owners delete a vault.</p>`}`;
-  });
+      ${owner ? "" : html`<p class="hint">Only owners delete a vault.</p>`}
+    </section>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +303,7 @@ async function deletePage(ctx: Ctx, id: string, error?: string): Promise<Reply> 
     id,
     "Delete vault",
     async (c, v) => {
-      const where = settingsCrumb(id, v, { label: "Danger zone", href: settingsPath(id, "/danger") }, { label: "Delete" });
+      const where = settingsCrumb(id, v, { label: "Danger zone", href: dangerPath(id) }, { label: "Delete" });
       if (v.role !== "owner") {
         return html`${pageHeader({ crumb: where, title: "Delete vault" })}${callout("info", "Only owners delete a vault.")}`;
       }
@@ -321,7 +331,7 @@ async function deletePage(ctx: Ctx, id: string, error?: string): Promise<Reply> 
         csrf: ctx.csrf,
         typed: { value: v.name },
         button: `Delete ${v.name}`,
-        cancel: settingsPath(id, "/danger"),
+        cancel: dangerPath(id),
         error,
       });
     },
@@ -345,7 +355,7 @@ async function deleteVault(ctx: Ctx, id: string): Promise<Reply> {
     const e = err as { code?: string };
     if (e.code === "22023") return deletePage(ctx, id, "That isn’t the vault’s name. Nothing was deleted.");
     ctx.setFlash(message(err));
-    return { redirect: settingsPath(id, "/danger") };
+    return { redirect: dangerPath(id) };
   }
 }
 
@@ -432,7 +442,7 @@ export async function adminRoutes(ctx: Ctx, id: string, rest: string): Promise<R
   if (rest === "/config/usage") return get ? usagePage(ctx, id) : notFound(ctx);
   if (rest === "/config/watching") return watchingRoutes(ctx, id);
   if (rest === "/config/export") return get ? exportPage(ctx, id) : exportDownload(ctx, id);
-  if (rest === "/config/danger") return get ? dangerPage(ctx, id) : notFound(ctx);
+  if (rest === "/config/danger") return get ? { redirect: dangerPath(id) } : notFound(ctx);
   if (rest === "/config/delete") return get ? deletePage(ctx, id) : deleteVault(ctx, id);
   if (rest === "/erase") return get ? erasePage(ctx, id) : eraseFile(ctx, id);
   return notFound(ctx);

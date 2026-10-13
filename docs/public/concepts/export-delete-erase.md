@@ -23,7 +23,7 @@ Nothing reads an export back in yet, a self-hosted Reliquary included: an export
 
 ## Delete a vault
 
-On **Settings**, **Danger zone**, an owner chooses **Delete vault** and deletes it by typing its name. Deletion is immediate and can't be undone: files, versions, proposals, comments, threads, rules, members, invites, variables and both logs are gone. Only who deleted it, when, and counts are kept, without the vault's name.
+In the **Danger zone** at the bottom of **Settings**, **General**, an owner chooses **Delete vault** and deletes it by typing its name. Deletion is immediate and can't be undone: files, versions, proposals, comments, threads, rules, members, invites, variables and both logs are gone. Only who deleted it, when, and counts are kept, without the vault's name.
 
 Every other member sees a one-time notice on Home ("<name> was deleted by <email> on <date>") within 30 days. Tokens that reached only that vault are revoked. Export first if you might need anything.
 

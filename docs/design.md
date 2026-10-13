@@ -25,7 +25,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 7 | [Context](#context) | Built |
 | 8 | [Path ownership](#path-ownership) | Built |
 | 9 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
-| 10 | [Claims and work plans](#claims-and-work-plans) | Built, except waiting in line |
+| 10 | [Claims and work plans](#claims-and-work-plans) | Built; waiting in line in the database, not yet over MCP or on the Tasks page |
 | 11 | [Threads](#threads) | Built |
 | 12 | [Links](#links) | Built |
 | 13 | [Routines](#routines) | Designed, not built |
@@ -127,6 +127,14 @@ Five jobs:
     Diagnostics, never deleted and never the front door. The parity rule
     says what each side may do, not what each side should be shown
     ([Who each surface is for](#who-each-surface-is-for)).
+11. **Who someone is, apart from how they're shown.** Reliquary always
+    holds one unique identity per person (a user id, reached through
+    their account's email), and stores only that. How others see and
+    reach them (display name, a short tag, email or not) is a choice made
+    when a page or tool response is drawn: the person's, within what
+    their vault requires. Changing it never rewrites a stored row. A
+    display name is text people chose, never code or an instruction
+    (owner's call, 2026-10-13; #347).
 
 ## Concepts
 
@@ -543,10 +551,11 @@ an idle agent: MCP has no push, so an agent learns on its next call.
 Written 2026-09-30, settling CL-0.2 of the claims, waiting and work
 plans effort (tracking issue #52; the exception is logged in
 [progress.md](progress.md#decisions)). Built as of 2026-10-09: phase 1 (compare-and-swap writes), phase 2 (claims)
-and phase 3 (work plans), apart from waiting in line (item 11, CL-3.9, #74);
-[progress.md](progress.md) has what shipped. Validated first in a throwaway
+and phase 3 (work plans); waiting in line (item 11, CL-3.9, #74) built in
+the database on 2026-10-13, with its MCP tools (#75) and the view of who is
+waiting (#76) still to come; [progress.md](progress.md) has what shipped. Validated first in a throwaway
 PostgreSQL 16 model, not Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
-Twelve points, each with the reason it was decided that way.
+Twelve points, each with the reason it was decided that way, and a thirteenth added later.
 
 ### 1. Names
 
@@ -656,7 +665,7 @@ advisory lock per plan (20261013160000_work_plan_gains_steps.sql says why).
 
 ### 7. Step states
 
-Stored: `open`, `claimed`, `done`, `cancelled`. Computed, never stored,
+Stored: `open`, `claimed`, `review` (awaiting review, since #78), `done`, `cancelled`. Computed, never stored,
 so nothing can drift out of sync with the graph: `ready` (open, every
 blocker done), `blocked` (open, a blocker not done yet),
 `blocked_by_cancelled` (a blocker is cancelled, so it can never become
@@ -667,7 +676,12 @@ state, not a silent pass-through. A step may carry `gate: review`, which
 holds its dependents until a person approves it directly or its linked
 proposal is applied, for a step whose output needs a person's judgement
 before anything downstream should start, not just before it's marked
-done.
+done. **As built (2026-10-13, #78;** `20261013233000_review_gate.sql`):
+completing a gated step stores `review`; `approve_step` (on the ceiling)
+or the linked proposal being applied makes it `done` and only then
+decrements its dependents. The link is the completing agent's: it names
+a proposal its own person made since claiming the step, still undecided,
+and a trigger on the proposal reaching `applied` approves the step.
 
 ### 8. Limits
 
@@ -703,7 +717,7 @@ One dot each, matching the existing activity-label convention
 `claim.release`, `claim.break`, `claim.expire`, `work_plan.register`,
 `work_plan.update`,
 `step.claim`, `step.complete`, `step.release`, `step.cancel`,
-`step.skip`, `queue.join`, `queue.leave`, `queue.expire`.
+`step.skip`, `step.approve`, `queue.join`, `queue.leave`, `queue.expire`.
 
 ### 10. Export, erasure, deletion
 
@@ -740,6 +754,55 @@ to stop and return at the suggested time; bringing it back is the
 agent's own harness's job, or a person's, the same limit MCP's
 request/response shape already puts on [Notifications](#notifications).
 
+**As built (2026-10-13, #74;** `20261013170000_waiting_in_line.sql` to
+`20261013170300_leave_queue.sql`). `request_work(vault, path)` and
+`leave_queue(vault, path)`, executable by whoever can write the plan's
+path, identity from the session as `claim_step` takes it. The rule, the
+lapse of a place, the cheap refusal, the hint cap and the strikes are the
+spike's, ported onto `work_plan_steps` and the claim rule's stored
+waiting settings (item 3; with no rule, the Org preset: a place lives 6
+hours, the longest hint is 1 hour, the minimum gap 15 minutes, one free
+lapse, a 48 hour cooldown cap). Where it differs from the spike:
+
+- **The answer to "too many places" is `refused`**, and the 3 places per
+  person in a vault (item 8) is a constant, not a rule column.
+- **Item 12a's "one way in" is the API role's, not a separate agent
+  role:** agents and people share `authenticated`, which writes neither
+  places nor strikes, and reads places (who is waiting) as it reads steps.
+  `claim_step`, naming one step, stays executable by agents, and since
+  #75 (`20261013220000_claim_step_follows_the_line.sql`) runs the same
+  function as `request_work` (`private.take_step`, which no API role
+  executes) with the pick narrowed to the named step: it is granted only
+  what `request_work` would grant that caller at that moment, so it keeps
+  the line, the caps and the cooldown, and a refusal takes no place.
+- **A strike is counted when a lapsed step is handed on**, by
+  `request_work` or, since #75, by `claim_step`.
+- **Lock order.** `request_work` and `leave_queue` take the vault's row
+  first (for key share), the order `post_message` uses, because they
+  insert places and an insert has no row `delete_vault` could lock ahead
+  of it; `delete_vault` is unchanged. One person's requests to a vault
+  take turns on an advisory lock, so two at once leave one place. Other
+  people's lapsed places and the step are taken with SKIP LOCKED.
+- **Events:** `queue.join` when a place is taken, `queue.leave` when its
+  holder leaves, and `queue.expire` when it ends without them, with the
+  reason (`lapsed`, `plan_complete`, `cooling_down`), logged as the
+  holder's. A grant ends the place silently; `step.claim` records the
+  place and the ready count it was granted at.
+- **Rate limits (item 8):** the per-token one is the MCP server's (#75,
+  `mcp/src/ratelimit.ts`); the per-vault budget is the database's (#80,
+  `20261013235000_vault_request_budget.sql`), so it holds whichever server
+  calls: `take_step` counts each full evaluation (not a cheap refusal)
+  against the vault, 300 a minute, the number the capacity model gives (a
+  Pro vault's 50 people, one place each, at the 10 second floor), and over
+  it answers `wait` with no place and the seconds until the vault's minute
+  ends; `claim_step` refuses it as RLW06. The model:
+  `docs/public/reference/limits.md`, "What asking for work costs".
+- **One read for every line** (#79, `20261013230000_my_places.sql`):
+  `my_places()` gives the caller's person, across the vaults the caller
+  reads, each place's state as `request_work` would answer it (with
+  `lapsed` for a place that ran out) and each step held, writing nothing
+  (item 12d's cheap read, for every plan at once). Over MCP it counts only
+  against the general tool call limit, not item 8's `request_work` one.
 ### 12. The agent is not trusted
 
 No rule may depend on an agent behaving, and none needs a model: every
@@ -800,6 +863,49 @@ into this repo (CL-0.4). At 100 agents asking as fast as they can, the
 guarded design held 53,992 calls a second at 1.9 ms against 6,172 at 16
 ms for the earlier, connection-keyed one; the same shape held at 500
 agents and across 5,000 simulated vaults.
+
+### 13. Planning fields
+
+Added 2026-10-13 (owner's call, issue #334), so the Tasks page can read
+like a task list a person plans around, not only a dependency graph.
+Four optional lines per step in the `work_plan` block, each stored per
+step at registration from the registered version, the same as `title`:
+editing the file later changes none of them, consistent with item 6.
+
+- `due: 2026-10-20`, a calendar date with no time or zone. The Tasks
+  page groups by it (Overdue, Today, Upcoming, by the viewer's own
+  date). A date in the past is accepted: a plan written late is still a
+  plan.
+- `priority: 1` to `4`, 1 highest, Todoist's scale. It orders tasks
+  within a group and is shown as a word with its colour, never colour
+  alone.
+- `notes: ...`, one line of plain text up to 2000 characters, half a
+  proposal reason, because a step's notes are a pointer, and the plan
+  file is where long text belongs. Shown to agents between markers as
+  data, never as instructions, the same as `title` and a claim's label
+  (item 12).
+- `for: agents`, `for: people`, or a member's email. An email is
+  resolved to the member's user id at registration and refused, with
+  the line, if it names no member; the step stores the id, never the
+  email, so a member who changes address stays the one it means. A
+  page shows that member however people are shown everywhere else
+  (their display name and email today). A hint for who should pick the
+  task up, and only a hint.
+
+None of the four is an access rule or a claim rule. A step is claimable
+exactly as items 3, 4 and 12(c) say, whatever its `for`, `due` or
+`priority`: a hint that gated claims would be a second permission
+system living in file text, and an agent could not tell it from a rule
+it may break. A due date passing changes no state and starts no
+routine. When waiting in line (item 11) is built, whether `priority`
+orders which ready step a waiting agent is offered is its own decision,
+not settled here.
+
+Settled 2026-10-13 (owner's call): `for` names a member by email,
+because an email is unique and a display name is not. What identifies a
+person (their id, reached through their email) stays separate from how
+they are shown, so letting a person choose how co-members see them is
+its own change and never touches a stored plan.
 
 ### What this doesn't show
 

@@ -38,6 +38,14 @@ On a phone, a vault's sections (**Files**, **Proposals**, **Threads**, **Tasks**
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
 
+## Settings
+
+A vault's **Settings** has a menu beside the page (above it on a phone), in three groups:
+
+- **Vault**: **General** (the name and default policy, and the **Danger zone** at the bottom, with **Leave this vault** and, for owners, **Delete vault**), **Members**, **Rules** and **Usage**.
+- **You**: **Watching**, the folders and files you watch.
+- **Advanced**: **Diagnostics** and, for owners, **Export**.
+
 ## Diagnostics
 
 **Settings**, then **Diagnostics**, is for working out why something happened. It has a tab for [Flags](flags.md) (what changed since you were last told), one for [Claims](claims.md) (who is working on which path) and one for the **Log**, every event the vault recorded (see [Changes and the log](activity.md)). Most people never need it, so none of them is in the vault's main navigation. What people changed, in plain words, is under **Changes**. The **Diagnostics** page itself only lists its tabs; it changes nothing.

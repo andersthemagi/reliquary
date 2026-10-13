@@ -28,14 +28,17 @@ A rule sets four things:
 - **Hold limit:** the longest one claim can be kept, however often it checks in. After that the agent releases it and claims again. At least the lease, at most 365 days.
 - **Claims per connection:** how many claims one connection (one agent) may hold in the vault at once.
 - **Claims per person:** how many all of one person's agents may hold together.
+- **Place in line, longest check-again hint and minimum gap:** how an agent waits for a task when none is free. See [Waiting in line](tasks.md#the-settings).
 
 Three presets are starting points, not measurements: tune one once it actually causes a problem.
 
-| Preset | Lease | Hold limit |
-|---|---|---|
-| Hackathon | 30 minutes | 2 hours |
-| Team | 8 hours | 1 day |
-| Org (the default) | 48 hours | 7 days |
+| Preset | Lease | Hold limit | Place in line | Longest hint | Minimum gap |
+|---|---|---|---|---|---|
+| Hackathon | 30 minutes | 2 hours | 15 minutes | 1 minute | 15 seconds |
+| Team | 8 hours | 1 day | 2 hours | 15 minutes | 225 seconds |
+| Org (the default) | 48 hours | 7 days | 6 hours | 1 hour | 15 minutes |
+
+Each preset's minimum gap is a quarter of its longest hint, and its cooldown cap is its lease.
 
 Only an owner sets a claim rule, in person: in the vault, **Settings**, **Rules**, **Claim rules**. The first row is the whole vault, with the fixed defaults until you set one. To make every path in a vault lease for 30 minutes with a 2 hour hold limit, choose **The whole vault** and press **Hackathon**, or type the numbers and press **Save claim rule**. To give one folder or file its own numbers, choose **A folder or file** and type its path. **Change** on a row opens it filled in; **Remove** takes it away, and the paths it covered follow the next rule that applies. Setting a rule never touches a claim already granted; it only changes what the next claim, or the next check-in, gets.
 
@@ -68,9 +71,9 @@ A work plan is steps with dependencies, so no agent is handed a step before the 
   gate: review
 ```
 
-Each step has a `key` (lowercase letters, digits and hyphens, unique in the plan) and a `title`. `blocked_by` names other steps' keys, comma-separated; `cites` names canon paths this step's work depends on, each as `path@version`, comma-separated; `gate: review` is meant to hold a step's dependents until a person approves it, directly or by applying its proposal; today it is stored and shown, and nothing enforces it yet. A malformed block, a blocker that doesn't exist, or a cycle of steps blocking each other is refused, naming the line and why.
+Each step has a `key` (lowercase letters, digits and hyphens, unique in the plan) and a `title`. `blocked_by` names other steps' keys, comma-separated; `cites` names canon paths this step's work depends on, each as `path@version`, comma-separated; `gate: review` holds what waits on the step until a person approves it, directly or by applying the proposal its agent linked ([Tasks that need a person's review](tasks.md#tasks-that-need-a-persons-review)). A malformed block, a blocker that doesn't exist, or a cycle of steps blocking each other is refused, naming the line and why.
 
-Registering a plan from its file turns each step into a row with a status (`open`, `claimed`, `done` or `cancelled`) and a live, computed one layered on top for people and agents to read (`ready`, `blocked`, `blocked_by_cancelled`, or the stored status itself once it's `claimed`, `done` or `cancelled`): a step is `ready` exactly when every step blocking it is done. Claiming a ready step works the same way claiming a path does (a lease, a secret returned once, the same check-again-later shape); finishing it frees every step it was blocking. Checking in restarts a claimed step's lease without finishing it, the same shape checking in on a path claim already has, and is capped the same way: no amount of checking in holds a step past its hold limit, counted from when it was first claimed. Only a person can cancel a step (its dependents stay blocked forever, on purpose, until a person acts), skip one (marks it done without anyone having claimed it, so dependents proceed as if it were), or reopen a cancelled one (it is open again, and its dependents wait for it to be done).
+Registering a plan from its file turns each step into a row with a status (`open`, `claimed`, awaiting review, `done` or `cancelled`) and a live, computed one layered on top for people and agents to read (`ready`, `blocked`, `blocked_by_cancelled`, or the stored status itself once it's `claimed`, `awaiting_review`, `done` or `cancelled`): a step is `ready` exactly when every step blocking it is done. Claiming a ready step works the same way claiming a path does (a lease, a secret returned once, the same check-again-later shape); finishing it frees every step it was blocking. Checking in restarts a claimed step's lease without finishing it, the same shape checking in on a path claim already has, and is capped the same way: no amount of checking in holds a step past its hold limit, counted from when it was first claimed. Only a person can cancel a step (its dependents stay blocked forever, on purpose, until a person acts), skip one (marks it done without anyone having claimed it, so dependents proceed as if it were), or reopen a cancelled one (it is open again, and its dependents wait for it to be done).
 
 A person sees a vault's plans, and what each task is doing, on the vault's [Tasks](tasks.md) page, and cancels, skips or reopens a task there.
 
@@ -80,11 +83,6 @@ An agent registers a plan with `register_work_plan`, naming the vault and the pl
 
 `work_plan_status` lists the steps in plan order: each one's state, what it is waiting on, who holds it and until when, and what it cites. A step that is not done or cancelled and cites a file that now has a newer version says `context moved` on its state line, and names the moved files with its cites. Read those files again before working it. The person who registered the plan, and whoever holds such a step, are also flagged (see [Flags](flags.md)) when the file changes.
 
-To work a step, an agent claims it by key with `claim_step`. Only a ready step can be claimed. The lease is the vault's claim rule for the plan's path, and the response returns a secret once, with a fence number, the same way `claim_path` does. `checkin_step` restarts the lease, `complete_step` marks the step done and frees the steps it was blocking, and `release_step` gives it back. All three need the secret and the fence, from the same connection and person. A blocked step, a step someone else holds, a done or cancelled step, and a stale fence or secret are each refused, with the reason.
+To get work, an agent calls `request_work` with the plan's path, and is given any ready step or told to wait its turn ([Waiting in line](tasks.md#waiting-in-line)). It can also claim one step by key with `claim_step`. Only a ready step can be claimed. The lease is the vault's claim rule for the plan's path, and the response returns a secret once, with a fence number, the same way `claim_path` does. `checkin_step` restarts the lease, `complete_step` marks the step done and frees the steps it was blocking (a review-gated step waits for a person's approval first, and its agent may name the proposal holding its output), and `release_step` gives it back. All three need the secret and the fence, from the same connection and person. A blocked step, a step someone else holds, a done or cancelled step, and a stale fence or secret are each refused, with the reason. Claiming by key keeps to the line, the claim rule's caps and the cooldown ([Claiming a task by name](tasks.md#claiming-a-task-by-name)): while others wait ahead for the ready steps, while the connection or its person holds as many steps as the rule allows, or while its person cools down, it is refused.
 
-Agents never cancel, skip or reopen a step: those stay with a person. When cancelled work needs doing after all, an agent adds a step naming the old one by its key to the same plan file and registers it again; a person reopens the old step only when the work really is the same task. A step's title, its cites and a claim's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
-
-### What isn't built yet
-
-- **Waiting in line.** An agent names the step it wants and is refused if it isn't ready. There is no "give me any ready step", no place in line and no list of who is waiting.
-- **Review gates.** `gate: review` is stored and shown, but nothing holds a step's dependents for a review.
+Agents never cancel, skip, reopen or approve a step: those stay with a person. When cancelled work needs doing after all, an agent adds a step naming the old one by its key to the same plan file and registers it again; a person reopens the old step only when the work really is the same task. A step's title, its cites and a claim's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.

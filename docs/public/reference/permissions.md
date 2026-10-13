@@ -29,8 +29,11 @@ What people and their agents can each do, where, and who may: every rule here is
 | Break someone else's claim | **Diagnostics**, **Claims**, **Break** | none | person, owners and editors |
 | Register a plan file as a [work plan](../concepts/claims.md#work-plans) | none (agents register plans) | `register_work_plan` | agent, owners and editors (whoever could write the path) |
 | See a work plan's steps | **Tasks** | `work_plan_status` | both, any member |
+| Ask for any ready step, or leave a plan's line | none | `request_work`, `leave_queue` | agent; whoever could write the path; leaving gives up only its own person's place |
+| See where you stand in every plan's line | none | `my_places` | agent; any connection, read-only included, for its own person's places and steps in the vaults it reaches |
 | Claim a step, check in on it, complete it or give it back | none | `claim_step`, `checkin_step`, `complete_step`, `release_step` | agent; claiming: whoever could write the path; the rest: the step's holder |
 | Cancel or skip a step | **Tasks**, a task's **Cancel** or **Skip** | none | person, owners and editors (whoever could write the path) |
+| Approve a step awaiting review | **Tasks**, a task's **Approve**; or applying the proposal its agent linked | none (`complete_step` can name the proposal) | person, owners and editors (whoever could write the path) |
 
 ## Links
 
@@ -60,15 +63,15 @@ What people and their agents can each do, where, and who may: every rule here is
 | See members (by email) | **Settings**, **Members** | none | person, any member |
 | Invite, change roles, remove members | **Members** | none | person, owners |
 | Accept an invite | the invite link | none | person, the invited address |
-| Leave a vault | **Settings**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains |
-| See and cut members' connections | **Members** | none | person, owners |
+| Leave a vault | **Settings**, **General**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains |
+| See and cut members' connections | **Members**, **Agents** | none | person, owners |
 | Create or revoke a token | **Connections** (the account menu) | none | person |
 | Set your display name | **Account settings** | none | person, for themself only |
 | Change your email address, sign out everywhere or delete your account | **Account settings** | none | person, for themself only |
 | Allow an OAuth client or the CLI | the consent page | none | person |
 | Erase a file | the file's **More**, **Erase file** | none | person, owners |
 | Export a vault | **Settings**, **Export** | none | person, owners |
-| Delete a vault | **Settings**, **Danger zone** | none | person, owners |
+| Delete a vault | **Settings**, **General**, **Danger zone** | none | person, owners |
 
 ## Feedback
 

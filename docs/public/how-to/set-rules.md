@@ -10,7 +10,7 @@ Open the vault, then **Settings**, **Rules**. The table lists every rule in fold
 
 ## Add or change a rule
 
-1. On **Rules**, choose **Add rule** at the top. With no rules yet the form is already on the page, under the note, so go to step 2.
+1. On **Rules**, choose **Add rule** at the top. The form opens above the list.
 2. Under **Add or change a rule**, fill in:
    - **Path or folder**: a folder ends in `/`, like `clients/`; a file is its full path, like `pricing.md`.
    - **Policy**: **Canon** or **Open**.
@@ -34,7 +34,7 @@ The message shows in the form with a reference; what you typed stays in it to co
 
 ## Check what applies
 
-Under **What applies to a path?**, type any path, like `clients/acme/brief.md`, and choose **Check**. The page says whether it is canon or open, which rule decides (or the vault default), and how many approvals a change needs.
+Open **What applies to a path?** under the list, type any path, like `clients/acme/brief.md`, and choose **Check**. The page says whether it is canon or open, which rule decides (or the vault default), and how many approvals a change needs.
 
 ## Remove a rule
 

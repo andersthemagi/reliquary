@@ -279,6 +279,49 @@ live stops matching a release (the next deploy's `/version` check says so).
   ([Supabase troubleshooting: schema "pg_pgrst_no_exposed_schemas" does not
   exist](https://supabase.com/docs/guides/troubleshooting/schema-pg_pgrst_no_exposed_schemas-does-not-exist)).
 
+## Capacity: the pooler and asking for work
+
+The model, with worked numbers, is public: `docs/public/reference/limits.md`,
+"What asking for work costs". In short, agents waiting for work cost
+agents / minimum gap calls a second, 6 pooler round trips each, and each
+vault is held to 300 full evaluations a minute (#80).
+
+**Alert on the pooler's client connections** (Supabase dashboard, the
+database report's pooler client connections; the plan's limit is in
+Settings, Compute; 200 on Nano and Micro):
+
+| Clients in use | What to do |
+|---|---|
+| 60% of the limit (120 of 200) | Look: which vaults are at their budget (query below), and whether one vault's rule has a short minimum gap |
+| 80% (160 of 200) | Act: ask that vault's owner to lengthen its gap (Rules page), or lower the budget for everyone (below); then consider more compute |
+| 100% | New connections are refused; requests fail with a `db connection` ref (see "Finding an error by its ref") |
+
+Each function instance holds up to `DB_POOL_MAX` clients (5 by default), so
+the client count follows the number of warm instances, not only the calls.
+
+Vaults at their budget this minute (SQL editor):
+
+```sql
+select v.name, r.hits, r.expires_at
+  from private.rate_limits r
+  join public.vaults v on r.key = encode(sha256(convert_to('vault:' || v.id::text, 'UTF8')), 'hex')
+ where r.bucket = 'vault_request_work_minute' and r.expires_at > now()
+ order by r.hits desc limit 20;
+```
+
+Changing the budget, for every vault at once (a self-hosted operator too):
+
+```sql
+update private.request_budget set per_minute = 300;
+```
+
+Connections the apps hold on the database itself:
+
+```sql
+select usename, state, count(*) from pg_stat_activity
+ where usename in ('reliquary_mcp', 'reliquary_web') group by 1, 2 order by 1, 2;
+```
+
 ## Backups and restore
 
 - **Supabase:** daily backups, 7 days on Pro (dashboard, Database, Backups).
