@@ -18,7 +18,7 @@ not the whole file top to bottom.
 - [Path ownership](#alongside-milestone-3-path-ownership), alongside milestone 3: built.
 - [Flags](#alongside-milestone-3-flags), alongside milestone 3: built, except addressed notes.
 - [Docs, plans, limits, admission, concurrency](#also-alongside-docs-plans-limits-admission-concurrency): built.
-- [Compare-and-swap writes, claims and work plans](#alongside-milestone-3-compare-and-swap-writes-claims-and-work-plans): built, except waiting in line.
+- [Compare-and-swap writes, claims and work plans](#alongside-milestone-3-compare-and-swap-writes-claims-and-work-plans): built; waiting in line in the database, not yet over MCP or on the Tasks page.
 - [Threads, the audience split and the Tasks view](#alongside-milestone-3-threads-the-audience-split-and-the-tasks-view): built.
 
 ## Decisions
@@ -587,6 +587,24 @@ start the next one.
     Tasks plan page and the Flags page. Registry: `tests/features.md`
     F803-F805. Docs: `docs/public/concepts/tasks.md` ("Context moved"),
     `flags.md`, `claims.md`.
+  - waiting in line (CL-3.9, #74, 2026-10-13; `supabase/migrations/
+    20261013170000_waiting_in_line.sql` to `20261013170300_leave_queue.sql`):
+    `work_plan_places` (one place per person per plan) and
+    `private.work_plan_strikes`; `request_work` answers at once with
+    `granted`, `wait` (place, ready count, seconds), `at_capacity`,
+    `cooling_down`, `blocked_by_cancelled`, `plan_complete`, `refused` or
+    `no_such_plan`, under the rule "the k-th oldest live place may claim
+    only if at least k steps are ready", with the cheap refusal, the hint
+    cap, lapsed places, strikes and the doubling cooldown; `leave_queue`;
+    `complete_step` clears strikes; events `queue.join`, `queue.leave`,
+    `queue.expire` with Activity labels. Ported from the spike, with the
+    differences in docs/design.md (item 11, "As built"). Tests:
+    `supabase/tests/waiting_test.sql` and `web/test/races.test.mjs`
+    ("races, waiting in line" and the lock-order tests), every new guard
+    mutation-checked. Registry: `tests/features.md` F813-F818. Docs:
+    `docs/public/concepts/tasks.md` ("Waiting in line"). Not yet: the MCP
+    tools and their rate limits (#75), who is waiting on the Tasks page
+    (#76).
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
 plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.
