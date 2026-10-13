@@ -81,7 +81,7 @@ The lease, the hold limit and how many tasks an agent may hold come from the vau
 
 ## The Tasks page
 
-Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). It opens on what is open across every plan in the vault, in up to four sections: **Awaiting review**, **In progress**, **Ready to pick up** and **Blocked**. Each task names its plan, linked. Done and cancelled tasks stay on their plan's page.
+Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). It opens on what is open across every plan in the vault, in up to four sections: **Awaiting review**, **In progress**, **Ready to pick up** and **Blocked**. Each task names its plan, linked. Within each section, the highest priority comes first, then the earliest due date; tasks with neither come last. Done and cancelled tasks stay on their plan's page.
 
 Under **Plans**, each plan is a card:
 
@@ -99,6 +99,8 @@ Select a plan to see every task in it, grouped so what needs attention comes fir
 - An in-progress task has a chip saying who holds it: **you**, a person, or a person's agent ("Ana via Claude Code"). The line under it gives the label they gave it and how long is left. The label is whatever the holder wrote, such as "cleaning the rows". It is a note, never proof of who is working on the task, and the page shows it in quotes for that reason.
 - A blocked task says **Blocked by** and names the tasks it waits on, marking any awaiting review.
 - A task awaiting review says who finished it, and links its proposal if its agent linked one.
+- A task with a priority shows **P1** to **P4** in words and colour, and one with a due date shows it. Once the date has ended everywhere in the world and the task isn't done or cancelled, it says **Overdue**. The page doesn't know your time zone, so in the furthest east it can say so up to a day late, never early.
+- The line under a task says who it is meant for (**for agents**, **for people**, or the member) and its notes.
 
 The page shows the plan as it is when you open it. Reload to see changes.
 
