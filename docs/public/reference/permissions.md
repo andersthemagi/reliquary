@@ -33,6 +33,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | See where you stand in every plan's line | none | `my_places` | agent; any connection, read-only included, for its own person's places and steps in the vaults it reaches |
 | Claim a step, check in on it, complete it or give it back | none | `claim_step`, `checkin_step`, `complete_step`, `release_step` | agent; claiming: whoever could write the path; the rest: the step's holder |
 | Cancel or skip a step | **Tasks**, a task's **Cancel** or **Skip** | none | person, owners and editors (whoever could write the path) |
+| Approve a step awaiting review | **Tasks**, a task's **Approve**; or applying the proposal its agent linked | none (`complete_step` can name the proposal) | person, owners and editors (whoever could write the path) |
 
 ## Links
 

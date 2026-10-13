@@ -15,7 +15,7 @@ Anyone who can read the vault can read its plans, viewers included.
 Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). Each row is one plan:
 
 - the path of its file, which opens the plan;
-- how many of its tasks are done, and how the rest are split: in progress, ready, blocked, cancelled;
+- how many of its tasks are done, and how the rest are split: in progress, awaiting review, ready, blocked, cancelled;
 - whether the plan file has changed since it was registered;
 - who registered it, and when.
 
@@ -41,7 +41,8 @@ Select a plan to see every task in it. Tasks are grouped so what can be worked o
 |---|---|
 | In progress | An agent holds the task and its time has not run out. The row says who holds it, the label they gave it, and how long is left. |
 | Ready | Every task it waits on is done, and nobody holds it. A task whose holder ran out of time is ready again. |
-| Blocked | It waits on tasks that are not done yet. The row names them. |
+| Awaiting review | Its agent finished it, and it needs a person's approval before the tasks waiting on it can start. See [Tasks that need a person's review](#tasks-that-need-a-persons-review). |
+| Blocked | It waits on tasks that are not done yet, or awaiting review. The row names them. |
 | Blocked by a cancelled task | One of the tasks it waits on was cancelled. A cancelled task never counts as done, so this task stays blocked until a person reopens that task, or cancels or skips this one. |
 | Done | Finished, or skipped by a person. |
 | Cancelled | Dropped by a person. It doesn't count as done. |
@@ -60,6 +61,23 @@ Time left is a lease, the same as for a [claim](claims.md#how-a-claim-works). A 
 
 The page shows the plan as it is when you open it. Reload to see changes.
 
+## Tasks that need a person's review
+
+Some work needs a person to check it before anything that depends on it starts: a schema, a brief, a decision. Mark that step `gate: review` in the plan file's `work_plan` block.
+
+- When its agent finishes the task, it is **Awaiting review**, not done. The tasks waiting on it stay blocked, and no agent can take them, whether it asks for work or names the task.
+- It becomes done when a person approves it, in one of two ways: directly, with **Approve** on the plan's page, or by applying the proposal its agent linked to it. Only then do the tasks waiting on it stop waiting.
+- Who can approve it: whoever can write the plan file (an owner or editor, or a named owner of its path), signed in, in the web app. No agent can approve a task, not even its own person's, the same [ceiling](agents.md#the-ceiling) as approving a proposal.
+- The Activity log records **Approved a step**, by the person who approved it.
+
+On the plan's page, tasks awaiting review come first. Each says who finished it, and the tasks waiting on it say so too. If you can write the plan file, the task has **Approve** beside **Cancel** and **Skip**. Approve opens a confirm page that asks you to check the work first, says which tasks become ready, and changes nothing until you confirm; its way out is **Not yet**. Approving can't be undone from the page.
+
+### Approving through a proposal
+
+When the task's work is a change to a canon file, the agent proposes the change, then finishes the task naming that proposal (`complete_step` with `proposal`). Applying the proposal approves the task: the person reviewing the change is reviewing the task's work, and the proposal's page says so. Approving the task directly works as well, and leaves the proposal waiting. The task's row links its proposal.
+
+The proposal has to be one the agent's own person made in this vault after the task was taken, and still waiting for review: not yet applied, rejected or stale. A proposal already decided was decided without the task in view, so it can't stand in for the review. If the linked proposal is rejected or goes stale, the task stays awaiting review, for a person to approve or cancel. A task with no `gate: review` takes no proposal.
+
 ## Cancelling, skipping and reopening a task
 
 If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has two buttons, **Cancel** and **Skip**, and each cancelled task has **Reopen**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it; on the reopen page it is **Keep it cancelled**. Only a person can do any of them: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
@@ -67,6 +85,8 @@ If you can write the plan's file (an owner or editor, or a named owner of its pa
 - **Cancel** drops the task. A cancelled task never counts as done, so every task waiting on it stays blocked, shown as blocked by a cancelled task, until a person reopens it, or cancels or skips each of them.
 - **Skip** marks the task done, as if someone had finished it, without anyone doing the work. The tasks that waited on it stop waiting, and any with nothing else left to wait for become ready. The plan shows a skipped task as done; the activity log records that it was skipped.
 - **Reopen** puts a cancelled task back in the plan. It is ready if everything it waits on is done, and blocked if not. The tasks that waited on it stop showing as blocked by a cancelled task and wait for it to be done, like any other task. Only a cancelled task can be reopened: a skipped task counts as done, and what waited on it may already be under way.
+
+A task awaiting review can be cancelled or skipped too. Skipping it lets what waits on it go ahead, the same as approving it, but the log records a skip.
 
 If an agent holds the task, cancelling or skipping takes it from them, and if that agent then tries to finish the task, it is refused. All three actions are logged.
 
@@ -89,7 +109,7 @@ An agent asks for any ready task of a plan with the MCP tool `request_work`, nam
 | At capacity | The agent, or all of its person's agents together, already hold as many tasks in the vault as the [claim rule](claims.md#claim-rules) allows. Finish or give one back first. |
 | Cooling down | Its person's agents let tasks run out of time unfinished, so its person waits before getting more. The answer says how many seconds. |
 | Blocked by a cancelled task | Nothing in the plan can move until a person reopens, cancels or skips a task. Stop asking. |
-| Plan complete | Every task is done or cancelled. Stop asking. |
+| Plan complete | No task is left for an agent: each is done, cancelled, or awaiting a person's review. Stop asking. |
 | Refused | Its person already waits in 3 lines in this vault. |
 | No such plan | No plan is registered at that path. |
 
