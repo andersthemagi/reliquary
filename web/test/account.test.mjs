@@ -138,12 +138,23 @@ after(async () => {
 test("sign out everywhere: Account settings offers it, says connections are separate, and offers to revoke them too", async () => {
   const jar = await signIn("acct-sofia@example.test");
   const h = await (await get("/settings", jar)).text();
-  assert.match(h, /<h2 id="everywhere">Sign out everywhere<\/h2>/);
+  assert.match(h, /<h3 id="everywhere">Sign out everywhere<\/h3>/);
   assert.match(h, /in every browser and on every device, this one included/);
   assert.match(h, /Connections are separate: tokens, apps \(Claude, ChatGPT, Cursor and others\) and the Reliquary CLI keep working after you sign out everywhere\. Revoke them all here, or one at a time on <a href="\/connections">Connections<\/a>\./);
   assert.match(h, /<form method="post" action="\/settings\/sign-out-everywhere" class="panel settings-form">\s*<input type="hidden" name="csrf" value="[0-9a-f]+">/);
   assert.match(h, /<label class="choice"><input type="checkbox" name="revoke_connections" value="1"> Also revoke all my connections: tokens, apps and the Reliquary CLI<\/label>/);
   assert.match(h, /<button class="danger">Sign out everywhere<\/button>/);
+});
+
+test("account sections: hosted, the sub-nav lists Profile, Appearance, Sessions and Danger zone; sign-outs are under Sessions, Delete account under Danger zone", async () => {
+  const jar = await signIn("acct-sofia@example.test");
+  const h = await (await get("/settings", jar)).text();
+  const at = h.indexOf('<nav class="settings-nav" aria-label="Account settings">');
+  const nav = h.slice(at, h.indexOf("</nav>", at));
+  assert.deepEqual([...nav.matchAll(/<a href="#([a-z-]+)">([^<]+)<\/a>/g)].map((m) => m[1]), ["profile", "appearance", "sessions", "danger"]);
+  const order = ['id="profile"', 'id="email"', 'id="appearance"', 'id="sessions"', 'id="signout"', 'id="everywhere"', 'id="danger"', 'id="delete-account"'].map((x) => h.indexOf(x));
+  assert.ok(order.every((n, i) => n > 0 && (i === 0 || n > order[i - 1])), `in order: ${order}`);
+  assert.match(h, /<a class="button danger" href="\/settings\/delete">Delete account<\/a>/, "Delete account still goes to its confirm page");
 });
 
 test("sign out everywhere: every browser's session ends at once, this one included, and connections keep working", async () => {
@@ -253,7 +264,7 @@ test("change email: Account settings shows my address and a form for a new one, 
   await account("acct-vera@example.test");
   const jar = await signIn("acct-vera@example.test");
   const h = await (await get("/settings", jar)).text();
-  assert.match(h, /<h2 id="email">Email<\/h2>\s*<p><strong>acct-vera@example\.test<\/strong><\/p>/);
+  assert.match(h, /<h3 id="email">Email<\/h3>\s*<p><strong>acct-vera@example\.test<\/strong><\/p>/);
   assert.match(h, /<form method="post" action="\/settings\/email" class="panel settings-form">\s*<input type="hidden" name="csrf" value="[0-9a-f]+">\s*<label for="new-email">New email address<\/label>/);
   assert.match(h, /<input id="new-email" type="text" name="new_email" inputmode="email" autocomplete="email"[^>]* maxlength="254" required aria-describedby="new-email-hint">/);
   assert.match(h, /We email a link to the new address to confirm it is yours; nothing changes until you open it\. Afterwards you sign in with the new address\. Your vaults, roles, connections and plan stay as they are, and people who share a vault with you see the new address\. Invites made out to your old address stop working: ask for a new one\./);
@@ -315,7 +326,7 @@ test("change email: a refused address stays in its field, marked, the form first
   const h = await r.text();
   assert.match(h, /<input id="new-email" type="text" name="new_email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required value="not an address" aria-invalid="true" aria-describedby="email-error new-email-hint">/);
   assert.match(h, /<p><strong>acct-vera\.new@example\.test<\/strong><\/p>/, "not 'no email on this account'");
-  assert.ok(h.indexOf('aria-labelledby="email"') < h.indexOf('aria-labelledby="profile"'), "the refused section is on the first screen");
+  assert.ok(h.indexOf('aria-labelledby="email"') < h.indexOf('aria-labelledby="display-name-title"'), "the refused section is on the first screen");
   assert.match(h, /<form method="post" action="\/signout">/, "the rest of the page is there");
 });
 
@@ -371,7 +382,7 @@ test("delete account: Account settings links to it, saying what goes and what st
   await as(W.wes, "select public.create_access_token('wes laptop', 30)");
   const jar = await signIn("acct-wes@example.test");
   const h = await (await get("/settings", jar)).text();
-  assert.match(h, /<h2 id="delete-account">Delete account<\/h2>/);
+  assert.match(h, /<h3 id="delete-account">Delete account<\/h3>/);
   assert.match(h, /Deletes your account now: you leave every vault, your connections are deleted, and Reliquary forgets your email address and name\. What you wrote in vaults stays there, shown as written by a deleted account\. This can’t be undone\./);
   assert.match(h, /<a class="button danger" href="\/settings\/delete">Delete account<\/a>/);
 });

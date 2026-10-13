@@ -11,7 +11,7 @@ Deleting your account is immediate and can't be undone. You leave every vault, y
 ## Delete it
 
 1. Open the account menu at the top right and choose **Account settings**.
-2. Under **Delete account**, choose **Delete account**.
+2. Under **Danger zone** (the last section, or choose it in the menu beside the page), choose **Delete account**.
 3. Read the page: it lists the vaults you'll leave, how many connections are deleted and what stays.
 4. Type your email address exactly as it is on your account, and choose **Delete my account**.
 

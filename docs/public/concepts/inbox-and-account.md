@@ -43,7 +43,7 @@ A proposal you snoozed leaves the count and the list until the snooze ends. **Sh
 
 The account menu, at the right of the bar, shows who you're signed in as and links to:
 
-- **Account settings** (`/settings`): your display name, your email address, the theme, sign out, sign out everywhere and delete account.
+- **Account settings** (`/settings`): one page in sections, with a menu beside them to jump to each: **Profile** (your display name and email address), **Appearance** (the theme), **Sessions** (sign out and sign out everywhere, on hosted Reliquary) and **Danger zone** (delete account). The same menu links to Plan and usage, Connections and Connect.
 - **Plan and usage** (`/account`): your plan and your vaults' people and storage. See [Plans and limits](plans-and-limits.md).
 - **Connections** (`/connections`): everything that can act as you (tokens, apps and the Reliquary CLI), each with **Revoke**. See [Connections](connections.md).
 - **Send feedback** (`/feedback`), as above.
@@ -82,7 +82,7 @@ If the new address already belongs to another Reliquary account, the change is r
 
 ## Sign out everywhere
 
-**Sign out** on **Account settings** ends your session in this browser. **Sign out everywhere** ends every session of your account at once: in every browser and on every device, this one included. Use it if you signed in on a computer you no longer use, or lost a phone. Pages open elsewhere go to the sign-in page on their next click. Signing in again works right away.
+**Sign out**, under **Sessions** on **Account settings**, ends your session in this browser. **Sign out everywhere** ends every session of your account at once: in every browser and on every device, this one included. Use it if you signed in on a computer you no longer use, or lost a phone. Pages open elsewhere go to the sign-in page on their next click. Signing in again works right away.
 
 Connections are not sessions. Tokens, apps (Claude, ChatGPT, Cursor and others) and the Reliquary CLI keep working after you sign out everywhere, unless you tick **Also revoke all my connections**. That revokes every one of them at once; to revoke them one at a time, use **Connections**. See [Connections](connections.md).
 
@@ -90,4 +90,4 @@ Only you can sign out everywhere, signed in to the web app. An agent can't do it
 
 ## Delete your account
 
-**Delete account** on **Account settings** deletes your account at once: you leave every vault, your connections are deleted, and Reliquary forgets your email address, display name and plan. What you wrote in vaults stays there, and people see it as written by **a deleted account**. You can't delete your account while you're the only owner of a vault. See [Delete your account](../how-to/delete-your-account.md).
+**Delete account**, under **Danger zone** on **Account settings**, deletes your account at once: you leave every vault, your connections are deleted, and Reliquary forgets your email address, display name and plan. What you wrote in vaults stays there, and people see it as written by **a deleted account**. You can't delete your account while you're the only owner of a vault. See [Delete your account](../how-to/delete-your-account.md).
