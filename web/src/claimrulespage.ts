@@ -39,6 +39,9 @@ export type ClaimRule = {
   hold_limit_minutes: number;
   connection_cap: number;
   person_cap: number;
+  place_in_line_minutes: number;
+  check_again_minutes: number;
+  min_gap_seconds: number;
   set_by: string;
   set_at: Date;
 };
@@ -47,15 +50,17 @@ export const claimRulesPath = (id: string) => vaultPath(id, "/rules/claims");
 
 export async function loadClaimRules(c: pg.PoolClient, id: string): Promise<ClaimRule[]> {
   const { rows } = await c.query(
-    `select path, lease_minutes, hold_limit_minutes, connection_cap, person_cap, set_by, set_at
+    `select path, lease_minutes, hold_limit_minutes, connection_cap, person_cap,
+            place_in_line_minutes, check_again_minutes, min_gap_seconds, set_by, set_at
        from public.claim_rules where vault_id = $1 order by path`,
     [id],
   );
   return rows;
 }
 
-// What a path gets when no rule covers it: private.claim_rule_for's own fallback.
-export const BUILT_IN = { lease: 48 * 60, hold: 7 * 24 * 60, conn: 1, person: 5 };
+// What a path gets when no rule covers it: private.claim_rule_for's and
+// private.queue_rule_for's own fallbacks (the Org preset).
+export const BUILT_IN = { lease: 48 * 60, hold: 7 * 24 * 60, conn: 1, person: 5, place: 6 * 60, hint: 60, gap: 15 * 60 };
 
 // Minutes as a person reads them, exactly: 150 minutes is "150 min", never
 // a rounded "3 h".
@@ -65,10 +70,12 @@ export function duration(minutes: number): string {
   return `${minutes} min`;
 }
 
+// Design item 3: lease, longest check-again hint and place in line as given
+// there; the minimum gap a quarter of the hint, never below the 10 second floor.
 export const CLAIM_RULE_PRESETS = [
-  { id: "hackathon", name: "Hackathon", lease: 30, hold: 120 },
-  { id: "team", name: "Team", lease: 480, hold: 1440 },
-  { id: "org", name: "Org", lease: 2880, hold: 10080 },
+  { id: "hackathon", name: "Hackathon", lease: 30, hold: 120, place: 15, hint: 1, gap: 15 },
+  { id: "team", name: "Team", lease: 480, hold: 1440, place: 120, hint: 15, gap: 225 },
+  { id: "org", name: "Org", lease: 2880, hold: 10080, place: 360, hint: 60, gap: 900 },
 ] as const;
 const PRESET_BY_ID = new Map<string, (typeof CLAIM_RULE_PRESETS)[number]>(CLAIM_RULE_PRESETS.map((p) => [p.id, p]));
 
@@ -76,6 +83,10 @@ const UNITS = { minutes: 1, hours: 60, days: 1440 } as const;
 type Unit = keyof typeof UNITS;
 // A year: far past any lease worth setting, and a bound the typed number times its unit can't overflow.
 const MAX_MINUTES = 365 * 1440;
+const GAP_FLOOR = 10;
+
+// A gap in seconds, in minutes once it is a whole number of them.
+const gapText = (s: number) => (s % 60 === 0 ? duration(s / 60) : `${s} s`);
 
 // The largest unit that holds the minutes exactly, so a stored 120 shows as 2 hours.
 function inUnits(minutes: number): { n: string; unit: Unit } {
@@ -96,13 +107,22 @@ type ClaimForm = {
   holdUnit: Unit;
   conn: string;
   person: string;
+  place: string;
+  placeUnit: Unit;
+  hint: string;
+  hintUnit: Unit;
+  gap: string;
   error?: string;
-  field?: "path" | "lease" | "hold" | "conn" | "person";
+  field?: "path" | "lease" | "hold" | "conn" | "person" | "place" | "hint" | "gap";
 };
 
-const formOf = (r: { path: string; lease: number; hold: number; conn: number; person: number }): ClaimForm => {
+type RuleNumbers = { path: string; lease: number; hold: number; conn: number; person: number; place: number; hint: number; gap: number };
+
+const formOf = (r: RuleNumbers): ClaimForm => {
   const lease = inUnits(r.lease);
   const hold = inUnits(r.hold);
+  const place = inUnits(r.place);
+  const hint = inUnits(r.hint);
   return {
     scope: r.path === "" ? "vault" : "path",
     path: r.path,
@@ -112,8 +132,24 @@ const formOf = (r: { path: string; lease: number; hold: number; conn: number; pe
     holdUnit: hold.unit,
     conn: String(r.conn),
     person: String(r.person),
+    place: place.n,
+    placeUnit: place.unit,
+    hint: hint.n,
+    hintUnit: hint.unit,
+    gap: String(r.gap),
   };
 };
+
+const numbersOf = (r: ClaimRule): RuleNumbers => ({
+  path: r.path,
+  lease: r.lease_minutes,
+  hold: r.hold_limit_minutes,
+  conn: r.connection_cap,
+  person: r.person_cap,
+  place: r.place_in_line_minutes,
+  hint: r.check_again_minutes,
+  gap: r.min_gap_seconds,
+});
 
 const scopeName = (path: string) => (path === "" ? "the whole vault" : path);
 
@@ -142,14 +178,14 @@ export async function claimRules(ctx: Ctx, id: string, form?: ClaimForm): Promis
     const values: ClaimForm | undefined =
       form ??
       (changing
-        ? formOf({ path: changing.path, lease: changing.lease_minutes, hold: changing.hold_limit_minutes, conn: changing.connection_cap, person: changing.person_cap })
+        ? formOf(numbersOf(changing))
         : claim === ""
-          ? formOf({ path: "", lease: BUILT_IN.lease, hold: BUILT_IN.hold, conn: BUILT_IN.conn, person: BUILT_IN.person })
+          ? formOf({ path: "", ...BUILT_IN })
           : undefined);
     const described = (f: NonNullable<ClaimForm["field"]>, hint: string) =>
       form?.error && form.field === f ? html` aria-invalid="true" aria-describedby="claim-error ${hint}"` : html` aria-describedby="${hint}"`;
-    const unitSelect = (name: string, chosen: Unit) =>
-      html`<select name="${name}" aria-label="${name === "lease_unit" ? "Lease" : "Hold limit"} unit">${(Object.keys(UNITS) as Unit[]).map(
+    const unitSelect = (name: string, label: string, chosen: Unit) =>
+      html`<select name="${name}" aria-label="${label} unit">${(Object.keys(UNITS) as Unit[]).map(
         (u) => html`<option value="${u}"${u === chosen ? html` selected` : ""}>${u}</option>`,
       )}</select>`;
     const scope = values?.scope ?? "vault";
@@ -161,6 +197,9 @@ export async function claimRules(ctx: Ctx, id: string, form?: ClaimForm): Promis
       const hold = r?.hold_limit_minutes ?? BUILT_IN.hold;
       const conn = r?.connection_cap ?? BUILT_IN.conn;
       const person = r?.person_cap ?? BUILT_IN.person;
+      const place = r?.place_in_line_minutes ?? BUILT_IN.place;
+      const hint = r?.check_again_minutes ?? BUILT_IN.hint;
+      const gap = r?.min_gap_seconds ?? BUILT_IN.gap;
       const path = r?.path ?? "";
       const here = `${action}?claim=${q(path)}#set-claim-rule`;
       return html`<tr>
@@ -168,6 +207,7 @@ export async function claimRules(ctx: Ctx, id: string, form?: ClaimForm): Promis
         <td data-label="Lease">${duration(lease)}</td>
         <td data-label="Hold limit">${duration(hold)}</td>
         <td data-label="Claims at once" class="small">${conn} per connection, ${person} per person</td>
+        <td data-label="Waiting in line" class="small">${duration(place)} place, checks within ${duration(hint)}, ${gapText(gap)} gap</td>
         ${owner
           ? html`<td class="num row-actions">${
               r
@@ -181,14 +221,14 @@ export async function claimRules(ctx: Ctx, id: string, form?: ClaimForm): Promis
     };
 
     const table = html`<div class="table-wrap"><table class="table-stack rules-table claim-rules">
-      <thead><tr><th scope="col">Applies to</th><th scope="col">Lease</th><th scope="col">Hold limit</th><th scope="col">Claims at once</th>${
+      <thead><tr><th scope="col">Applies to</th><th scope="col">Lease</th><th scope="col">Hold limit</th><th scope="col">Claims at once</th><th scope="col">Waiting in line</th>${
         owner ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""
       }</tr></thead>
       <tbody>${row(whole)}${paths.map(row)}</tbody></table></div>`;
 
     const presetButtons = CLAIM_RULE_PRESETS.map(
       (p) =>
-        html`<button class="button" name="preset" value="${p.id}" formnovalidate>${p.name}<span class="token-client">${duration(p.lease)} lease, ${duration(p.hold)} hold limit</span></button>`,
+        html`<button class="button" name="preset" value="${p.id}" formnovalidate>${p.name}<span class="token-client">${duration(p.lease)} lease, ${duration(p.hold)} hold limit, ${duration(p.place)} place in line, checks within ${duration(p.hint)}</span></button>`,
     );
 
     const addForm = owner
@@ -206,8 +246,8 @@ export async function claimRules(ctx: Ctx, id: string, form?: ClaimForm): Promis
               <p class="hint" id="crp-hint">A folder ends in <code>/</code> and covers everything inside it; a file is its full path. Only used when “A folder or file” is chosen.</p></div>
           </fieldset>
           <div class="fields claim-fields">
-            <div><label for="crl">Lease</label><div class="duration"><input id="crl" class="narrow" type="number" name="lease" min="1" step="1" inputmode="numeric" required value="${values?.lease ?? ""}"${described("lease", "crl-hint")}>${unitSelect("lease_unit", values?.leaseUnit ?? "hours")}</div></div>
-            <div><label for="crh">Hold limit</label><div class="duration"><input id="crh" class="narrow" type="number" name="hold" min="1" step="1" inputmode="numeric" required value="${values?.hold ?? ""}"${described("hold", "crh-hint")}>${unitSelect("hold_unit", values?.holdUnit ?? "hours")}</div></div>
+            <div><label for="crl">Lease</label><div class="duration"><input id="crl" class="narrow" type="number" name="lease" min="1" step="1" inputmode="numeric" required value="${values?.lease ?? ""}"${described("lease", "crl-hint")}>${unitSelect("lease_unit", "Lease", values?.leaseUnit ?? "hours")}</div></div>
+            <div><label for="crh">Hold limit</label><div class="duration"><input id="crh" class="narrow" type="number" name="hold" min="1" step="1" inputmode="numeric" required value="${values?.hold ?? ""}"${described("hold", "crh-hint")}>${unitSelect("hold_unit", "Hold limit", values?.holdUnit ?? "hours")}</div></div>
           </div>
           <p class="hint" id="crl-hint"><strong>Lease:</strong> how long a claim lasts if its agent goes quiet. Every check-in starts the lease again.</p>
           <p class="hint" id="crh-hint"><strong>Hold limit:</strong> the longest one claim can be kept, however often it checks in. After that the agent has to release it and claim again. At least the lease, at most 365 days.</p>
@@ -216,6 +256,12 @@ export async function claimRules(ctx: Ctx, id: string, form?: ClaimForm): Promis
             <div><label for="crpn">Claims per person</label><input id="crpn" class="narrow" type="number" name="person" min="1" step="1" inputmode="numeric" value="${values?.person ?? "5"}"${described("person", "crc-hint")}></div>
           </div>
           <p class="hint" id="crc-hint"><strong>Claims at once:</strong> how many claims one connection (one agent) may hold in this vault, and how many all of one person’s agents may hold together.</p>
+          <div class="fields claim-fields">
+            <div><label for="crq">Place in line</label><div class="duration"><input id="crq" class="narrow" type="number" name="place" min="1" step="1" inputmode="numeric" required value="${values?.place ?? "6"}"${described("place", "crq-hint")}>${unitSelect("place_unit", "Place in line", values?.placeUnit ?? "hours")}</div></div>
+            <div><label for="crk">Longest check-again hint</label><div class="duration"><input id="crk" class="narrow" type="number" name="hint" min="1" step="1" inputmode="numeric" required value="${values?.hint ?? "1"}"${described("hint", "crq-hint")}>${unitSelect("hint_unit", "Longest check-again hint", values?.hintUnit ?? "hours")}</div></div>
+            <div><label for="crg">Minimum gap, in seconds</label><input id="crg" class="narrow" type="number" name="gap" min="${String(GAP_FLOOR)}" step="1" inputmode="numeric" required value="${values?.gap ?? String(BUILT_IN.gap)}"${described("gap", "crq-hint")}></div>
+          </div>
+          <p class="hint" id="crq-hint"><strong>Waiting in line:</strong> an agent that asks for work when none is free gets a place in line, kept as long as it asks again before the place time runs out. It is told to come back within the longest hint, and asking again sooner than the minimum gap gets the last answer, not a fresh look. The gap is at least ${String(GAP_FLOOR)} seconds.</p>
           <div class="actions"><button class="primary">Save claim rule</button>${picking ? html`<a class="button quiet" href="${action}">Cancel</a>` : ""}</div>
           <p class="hint">Saving a rule that already exists replaces it. Changing a rule never touches a claim already granted, only the next claim or check-in.</p>
           <div class="presets"><p class="hint">Or start from a preset, for the choice above, in one step:</p><div class="actions">${presetButtons}</div></div>
@@ -301,6 +347,12 @@ export async function setClaimRuleAction(ctx: Ctx, id: string): Promise<Reply> {
     holdUnit: unit("hold_unit"),
     conn: (ctx.form.get("conn") ?? "1").trim(),
     person: (ctx.form.get("person") ?? "5").trim(),
+    // A form from before these fields existed sends none: the fixed defaults, not a refusal.
+    place: (ctx.form.get("place") ?? String(BUILT_IN.place)).trim(),
+    placeUnit: unit("place_unit"),
+    hint: (ctx.form.get("hint") ?? String(BUILT_IN.hint)).trim(),
+    hintUnit: unit("hint_unit"),
+    gap: (ctx.form.get("gap") ?? String(BUILT_IN.gap)).trim(),
   };
   const path = typed.scope === "vault" ? "" : typedPath;
   const again = (error: string, field: ClaimForm["field"]) => claimRules(ctx, id, { ...typed, error, field });
@@ -309,6 +361,9 @@ export async function setClaimRuleAction(ctx: Ctx, id: string): Promise<Reply> {
   const hold = preset ? preset.hold : whole(typed.hold, UNITS[typed.holdUnit]);
   const conn = whole(typed.conn, 1);
   const person = whole(typed.person, 1);
+  const place = preset ? preset.place : whole(typed.place, UNITS[typed.placeUnit]);
+  const hint = preset ? preset.hint : whole(typed.hint, UNITS[typed.hintUnit]);
+  const gap = preset ? preset.gap : whole(typed.gap, 1);
 
   if (typed.scope === "vault" && typedPath !== "") {
     return again(
@@ -334,10 +389,19 @@ export async function setClaimRuleAction(ctx: Ctx, id: string): Promise<Reply> {
       "conn",
     );
   }
+  if (!(place >= 1 && place <= MAX_MINUTES)) {
+    return again(refuse("The place in line is a whole number of minutes, hours or days: at least 1 minute and at most 365 days. Nothing was saved"), "place");
+  }
+  if (!(hint >= 1 && hint <= MAX_MINUTES)) {
+    return again(refuse("The longest check-again hint is a whole number of minutes, hours or days: at least 1 minute and at most 365 days. Nothing was saved"), "hint");
+  }
+  if (!(gap >= GAP_FLOOR && gap <= MAX_MINUTES * 60)) {
+    return again(refuse(`The minimum gap is a whole number of seconds: at least ${GAP_FLOOR} and at most 365 days. Nothing was saved`), "gap");
+  }
   try {
     const done = await asPerson(ctx.userId, async (c) => {
       if (!(await vault(c, ctx, id))) return null;
-      await c.query(`select public.set_claim_rule($1, $2, $3, $4, null, $5, $6)`, [id, path, lease, hold, conn, person]);
+      await c.query(`select public.set_claim_rule($1, $2, $3, $4, null, $5, $6, $7, $8, $9)`, [id, path, lease, hold, conn, person, place, hint, gap]);
       return true;
     });
     if (done === null) return notFound(ctx);

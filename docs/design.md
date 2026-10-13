@@ -25,7 +25,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 7 | [Context](#context) | Built |
 | 8 | [Path ownership](#path-ownership) | Built |
 | 9 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
-| 10 | [Claims and work plans](#claims-and-work-plans) | Built, except waiting in line |
+| 10 | [Claims and work plans](#claims-and-work-plans) | Built; waiting in line in the database, not yet over MCP or on the Tasks page |
 | 11 | [Threads](#threads) | Built |
 | 12 | [Links](#links) | Built |
 | 13 | [Routines](#routines) | Designed, not built |
@@ -543,8 +543,9 @@ an idle agent: MCP has no push, so an agent learns on its next call.
 Written 2026-09-30, settling CL-0.2 of the claims, waiting and work
 plans effort (tracking issue #52; the exception is logged in
 [progress.md](progress.md#decisions)). Built as of 2026-10-09: phase 1 (compare-and-swap writes), phase 2 (claims)
-and phase 3 (work plans), apart from waiting in line (item 11, CL-3.9, #74);
-[progress.md](progress.md) has what shipped. Validated first in a throwaway
+and phase 3 (work plans); waiting in line (item 11, CL-3.9, #74) built in
+the database on 2026-10-13, with its MCP tools (#75) and the view of who is
+waiting (#76) still to come; [progress.md](progress.md) has what shipped. Validated first in a throwaway
 PostgreSQL 16 model, not Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
 Twelve points, each with the reason it was decided that way.
 
@@ -656,7 +657,7 @@ advisory lock per plan (20261013160000_work_plan_gains_steps.sql says why).
 
 ### 7. Step states
 
-Stored: `open`, `claimed`, `done`, `cancelled`. Computed, never stored,
+Stored: `open`, `claimed`, `review` (awaiting review, since #78), `done`, `cancelled`. Computed, never stored,
 so nothing can drift out of sync with the graph: `ready` (open, every
 blocker done), `blocked` (open, a blocker not done yet),
 `blocked_by_cancelled` (a blocker is cancelled, so it can never become
@@ -667,7 +668,12 @@ state, not a silent pass-through. A step may carry `gate: review`, which
 holds its dependents until a person approves it directly or its linked
 proposal is applied, for a step whose output needs a person's judgement
 before anything downstream should start, not just before it's marked
-done.
+done. **As built (2026-10-13, #78;** `20261013233000_review_gate.sql`):
+completing a gated step stores `review`; `approve_step` (on the ceiling)
+or the linked proposal being applied makes it `done` and only then
+decrements its dependents. The link is the completing agent's: it names
+a proposal its own person made since claiming the step, still undecided,
+and a trigger on the proposal reaching `applied` approves the step.
 
 ### 8. Limits
 
@@ -703,7 +709,7 @@ One dot each, matching the existing activity-label convention
 `claim.release`, `claim.break`, `claim.expire`, `work_plan.register`,
 `work_plan.update`,
 `step.claim`, `step.complete`, `step.release`, `step.cancel`,
-`step.skip`, `queue.join`, `queue.leave`, `queue.expire`.
+`step.skip`, `step.approve`, `queue.join`, `queue.leave`, `queue.expire`.
 
 ### 10. Export, erasure, deletion
 
@@ -740,6 +746,55 @@ to stop and return at the suggested time; bringing it back is the
 agent's own harness's job, or a person's, the same limit MCP's
 request/response shape already puts on [Notifications](#notifications).
 
+**As built (2026-10-13, #74;** `20261013170000_waiting_in_line.sql` to
+`20261013170300_leave_queue.sql`). `request_work(vault, path)` and
+`leave_queue(vault, path)`, executable by whoever can write the plan's
+path, identity from the session as `claim_step` takes it. The rule, the
+lapse of a place, the cheap refusal, the hint cap and the strikes are the
+spike's, ported onto `work_plan_steps` and the claim rule's stored
+waiting settings (item 3; with no rule, the Org preset: a place lives 6
+hours, the longest hint is 1 hour, the minimum gap 15 minutes, one free
+lapse, a 48 hour cooldown cap). Where it differs from the spike:
+
+- **The answer to "too many places" is `refused`**, and the 3 places per
+  person in a vault (item 8) is a constant, not a rule column.
+- **Item 12a's "one way in" is the API role's, not a separate agent
+  role:** agents and people share `authenticated`, which writes neither
+  places nor strikes, and reads places (who is waiting) as it reads steps.
+  `claim_step`, naming one step, stays executable by agents, and since
+  #75 (`20261013220000_claim_step_follows_the_line.sql`) runs the same
+  function as `request_work` (`private.take_step`, which no API role
+  executes) with the pick narrowed to the named step: it is granted only
+  what `request_work` would grant that caller at that moment, so it keeps
+  the line, the caps and the cooldown, and a refusal takes no place.
+- **A strike is counted when a lapsed step is handed on**, by
+  `request_work` or, since #75, by `claim_step`.
+- **Lock order.** `request_work` and `leave_queue` take the vault's row
+  first (for key share), the order `post_message` uses, because they
+  insert places and an insert has no row `delete_vault` could lock ahead
+  of it; `delete_vault` is unchanged. One person's requests to a vault
+  take turns on an advisory lock, so two at once leave one place. Other
+  people's lapsed places and the step are taken with SKIP LOCKED.
+- **Events:** `queue.join` when a place is taken, `queue.leave` when its
+  holder leaves, and `queue.expire` when it ends without them, with the
+  reason (`lapsed`, `plan_complete`, `cooling_down`), logged as the
+  holder's. A grant ends the place silently; `step.claim` records the
+  place and the ready count it was granted at.
+- **Rate limits (item 8):** the per-token one is the MCP server's (#75,
+  `mcp/src/ratelimit.ts`); the per-vault budget is the database's (#80,
+  `20261013235000_vault_request_budget.sql`), so it holds whichever server
+  calls: `take_step` counts each full evaluation (not a cheap refusal)
+  against the vault, 300 a minute, the number the capacity model gives (a
+  Pro vault's 50 people, one place each, at the 10 second floor), and over
+  it answers `wait` with no place and the seconds until the vault's minute
+  ends; `claim_step` refuses it as RLW06. The model:
+  `docs/public/reference/limits.md`, "What asking for work costs".
+- **One read for every line** (#79, `20261013230000_my_places.sql`):
+  `my_places()` gives the caller's person, across the vaults the caller
+  reads, each place's state as `request_work` would answer it (with
+  `lapsed` for a place that ran out) and each step held, writing nothing
+  (item 12d's cheap read, for every plan at once). Over MCP it counts only
+  against the general tool call limit, not item 8's `request_work` one.
 ### 12. The agent is not trusted
 
 No rule may depend on an agent behaving, and none needs a model: every

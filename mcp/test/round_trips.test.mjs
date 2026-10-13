@@ -141,3 +141,42 @@ test("round trips: the flags hint is one more query, after the tool's own and be
   assert.deepEqual(await queries("list_files", { vault: "No such vault" }), ["begin;", "select", "rollback"]);
   assert.deepEqual(await queries("list_vaults", {}), ["begin;", "select", "commit"]);
 });
+
+// The capacity model's unit (docs/public/reference/limits.md, "What asking
+// for work costs"): request_work's round trips on the tool's connection.
+// The server's per-token count is one more, on a second connection, in
+// parallel with the first (mcp/src/server.ts).
+test("round trips: request_work is five, granted or told to wait with nothing ready: begin, its answer, the step's title or what holds the plan up, the flags hint, commit", async () => {
+  const fence = "`".repeat(3);
+  const planFile = (steps) =>
+    [`${fence}work_plan`, ...steps.flatMap(([k, b]) => [`- key: ${k}`, `  title: Step ${k}`, ...(b ? [`  blocked_by: ${b}`] : [])]), fence, ""].join("\n");
+  for (const [path, steps] of [["plan.md", [["a"], ["b", "a"]]], ["solo.md", [["c"]]]]) {
+    await client.callTool({ name: "write_file", arguments: { vault: VAULT, path, content: planFile(steps) } });
+    const reg = await client.callTool({ name: "register_work_plan", arguments: { vault: VAULT, path } });
+    assert.notEqual(reg.isError, true, reg.content[0].text);
+  }
+  // Another member works step a, so plan.md has nothing ready for Gus.
+  const ana = "00000000-0000-0000-0000-00000000000a";
+  const su = new pg.Client({ connectionString: process.env.TEST_SUPER_URL });
+  await su.connect();
+  try {
+    const [{ id: v }] = (await su.query("select id from public.vaults where name = $1", [VAULT])).rows;
+    await su.query("select test_support.add_member($1, $2, 'editor', created_by) from public.vaults where id = $1", [v, ana]);
+    await su.query("begin");
+    await su.query("set local role authenticated");
+    await su.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: ana, role: "authenticated" })]);
+    assert.equal((await su.query("select o_state from public.request_work($1, 'plan.md')", [v])).rows[0].o_state, "granted");
+    await su.query("commit");
+  } finally {
+    await su.end();
+  }
+  const queries = async (path) => {
+    const start = sent.length;
+    const r = await client.callTool({ name: "request_work", arguments: { vault: VAULT, path } });
+    return [r.content[0].text.split(" ")[0], ...sent.slice(start)];
+  };
+  const five = ["begin;", "select", "select", "savepoint", "commit"];
+  assert.deepEqual(await queries("plan.md"), ["Wait:", ...five]);
+  assert.deepEqual(await queries("plan.md"), ["Wait:", ...five], "asked again before its gap");
+  assert.deepEqual(await queries("solo.md"), ["Granted", ...five]);
+});

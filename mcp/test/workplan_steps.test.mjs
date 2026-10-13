@@ -12,9 +12,9 @@
 // Seed: test/seed.sql's "Team" vault (Ana owner, Ben editor, Cal viewer,
 // plus Ana's read-only token), Dee's own vault, and Ana's Workshop vault
 // and its scoped token. Each test registers its own plan path, so none
-// depends on another's side effects. A step claim has no per-connection cap
-// (unlike a path claim), so a test that fails midway leaves nothing that
-// refuses the next one.
+// depends on another's side effects. Claims keep to the claim rule's caps,
+// so the seed gives Team's plans/ a rule of 20 per connection: a test that
+// fails midway leaves nothing that refuses the next one.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";

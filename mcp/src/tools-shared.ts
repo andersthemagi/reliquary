@@ -168,6 +168,15 @@ export function explain(err: unknown): ToolResult {
       case "RLW04":
         lead = `Refused: ${e.message}`;
         break;
+      // claim_step keeps request_work's line, caps and cooldown
+      // (20261013220000_claim_step_follows_the_line.sql); the message names
+      // the step key and counts, never a label.
+      case "RLW05":
+        lead = `Not your turn: ${e.message}.`;
+        break;
+      case "RLW06":
+        lead = `Limit reached: ${e.message}.`;
+        break;
       // An hourly count (feedback, 20260926163000_feedback.sql): the
       // message says the limit and when there is room again.
       case "54000":
