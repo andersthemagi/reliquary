@@ -585,7 +585,7 @@ start the next one.
     `cite_moved`, to the plan's registrant and a citing step's holder, and
     a `plan` key on every flag. Shown by `work_plan_status` over MCP, the
     Tasks plan page and the Flags page. Registry: `tests/features.md`
-    F799-F801. Docs: `docs/public/concepts/tasks.md` ("Context moved"),
+    F803-F805. Docs: `docs/public/concepts/tasks.md` ("Context moved"),
     `flags.md`, `claims.md`.
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
