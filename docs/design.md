@@ -780,8 +780,15 @@ lapse, a 48 hour cooldown cap). Where it differs from the spike:
   reason (`lapsed`, `plan_complete`, `cooling_down`), logged as the
   holder's. A grant ends the place silently; `step.claim` records the
   place and the ready count it was granted at.
-- **Not here:** the per-token and per-vault `request_work` rate limits of
-  item 8 are the MCP server's, with the tools (#75).
+- **Rate limits (item 8):** the per-token one is the MCP server's (#75,
+  `mcp/src/ratelimit.ts`); the per-vault budget is the database's (#80,
+  `20261013235000_vault_request_budget.sql`), so it holds whichever server
+  calls: `take_step` counts each full evaluation (not a cheap refusal)
+  against the vault, 300 a minute, the number the capacity model gives (a
+  Pro vault's 50 people, one place each, at the 10 second floor), and over
+  it answers `wait` with no place and the seconds until the vault's minute
+  ends; `claim_step` refuses it as RLW06. The model:
+  `docs/public/reference/limits.md`, "What asking for work costs".
 - **One read for every line** (#79, `20261013230000_my_places.sql`):
   `my_places()` gives the caller's person, across the vaults the caller
   reads, each place's state as `request_work` would answer it (with

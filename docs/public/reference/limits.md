@@ -138,12 +138,38 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 | MCP tool calls | 120 a minute and 10000 a day per token or connection; a batch counts each call; listing tools and starting a session don't count |
 | Opening threads and posting in them over MCP (`open_thread`, `post_message`) | 20 a minute and 300 a day per token or connection, counted within the tool call limit above |
 | Asking for work over MCP (`request_work`, and `claim_step`) | 30 a minute per token or connection, counted within the tool call limit above |
+| Asking for work, everyone in a vault together | 300 a minute per vault, counted in the database. Over it, `request_work` answers `wait` with the seconds to come back and `claim_step` is refused saying when; see [What asking for work costs](#what-asking-for-work-costs) |
 | MCP requests without a valid token | 30 a minute per IP address |
 | The env API (the CLI) | 60 a minute and 5000 a day per Reliquary CLI connection |
 
 "Per app" counts every person's use of one app together (one client id). "Per token or connection" counts a personal token, or an OAuth connection across its hourly access tokens.
 
 Addresses and emails are never stored: each is counted under a keyed hash that can't be turned back into the address. An IPv6 address counts by its /64. If the counters can't be reached, sign-in stops and says it is unavailable, so codes can't be guessed while they are down; everything else carries on without limits.
+
+
+### What asking for work costs
+
+Agents waiting for [tasks](../concepts/tasks.md) ask again and again, so the cost is in how often. A well-behaved agent asks once per minimum gap (the claim rule's; 15 minutes with no rule, never under 10 seconds), so:
+
+**calls a second = agents waiting / minimum gap in seconds**
+
+| Minimum gap | 50 agents | 500 agents | 5000 agents |
+|---|---|---|---|
+| 15 minutes (Org, the default) | 0.06 | 0.6 | 5.6 |
+| 225 seconds (Team) | 0.2 | 2.2 | 22 |
+| 15 seconds (Hackathon) | 3.3 | 33 | 333 |
+| 10 seconds (the floor) | 5 | 50 | 500 |
+
+Each `request_work` over MCP is 6 round trips to the database's connection pooler: 5 on the request's own connection (begin, the answer, the task's title or what holds the plan up, the flags check, commit) and 1 more for the per-connection count. So 5000 agents at the floor make 3000 round trips a second, and at the default gap 33.
+
+A short gap is the expensive setting because cost grows with 1 / gap: going from 15 minutes to 10 seconds asks 90 times as often, and each of those asks is a full evaluation that locks the line and writes the agent's place. Asking before the gap costs much less: it gets the last answer back from one read and writes nothing. That is why a short gap is a per-vault choice and why the floor exists.
+
+**Each vault's budget** is 300 full evaluations a minute (5 a second, 30 round trips a second), all its people and agents together. The number comes from the model: a Pro vault's 50 people, each with one place in line, each asking at the 10 second floor, is 50 times 6 a minute, 300. A vault where everyone waits at the floor fits; going over it takes agents asking outside their gap (at capacity, cooling down, or many plans at once), which is the load the budget is there to stop. It counts:
+
+- every `request_work` or `claim_step` the database evaluates in full: a task granted, a wait that takes or refreshes a place, at capacity, cooling down, blocked, plan complete;
+- not a call back before its own gap (the 30 a minute per connection bounds those), not `my_places`, and not a call that is refused, `claim_step`'s refusals included.
+
+Over the budget, `request_work` answers `wait` with the seconds until the vault's minute ends (at most 60) and keeps any place the agent already has; `claim_step` is refused with the budget and the seconds. Other vaults' agents are not affected: each vault has its own count. The count is kept in the database, so it holds however many servers answer.
 
 ## Pages
 
