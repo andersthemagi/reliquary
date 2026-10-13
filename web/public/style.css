@@ -1214,8 +1214,30 @@ form.confirm .actions:first-child { margin-top: 0; }
    and who holds it on one line, the row's ⋯ menu pushed to the end, then a
    quiet line under it. Plans are cards with a bar (a <progress>, since the
    CSP allows no inline width). */
-.task-list { list-style: none; margin: 0 0 var(--space-6); padding: 0; border-top: 1px solid var(--border); }
-.task-row { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.task-list { list-style: none; margin: 0 0 var(--space-6); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden; }
+.task-row { padding: var(--space-3) var(--space-4); transition: background-color 120ms ease-out; }
+.task-row + .task-row { border-top: 1px solid var(--border); }
+.task-row:hover { background: var(--bg-subtle); }
+/* The state as a shape, Todoist's circle: a ring when it can be picked up,
+   half filled while someone has it, dashed while it waits, filled with a
+   tick when done, struck through when cancelled. The word beside it is
+   the state; the shape only lets the eye scan a long list. */
+.task-dot {
+  flex: none; position: relative; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border-strong); box-sizing: border-box;
+}
+.task-dot.ready { border-color: var(--success); }
+.task-dot.claimed { border-color: var(--info); background: linear-gradient(90deg, var(--info) 50%, transparent 50%); }
+.task-dot.blocked { border-style: dashed; border-color: var(--attention); }
+.task-dot.blocked_by_cancelled { border-style: dashed; border-color: var(--danger); }
+.task-dot.done { border-color: var(--success); background: var(--success); }
+.task-dot.done::after {
+  content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
+  border: solid var(--bg); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.task-dot.cancelled::after { content: ""; position: absolute; left: -2px; right: -2px; top: 5px; height: 2px; background: var(--border-strong); transform: rotate(-45deg); }
+.task-row:has(.task-dot.done) .task-title, .task-row:has(.task-dot.cancelled) .task-title { color: var(--fg-muted); }
+.task-row:has(.task-dot.cancelled) .task-title { text-decoration: line-through; }
 .task-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .task-line .badge { white-space: normal; padding-block: 2px; }
 .task-title { font-weight: 500; overflow-wrap: anywhere; }
@@ -1225,7 +1247,8 @@ form.confirm .actions:first-child { margin-top: 0; }
 .task-done > summary { cursor: pointer; }
 .task-done > summary h2 { display: inline; }
 .plan-cards { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
-.plan-card { padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
+.plan-card { position: relative; padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); transition: border-color 120ms ease-out, box-shadow 160ms ease-out; }
+.plan-card:hover { border-color: var(--border-strong); box-shadow: 0 4px 14px rgb(0 0 0 / 0.08); }
 .plan-card h3 { margin: 0; overflow-wrap: anywhere; }
 .plan-card p { margin: var(--space-2) 0 0; overflow-wrap: anywhere; }
 .task-progress {

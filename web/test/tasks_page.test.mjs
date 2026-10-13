@@ -285,9 +285,9 @@ test("plan page: every task's state is a word in its row, not only a colour", as
   const h = await page(noa, planUrl(V.main, "plans/launch.md"));
   const states = { clean: "In progress", check: "Ready", ship: "Blocked", after: "Blocked by a cancelled task", side: "Cancelled", fetch: "Done" };
   for (const [key, label] of Object.entries(states)) {
-    assert.match(taskRow(h, key), new RegExp(`<div class="task-line">\\s*<span class="badge[^"]*">${label}</span>`), key);
+    assert.match(taskRow(h, key), new RegExp(`<div class="task-line">\\s*<span class="task-dot [a-z_]+" aria-hidden="true"></span><span class="badge[^"]*">${label}</span>`), key);
   }
-  assert.equal(h.match(/<div class="task-line">\s*<span class="badge/g).length, 6, "a state for every task");
+  assert.equal(h.match(/<div class="task-line">\s*<span class="task-dot [a-z_]+" aria-hidden="true"><\/span><span class="badge/g).length, 6, "a state for every task, its shape hidden from screen readers");
 });
 
 test("plan page: a task in progress names who holds it, quotes the label as data, and shows the time left", async () => {

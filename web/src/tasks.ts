@@ -317,7 +317,7 @@ function taskRow(ctx: Ctx, id: string, t: Task, o: { plan?: string; canAct?: boo
         : "";
   // A key is unique only within its plan, so only a plan's page gives rows an id.
   return html`<li class="task-row"${o.plan ? "" : html` id="task-${t.key}"`}><div class="task-line">
-      <span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span>
+      <span class="task-dot ${t.state}" aria-hidden="true"></span><span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span>
       <strong class="task-title">${t.title}</strong>
       ${t.state === "claimed" ? html`<span class="chip task-holder">${who(ctx, t.holder, t.agent)}</span>` : ""}
       ${t.moved.length ? html`<span class="badge warning">A file it cites changed</span>` : ""}
