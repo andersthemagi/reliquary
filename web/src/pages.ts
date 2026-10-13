@@ -11,7 +11,7 @@ import { activityBody } from "./activity.js";
 import { callout, csrfField, emptyState, html, ICON_SEARCH, page, pageHeader, plural, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
-import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, signOutEverywhere } from "./settings.js";
+import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, saveShownAs, signOutEverywhere } from "./settings.js";
 import { feedbackRoutes } from "./feedback.js";
 import { welcomeLanding, welcomeRoutes } from "./welcome.js";
 import { errorPage, refusalText } from "./errorpage.js";
@@ -81,7 +81,9 @@ export type Download = { filename: string; type: string; write: (out: Writable) 
 export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string; download?: Download; retryAfter?: number };
 
 export { UUID };
-export type Vault = { id: string; name: string; role: string };
+// consent_needed: the vault requires members' emails and the reader hides
+// theirs without having agreed here (vaultShell asks them).
+export type Vault = { id: string; name: string; role: string; require_emails?: boolean; consent_needed?: boolean };
 
 // A refusal from the database, as the reason and a reference to show on the
 // page (errorpage.ts); anything else is thrown on to the error page.
@@ -167,7 +169,7 @@ export const notFound = (ctx: Ctx): Reply => {
 export async function vault(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Vault | undefined> {
   if (!UUID.test(id)) return undefined;
   const { rows } = await c.query(
-    `select v.id, v.name, m.role from public.vaults v
+    `select v.id, v.name, m.role, v.require_emails, public.email_consent_needed(v.id) as consent_needed from public.vaults v
        join public.vault_members m on m.vault_id = v.id and m.user_id = $2
       where v.id = $1`,
     [id, ctx.userId],
@@ -657,6 +659,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && p === "/search") return searchAll(ctx);
   if (get && p === "/settings") return accountSettings(ctx);
   if (!get && p === "/settings/name") return saveDisplayName(ctx);
+  if (!get && p === "/settings/shown-as") return saveShownAs(ctx);
   if (!get && p === "/settings/sign-out-everywhere") return signOutEverywhere(ctx);
   if (!get && p === "/settings/email") return changeEmail(ctx);
   if (p === "/settings/delete") return get ? deleteAccountPage(ctx) : deleteAccount(ctx);

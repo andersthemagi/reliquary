@@ -5,7 +5,9 @@
 // is the database's to keep and check
 // (public.set_display_name, public.profiles with RLS: your own row, in
 // person only; 20260926100000_shell_inbox.sql). An agent can't set it: it's
-// profile management, like managing members (docs/parity.md).
+// profile management, like managing members (docs/parity.md). So is "Show
+// me to others as" (public.set_email_shown; who sees what is the
+// database's rule, 20261014150000_display_preferences.sql).
 //
 // What the page shows comes from the top bar's summary (ctx.shell), so the
 // page costs no query of its own.
@@ -65,6 +67,7 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
   const hosted = signsOut();
   // A change of address waiting for its link, as Supabase Auth has it.
   const pending = hosted && ctx.session ? await ctx.session.pendingEmail() : null;
+  const showEmail = ctx.shell?.show_email !== false;
   const name = html`<section aria-labelledby="display-name-title">
       <h3 id="display-name-title">Display name</h3>
       <form method="post" action="/settings/name" class="panel settings-form">
@@ -74,8 +77,19 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
         <input id="display-name" type="text" name="display_name" value="${d.name?.value ?? me.name ?? ""}" maxlength="${DISPLAY_NAME_MAX}" autocomplete="name"${
           d.name ? html` aria-invalid="true" aria-describedby="name-error display-name-hint"` : html` aria-describedby="display-name-hint"`
         }>
-        <p class="hint" id="display-name-hint">Shown next to your email to people who share a vault with you: in Activity, proposals, threads and members. Up to ${DISPLAY_NAME_MAX} characters, without “@”. Leave it empty to be shown by your email alone.</p>
+        <p class="hint" id="display-name-hint">Shown to people who share a vault with you, and their agents: in Activity, proposals, threads and members. Up to ${DISPLAY_NAME_MAX} characters, without “@”. Leave it empty to be shown by your email alone.</p>
         <div class="actions"><button class="primary">Save name</button></div>
+      </form>
+      <form method="post" action="/settings/shown-as" class="panel settings-form choice-form" id="shown-as">
+        ${csrfField(ctx.csrf)}
+        <fieldset>
+          <legend>Show me to others as</legend>
+          <label class="choice"><input type="radio" name="show_email" value="1"${showEmail ? html` checked` : ""}>
+            <span><strong>Display name and email</strong></span></label>
+          <label class="choice"><input type="radio" name="show_email" value="0"${showEmail ? "" : html` checked`}>
+            <span><strong>Display name alone:</strong> others see your name and a short tag from your account id, like “Ana · ${shortId(ctx.userId)}”, never your email. A vault can require members’ emails; it asks you first.</span></label>
+        </fieldset>
+        <div class="actions"><button class="primary">Save</button></div>
       </form>
     </section>`;
   const email = html`<section aria-labelledby="email">
@@ -174,6 +188,14 @@ export async function saveDisplayName(ctx: Ctx): Promise<Reply> {
   } catch (err) {
     return accountSettings(ctx, { name: { value: name, error: refusalText(err) } });
   }
+  return { redirect: "/settings" };
+}
+
+// POST /settings/shown-as: public.set_email_shown, the person in person.
+export async function saveShownAs(ctx: Ctx): Promise<Reply> {
+  const show = ctx.form.get("show_email") !== "0";
+  await asPerson(ctx.userId, (c) => c.query(`select public.set_email_shown($1)`, [show]));
+  ctx.setFlash(show ? "Saved. People who share a vault with you see your name and email." : "Saved. People see your name and a short tag, not your email, unless you agree to show it in a vault that requires it.", "success");
   return { redirect: "/settings" };
 }
 

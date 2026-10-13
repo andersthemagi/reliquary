@@ -381,7 +381,14 @@ export function freshNonce(texts: (string | null | undefined)[]): string {
 // to, once, marking the caller's own person out. Shared by changes_since
 // (proposals-tools.ts) and list_flags (flags-tools.ts), which built an
 // identical map and line by hand before this moved here.
-export function peopleLabeler(youId: string): { who: (u: string | null) => string; summary: () => string } {
+// Everyone else is shown as public.co_member_people labels them for an
+// agent (20261014150000_display_preferences.sql): display name and a short
+// tag from the id, or the tag alone, never an email, so a model gets the
+// least that tells people apart. The label is in JSON quotes: a display name is
+// a person's words, and quoted it can't pass for another "p2=..." entry.
+// summary(null) names ids alone, for request_work's answer, whose round
+// trips are the capacity model's unit (docs/public/reference/limits.md).
+export function peopleLabeler(youId: string): { who: (u: string | null) => string; summary: (c: pg.PoolClient | null) => Promise<string> } {
   const people = new Map<string, string>();
   const who = (u: string | null): string => {
     if (!u) return "system";
@@ -389,7 +396,20 @@ export function peopleLabeler(youId: string): { who: (u: string | null) => strin
     if (!label) people.set(u, (label = `p${people.size + 1}`));
     return label;
   };
-  const summary = () => "people: " + [...people].map(([u, l]) => `${l}=${u}${u === youId ? " (your person)" : ""}`).join(", ");
+  const summary = async (c: pg.PoolClient | null) => {
+    const others = [...people.keys()].filter((u) => u !== youId);
+    const shown = new Map<string, string>();
+    if (c && others.length) {
+      const { rows } = await c.query(`select user_id, label from public.co_member_people($1::uuid[])`, [others]);
+      for (const r of rows) shown.set(r.user_id, r.label);
+    }
+    return (
+      "people: " +
+      [...people]
+        .map(([u, l]) => `${l}=${u}${u === youId ? " (your person)" : shown.has(u) ? ` ${JSON.stringify(shown.get(u))}` : ""}`)
+        .join(", ")
+    );
+  };
   return { who, summary };
 }
 

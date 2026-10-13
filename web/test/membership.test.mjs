@@ -244,7 +244,7 @@ test("notices: the delete page says the other members will be told", async () =>
   await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.doomed, CY, BEA]);
   assert.match(
     await page("bea", `/v/${V.doomed}/config/delete`),
-    /The other members are told once, on their Home page, within 30 days: the vault’s name, your email and the date\./,
+    /The other members are told once, on their Home page, within 30 days: the vault’s name, your email \(unless you hide it\) and the date\./,
   );
 });
 

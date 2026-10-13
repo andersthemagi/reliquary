@@ -98,11 +98,12 @@ select t.expect('people: you see your own name',
   t.run('ana', format($q$select display_name from public.co_member_people(array[%L]::uuid[])$q$, t.id('ana'))), 'Ana R.');
 select t.expect('people: an outsider learns neither the email nor the name',
   t.run('dee', format($q$select count(*)::text from public.co_member_people(array[%L, %L]::uuid[])$q$, t.id('ana'), t.id('cal'))), '0');
-select t.expect('people: agents, tokens and anonymous are refused',
+select t.expect('people: agents and tokens get what their person would; anonymous is refused',
   t.run('ben', format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ana')), 'Claude Code') || ' '
   || t.run_tok('ana', 'ana-all', format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ana'))) || ' '
+  || t.run('dee', format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ana')), 'Claude Code') || ' '
   || t.run(null, format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ana'))),
-  'ERR 42501 ERR 42501 ERR 42501');
+  '1 1 0 ERR 42501');
 select t.expect('people: at most 500 ids a call',
   t.run('ana', $q$select count(*)::text from public.co_member_people(array(select gen_random_uuid() from generate_series(1, 501)))$q$),
   'ERR 54000');

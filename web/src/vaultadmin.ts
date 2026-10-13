@@ -151,8 +151,56 @@ async function settings(ctx: Ctx, id: string, d?: GeneralForm): Promise<Reply> {
             <div><dt>Your role</dt><dd>${v.role === "editor" ? "Editor" : "Viewer"}</dd></div>
           </dl>
           <p class="hint">Only owners rename a vault or change its default.</p>`}
+      ${emailsSection(ctx, id, v, owner)}
       ${dangerZone(id, v, owner, soleOwner)}`);
   }, d ? 400 : undefined);
+}
+
+// Whether members' emails are required (public.set_require_emails: an
+// owner, in person). Nobody's email is shown without their consent: a
+// member who hides theirs is asked on the vault's pages (files.ts).
+function emailsSection(ctx: Ctx, id: string, v: Vault, owner: boolean): Raw {
+  const on = v.require_emails === true;
+  return html`<section aria-labelledby="emails-title">
+      <h2 id="emails-title">Members’ emails</h2>
+      ${owner
+        ? html`<form method="post" action="${settingsPath(id, "/emails")}" class="panel choice-form" id="emails">
+            ${csrfField(ctx.csrf)}
+            <fieldset>
+              <legend>Who sees members’ emails</legend>
+              <label class="choice"><input type="radio" name="require_emails" value="0"${on ? "" : html` checked`}>
+                <span><strong>Each member decides:</strong> members who hide their email are shown by display name and a short tag.</span></label>
+              <label class="choice"><input type="radio" name="require_emails" value="1"${on ? html` checked` : ""}>
+                <span><strong>Required:</strong> members’ emails are visible to the other members. Anyone who hides theirs is asked to agree or leave, and stays hidden until they agree.</span></label>
+            </fieldset>
+            <div class="actions"><button class="primary">Save</button></div>
+          </form>`
+        : html`<p>${on ? "This vault requires members’ emails to be visible to the other members." : "Each member decides whether the other members see their email."} Only owners change this.</p>`}
+    </section>`;
+}
+
+// POST /config/emails: the database refuses anyone but an owner.
+async function saveEmails(ctx: Ctx, id: string): Promise<Reply> {
+  const on = ctx.form.get("require_emails") === "1";
+  try {
+    await asPerson(ctx.userId, (c) => c.query(`select public.set_require_emails($1, $2)`, [id, on]));
+    ctx.setFlash(on ? "Members’ emails are required now. Members who hide theirs are asked to agree or leave." : "Each member decides now whether others see their email.", "success");
+  } catch (err) {
+    ctx.setFlash(message(err));
+  }
+  return { redirect: settingsPath(id) };
+}
+
+// POST /config/email-consent: a member agrees to show their email in this
+// vault (public.consent_to_show_email: in person, a member only).
+async function consentEmail(ctx: Ctx, id: string): Promise<Reply> {
+  try {
+    await asPerson(ctx.userId, (c) => c.query(`select public.consent_to_show_email($1)`, [id]));
+    ctx.setFlash("Your email is visible to the people in this vault now.", "success");
+  } catch (err) {
+    ctx.setFlash(message(err));
+  }
+  return { redirect: vaultPath(id) };
 }
 
 // POST /config: rename and default policy. Owners get a confirmation page
@@ -324,7 +372,7 @@ async function deletePage(ctx: Ctx, id: string, error?: string): Promise<Reply> 
           "Nothing is kept to restore from. Backups hold it until they age out, then it is gone everywhere.",
           html`Want a copy? <a href="${settingsPath(id, "/export")}">Export it first</a>. Variable values are never exported.`,
           ...(n.members > 1
-            ? ["The other members are told once, on their Home page, within 30 days: the vault’s name, your email and the date. Nothing else is kept."]
+            ? ["The other members are told once, on their Home page, within 30 days: the vault’s name, your email (unless you hide it) and the date. Nothing else is kept."]
             : []),
         ],
         action: settingsPath(id, "/delete"),
@@ -439,6 +487,8 @@ export async function adminRoutes(ctx: Ctx, id: string, rest: string): Promise<R
   if (rest === "/config") return get ? settings(ctx, id) : saveSettings(ctx, id);
   if (rest === "/config/members" || rest.startsWith("/config/members/")) return membersRoutes(ctx, id, rest);
   if (rest === "/config/leave") return leaveRoutes(ctx, id);
+  if (rest === "/config/emails") return get ? notFound(ctx) : saveEmails(ctx, id);
+  if (rest === "/config/email-consent") return get ? notFound(ctx) : consentEmail(ctx, id);
   if (rest === "/config/usage") return get ? usagePage(ctx, id) : notFound(ctx);
   if (rest === "/config/watching") return watchingRoutes(ctx, id);
   if (rest === "/config/export") return get ? exportPage(ctx, id) : exportDownload(ctx, id);

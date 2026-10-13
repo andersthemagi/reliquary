@@ -58,8 +58,9 @@ type Conn = {
   expires_at: Date;
 };
 
-// By email, with their display name when they gave one (people.ts fills it in).
-const label = (m: { email: string | null; user_id: string }) => (m.email ? personRef(m.user_id) : `Account ${m.user_id.slice(0, 8)}`);
+// As the reader may see them (people.ts fills it in): a member's email is
+// null here when they hide it, and they are still shown by name and tag.
+const label = (m: { user_id: string }) => personRef(m.user_id);
 
 // A connection as its owner's co-member sees it: its type, the words of
 // the Connections page (access.ts), and the client it reported. The CLI
