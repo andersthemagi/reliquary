@@ -25,10 +25,13 @@
 --    its budget. Over budget, the answer is `wait` with no place and no
 --    ready count, and the seconds to return; nothing else is written and
 --    the caller's place, if it has one, is kept as it was. Same body as
---    20261013220000_claim_step_follows_the_line.sql otherwise.
+--    20261013220000_claim_step_follows_the_line.sql otherwise (the newest
+--    take_step; 20261013233000_review_gate.sql doesn't redefine it).
 -- 4. public.claim_step refuses the same case as RLW06, with the budget and
 --    the seconds. A claim_step refused for any reason rolls back, its count
---    with it, as a refused request counts nothing anywhere.
+--    with it, as a refused request counts nothing anywhere. Same body as
+--    20261013233000_review_gate.sql otherwise, its refusal for a step
+--    awaiting review included.
 --
 -- The counter row is the vault's: a full evaluation holds its lock until
 -- its transaction ends, so a vault's evaluations take turns on it. It is
@@ -311,6 +314,9 @@ begin
     raise exception 'no such step' using errcode = 'P0002';
   elsif v_cur.status in ('done', 'cancelled') then
     raise exception 'step "%" is already %', p_key, v_cur.status using errcode = 'RLW02';
+  elsif v_cur.status = 'review' then
+    raise exception 'step "%" is done and awaiting a person''s review; what waits on it can be claimed once a person approves it', p_key
+      using errcode = 'RLW02';
   elsif v_cur.status = 'claimed' and v_cur.expires_at > clock_timestamp() then
     raise exception 'step "%" is already claimed by % until %', p_key, coalesce(v_cur.holder_label, 'someone'), v_cur.expires_at
       using errcode = 'RLW01';
