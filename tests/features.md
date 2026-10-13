@@ -335,6 +335,7 @@ Conversations between a vault's members and their agents. Not the proposal threa
 | F177 | The roadmap is the GitHub project board | `/roadmap` answers 302 to the board (the Alpha badge, the nav and the README keep linking `/roadmap`); there is no roadmap page, `/roadmap.md`, docs page, llms.txt line or `docs/public/roadmap.yml`, so nothing is kept in two places | `web/test/docs.test.mjs#roadmap:` | `docs/public/index.md` |
 | F178 | Alpha, said plainly | An "Alpha" badge linking to the roadmap in the top bar of the app and the public site, and "Alpha: things change and may break; data is backed up daily." on the landing page, every docs page and the app's Account menu | `web/test/docs.test.mjs#stage:` | `docs/public/index.md` |
 | F179 | Docs stay honest | Every feature row names a docs page that exists (`scripts/check-registry.sh` too); docs sources carry no em dashes and nothing shaped like a token or key | `web/test/docs.test.mjs#docs registry:`, `web/test/docs.test.mjs#docs copy:` | `docs/public/concepts/security.md` |
+| F800 | The MCP registry entry copies the docs | `server.json` at the repo root, the entry for the official MCP registry, carries the MCP URL and the one-line summary the docs home gives (the summary cut to the registry's 100 characters), the docs URL, and the version in `version.txt` (release-please bumps both) | `web/test/docs.test.mjs#mcp registry:` | `docs/public/index.md` |
 
 ## Two hosts: the public site and the app (`web/src/hosts.ts`, docs/ops/runbook.md "Hosts")
 

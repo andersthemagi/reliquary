@@ -89,6 +89,11 @@
         },
         {
           "type": "json",
+          "path": "server.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
           "path": "mcp/package.json",
           "jsonpath": "$.version"
         },

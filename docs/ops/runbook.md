@@ -430,6 +430,48 @@ what shipped is `CHANGELOG.md`, and what was built and why is
   OPTION is `4065f07e` (Considering), `fd624e83` (Planned) or `cf4d72d0` (In
   progress).
 
+## The MCP registry
+
+`server.json` at the repo root is Reliquary's entry in the official MCP
+registry (registry.modelcontextprotocol.io), named `cc.redmage/reliquary`.
+release-please bumps its version with `version.txt`, and
+`web/test/docs.test.mjs` ("mcp registry:") fails if its MCP URL, docs URL,
+version or description drift. The registry never takes a version twice and
+never edits one, so publish once per product release, after the release pull
+request merges.
+
+Proving the name is DNS on `redmage.cc`, which grants `cc.redmage/*` and
+every `cc.redmage.*` name. It can't be on `reliquary.redmage.cc`: that name
+is a CNAME to Netlify, and a CNAME can't carry a TXT record beside it. Run
+this in your own terminal; `key.pem` is a secret, so keep it outside the
+repo and out of any chat.
+
+1. Install the publisher (`brew install mcp-publisher`, or the binary from
+   the registry's GitHub releases) and make the key and the record, once:
+
+   ```bash
+   openssl genpkey -algorithm Ed25519 -out ~/.config/reliquary-mcp-registry.pem
+   PUBLIC_KEY="$(openssl pkey -in ~/.config/reliquary-mcp-registry.pem -pubout -outform DER | tail -c 32 | base64)"
+   echo "redmage.cc. IN TXT \"v=MCPv1; k=ed25519; p=${PUBLIC_KEY}\""
+   ```
+
+2. Add that TXT record on the apex `redmage.cc` at its DNS provider (not
+   under a `_mcp` name: the registry only reads the apex) and wait for it to
+   show: `curl -s 'https://dns.google/resolve?name=redmage.cc&type=TXT'`.
+3. Log in and publish, from the repo root on the release tag:
+
+   ```bash
+   PRIVATE_KEY="$(openssl pkey -in ~/.config/reliquary-mcp-registry.pem -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\n')"
+   mcp-publisher login dns --domain redmage.cc --private-key "${PRIVATE_KEY}"
+   mcp-publisher publish
+   curl -s "https://registry.modelcontextprotocol.io/v0.1/servers?search=cc.redmage/reliquary"
+   ```
+
+For the next release, check out its tag and run step 3 again (a publish
+that says the token expired needs the login line again). A rotated key means a new TXT record and removing the old one, which
+the registry would otherwise try first and fail on. Publishing from the
+release workflow on each release is the rest of #241.
+
 ## Feedback
 
 People send bugs, ideas and questions from the web app's **Feedback**
