@@ -308,6 +308,158 @@ test("races, one wins: 12 connections claim the same free path at once, exactly 
 });
 
 // ---------------------------------------------------------------------------
+// A work plan under a crowd (CL-3.3): claim_step's own update grants a step
+// only when its stored count of unfinished blockers is 0. Thirty people work
+// a 120-step layered plan at once, each trying any unfinished step, and walk
+// away from a quarter of what they claim. Checked afterwards from the log
+// (its seq is the order things committed in) and the steps' own timestamps,
+// and while it runs, from single-statement snapshots of the stored counts.
+
+// Same seed, same plan and the same choices per person, every run; only the
+// interleaving varies, and no interleaving may break what's checked.
+function seeded(seed) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// 8 layers of 15; each step after the first layer is blocked by 1 to 3 of
+// the layer before, and sometimes one further back.
+function layeredPlan(rand) {
+  const key = (l, i) => `l${l}-s${String(i).padStart(2, "0")}`;
+  const steps = [];
+  for (let l = 0; l < 8; l++) {
+    for (let i = 0; i < 15; i++) {
+      const blocked_by = new Set();
+      if (l > 0) {
+        const n = 1 + Math.floor(rand() * 3);
+        while (blocked_by.size < n) blocked_by.add(key(l - 1, Math.floor(rand() * 15)));
+        if (l > 1 && rand() < 0.3) blocked_by.add(key(Math.floor(rand() * (l - 1)), Math.floor(rand() * 15)));
+      }
+      steps.push({ key: key(l, i), title: `Step ${l}.${i}`, blocked_by: [...blocked_by] });
+    }
+  }
+  return steps;
+}
+
+test("races, work plan gate: 30 people working a 120-step plan at once, abandoning a quarter of their claims, never claim or finish a step before its blockers", async () => {
+  const crowd = Array.from({ length: 30 }, (_, i) => uid(400 + i));
+  await sql(`insert into auth.users (id, email) select u, 'races-' || right(u::text, 4) || '@example.test' from unnest($1::uuid[]) u
+             on conflict (id) do nothing`, [crowd]);
+  const v = await newVault(OWNER, "Races work plan crowd");
+  for (const p of crowd) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  const seededFile = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan') as v", [v]);
+  assert.ok(seededFile.ok, seededFile.message);
+  const steps = layeredPlan(seeded(72));
+  const reg = await as(db, OWNER, "select public.register_work_plan($1, 'plan.md', $2, $3::jsonb)::text as id", [v, seededFile.rows[0].v, JSON.stringify(steps)]);
+  assert.ok(reg.ok, reg.message);
+  const plan = reg.rows[0].id;
+
+  // Every stored count equals the real number of unfinished blockers, in one
+  // snapshot (complete_step changes a step and its dependents' counts in one
+  // transaction).
+  const miscounted = async (c) =>
+    (await c.query(
+      `select s.key, s.open_blockers as stored,
+              (select count(*)::int from public.work_plan_step_blockers d join public.work_plan_steps b on b.id = d.blocker_id
+                where d.step_id = s.id and b.status <> 'done') as real
+         from public.work_plan_steps s where s.plan_id = $1
+        order by s.key`, [plan])).rows.filter((r) => r.stored !== r.real);
+
+  const remaining = new Set(steps.map((s) => s.key));
+  const refusals = {};
+  const unexpected = [];
+  const stale = [];
+  let abandoned = 0;
+  const work = async (c, who, rand) => {
+    for (let tries = 0; remaining.size > 0; tries++) {
+      if (tries > 3000) throw new Error(`${who} gave up with ${remaining.size} steps unfinished`);
+      const keys = [...remaining];
+      const key = keys[Math.floor(rand() * keys.length)];
+      const cl = await as(c, who, "select o_fence, o_secret from public.claim_step($1, 'plan.md', $2)", [v, key]);
+      if (!cl.ok) {
+        refusals[cl.code] = (refusals[cl.code] ?? 0) + 1;
+        if (cl.code !== "RLW01" && cl.code !== "RLW02") unexpected.push(`claim ${key}: ${cl.code} ${cl.message}`);
+        continue;
+      }
+      const { o_fence: fence, o_secret: secret } = cl.rows[0];
+      const complete = () => as(c, who, "select public.complete_step($1, 'plan.md', $2, $3, $4)::text", [v, key, fence, secret]);
+      if (rand() < 0.25) {
+        // Walked away: the lease lapses (the clock moved for this claim
+        // alone), and coming back late to finish it is refused.
+        abandoned++;
+        await c.query("update public.work_plan_steps set expires_at = clock_timestamp() where plan_id = $1 and key = $2 and fence = $3", [plan, key, fence]);
+        stale.push(outcome(await complete()));
+        continue;
+      }
+      const done = await complete();
+      if (done.ok) remaining.delete(key);
+      else unexpected.push(`complete ${key}: ${done.code} ${done.message}`);
+    }
+  };
+
+  const watcher = await connect();
+  const conns = await Promise.all(crowd.map(() => connect()));
+  const t0 = Date.now();
+  const running = Promise.all(crowd.map((p, i) => work(conns[i], p, seeded(1000 + i))));
+  let snapshots = 0;
+  const seenMiscounted = [];
+  let finished = false;
+  running.finally(() => (finished = true)).catch(() => {});
+  while (!finished) {
+    seenMiscounted.push(...(await miscounted(watcher)));
+    snapshots++;
+  }
+  await running;
+  await close(watcher, conns);
+  log("work plan crowd", { ms: Date.now() - t0, refusals, abandoned, snapshots });
+
+  assert.deepEqual(unexpected, []);
+  assert.deepEqual(seenMiscounted, [], "a stored open_blockers count disagreed with the real one while the crowd ran");
+  assert.deepEqual(await miscounted(db), []);
+
+  // From the log, in commit order, and from the steps' own timestamps.
+  const violations = await sql(
+    `with st as (select id, key, claimed_at, done_at from public.work_plan_steps where plan_id = $2),
+          edge as (select s.key as step, b.key as blocker, s.claimed_at, s.done_at, b.done_at as blocker_done
+                     from public.work_plan_step_blockers d join st s on s.id = d.step_id join st b on b.id = d.blocker_id),
+          ev as (select seq, event, detail->>'step' as key from public.log
+                  where vault_id = $1 and event in ('step.claim', 'step.complete'))
+     select 'claimed before its blocker was done (log)' as what, e.step, e.blocker
+       from edge e join ev c on c.event = 'step.claim' and c.key = e.step
+      where not exists (select 1 from ev x where x.event = 'step.complete' and x.key = e.blocker and x.seq < c.seq)
+     union all
+     select 'done before its blocker was done (log)', e.step, e.blocker
+       from edge e join ev c on c.event = 'step.complete' and c.key = e.step
+      where not exists (select 1 from ev x where x.event = 'step.complete' and x.key = e.blocker and x.seq < c.seq)
+     union all
+     select 'claimed before its blocker was done (timestamps)', step, blocker from edge where claimed_at < blocker_done
+     union all
+     select 'done before its blocker was done (timestamps)', step, blocker from edge where done_at < blocker_done
+     order by 1, 2, 3`,
+    [v, plan],
+  );
+  assert.deepEqual(violations.slice(0, 10), [], `${violations.length} gate violations`);
+
+  // Every step finished once; every abandoned claim was claimed again; no
+  // late completion counted.
+  const [tally] = await sql(
+    `select count(*) filter (where s.status = 'done' and s.done_at is not null)::int as done,
+            (select count(*)::int from public.log where vault_id = $1 and event = 'step.complete') as completions,
+            (select count(*)::int from public.log where vault_id = $1 and event = 'step.claim') as claims,
+            sum(s.fence)::int as fences
+       from public.work_plan_steps s where s.plan_id = $2`,
+    [v, plan],
+  );
+  assert.deepEqual(tally, { done: 120, completions: 120, claims: 120 + abandoned, fences: 120 + abandoned });
+  assert.ok(abandoned > 0, "no claim was abandoned");
+  assert.deepEqual([...new Set(stale)], ["RLW03"]);
+  assert.ok((refusals.RLW02 ?? 0) > 0, "no claim ever hit the blocker gate");
+});
+
+// ---------------------------------------------------------------------------
 // Forced interleavings
 
 // Runs `first` until it stops at the barrier, then `second` until it is

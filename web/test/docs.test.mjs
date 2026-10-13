@@ -364,6 +364,19 @@ test("docs registry: every feature row in tests/features.md names a docs page th
   }
 });
 
+// The registry keeps each published version for good, so a drifted entry
+// can't be fixed in place; release-please bumps the version (extra-files).
+test("mcp registry: server.json names the docs' MCP URL and docs URL, version.txt's version, and the docs' summary in 100 characters", () => {
+  const entry = JSON.parse(readFileSync(join(REPO, "server.json"), "utf8"));
+  const index = readFileSync(join(SRC, "index.md"), "utf8");
+  const mcpUrl = /The MCP URL: `([^`]+)`/.exec(index)[1];
+  assert.deepEqual(entry.remotes, [{ type: "streamable-http", url: mcpUrl }]);
+  assert.equal(entry.websiteUrl, `${LOCAL_ORIGIN}/docs`);
+  assert.equal(entry.version, readFileSync(join(REPO, "version.txt"), "utf8").trim());
+  assert.ok(entry.description.length <= 100, "the registry refuses a description over 100 characters");
+  assert.ok(index.toLowerCase().includes(entry.description.toLowerCase().replace(/\.$/, "")), "the description is not the docs' summary");
+});
+
 test("docs copy: no em dashes, and nothing shaped like a token or key", () => {
   for (const f of walk(SRC)) {
     const text = readFileSync(join(SRC, f), "utf8");
