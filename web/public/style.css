@@ -772,7 +772,7 @@ a.dir { font-weight: 600; }
 .side-links a:active { background: var(--border); }
 .side-links a:focus-visible { outline-offset: -2px; }
 .side-links a[aria-current="page"] {
-  background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgb(0 0 0 / 0.06);
+  background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 0 0 1px var(--border);
 }
 .side-links a[aria-current="page"] .icon { color: var(--brand-strong); opacity: 1; }
 .side-links a[aria-current="page"]::before {
