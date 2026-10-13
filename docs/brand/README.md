@@ -11,7 +11,6 @@
   a fictional vault, by `scripts/demo-shots.sh` (needs `./mcp/dev.sh up`,
   and chromium, node and ffmpeg on the host); never edited by hand, and
   regenerated whenever the UI they show changes.
-
 - `og.svg`: source of `web/public/og.png` (1200x630 link preview). Regenerate:
 
   ```bash
