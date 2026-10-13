@@ -155,7 +155,7 @@ echo "== supabase-mode server logs (must contain no JWTs, refresh tokens, codes,
 # to .auth-secrets-<slot>; none may appear in a log.
 # Without auth.test.mjs (WEB_TESTS), there is nothing recorded to look for.
 [ -s .auth-secrets-$slot ] || [[ -n "${WEB_TESTS:-}" && "$WEB_TESTS" != *auth* ]] || { echo "auth.test.mjs recorded no secrets to look for"; exit 1; }
-touch .auth-secrets-$slot
+[ -e .auth-secrets-$slot ] || : > .auth-secrets-$slot  # on CI the container owns it; only make it when WEB_TESTS skipped auth.test.mjs
 { "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; "$engine" logs "$split"; "$engine" logs "$rl"; } > .auth-logs-$slot 2>&1
 leak=0
 grep -E 'eyJ|@|token_hash|rlq_|rli_|EUR|script' .auth-logs-$slot && leak=1
