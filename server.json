@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "cc.redmage/reliquary",
+  "title": "Reliquary",
+  "description": "Shared vault of context and environment variables for people and the AI agents they use.",
+  "version": "0.23.0",
+  "websiteUrl": "https://reliquary.redmage.cc/docs",
+  "repository": {
+    "url": "https://github.com/andersthemagi/reliquary",
+    "source": "github",
+    "id": "1384934730"
+  },
+  "icons": [
+    {
+      "src": "https://reliquary.redmage.cc/apple-touch-icon.png",
+      "mimeType": "image/png",
+      "sizes": ["180x180"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.reliquary.redmage.cc/mcp"
+    }
+  ]
+}
