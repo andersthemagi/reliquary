@@ -128,3 +128,51 @@ test("workplan_format: a cites entry with no version is refused", () => {
 test("workplan_format: an invalid step key is refused", () => {
   assertRefused(["```work_plan", "- key: Not_Valid", "  title: A", "```"].join("\n"), 'isn\'t a valid step key');
 });
+
+test("workplan_format: planning fields: due, priority, notes and for parse and round-trip", () => {
+  const text = [
+    "```work_plan",
+    "- key: a",
+    "  title: A",
+    "  due: 2020-02-29",
+    "  priority: 1",
+    "  notes: Drop rows with no account id;\tkeep the raw file.",
+    "  for: agents",
+    "- key: b",
+    "  title: B",
+    "  for: Ana@Example.test",
+    "- key: c",
+    "  title: C",
+    "```",
+  ].join("\n");
+  const first = parseWorkPlanBlock(text);
+  assert.equal(first.ok, true, JSON.stringify(first.errors));
+  const [a, b, c] = first.plan.steps;
+  assert.deepEqual([a.due, a.priority, a.notes, a.for], ["2020-02-29", 1, "Drop rows with no account id;\tkeep the raw file.", "agents"]);
+  assert.equal(b.for, "Ana@Example.test");
+  assert.deepEqual([c.due, c.priority, c.notes, c.for], [null, null, null, null]);
+  const second = parseWorkPlanBlock(renderWorkPlanBlock(first.plan));
+  const strip = (steps) => steps.map(({ line, ...rest }) => rest);
+  assert.deepEqual(strip(second.plan.steps), strip(first.plan.steps));
+});
+
+const withLine = (field) => ["```work_plan", "- key: a", "  title: A", `  ${field}`, "```"].join("\n");
+
+test("workplan_format: planning fields: a due date not written YYYY-MM-DD, or not a real date, is refused with its line", () => {
+  assertRefused(withLine("due: 20/10/2026"), "line 4: due must be a real date written YYYY-MM-DD");
+  assertRefused(withLine("due: 2026-02-30"), "line 4: due must be a real date written YYYY-MM-DD");
+});
+
+test("workplan_format: planning fields: a priority other than 1 to 4 is refused with its line", () => {
+  for (const p of ["0", "5", "high", "1.5"]) assertRefused(withLine(`priority: ${p}`), "line 4: priority must be 1, 2, 3 or 4");
+});
+
+test("workplan_format: planning fields: empty notes, notes over 2000 characters or with a control character are refused with their line", () => {
+  assertRefused(withLine("notes:"), "line 4: notes can't be empty");
+  assertRefused(withLine(`notes: ${"n".repeat(2001)}`), "line 4: notes are longer than 2000 characters");
+  assertRefused(withLine("notes: a\u0007b"), "line 4: notes have a control character");
+});
+
+test("workplan_format: planning fields: for that is not agents, people or an email is refused with its line", () => {
+  assertRefused(withLine("for: robots"), "line 4: for must be agents, people or a member's email");
+});

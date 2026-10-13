@@ -838,3 +838,61 @@ test("review gate: a task with a linked proposal links it, and the proposal's pa
   assert.equal(await gateStatus(v, "spec"), "done");
   assert.doesNotMatch(await page(noa, `/v/${v}/proposals/${pid}`), /This is the work of the task/, "once applied, the note goes");
 });
+
+// ---------------------------------------------------------------------------
+// Planning fields (issue #334): what a task row shows of its due date,
+// priority, notes and who it is for, and the cross-plan order. What is
+// stored and refused is SQL's (step_planning_test.sql).
+
+test("planning: a task row shows its priority as a word with its colour, its due date, who it is for and its notes as text", async () => {
+  const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks planning rows', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, EDDA, NOA]);
+  const path = "plans/rows.md";
+  await register(NOA, v, path, [
+    { key: "hi", title: "Urgent one", priority: 1, due: "2999-01-01", for: "edda@example.test", notes: "<b>not markup</b> & kept" },
+    { key: "ag", title: "For agents", for: "agents" },
+    { key: "pe", title: "For people", priority: 4, for: "people" },
+  ]);
+  const h = await page(noa, planUrl(v, path));
+  const hi = taskRow(h, "hi");
+  assert.match(hi, /<span class="badge danger" title="Priority 1, 1 is highest">P1<\/span>/);
+  assert.match(hi, /Due <time datetime="2999-01-01">2999-01-01<\/time>/);
+  assert.match(hi, /<p class="task-meta">for edda@example\.test · &lt;b&gt;not markup&lt;\/b&gt; &amp; kept<\/p>/);
+  assert.doesNotMatch(hi, /Overdue/);
+  assert.match(taskRow(h, "ag"), /<p class="task-meta">for agents<\/p>/);
+  assert.match(taskRow(h, "pe"), />P4<\/span>/);
+  assert.match(taskRow(h, "pe"), /<p class="task-meta">for people<\/p>/);
+});
+
+test("planning: a task past its due date says Overdue in words; one due later, or done, doesn't", async () => {
+  const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks planning due', 'open') as id");
+  const path = "plans/due.md";
+  await register(NOA, v, path, [
+    { key: "late", title: "Late one", due: "2020-01-01" },
+    { key: "later", title: "Later one", due: "2999-01-01" },
+    { key: "finished", title: "Finished one", due: "2020-01-01" },
+  ]);
+  const c = await claim(NOA, v, path, "finished", null);
+  await as(NOA, "select public.complete_step($1, $2, 'finished', $3, $4)", [v, path, c.o_fence, c.o_secret]);
+  const h = await page(noa, planUrl(v, path));
+  assert.match(taskRow(h, "late"), /<span class="badge danger">Overdue<\/span>/);
+  assert.doesNotMatch(taskRow(h, "later"), /Overdue/);
+  assert.doesNotMatch(taskRow(h, "finished"), /Overdue/);
+});
+
+test("planning: across plans, each section lists the most pressing first: priority, then due date, none of either last", async () => {
+  const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks planning order', 'open') as id");
+  await register(NOA, v, "plans/a.md", [
+    { key: "none", title: "No planning" },
+    { key: "p2-late", title: "P2 due later", priority: 2, due: "2027-06-01" },
+    { key: "due-only", title: "Only a due date", due: "2026-01-01" },
+  ]);
+  await register(NOA, v, "plans/b.md", [
+    { key: "p2-soon", title: "P2 due sooner", priority: 2, due: "2026-12-01" },
+    { key: "p1", title: "P1 no date", priority: 1 },
+  ]);
+  const h = await page(noa, tasksUrl(v));
+  const ready = h.slice(h.indexOf('<h2 id="open-ready">'), h.indexOf("</section>", h.indexOf('<h2 id="open-ready">')));
+  const order = [...ready.matchAll(/<strong class="task-title">([^<]+)<\/strong>/g)].map((m) => m[1]);
+  assert.deepEqual(order, ["P1 no date", "P2 due sooner", "P2 due later", "Only a due date", "No planning"]);
+});
