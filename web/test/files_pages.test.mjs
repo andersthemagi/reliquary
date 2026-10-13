@@ -165,6 +165,13 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   }
 });
 
+test("vault sidebar: the sections are grouped, Work (Files, Proposals, Threads, Tasks, Changes) before Setup (Variables, Links, Settings)", async () => {
+  const side = /<nav class="side-links" aria-label="Vault">([\s\S]*?)<\/nav>/.exec(await page(`/v/${V.main}`))?.[1];
+  assert.ok(side, "a sidebar in the vault shell");
+  const order = [...side.matchAll(/<span class="side-group">(\w+)<\/span>|<a [^>]*>(\w+)/g)].map((m) => m[1] ? `[${m[1]}]` : m[2]);
+  assert.deepEqual(order, ["[Work]", "Files", "Proposals", "Threads", "Tasks", "Changes", "[Setup]", "Variables", "Links", "Settings"]);
+});
+
 test("vault tabs: the phone's Browse files holds only the folder tree, not the sections", async () => {
   const h = await page(file(V.main, "notes/a.md"));
   const mobile = /<details class="tree-mobile">([\s\S]*?)<\/details>\s*<div class="content">/.exec(h)?.[1];

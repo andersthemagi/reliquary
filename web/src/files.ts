@@ -103,16 +103,18 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
 
   // The vault's sections: the sidebar's links on wide screens, a row of tabs
   // on phones (always visible, with the open proposals' count), so no
-  // section hides behind the folder tree.
-  const sections: { section: Section; href: string; label: string; count?: number }[] = [
-    { section: "files", href: vaultPath(v.id), label: "Files" },
-    { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined },
-    { section: "threads", href: vaultPath(v.id, "/threads"), label: "Threads" },
-    { section: "tasks", href: vaultPath(v.id, "/tasks"), label: "Tasks" },
-    { section: "changes", href: vaultPath(v.id, "/changes"), label: "Changes" },
-    { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables" },
-    { section: "links", href: vaultPath(v.id, "/links"), label: "Links" },
-    { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings" },
+  // section hides behind the folder tree. The sidebar splits them into the
+  // work people do every day and the setup they visit once, so a newcomer
+  // reads the first group and can ignore the second.
+  const sections: { section: Section; href: string; label: string; count?: number; group: "Work" | "Setup" }[] = [
+    { section: "files", href: vaultPath(v.id), label: "Files", group: "Work" },
+    { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined, group: "Work" },
+    { section: "threads", href: vaultPath(v.id, "/threads"), label: "Threads", group: "Work" },
+    { section: "tasks", href: vaultPath(v.id, "/tasks"), label: "Tasks", group: "Work" },
+    { section: "changes", href: vaultPath(v.id, "/changes"), label: "Changes", group: "Work" },
+    { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables", group: "Setup" },
+    { section: "links", href: vaultPath(v.id, "/links"), label: "Links", group: "Setup" },
+    { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings", group: "Setup" },
   ];
   // Settings holds Rules and Diagnostics, so their pages mark Settings as current.
   const isCurrent = (s: Section) => current.section === s || (s === "settings" && (current.section === "rules" || current.section === "diagnostics"));
@@ -125,7 +127,9 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
       <form class="side-search" method="get" action="${vaultPath(v.id, "/search")}" role="search">
         <input type="search" name="q" placeholder="Search this vault" aria-label="Search this vault" value="${current.section === "search" ? ctx.url.searchParams.get("q") ?? "" : ""}">
       </form>
-      <nav class="side-links" aria-label="Vault">${sections.map(link)}</nav>
+      <nav class="side-links" aria-label="Vault">${(["Work", "Setup"] as const).map(
+        (g) => html`<span class="side-group">${g}</span>${sections.filter((s) => s.group === g).map(link)}`,
+      )}</nav>
       <nav class="tree" aria-label="Files">${tree}</nav>
     </aside>
     <div class="vault-tabs">${tabs(
