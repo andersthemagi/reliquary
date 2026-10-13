@@ -25,7 +25,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 7 | [Context](#context) | Built |
 | 8 | [Path ownership](#path-ownership) | Built |
 | 9 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
-| 10 | [Claims and work plans](#claims-and-work-plans) | Built; waiting in line in the database, not yet over MCP or on the Tasks page |
+| 10 | [Claims and work plans](#claims-and-work-plans) | Built, apart from the hosted load test (#82) |
 | 11 | [Threads](#threads) | Built |
 | 12 | [Links](#links) | Built |
 | 13 | [Routines](#routines) | Designed, not built |
@@ -543,9 +543,10 @@ an idle agent: MCP has no push, so an agent learns on its next call.
 Written 2026-09-30, settling CL-0.2 of the claims, waiting and work
 plans effort (tracking issue #52; the exception is logged in
 [progress.md](progress.md#decisions)). Built as of 2026-10-09: phase 1 (compare-and-swap writes), phase 2 (claims)
-and phase 3 (work plans); waiting in line (item 11, CL-3.9, #74) built in
-the database on 2026-10-13, with its MCP tools (#75) and the view of who is
-waiting (#76) still to come; [progress.md](progress.md) has what shipped. Validated first in a throwaway
+and phase 3 (work plans); waiting in line (item 11, CL-3.9, #74), its MCP
+tools (#75), the view of who is waiting (#76) and review gates (#78) built
+on 2026-10-13. Not built: the load test through the hosted path (CL-3.11,
+#82). [progress.md](progress.md) has what shipped. Validated first in a throwaway
 PostgreSQL 16 model, not Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
 Twelve points, each with the reason it was decided that way.
 
@@ -554,10 +555,12 @@ Twelve points, each with the reason it was decided that way.
 `work_plan`, `step` and `claim`, not `plan` (already a billing plan,
 [Plans and limits](public/concepts/plans-and-limits.md)) or `task` (an
 MCP-spec extension). Tools: `claim_path`, `renew_claim`, `release_claim`,
-`list_claims`, `register_work_plan`, `work_plan_status`, `claim_step`,
-`complete_step`, `release_step`, and person-only `break_claim`,
-`cancel_step`, `skip_step`: the last three follow the same ceiling as
-approving and revealing a secret, an agent's role never executes them.
+`list_claims`, `register_work_plan`, `work_plan_status`, `request_work`,
+`leave_queue`, `my_places`, `claim_step`, `checkin_step`, `complete_step`,
+`release_step`, and person-only `break_claim`, `cancel_step`, `skip_step`,
+`reopen_step` and `approve_step`: the last five follow the same ceiling as
+approving and revealing a secret, an agent's role never executes them. The
+web app shows a step as a task (`docs/public/concepts/tasks.md`).
 
 ### 2. Ownership proof and identity
 
@@ -662,7 +665,8 @@ so nothing can drift out of sync with the graph: `ready` (open, every
 blocker done), `blocked` (open, a blocker not done yet),
 `blocked_by_cancelled` (a blocker is cancelled, so it can never become
 done). A cancelled step never counts as done: a step waiting on it
-stays blocked forever unless a person cancels it too, matching the
+stays blocked forever unless a person cancels or skips it too, or
+reopens the cancelled step (`reopen_step`, 2026-10-13, #327), matching the
 spike's own finding that a cancelled blocker needs its own computed
 state, not a silent pass-through. A step may carry `gate: review`, which
 holds its dependents until a person approves it directly or its linked
@@ -709,7 +713,8 @@ One dot each, matching the existing activity-label convention
 `claim.release`, `claim.break`, `claim.expire`, `work_plan.register`,
 `work_plan.update`,
 `step.claim`, `step.complete`, `step.release`, `step.cancel`,
-`step.skip`, `step.approve`, `queue.join`, `queue.leave`, `queue.expire`.
+`step.skip`, `step.approve`, `step.checkin`, `step.reopen`, `queue.join`,
+`queue.leave`, `queue.expire`.
 
 ### 10. Export, erasure, deletion
 

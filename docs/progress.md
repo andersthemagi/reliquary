@@ -18,7 +18,7 @@ not the whole file top to bottom.
 - [Path ownership](#alongside-milestone-3-path-ownership), alongside milestone 3: built.
 - [Flags](#alongside-milestone-3-flags), alongside milestone 3: built, except addressed notes.
 - [Docs, plans, limits, admission, concurrency](#also-alongside-docs-plans-limits-admission-concurrency): built.
-- [Compare-and-swap writes, claims and work plans](#alongside-milestone-3-compare-and-swap-writes-claims-and-work-plans): built; waiting in line in the database, not yet over MCP or on the Tasks page.
+- [Compare-and-swap writes, claims and work plans](#alongside-milestone-3-compare-and-swap-writes-claims-and-work-plans): built, apart from the hosted load test (#82).
 - [Threads, the audience split and the Tasks view](#alongside-milestone-3-threads-the-audience-split-and-the-tasks-view): built.
 
 ## Decisions
@@ -55,6 +55,10 @@ maintainer's own judgement, not as a formal precondition.
 Status 2026-10-09: phases 1 and 2 are shipped, and phase 3 is built apart
 from waiting in line (CL-3.9, #74; see the entry below).
 
+Status 2026-10-13: phase 3 is built, waiting in line included, apart from
+the hosted load test (CL-3.11, #82), which needs a staging project from
+the owner.
+
 ### 2026-10-02: Threads, the audience split and the Tasks view
 
 Also (owner's decision, 2026-10-02): Threads, the audience split in the web
@@ -73,6 +77,9 @@ left out of both until it lands.
 Status 2026-10-09: Threads (#126 to #129), the audience split (#121 to #125),
 the Tasks page (#122) and the MCP step tools (#124) are built. `request_work`,
 `leave_queue`, places in line and who is waiting are not (#74 is open).
+
+Status 2026-10-13: they are built too (#74 to #76), so nothing is left out
+of the Tasks view or the step tools.
 
 ### 2026-10-09: open sign-up
 
@@ -516,7 +523,8 @@ start the next one.
   step, label length, title length, the per-person place-in-line cap),
   open since CL-0.2, confirmed by the maintainer as given (comment on
   #58), so CL-3.1 and onward build against real numbers, not a guess.
-  Built so far:
+  Built 2026-10-02 to 2026-10-13, apart from the hosted load test (CL-3.11,
+  #82, which needs a staging project from the owner):
   - the work plan block's grammar and parser (CL-3.1, `mcp/src/
     workplan-format.ts`): a fenced `work_plan` block lists steps (`key`,
     `title`, optional `blocked_by`, `cites`, `gate: review`); finding the
@@ -570,13 +578,21 @@ start the next one.
     F446-F447. Docs: `docs/public/concepts/claims.md`'s "Work plans"
     section now describes the step lifecycle, still plain that no MCP
     tool or web page reaches any of it yet; `docs/public/roadmap.yml`.
-  - **Phase 3, not yet built:** every other CL-3.x issue -- MCP tools
-    (CL-3.4, blocked on this entry and CL-3.9), the web page (CL-3.5),
-    review-gated steps (CL-3.7),
-    waiting and places in line (CL-3.9), a capacity model (CL-3.13),
-    one call for every place in line (CL-3.12), the adversary suite and
-    load test (CL-3.10/3.11), and CL-3.2's own deferred race/lock-order
-    tests (CL-3.3).
+  - the Tasks page and the MCP step tools (#122, #124, 2026-10-03): see
+    "Threads, the audience split and the Tasks view" below.
+  - race and lock-order tests (CL-3.3, #72; #323, #325,
+    `20261013110000_work_plans_lock_order.sql`,
+    `20261013110100_claim_step_vanished.sql`): thirty people on a 120-step
+    plan never claim a step before its blockers are done, a lapsed claim
+    never unblocks, and deleting a vault never deadlocks with claiming or
+    completing a step. Registry: `tests/features.md` F801-F802.
+  - reopening a cancelled step (#327, `20261013130000_reopen_step.sql`):
+    person-only `reopen_step` and **Reopen** on the Tasks page, whose
+    confirm page steers to a new step instead. Registry: F806-F807.
+  - a registered plan gains steps (#329, issue #262,
+    `20261013160000_work_plan_gains_steps.sql`): registering a newer
+    version adds the steps with new keys and changes nothing else.
+    Registry: F811-F812.
   - the "canon moved" signal (CL-3.6, #73, `supabase/migrations/
     20261013100000_canon_moved.sql`): `work_plan_status` gains `o_moved`,
     the cited files whose current version is newer than the one a step
@@ -602,9 +618,27 @@ start the next one.
     `supabase/tests/waiting_test.sql` and `web/test/races.test.mjs`
     ("races, waiting in line" and the lock-order tests), every new guard
     mutation-checked. Registry: `tests/features.md` F813-F818. Docs:
-    `docs/public/concepts/tasks.md` ("Waiting in line"). Not yet: the MCP
-    tools and their rate limits (#75), who is waiting on the Tasks page
-    (#76).
+    `docs/public/concepts/tasks.md` ("Waiting in line").
+  - who is waiting, on a plan's Tasks page (CL-3.5, #76, #350). Registry:
+    F823.
+  - the claim rule presets set the waiting settings, with a 10 second
+    floor on the gap (#351, `20261013210000_claim_rule_waiting_floor.sql`).
+    Registry: F829.
+  - the adversary suite (CL-3.10, #77, #352): no agent can get around the
+    line, in `supabase/tests/waiting_adversary_test.sql` and the crowd and
+    load races in `web/test/races.test.mjs`. Registry: F825-F827.
+  - waiting in line over MCP (CL-3.4, #75, #354; `request_work`,
+    `leave_queue`, and `claim_step` keeping the line,
+    `20261013220000_claim_step_follows_the_line.sql`), with its own rate
+    limit of 30 a minute per connection (`mcp/src/ratelimit.ts`).
+    Registry: F819-F821.
+  - one call for every place in line (CL-3.12, #79, #355,
+    `20261013230000_my_places.sql`): `my_places`. Registry: F830-F831.
+  - review-gated steps (CL-3.7, #78, #356,
+    `20261013233000_review_gate.sql`): a completed `gate: review` step
+    awaits review until a person approves it (`approve_step`, on the
+    ceiling) or applies the proposal its agent linked. Registry:
+    F834-F838.
   - the capacity model and each vault's request budget (CL-3.13, #80,
     `supabase/migrations/20261013235000_vault_request_budget.sql`): the
     model in `docs/public/reference/limits.md` ("What asking for work
@@ -615,9 +649,17 @@ start the next one.
     the design's number because the model gives it. Tests:
     `supabase/tests/request_budget_test.sql`, mutation-checked. Registry:
     `tests/features.md` F839-F840.
+  - the docs pass (CL-3.8, #81): `docs/public/concepts/tasks.md` is the
+    one concept page for work plans (`claims.md` keeps path claims and
+    points there), `docs/public/how-to/work-through-a-plan.md` walks a
+    plan end to end, and the ceiling lists every person-only step action.
+  - **Not built:** the hosted load test (CL-3.11, #82): the adversary
+    suite's crowds run against the database directly, not through the MCP
+    server and the pooler; it needs a staging project from the owner.
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
-plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.
+plans", CL-0.2); phases 2 and 3 are built, apart from phase 3's hosted
+load test (#82).
 
 ## Alongside milestone 3: Threads, the audience split and the Tasks view
 
@@ -655,7 +697,8 @@ requests. Each pull request that builds a part adds its own line here.
   the step functions the database already has (`register_work_plan`,
   `work_plan_status`, `claim_step`, `checkin_step`, `complete_step` and
   `release_step`; `cancel_step` and `skip_step` stay a person's). The
-  database has no reopen, though #76's text lists one. Built 2026-10-03: the
+  database had no reopen then, though #76's text lists one; it has one
+  since 2026-10-13 (#327). Built 2026-10-03: the
   Tasks page (#122, `web/src/tasks.ts`), the MCP tools (#124,
   `mcp/src/workplan-tools.ts`, with `checkin_step`, #115) and the audience
   split (Diagnostics #121, the Changes feed #123 and its filter #125, the
@@ -666,4 +709,5 @@ The Tasks view and the step tools shipped ahead of CL-3.9 (#74, waiting and
 places in line), which issues #75 and #76 list as a blocker. The decision
 log recorded that re-sequencing as proposed, and no later confirmation is
 recorded. Anything that needs CL-3.9 (`request_work`, `leave_queue`,
-places in line, who is waiting) is still left out of both.
+places in line, who is waiting) was left out of both until it landed on
+2026-10-13 (#349, #350, #354).
