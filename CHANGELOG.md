@@ -6,6 +6,48 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.24.0](https://github.com/andersthemagi/reliquary/compare/v0.23.0...v0.24.0) (2026-10-13)
+
+
+### Features
+
+* **account:** choose whether people see your email, and vaults can require it ([#376](https://github.com/andersthemagi/reliquary/issues/376)) ([fe902f1](https://github.com/andersthemagi/reliquary/commit/fe902f16122882862df9f2fa4ff536f114de3fc6))
+* **account:** delete your account while you own vaults; members can take an orphaned one ([#384](https://github.com/andersthemagi/reliquary/issues/384)) ([c1b78d2](https://github.com/andersthemagi/reliquary/commit/c1b78d21040867f5a6911c7d367af400cb4d8014))
+* **export:** a vault's export includes its threads ([#328](https://github.com/andersthemagi/reliquary/issues/328)) ([f99da04](https://github.com/andersthemagi/reliquary/commit/f99da044839e6591c0aa00a3d09cc32bfa99038a))
+* **mcp:** agents ask for work and wait in line over MCP ([#354](https://github.com/andersthemagi/reliquary/issues/354)) ([12a7654](https://github.com/andersthemagi/reliquary/commit/12a7654d85c5b27836a11606d7c40305e64e4f27))
+* **mcp:** agents get the server's current time in UTC ([#326](https://github.com/andersthemagi/reliquary/issues/326)) ([5f9738a](https://github.com/andersthemagi/reliquary/commit/5f9738aefc41bafe7741396bd201012b225cdaf8))
+* **mcp:** list Reliquary in the official MCP registry with a server.json entry ([#322](https://github.com/andersthemagi/reliquary/issues/322)) ([6df5e55](https://github.com/andersthemagi/reliquary/commit/6df5e55eb85841d24877a3d9c373fc4b4aebd105))
+* **mcp:** one call tells an agent where it stands in every line ([#355](https://github.com/andersthemagi/reliquary/issues/355)) ([3f3fb29](https://github.com/andersthemagi/reliquary/commit/3f3fb293a78833fef97b547e00b7662bfe7ab79b))
+* **site:** show the product on the landing page and in the README, a reel and real screens ([#319](https://github.com/andersthemagi/reliquary/issues/319)) ([45c7263](https://github.com/andersthemagi/reliquary/commit/45c726381a58aa978f4b65dc0b182a2801971089))
+* **tasks:** a registered plan gains new tasks when its file changes ([#329](https://github.com/andersthemagi/reliquary/issues/329)) ([334efa5](https://github.com/andersthemagi/reliquary/commit/334efa5e3b91d2adf2676720f02025354116fa9f))
+* **tasks:** a review-gated task holds what waits on it until a person approves ([#356](https://github.com/andersthemagi/reliquary/issues/356)) ([aff4981](https://github.com/andersthemagi/reliquary/commit/aff4981d6a307e33e71ea05ce44679f784d7d754))
+* **tasks:** a task can carry a due date, priority, notes and who it's for ([#374](https://github.com/andersthemagi/reliquary/issues/374)) ([06857b7](https://github.com/andersthemagi/reliquary/commit/06857b77522be1ca81ab4fc9644c3ed9bea3f762))
+* **tasks:** a task shows "context moved" when a file it cites has a newer version ([#324](https://github.com/andersthemagi/reliquary/issues/324)) ([bc094d1](https://github.com/andersthemagi/reliquary/commit/bc094d123a190d0e39e444363e5d82b3af623267))
+* **tasks:** agents wait in line for work, first come, first served ([#349](https://github.com/andersthemagi/reliquary/issues/349)) ([a57c398](https://github.com/andersthemagi/reliquary/commit/a57c398e569401216b56d737186a05b54f096d5d))
+* **tasks:** each vault gets its own request budget, so one busy vault can't slow the others ([#358](https://github.com/andersthemagi/reliquary/issues/358)) ([d5cf74d](https://github.com/andersthemagi/reliquary/commit/d5cf74de3655af10389de55b87e09d1946a5f5fc))
+* **tasks:** people who can approve a task are flagged when it awaits their review ([#369](https://github.com/andersthemagi/reliquary/issues/369)) ([798923d](https://github.com/andersthemagi/reliquary/commit/798923db7161d93cdadff92ed92c0f2c338df93c))
+* **tasks:** reopen a cancelled task from the Tasks page ([#327](https://github.com/andersthemagi/reliquary/issues/327)) ([9feea58](https://github.com/andersthemagi/reliquary/commit/9feea58d43f9fd68867537d2a139c7a446dc2a45))
+* **tasks:** the plan page shows who is waiting for work, in order ([#350](https://github.com/andersthemagi/reliquary/issues/350)) ([e7989bb](https://github.com/andersthemagi/reliquary/commit/e7989bb152b110d7e62f6c5c5f17bfa969f50335))
+* **web:** a vault opens on an overview of what's waiting, in progress and new ([#373](https://github.com/andersthemagi/reliquary/issues/373)) ([2006e68](https://github.com/andersthemagi/reliquary/commit/2006e680011795d704db395930a5eee47826a1b1))
+* **web:** a vault's sidebar and front page, grouped, labelled and full width ([#340](https://github.com/andersthemagi/reliquary/issues/340)) ([abcaaad](https://github.com/andersthemagi/reliquary/commit/abcaaad84cb213b97833b72ff902ce564a071201))
+* **web:** a vault's Updates page puts what's new for you above the changes ([#370](https://github.com/andersthemagi/reliquary/issues/370)) ([cf876da](https://github.com/andersthemagi/reliquary/commit/cf876da87f63090448108e7aab68472c921c1ce2))
+* **web:** an identity of its own: square corners, Atkinson Hyperlegible Next, mono metadata ([#363](https://github.com/andersthemagi/reliquary/issues/363)) ([bb30482](https://github.com/andersthemagi/reliquary/commit/bb304820e1373a605f9af1f6971409a10ff7dbc8))
+* **web:** Home shows your vaults and shared vaults as cards ([#343](https://github.com/andersthemagi/reliquary/issues/343)) ([4b9e7a0](https://github.com/andersthemagi/reliquary/commit/4b9e7a02b64d01a1b6a4a81ed5ef2d3da4d8ebbb))
+* **web:** Links, Connect and Account settings show the list first ([#368](https://github.com/andersthemagi/reliquary/issues/368)) ([006500b](https://github.com/andersthemagi/reliquary/commit/006500b8f022dccf15a217bd84455b456e23ed45))
+* **web:** proposals and threads share one row, and a proposal's decision sits beside its diff ([#372](https://github.com/andersthemagi/reliquary/issues/372)) ([a89a777](https://github.com/andersthemagi/reliquary/commit/a89a77725b8b28b958bb9c4c2007e6c0019f98f1))
+* **web:** Settings gets a grouped sub-nav, and Members splits people, invites and agents ([#345](https://github.com/andersthemagi/reliquary/issues/345)) ([ba08584](https://github.com/andersthemagi/reliquary/commit/ba085840bbb73dd1dc0846d659342206d182ba3e))
+* **web:** Tasks reads as a simple list, with who is on each task ([#344](https://github.com/andersthemagi/reliquary/issues/344)) ([c34a7cd](https://github.com/andersthemagi/reliquary/commit/c34a7cd80d69a2bad5e53329896543100462329c))
+* **web:** Variables shows one row per variable, with environments as views ([#342](https://github.com/andersthemagi/reliquary/issues/342)) ([cdbb9a1](https://github.com/andersthemagi/reliquary/commit/cdbb9a1ee24eb160f4546bea0fc74bb550ac06aa))
+
+
+### Bug fixes
+
+* **account:** a vault no longer decides whether members' emails show ([#382](https://github.com/andersthemagi/reliquary/issues/382)) ([0116ae5](https://github.com/andersthemagi/reliquary/commit/0116ae52c194173f3787df432730839d5ac1b430))
+* **tasks:** deleting a vault no longer deadlocks with claiming or finishing a task ([#325](https://github.com/andersthemagi/reliquary/issues/325)) ([02d0c6c](https://github.com/andersthemagi/reliquary/commit/02d0c6c30e8cc11754efadc8edbf3c05ef9ef7e6))
+* **tasks:** rule presets set how long agents wait in line and how often they check ([#351](https://github.com/andersthemagi/reliquary/issues/351)) ([6ac488f](https://github.com/andersthemagi/reliquary/commit/6ac488fdc1e6b3d54f07aa8a49627918eed8b9b2))
+* **tasks:** two work plan messages say what actually happens ([#365](https://github.com/andersthemagi/reliquary/issues/365)) ([fcdaf9e](https://github.com/andersthemagi/reliquary/commit/fcdaf9e68d387a09720435c1b5ffcc2694c69588))
+* **web:** show less on a vault's pages, and one section menu on phones ([#375](https://github.com/andersthemagi/reliquary/issues/375)) ([0b35bb0](https://github.com/andersthemagi/reliquary/commit/0b35bb040b8eb2ea63d90edbefb6d5b3b6af48e8))
+
 ## [0.23.0](https://github.com/andersthemagi/reliquary/compare/v0.22.0...v0.23.0) (2026-10-13)
 
 The legal pages now name who runs Reliquary, Memento Vivre Fine Arts LLC (doing business as Red Mage), a Colorado company, under Colorado law. The privacy policy adds US state privacy rights, and gathers what will apply in the EU, EEA, UK and Switzerland, where the alpha isn't offered yet, in one marked section. The pages stay marked draft until their legal review. No database changes.
