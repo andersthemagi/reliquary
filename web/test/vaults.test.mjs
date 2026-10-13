@@ -160,7 +160,7 @@ test("vault cards: Home is titled Home, as in the nav, and shows each of my vaul
   assert.match(h, /<a href="\/" aria-current="page">Home<\/a>/);
   assert.match(h, /<h2>Your vaults<\/h2>\s*<p class="meta plan-line">[\s\S]*?<\/p>\s*<ul class="card-grid">/);
   const card = cardNamed(h, "Zephyr ledger");
-  assert.match(card, /<div class="card-head"><h3 class="card-title"><a class="card-link" href="\/v\/[0-9a-f-]{36}">Zephyr ledger<\/a><\/h3><span class="badge">Standard \([^)]+\)<\/span><\/div>/);
+  assert.match(card, /<div class="card-head"><span class="vault-mark tint-[0-5]" aria-hidden="true">[^<]<\/span><h3 class="card-title"><a class="card-link" href="\/v\/[0-9a-f-]{36}">Zephyr ledger<\/a><\/h3><span class="badge">Standard \([^)]+\)<\/span><\/div>/);
   assert.match(card, /<p class="card-foot">Updated <time datetime="\d{4}-\d\d-\d\dT[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">[^<]+<\/time><\/p>/);
   assert.doesNotMatch(card, /card-counts/, "no proposals and no ready tasks: nothing said");
   assert.doesNotMatch(card, /card-role/, "my own vault doesn't say my role");

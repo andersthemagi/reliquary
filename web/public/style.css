@@ -1729,12 +1729,32 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
   position: relative; display: grid; gap: var(--space-3); align-content: start; min-width: 0;
   padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg);
   font-size: var(--text-sm); line-height: var(--lh-sm);
-  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+  transition: border-color 120ms ease-out, box-shadow 160ms ease-out, transform 160ms ease-out;
 }
-.card:hover { border-color: var(--border-strong); background: var(--bg-subtle); }
+.card:hover { border-color: var(--border-strong); box-shadow: 0 4px 14px rgb(0 0 0 / 0.08); transform: translateY(-1px); }
+.card:active { transform: none; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .card, .card:hover { transform: none; transition: none; } }
 .card:has(.card-link:focus-visible) { outline: 2px solid var(--link); outline-offset: 2px; }
 .card p { margin: 0; }
-.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.card-head { display: flex; align-items: center; gap: var(--space-3); }
+.card-head .card-title { flex: 1; }
+.vault-mark {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-md);
+  font-weight: 700; font-size: var(--text-md); line-height: 1;
+}
+/* Six tints, light and dark, each dark text on a pale fill (or the reverse)
+   well past 4.5:1, so the letter reads in either theme. */
+.tint-0 { background: #fde2e1; color: #8a1c1b; } .tint-1 { background: #dfeafe; color: #0b3b8c; }
+.tint-2 { background: #dcf3e4; color: #145a32; } .tint-3 { background: #fdf0d5; color: #7a4a00; }
+.tint-4 { background: #ece3fd; color: #4b2391; } .tint-5 { background: #d9f2f4; color: #0c5560; }
+:root[data-theme="dark"] .tint-0 { background: #4a1f1e; color: #ffd2d0; } :root[data-theme="dark"] .tint-1 { background: #1c2c4c; color: #cfe0ff; }
+:root[data-theme="dark"] .tint-2 { background: #1b3a27; color: #c8f0d6; } :root[data-theme="dark"] .tint-3 { background: #42331a; color: #fbe5b8; }
+:root[data-theme="dark"] .tint-4 { background: #2f2350; color: #e2d6ff; } :root[data-theme="dark"] .tint-5 { background: #173a3e; color: #c6eef2; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tint-0 { background: #4a1f1e; color: #ffd2d0; } :root:not([data-theme="light"]) .tint-1 { background: #1c2c4c; color: #cfe0ff; }
+  :root:not([data-theme="light"]) .tint-2 { background: #1b3a27; color: #c8f0d6; } :root:not([data-theme="light"]) .tint-3 { background: #42331a; color: #fbe5b8; }
+  :root:not([data-theme="light"]) .tint-4 { background: #2f2350; color: #e2d6ff; } :root:not([data-theme="light"]) .tint-5 { background: #173a3e; color: #c6eef2; }
+}
 .card-title { margin: 0; font-size: var(--text-md); line-height: var(--lh-md); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .card-link { color: var(--fg); text-decoration: none; }
 .card-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
@@ -1745,7 +1765,13 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 .card-stats dt { color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); }
 .card-stats dd { margin: 0; white-space: nowrap; }
 .card-stats .usage-meter { margin-bottom: 0; }
-.card-counts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+.card-counts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.card-counts a {
+  display: inline-flex; align-items: center; min-height: 26px; padding: 0 var(--space-3); border-radius: 999px;
+  background: var(--bg-muted); color: var(--fg); font-weight: 500; text-decoration: none;
+}
+.card-counts a:hover { background: var(--border); }
+.card-foot { padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--text-xs); line-height: var(--lh-xs); }
 /* The first-vault checklist: three numbered steps, read left-aligned. */
 .first-steps { max-width: var(--measure); margin: 0 auto var(--space-5); padding-left: 1.5em; text-align: left; color: var(--fg); }
 .first-steps li + li { margin-top: var(--space-3); }

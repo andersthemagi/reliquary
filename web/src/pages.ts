@@ -236,8 +236,12 @@ function vaultCard(v: HomeVault): Raw {
   const count = (n: number, what: string, path: string) =>
     n ? html`<a href="${vaultPath(v.id, path)}" aria-label="${plural(n, what)} in ${v.name}">${plural(n, what)}</a>` : "";
   const counts = [count(v.open, "open proposal", "/proposals"), count(v.ready, "ready task", "/tasks")].filter(Boolean);
+  // A tile with the vault's first letter, tinted from its id so a vault
+  // keeps its colour across visits; a class, not a style attribute, because
+  // the CSP allows no inline styles. Decoration only: the name says it.
+  const tint = parseInt(v.id.replace(/-/g, "").slice(-4), 16) % 6;
   return html`<li class="card vault-card">
-    <div class="card-head"><h3 class="card-title"><a class="card-link" href="${vaultPath(v.id)}">${v.name}</a></h3>${u ? html`<span class="badge">${tierLabel(u)}</span>` : ""}</div>
+    <div class="card-head"><span class="vault-mark tint-${tint}" aria-hidden="true">${Array.from(v.name.trim())[0]?.toUpperCase() ?? "?"}</span><h3 class="card-title"><a class="card-link" href="${vaultPath(v.id)}">${v.name}</a></h3>${u ? html`<span class="badge">${tierLabel(u)}</span>` : ""}</div>
     ${v.mine ? "" : html`<p class="card-role">Your role: ${ROLE_LABEL[v.role] ?? v.role}</p>`}
     ${u ? html`<dl class="card-stats"><div><dt>People</dt><dd>${peopleUsage(u)}</dd></div><div><dt>Storage</dt><dd>${storageUsage(u)}</dd></div></dl>` : ""}
     ${counts.length ? html`<p class="card-counts">${counts}</p>` : ""}
