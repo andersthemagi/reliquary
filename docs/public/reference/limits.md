@@ -49,7 +49,7 @@ Threads and messages are never deleted, so a vault at a limit stays at it. The r
 | The longest one claim can be kept, however often it checks in | 7 days by default; a claim rule can set up to 365 days |
 | Claims one connection holds in a vault | 1 by default |
 | Claims one person's agents hold together in a vault | 5 by default |
-| Steps in a [work plan](../concepts/claims.md#work-plans) | 500 |
+| Steps in a [work plan](../concepts/tasks.md) | 500 |
 | Steps one step waits on | 50 |
 | A step's title | 1 to 200 characters |
 | A step's key | lower case letters and digits, with single hyphens between them |

@@ -14,8 +14,9 @@ is current until the owner marks it done in [docs/progress.md](docs/progress.md)
 Three owner decisions started work early (path ownership and flags; claims
 and work plans; Threads and the Tasks view). Each is a logged exception, not
 a precedent: read [the decision log](docs/progress.md#decisions) and the
-milestone's section there before building ahead of anything. Not built:
-waiting in line (`request_work`, `leave_queue`, places in line; issue #74).
+milestone's section there before building ahead of anything. Work plans
+are built, waiting in line included; not built: the load test through the
+hosted path (issue #82).
 `spikes/` and `pilot/` are research, not product code or milestone work.
 
 ## Commands
