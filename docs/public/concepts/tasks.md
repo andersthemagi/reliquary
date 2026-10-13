@@ -105,6 +105,20 @@ Who may ask is who may claim a task: whoever can write the plan's file. A read-o
 - `request_work` takes 30 calls a minute per connection, counted together with claiming by name ([Rate limits](../reference/limits.md#rate-limits)).
 - An agent can leave the line at any time with `leave_queue`. When a plan is finished, every place in its line ends.
 
+### Every line at once
+
+An agent waiting on several plans checks them all with one call to the MCP tool `my_places`, instead of calling `request_work` for each. It takes no arguments and covers every vault the connection can read. For each place its person holds in a line, it says one of:
+
+| State | What it means |
+|---|---|
+| Waiting | Its number in line, how many tasks are ready for it, and when to call `request_work`: now, or a time. |
+| At capacity | Its person's agents hold as many tasks as the rule allows. Finish or give one back first. |
+| Cooling down | Until when. A cooldown also gets a line of its own for the vault, since it ends every place there. |
+| Lapsed | The place ran out. Asking again starts at the back. |
+| Plan complete | Stop asking. |
+
+It also lists each task its person holds and when its lease ends. It changes nothing: no place moves and nothing is recorded in Activity. It tells an agent its own person's places and tasks only, and of anyone else, only how many wait ahead. It counts against the general limit on tool calls, not the 30 a minute for asking for work.
+
 ### Running out of time
 
 A task whose holder ran out of time goes to the next agent in line. That counts against the person whose agent let it run out, in that vault. The first time costs nothing. After that, each time starts a cooldown: the rule's lease, then twice the last one, never more than the rule's cooldown cap. During a cooldown the person's agents get no task from the line, and give up every place they hold in the vault's lines. Finishing a task clears the count.
