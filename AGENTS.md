@@ -208,6 +208,31 @@ issue; these rules make the PR carry that, and CI checks what it can.
 - `owner` marks what needs the owner: an account, money or a decision. Don't
   guess at those; comment on the issue.
 
+### How an issue reads
+
+Every issue we file has the same four headings, in this order, so a person
+or an agent can pick it up cold (the **Planned work** template has them;
+#264 and #295 are good examples):
+
+- **## The job**: who needs what and why, in a paragraph. The problem, not
+  the solution. Where it showed up, if it did.
+- **## Where to start**: the files, functions, pages and design sections to
+  read first, and the existing pattern to copy.
+- **## Done looks like**: the observable outcomes as a list, each one
+  something a test can check (they become the test names and the registry
+  row), the docs page that changes, and a last line `Check: ./test.sh web`
+  (the suites that prove it).
+- **## Depends on**: `Blocked by #N` and `Part of #N` (also set as
+  Relationships in the sidebar), any owner decision it waits for, and what
+  is out of scope. Omit it when there is nothing to say.
+
+Keep the body the spec: when scope changes, edit it and say so with a
+dated line at the top (`Scope changed 2026-10-13: ...`). Progress goes in
+comments, each starting `Status, YYYY-MM-DD:` with what shipped (PR
+numbers), what is left and what is now unblocked. Titles say the outcome
+in plain words (`Agents wait in line for work`), with an internal code
+like `CL-3.9` only after it, if at all.
+
 ## Conventions
 
 - Conventional commits (`feat(feed): ...`, `fix(rls): ...`). Trailers
