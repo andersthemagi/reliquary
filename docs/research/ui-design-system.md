@@ -168,26 +168,35 @@ reduced-motion rule, and the diff views from phase 2.
 
 ### Font
 
-**Inter**, self-hosted, one variable `woff2` (latin subset, weights 400 to
-600), with the system stack as fallback. Mono uses the system stack.
+**Changed 2026-10-13 (owner's call, #362):** the app looked like GitHub
+(Primer's radii, Inter, soft shadows), so it now has an identity of its
+own, still conventional:
 
-Why Inter rather than the system stack alone:
+- **Atkinson Hyperlegible Next** for text: drawn by the Braille Institute
+  for legibility (distinct I, l and 1; open counters), so it is unusual
+  enough to be noticed and serves the "people and agents read this"
+  promise. SIL OFL, self-hosted, one variable latin `woff2` per style
+  (about 34 KB upright, 38 KB italic, against Inter's 73 KB and 52 KB).
+- **Geist Mono** for code and metadata: times, the meta line under a
+  title and numbers in tables, so they line up and read as an index
+  beside the text. SIL OFL, about 23 KB. Chosen over IBM Plex, Instrument
+  Sans and Hanken Grotesk in a side-by-side specimen of the real
+  components.
+- **Square corners** on every box (`--radius-sm`, `-md`, `-lg` are 0);
+  `--radius-full` only for pills and labels: badges, chips, counts.
+- **Flat and ruled:** no lift or drop shadow on hover, a darker 1px rule
+  instead. Floating menus keep `--shadow-menu` to separate them from
+  the page.
+- **A short brand-red rule** before the app's section headings, echoing
+  the sidebar's current marker. Not in written content or on the
+  public site.
 
-- The owner runs Linux, where `system-ui` falls back to whatever the
-  distribution ships (Cantarell, Noto, DejaVu). The look and metrics would
-  drift between machines and screenshots.
-- It is the most common neutral UI face: Linear uses it, and Atlassian
-  Sans is derived from it *(unverified)*.
-- Tall x-height, tabular figures (`tnum`), and SIL Open Font License, like
-  Barlow today. Self-hosting fits `style-src 'self'` and the CSP.
-
-Why not Geist: also OFL and good, but it reads as Vercel's. Why not keep
-Barlow: it is the Red Mage face. Size of a latin variable Inter is about
-100 KB *(unverified; measure after subsetting)*.
+Before: Inter, chosen as the most common neutral UI face, which is why
+it read as everyone else's.
 
 ```css
---font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
---font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+--font-sans: "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+--font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 ```
 
 ### Type scale
