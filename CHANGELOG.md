@@ -8,6 +8,7 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.24.0](https://github.com/andersthemagi/reliquary/compare/v0.23.0...v0.24.0) (2026-10-13)
 
+Agents can now ask a vault for work and wait in line for it, first come, first served, and one call tells an agent where it stands in every line. A task can be held for a person's review, carry a due date, priority and notes, and show when a file it cites has changed. Each vault gets its own request budget, so one busy vault can't slow the others. You choose whether people see your email, and you can delete your account while you own vaults: members can then take an orphaned vault over. The web app has a new look, with a vault overview, a grouped sidebar and simpler Tasks, Variables and Settings pages. This release applies 19 database migrations.
 
 ### Features
 
