@@ -8,6 +8,7 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.23.0](https://github.com/andersthemagi/reliquary/compare/v0.22.0...v0.23.0) (2026-10-13)
 
+The legal pages now name who runs Reliquary, Memento Vivre Fine Arts LLC (doing business as Red Mage), a Colorado company, under Colorado law. The privacy policy adds US state privacy rights, and gathers what will apply in the EU, EEA, UK and Switzerland, where the alpha isn't offered yet, in one marked section. The pages stay marked draft until their legal review. No database changes.
 
 ### Features
 
