@@ -1727,7 +1727,7 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 .card-grid { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: var(--space-4); }
 /* Home's filter and sort, shown past six vaults: the box with its own
    button, the sorts as chips, and how many vaults are shown. */
-.home-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); margin: 0 0 var(--space-5); }
+.home-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); margin: var(--space-7) 0 var(--space-5); }
 .home-filter .chips { margin: 0; }
 .home-count { margin: 0; flex-basis: 100%; }
 .home-search { position: relative; flex: 1 1 18rem; max-width: 28rem; margin: 0; }
@@ -1742,11 +1742,11 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
   position: relative; display: grid; gap: var(--space-3); align-content: start; min-width: 0;
   padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg);
   font-size: var(--text-sm); line-height: var(--lh-sm);
-  transition: border-color 120ms ease-out, box-shadow 160ms ease-out, transform 160ms ease-out;
+  transition: border-color 120ms ease-out;
 }
-.card:hover { border-color: var(--border-strong); box-shadow: 0 4px 14px rgb(0 0 0 / 0.08); transform: translateY(-1px); }
-.card:active { transform: none; box-shadow: none; }
-@media (prefers-reduced-motion: reduce) { .card, .card:hover { transform: none; transition: none; } }
+/* Flat and ruled (owner, 2026-10-13): hover darkens the rule, nothing lifts. */
+.card:hover { border-color: var(--border-strong); }
+.card:active { border-color: var(--fg-muted); }
 .card:has(.card-link:focus-visible) { outline: 2px solid var(--link); outline-offset: 2px; }
 .card p { margin: 0; }
 .card-head { display: flex; align-items: center; gap: var(--space-3); }
