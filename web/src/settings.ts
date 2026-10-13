@@ -250,7 +250,7 @@ export async function deleteAccountPage(ctx: Ctx, error?: string): Promise<Reply
       )}
       <ul class="rows">
         ${s.sole_owner.map(
-          (v) => html`<li><span><strong>${v.name}</strong></span><span class="actions"><a href="/v/${v.id}/config/members">Members</a> <a href="/v/${v.id}/config/danger">Delete vault</a></span></li>`,
+          (v) => html`<li><span><strong>${v.name}</strong></span><span class="actions"><a href="/v/${v.id}/config/members">Members</a> <a href="/v/${v.id}/config#danger">Delete vault</a></span></li>`,
         )}
       </ul>
       <p><a class="button quiet" href="/settings">Back to Account settings</a></p>`,

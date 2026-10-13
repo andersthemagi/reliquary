@@ -151,11 +151,23 @@ test("members: Settings links to Members, which lists each member by email and r
   assert.doesNotMatch(h, new RegExp(`>${PAUL}|Account ${PAUL.slice(0, 8)}`));
 });
 
+test("members sections: the owner's page has People, Pending invites and Agents, in that order, with Remove in a member's ⋯ menu and none on their own row", async () => {
+  const h = await page("olga", members(V.team));
+  const at = (s) => h.indexOf(s);
+  assert.ok(at("<h2>People</h2>") > 0 && at("<h2>People</h2>") < at("<h2>Pending invites</h2>") && at("<h2>Pending invites</h2>") < at("<h2>Agents</h2>"));
+  const paul = /<tr><td>paul@example\.test<\/td>[\s\S]*?<\/tr>/.exec(h)?.[0] ?? "";
+  assert.match(paul, /<summary class="button quiet icon-button" aria-label="Actions for paul@example\.test" title="Actions for paul@example\.test">/);
+  assert.match(paul, new RegExp(`<a class="menu-item danger" href="/v/${V.team}/config/members/remove\\?user=${PAUL}"><span class="menu-item-title">Remove</span>`));
+  const own = /<tr><td>olga@example\.test <span class="badge">You<\/span><\/td>[\s\S]*?<\/tr>/.exec(h)?.[0] ?? "";
+  assert.ok(own, "the owner's own row");
+  assert.doesNotMatch(own, /\/remove\?user=|Actions for/);
+});
+
 test("members: an editor sees the members but no invite form, role controls, invites or connections", async () => {
   const h = await page("paul", members(V.team));
   assert.match(h, /<td>olga@example\.test<\/td>/);
   assert.match(h, /Only owners invite people, change roles or remove members\./);
-  assert.doesNotMatch(h, /Invite someone|<select name="role"|Pending invites|<h2>Connections<\/h2>|\/remove\?user=/);
+  assert.doesNotMatch(h, /Invite someone|<select name="role"|Pending invites|<h2>Agents<\/h2>|\/remove\?user=/);
 });
 
 test("members: an outsider gets not found, and no member's email", async () => {
@@ -360,7 +372,7 @@ test("members: removing asks first, saying what goes and what stays, then remove
 
 test("connections: the owner sees each member's connections to this vault, escaped, and none that don't reach it", async () => {
   const h = await page("olga", members(V.team));
-  assert.match(h, /<h2>Connections<\/h2>/);
+  assert.match(h, /<h2>Agents<\/h2>/);
   assert.match(h, /<td><span class="conn-name">Paul laptop<\/span><span class="muted token-client">Token · from Cursor &lt;b&gt;bold&lt;\/b&gt;<\/span><\/td>\s*<td class="small" data-label="Member">paul@example\.test<\/td>/);
   assert.match(h, /Paul both/);
   assert.doesNotMatch(h, /Paul private/);
