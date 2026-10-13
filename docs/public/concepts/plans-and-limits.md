@@ -43,7 +43,7 @@ Sizes are decimal: 1 MB is 1,000,000 bytes, 1 GB is 1,000 MB.
 
 ## What counts
 
-- **Vaults you own**: the vaults you created. Being a member, even an owner, of someone else's vault doesn't count.
+- **Vaults you own**: the vaults you created, and any you chose to [become the owner of](members.md#a-vault-with-no-owner) after its owner deleted their account. Being a member, even an owner, of someone else's vault doesn't count.
 - **People**: a vault's members, of every role. When an owner invites someone, invites still waiting count too, so a vault never hands out more links than it has places for.
 - **Storage**: the text of every version of every file (history takes space too), every variable's encrypted value, and the encrypted values of imports waiting to be applied. A proposal counts once it is applied. Comments, review notes and the activity log don't count.
 

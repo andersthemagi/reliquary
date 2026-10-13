@@ -163,9 +163,20 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
       waiting ? html`<span class="count" aria-label="${waiting} waiting">${waiting}</span>` : ""}</summary>
       <nav class="side-links" aria-label="Vault (phone)">${groups}</nav>
       <nav class="tree" aria-label="Files (phone)"><span class="side-group side-tree-label">Files</span>${tree}</nav></details>
-    <div class="content">${body}</div>
+    <div class="content">${v.orphaned ? needsOwner(ctx, v) : ""}${body}</div>
   </div>`;
 }
+
+// A vault whose only owner deleted their account tells every member, on
+// every page of it, and lets any of them take it (public.take_vault,
+// 20261014170000_orphaned_vaults.sql).
+const needsOwner = (ctx: Ctx, v: Vault): Raw =>
+  callout(
+    "warning",
+    html`<p>${v.name}’s only owner deleted their account. Everyone keeps reading, writing and proposing as before, but nobody can do what only an owner may, such as changing rules or members, inviting people, exporting or deleting the vault, until a member becomes its owner. Becoming its owner counts it against your plan.</p>
+      <form method="post" action="${vaultPath(v.id, "/config/take")}" class="actions">${csrfField(ctx.csrf)}<button class="primary">Become owner</button></form>`,
+    { title: "This vault needs an owner", id: "needs-owner" },
+  );
 
 export type RuleInfo = {
   rule?: { path: string; policy: string; quorum: number; set_by: string | null; set_at: Date | null };

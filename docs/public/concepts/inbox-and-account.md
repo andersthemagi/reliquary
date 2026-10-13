@@ -103,4 +103,4 @@ Only you can sign out everywhere, signed in to the web app. An agent can't do it
 
 ## Delete your account
 
-**Delete account**, under **Danger zone** on **Account settings**, deletes your account at once: you leave every vault, your connections are deleted, and Reliquary forgets your email address, display name and plan. What you wrote in vaults stays there, and people see it as written by **a deleted account**. You can't delete your account while you're the only owner of a vault. See [Delete your account](../how-to/delete-your-account.md).
+**Delete account**, under **Danger zone** on **Account settings**, deletes your account at once: you leave every vault, your connections are deleted, and Reliquary forgets your email address, display name and plan. What you wrote in vaults stays there, and people see it as written by **a deleted account**. A vault nobody else is in is deleted with it, and one with members but no other owner is left for one of them to take on. See [Delete your account](../how-to/delete-your-account.md).

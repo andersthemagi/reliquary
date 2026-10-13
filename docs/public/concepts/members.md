@@ -11,9 +11,20 @@ A vault's members are on **Settings**, **Members**. Every member sees who else i
 - Pending invites, with when each was sent and expires, and **Revoke** behind a confirm page.
 - **Agents**: each member's connections that reach this vault (tokens, apps and the Reliquary CLI), with each one's type, when it was created and last used, and **Revoke** behind a confirm page, which cuts that connection off from this vault only. See [Connections](connections.md).
 
-A vault always keeps an owner: the only owner can't step down, leave or remove themself. Make someone else an owner first.
+The only owner can't step down, leave or remove themself. Make someone else an owner first. The one way a vault loses its last owner is that owner [deleting their account](../how-to/delete-your-account.md).
 
 Managing members is in the [ceiling](agents.md): no agent can do any of it, and no agent ever learns members' email addresses.
+
+## A vault with no owner
+
+When a vault's only owner deletes their account and other members remain, the vault is left without an owner. Every member sees **This vault needs an owner** at the top of its pages.
+
+- Members keep reading, writing and proposing as their roles allow.
+- Nobody can do what only an owner may: change rules or members, invite people, export or delete the vault. Its waiting invites were withdrawn when the owner left.
+- Any member can choose **Become owner**. The first to choose it is the owner; anyone after them is told the vault has one. Nobody is made an owner without choosing it.
+- Becoming the owner counts the vault against your plan, as if you had created it, and from then on it takes its people and storage limits from your plan. If you're at your plan's vault limit, you're refused and told so: delete a vault you no longer need, or ask for a bigger plan. Until someone takes it, the vault has the Free plan's limits.
+- Only you can choose it, signed in to the web app: it's in the [ceiling](agents.md#the-ceiling).
+- The last member of a vault with no owner can't leave it, since nobody could reach or delete it after. Become its owner, then delete it.
 
 ## Invites
 

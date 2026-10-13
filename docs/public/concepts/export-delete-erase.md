@@ -37,4 +37,4 @@ Deleting a file is different: it keeps the versions. See [Vaults, files and fold
 
 ## Delete your account
 
-Deleting your account is separate from deleting a vault: you leave your vaults, and what you wrote stays in them. See [Delete your account](../how-to/delete-your-account.md).
+Deleting your account is separate from deleting a vault: you leave your vaults, and what you wrote stays in them. Only a vault nobody else is in is deleted with your account. See [Delete your account](../how-to/delete-your-account.md).

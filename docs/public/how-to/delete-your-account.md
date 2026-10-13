@@ -4,7 +4,10 @@ Deleting your account is immediate and can't be undone. You leave every vault, y
 
 ## Before you start
 
-- **Vaults you own alone.** A vault always keeps an owner, so you can't delete your account while you're the only owner of a vault. For each one, either make someone else an owner (the vault's **Settings**, **Members**) or delete the vault (**Settings**, **General**, **Danger zone** at the bottom). The delete page lists these vaults with a link to each.
+- **Vaults you own alone.** Owning vaults never stops you deleting your account. What happens to each vault depends on who else is in it, and the delete page says it for each one:
+  - **Nobody else is in it:** it's deleted with your account, with everything in it, as if you had deleted the vault. Export it first if you want a copy.
+  - **Another owner is in it:** you just leave. It counts against the plan of its longest-standing remaining owner if you created it.
+  - **Other members, but no other owner:** you leave and it's left without an owner. Its members keep working in it, and any of them can choose to become its owner (see [Members and invites](../concepts/members.md#a-vault-with-no-owner)). Its waiting invites are withdrawn. If you'd rather pick who takes it on, make them an owner on **Settings**, **Members** before you delete your account.
 - **A copy.** To keep a vault's files, export it first: **Settings**, **Export**. See [Export, delete and erase](../concepts/export-delete-erase.md).
 - **What you wrote.** Files, proposals, comments and the activity log belong to each vault and its owners, so they stay. To remove something you wrote, erase it (owners only, **More**, **Erase file**) or ask an owner to, before you delete your account.
 
@@ -12,7 +15,7 @@ Deleting your account is immediate and can't be undone. You leave every vault, y
 
 1. Open the account menu at the top right and choose **Account settings**.
 2. Under **Danger zone** (the last section, or choose it in the menu beside the page), choose **Delete account**.
-3. Read the page: it lists the vaults you'll leave, how many connections are deleted and what stays.
+3. Read the page: it lists the vaults you'll leave, which vaults are deleted with your account or left without an owner, how many connections are deleted and what stays.
 4. Type your email address exactly as it is on your account, and choose **Delete my account**.
 
 You're signed out everywhere at once, and the page confirms what was deleted.
@@ -21,7 +24,9 @@ You're signed out everywhere at once, and the page confirms what was deleted.
 
 Deleted at once:
 
-- your memberships: you leave every vault, and each vault's activity log records that you left;
+- your memberships: you leave every vault, and each vault's activity log records that you left (and that it was left without an owner, where it was);
+- vaults nobody else is in, with everything in them;
+- your watches, snoozes and claims;
 - your connections: tokens, apps (Claude, ChatGPT, Cursor and others) and the Reliquary CLI;
 - invites you made that are still waiting, which are withdrawn;
 - your email address, display name, plan, and your sign-in account itself;

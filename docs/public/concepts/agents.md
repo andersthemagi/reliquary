@@ -22,6 +22,7 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - add, edit or delete a link, or set its tool grants;
 - rename a vault or change its default policy;
 - erase a file, export a vault, or delete one;
+- become the owner of a [vault with no owner](members.md#a-vault-with-no-owner), which counts it against your plan;
 - redact a [thread](threads.md#redacting-a-message) message;
 - snooze a proposal;
 - start or stop watching a path for [flags](flags.md);

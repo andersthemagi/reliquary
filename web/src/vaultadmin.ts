@@ -155,6 +155,18 @@ async function settings(ctx: Ctx, id: string, d?: GeneralForm): Promise<Reply> {
   }, d ? 400 : undefined);
 }
 
+// POST /config/take: a member becomes the owner of a vault that has none
+// (public.take_vault: in person, a member only, within their plan).
+async function takeVault(ctx: Ctx, id: string): Promise<Reply> {
+  try {
+    const name = await asPerson(ctx.userId, async (c) => (await c.query(`select public.take_vault($1) as n`, [id])).rows[0].n as string);
+    ctx.setFlash(`You’re the owner of ${name} now. It counts against your plan.`, "success");
+  } catch (err) {
+    ctx.setFlash(message(err));
+  }
+  return { redirect: vaultPath(id) };
+}
+
 // POST /config: rename and default policy. Owners get a confirmation page
 // first; anyone else goes straight to the database, which refuses.
 async function saveSettings(ctx: Ctx, id: string): Promise<Reply> {
@@ -439,6 +451,7 @@ export async function adminRoutes(ctx: Ctx, id: string, rest: string): Promise<R
   if (rest === "/config") return get ? settings(ctx, id) : saveSettings(ctx, id);
   if (rest === "/config/members" || rest.startsWith("/config/members/")) return membersRoutes(ctx, id, rest);
   if (rest === "/config/leave") return leaveRoutes(ctx, id);
+  if (rest === "/config/take") return get ? notFound(ctx) : takeVault(ctx, id);
   if (rest === "/config/usage") return get ? usagePage(ctx, id) : notFound(ctx);
   if (rest === "/config/watching") return watchingRoutes(ctx, id);
   if (rest === "/config/export") return get ? exportPage(ctx, id) : exportDownload(ctx, id);
