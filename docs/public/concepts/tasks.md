@@ -42,7 +42,7 @@ Select a plan to see every task in it. Tasks are grouped so what can be worked o
 | In progress | An agent holds the task and its time has not run out. The row says who holds it, the label they gave it, and how long is left. |
 | Ready | Every task it waits on is done, and nobody holds it. A task whose holder ran out of time is ready again. |
 | Blocked | It waits on tasks that are not done yet. The row names them. |
-| Blocked by a cancelled task | One of the tasks it waits on was cancelled. A cancelled task never counts as done, so this task stays blocked until a person cancels or skips it. |
+| Blocked by a cancelled task | One of the tasks it waits on was cancelled. A cancelled task never counts as done, so this task stays blocked until a person reopens that task, or cancels or skips this one. |
 | Done | Finished, or skipped by a person. |
 | Cancelled | Dropped by a person. It doesn't count as done. |
 
@@ -60,19 +60,23 @@ Time left is a lease, the same as for a [claim](claims.md#how-a-claim-works). A 
 
 The page shows the plan as it is when you open it. Reload to see changes.
 
-## Cancelling and skipping a task
+## Cancelling, skipping and reopening a task
 
-If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has two buttons, **Cancel** and **Skip**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it. Only a person can do either: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
+If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has two buttons, **Cancel** and **Skip**, and each cancelled task has **Reopen**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it; on the reopen page it is **Keep it cancelled**. Only a person can do any of them: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
 
-- **Cancel** drops the task. A cancelled task never counts as done, so every task waiting on it stays blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them. A cancelled task can't be reopened.
+- **Cancel** drops the task. A cancelled task never counts as done, so every task waiting on it stays blocked, shown as blocked by a cancelled task, until a person reopens it, or cancels or skips each of them.
 - **Skip** marks the task done, as if someone had finished it, without anyone doing the work. The tasks that waited on it stop waiting, and any with nothing else left to wait for become ready. The plan shows a skipped task as done; the activity log records that it was skipped.
+- **Reopen** puts a cancelled task back in the plan. It is ready if everything it waits on is done, and blocked if not. The tasks that waited on it stop showing as blocked by a cancelled task and wait for it to be done, like any other task. Only a cancelled task can be reopened: a skipped task counts as done, and what waited on it may already be under way.
 
-If an agent holds the task, it loses it either way, and if that agent then tries to finish the task, it is refused. Both actions are logged.
+If an agent holds the task, cancelling or skipping takes it from them, and if that agent then tries to finish the task, it is refused. All three actions are logged.
 
-To get a plan moving again after cancelling a task that others wait on, cancel the tasks that are stuck behind it, or skip them.
+To get a plan moving again after cancelling a task that others wait on, reopen it, or cancel or skip the tasks that are stuck behind it.
+
+### A new task or a reopened one
+
+When cancelled work needs doing after all, prefer a new task that names the old one by its key (for example, "redo of `draft` in plans/launch.md"), in a new plan file an agent registers. The old task stays cancelled, and the history reads plainly: what was dropped, and what replaced it. Reopen only when the work really is the same task, so the tasks that waited on it should wait on it again. The reopen page says the same before you confirm, and agents are told the same.
 
 ## Not here yet
 
-- Reopening a cancelled task. Nothing can undo a cancel yet, so cancel only what you mean to drop.
 - Who is waiting for a task, and their place in line.
 - Registering a plan from the web app. Agents register plans.

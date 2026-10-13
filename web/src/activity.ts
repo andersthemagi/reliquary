@@ -77,6 +77,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["step.checkin", "Checked in on a step"],
   ["step.cancel", "Cancelled a step"],
   ["step.skip", "Skipped a step"],
+  ["step.reopen", "Reopened a step"],
 ];
 
 // Who an event is for. Content events are what a person reading a vault wants
@@ -139,6 +140,7 @@ export const EVENT_KIND: Record<string, EventKind> = {
   "step.checkin": "diagnostic",
   "step.cancel": "diagnostic",
   "step.skip": "diagnostic",
+  "step.reopen": "diagnostic",
   // Thread events log ids only: no path, proposal or title for a Changes
   // line to link or say, so threads are read on their own page.
   "thread.open": "diagnostic",

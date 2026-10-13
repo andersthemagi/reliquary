@@ -250,7 +250,7 @@ test("plan page: a blocked task names what it waits on", async () => {
 
 test("plan page: a task blocked by a cancelled one says so plainly, and what it takes to move it", async () => {
   const row = taskRow(await page(noa, planUrl(V.main, "plans/launch.md")), "after");
-  assert.match(row, /Blocked by a cancelled task: Side job <code>side<\/code>\. A cancelled task never counts as done, so this one stays blocked until a person cancels or skips it\./);
+  assert.match(row, /Blocked by a cancelled task: Side job <code>side<\/code>\. A cancelled task never counts as done, so this one stays blocked until a person reopens that task, or cancels or skips this one\./);
 });
 
 test("plan page: a ready task, a done one and a cancelled one each say what they are", async () => {
@@ -364,7 +364,7 @@ test("cancel: the confirm page says what happens and what stays blocked, and ope
     h,
     /<li>These tasks wait on it and stay blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them: Review the draft <code>b<\/code>\.<\/li>/,
   );
-  assert.match(h, /<li>A cancelled task can’t be reopened\.<\/li>/);
+  assert.match(h, /<li>A person can reopen it later from this page\.<\/li>/);
   const { action, fields } = formFields(h, "Cancel “Draft”");
   assert.equal(action, `/v/${V.main}/tasks/plan`);
   assert.deepEqual({ ...fields, csrf: undefined }, { csrf: undefined, path: WORK, key: "a", action: "cancel", confirm: "1" });
@@ -452,6 +452,93 @@ test("skip: an unknown task goes back with a warning, and a form naming no actio
   assert.equal(tone, "danger");
   assert.match(text, /^The form didn’t say what to do, so nothing changed\. \(ref [0-9a-f]{8}\)$/);
   assert.equal((await stepOf("d")).status, "open");
+});
+
+// ---------------------------------------------------------------------------
+// Reopen (issue #76). reopen_step is the database's to allow (a person who
+// can write the path, only a cancelled step: reopen_step_test.sql); these
+// check the button, the confirm page and its nudge toward a new task, and
+// what the page says afterwards. Its own plan: base is ready, drop (waits
+// on base) and solo are cancelled, next waits on drop.
+
+const REOPEN = "plans/reopen.md";
+const reopenUrl = (key) => `${planUrl(V.main, REOPEN)}&reopen=${key}`;
+async function reopenPlan() {
+  if ((await sql("select 1 from public.work_plans where vault_id = $1 and path = $2", [V.main, REOPEN])).length) return;
+  await register(NOA, V.main, REOPEN, [
+    { key: "base", title: "Base" },
+    { key: "drop", title: "Dropped work", blocked_by: ["base"] },
+    { key: "next", title: "Next step", blocked_by: ["drop"] },
+    { key: "solo", title: "Solo work" },
+  ]);
+  for (const key of ["drop", "solo"]) await as(NOA, "select public.cancel_step($1, $2, $3)", [V.main, REOPEN, key]);
+}
+const reopenStatus = async (key) =>
+  (await sql("select s.status from public.work_plan_steps s join public.work_plans p on p.id = s.plan_id where p.vault_id = $1 and p.path = $2 and s.key = $3",
+    [V.main, REOPEN, key]))[0].status;
+
+test("reopen: an owner is offered Reopen on a cancelled task and on no other; a viewer is offered nothing and is sent back from the confirm page", async () => {
+  await reopenPlan();
+  const h = await page(noa, planUrl(V.main, REOPEN));
+  assert.match(taskRow(h, "drop"), new RegExp(`<a class="button quiet" href="${planUrl(V.main, REOPEN).replace("?", "\\?")}&amp;reopen=drop" aria-label="Reopen the task Dropped work">Reopen</a>`));
+  assert.doesNotMatch(taskRow(h, "drop"), /Cancel<\/a>|Skip<\/a>/);
+  for (const key of ["base", "next"]) assert.doesNotMatch(taskRow(h, key), /Reopen/, `no Reopen on ${key}`);
+  assert.match(h, /Cancel drops a task, and Reopen puts a cancelled one back\./);
+
+  assert.doesNotMatch(await page(rex, planUrl(V.main, REOPEN)), /Reopen<\/a>/);
+  const back = await landed(rex, await get(rex, reopenUrl("drop")));
+  assert.deepEqual(flashOf(back), ["warning", "status", "Only someone who can write this plan’s file reopens its tasks."]);
+  assert.equal(await reopenStatus("drop"), "cancelled");
+});
+
+test("reopen: the confirm page says a new task naming the old one is usually better, what it waits on and what waits on it, and opening it reopens nothing", async () => {
+  await reopenPlan();
+  const h = await page(noa, reopenUrl("drop"));
+  assert.match(h, /<h1>Reopen “Dropped work”\?<\/h1>/);
+  assert.match(h, /Reopening <strong>Dropped work<\/strong> <code>drop<\/code> puts it back in the plan as open work, for an agent to take once what it waits on is done\./);
+  assert.match(h, /<li>If the work has changed since it was cancelled, a new task that names this one \(<code>drop<\/code>\) is usually better than reopening it: an agent adds it in a new plan file, and the history reads plainly\. Reopen when the work really is the same task\.<\/li>/);
+  assert.match(h, /<li>It waits on Base <code>base<\/code> again before anyone can take it\.<\/li>/);
+  assert.match(h, /<li>These tasks wait on it, and wait for it to be done, the same as for any other task: Next step <code>next<\/code>\.<\/li>/);
+  assert.match(h, /<button class="danger solid">Reopen “Dropped work”<\/button><a class="button quiet" href="[^"]+">Keep it cancelled<\/a>/);
+  const { fields } = formFields(h, "Reopen “Dropped work”");
+  assert.deepEqual({ ...fields, csrf: undefined }, { csrf: undefined, path: REOPEN, key: "drop", action: "reopen", confirm: "1" });
+  assert.equal(await reopenStatus("drop"), "cancelled", "asking reopens nothing");
+});
+
+test("reopen: confirming reopens it, says so as a success, logs it, and what waited on it reads as blocked, not blocked by a cancelled task", async () => {
+  await reopenPlan();
+  assert.match(taskRow(await page(noa, planUrl(V.main, REOPEN)), "next"), /Blocked by a cancelled task/);
+  const { action, fields } = formFields(await page(noa, reopenUrl("drop")), "Reopen “Dropped work”");
+  const h = await landed(noa, await post(noa, action, fields));
+  assert.deepEqual(flashOf(h), ["success", "status", "“Dropped work” is reopened. Tasks that waited on it now wait for it to be done."]);
+  assert.equal(await reopenStatus("drop"), "open");
+  assert.deepEqual(
+    await sql("select actor, detail->>'step' as step from public.log where vault_id = $1 and path = $2 and event = 'step.reopen' order by seq", [V.main, REOPEN]),
+    [{ actor: NOA, step: "drop" }],
+  );
+  assert.match(taskRow(h, "drop"), /<span class="badge warning">Blocked<\/span>/);
+  assert.match(taskRow(h, "next"), /<span class="badge warning">Blocked<\/span>/);
+  assert.match(taskRow(h, "next"), /Waiting on Dropped work <code>drop<\/code>\./);
+});
+
+test("reopen: a cancelled task with nothing unfinished to wait on says it will be ready, and is ready once reopened", async () => {
+  await reopenPlan();
+  const h = await page(noa, reopenUrl("solo"));
+  assert.match(h, /<li>Nothing it waits on is unfinished, so it is ready for an agent to take\.<\/li>/);
+  assert.match(h, /<li>No other task is waiting on it\.<\/li>/);
+  const { action, fields } = formFields(h, "Reopen “Solo work”");
+  assert.match(taskRow(await landed(noa, await post(noa, action, fields)), "solo"), /<span class="badge success">Ready<\/span>/);
+});
+
+test("reopen: a task that isn't cancelled goes back with a warning, and a crafted form is refused with a reference and changes nothing", async () => {
+  await reopenPlan();
+  const back = await landed(noa, await get(noa, reopenUrl("base")));
+  assert.deepEqual(flashOf(back), ["warning", "status", "“Base” isn’t cancelled, so there’s nothing to reopen."]);
+  const h = await landed(noa, await post(noa, `/v/${V.main}/tasks/plan`, { csrf: csrfOf(back), path: REOPEN, key: "base", action: "reopen", confirm: "1" }));
+  const [tone, , text] = flashOf(h);
+  assert.equal(tone, "danger");
+  assert.match(text, /^Step &quot;base&quot; is not cancelled; only a cancelled step can be reopened\. \(ref [0-9a-f]{8}\)$/);
+  assert.equal(await reopenStatus("base"), "open");
 });
 
 // ---------------------------------------------------------------------------

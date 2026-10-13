@@ -128,6 +128,7 @@ and, for the agent, its token's vaults and access.
 | See a plan's steps: state, what blocks each, who holds it | `/v/:v/tasks`, `/v/:v/tasks/plan?path=` (`web/src/tasks.ts`) | `work_plan_status` | both, any connection (read-only is enough) | Both sides read the same rows through the same RLS; the web app shows them as tasks |
 | Claim a step, check in on it, complete it or give it back | none | `claim_step`, `checkin_step`, `complete_step`, `release_step` | agent; whoever could write the plan's path claims (a read-only connection or a viewer can't), and only the holder, from the same connection, with its secret and fence, checks in, completes or releases | **Gap**, left on purpose, flagged for the owner: a step is claimed by whoever will do the work, the same reasoning as `claim_path`, so a person has nothing to claim on their own behalf. A person who does a step themself marks it done with Skip (next row) |
 | Cancel a step, or skip one (mark it done without anyone doing it) | the Tasks page, a task's **Cancel** or **Skip** (a confirm page first) | none | person, owners and editors | **Ceiling**: `cancel_step` and `skip_step` are `require_human`, the same ceiling as `break_claim` (design.md "Claims and work plans" item 1) |
+| Reopen a cancelled step | the Tasks page, a cancelled task's **Reopen** (a confirm page first) | none | person, owners and editors | **Ceiling**: `reopen_step` is `require_human`, like `cancel_step`: undoing a person's cancel is a person's call |
 
 ## Fixed in this change
 

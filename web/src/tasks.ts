@@ -10,18 +10,21 @@
 // readable by every member of the vault (RLS), and a person's own actions
 // are the database's to allow or refuse.
 //
-// Cancel and skip are a person's only: cancel_step and skip_step are
-// require_human, so an agent is refused by the database whatever this page
-// does. Each goes through a confirm page, like Break on the Claims page
-// (claimspage.ts), because a cancel can't be undone and a skip frees
-// whatever waited on the task. The buttons are shown to whoever can write
-// the plan's path, which is what the database checks too.
+// Cancel, skip and reopen are a person's only: cancel_step, skip_step and
+// reopen_step are require_human, so an agent is refused by the database
+// whatever this page does. Each goes through a confirm page, like Break on
+// the Claims page (claimspage.ts): a cancel blocks what waits on the task,
+// a skip frees it, and a reopen puts back work someone dropped, when a new
+// task naming the old one is often the better way (the owner's call on
+// issue #76). The buttons are shown to whoever can write the plan's path,
+// which is what the database checks too.
 //
 //   GET  /v/:id/tasks                          the plans, with counts and a marker when a plan file changed
 //   GET  /v/:id/tasks/plan?path=               one plan: every task, ready or in progress first
 //   GET  /v/:id/tasks/plan?path=&cancel=<key>  confirm cancelling a task
 //   GET  /v/:id/tasks/plan?path=&skip=<key>    confirm skipping a task
-//   POST /v/:id/tasks/plan                     action=cancel|skip, path, key, confirm=1
+//   GET  /v/:id/tasks/plan?path=&reopen=<key>  confirm reopening a cancelled task
+//   POST /v/:id/tasks/plan                     action=cancel|skip|reopen, path, key, confirm=1
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
@@ -208,7 +211,7 @@ function detail(ctx: Ctx, t: Task): Raw {
     case "blocked_by_cancelled": {
       const cancelled = t.blockers.filter((b) => b.status === "cancelled");
       const others = t.blockers.filter((b) => b.status !== "done" && b.status !== "cancelled");
-      return html`Blocked by a cancelled task: ${nameList(cancelled)}. A cancelled task never counts as done, so this one stays blocked until a person cancels or skips it.${
+      return html`Blocked by a cancelled task: ${nameList(cancelled)}. A cancelled task never counts as done, so this one stays blocked until a person reopens that task, or cancels or skips this one.${
         others.length ? html`<span class="token-client">Also waiting on ${nameList(others)}.</span>` : ""
       }`;
     }
@@ -227,11 +230,14 @@ function moved(id: string, t: Task): Raw | "" {
     t.moved.length === 1 ? "has" : "have"} a newer version than the one this task cites.</span>`;
 }
 
-// Cancel and skip are offered on a task that isn't finished either way.
+// Cancel and skip are offered on a task that isn't finished either way,
+// reopen on a cancelled one.
 const unfinished = (t: Task) => t.state !== "done" && t.state !== "cancelled";
+const VERBS = ["cancel", "skip", "reopen"] as const;
+type Verb = (typeof VERBS)[number];
 
 function taskTable(ctx: Ctx, id: string, path: string, rows: Task[], canAct: boolean): Raw {
-  const href = (verb: "cancel" | "skip", t: Task) => `${planPath(id, path)}&${verb}=${q(t.key)}`;
+  const href = (verb: Verb, t: Task) => `${planPath(id, path)}&${verb}=${q(t.key)}`;
   return html`<div class="table-wrap"><table class="table-stack member-list task-table">
     <thead><tr><th scope="col">Task</th><th scope="col">State</th><th scope="col">Details</th>${
       canAct ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""
@@ -244,7 +250,9 @@ function taskTable(ctx: Ctx, id: string, path: string, rows: Task[], canAct: boo
         ${canAct
           ? unfinished(t)
             ? html`<td class="row-actions"><a class="button quiet" href="${href("cancel", t)}" aria-label="Cancel the task ${t.title}">Cancel</a> <a class="button quiet" href="${href("skip", t)}" aria-label="Skip the task ${t.title}">Skip</a></td>`
-            : html`<td class="row-actions"></td>`
+            : t.state === "cancelled"
+              ? html`<td class="row-actions"><a class="button quiet" href="${href("reopen", t)}" aria-label="Reopen the task ${t.title}">Reopen</a></td>`
+              : html`<td class="row-actions"></td>`
           : ""}</tr>`,
     )}</tbody></table></div>`;
 }
@@ -261,7 +269,7 @@ function fileNote(id: string, p: Plan): Raw | "" {
 
 export async function plan(ctx: Ctx, id: string): Promise<Reply> {
   const path = ctx.url.searchParams.get("path") ?? "";
-  for (const verb of ["cancel", "skip"] as const) {
+  for (const verb of VERBS) {
     const key = ctx.url.searchParams.get(verb);
     if (key !== null) return confirmTask(ctx, id, path, verb, key);
   }
@@ -284,38 +292,56 @@ export async function plan(ctx: Ctx, id: string): Promise<Reply> {
       })}
       ${fileNote(id, p)}
       ${groups.map((g) => html`<section aria-labelledby="g-${g.id}"><h2 id="g-${g.id}">${g.title} <span class="muted">${g.rows.length}</span></h2>${taskTable(ctx, id, path, g.rows, canAct)}</section>`)}
-      <p class="hint">${canAct ? "Cancel drops a task. Skip marks it done without anyone doing it. Each asks you to confirm first, and neither can be undone from here. " : ""}<a href="/docs/concepts/tasks">About tasks</a></p>`;
+      <p class="hint">${canAct ? "Cancel drops a task, and Reopen puts a cancelled one back. Skip marks a task done without anyone doing it, and can’t be undone from here. Each asks you to confirm first. " : ""}<a href="/docs/concepts/tasks">About tasks</a></p>`;
     return { body, title: path };
   });
 }
 
 // ---------------------------------------------------------------------------
-// Confirm cancelling or skipping a task. A GET: nothing changes until its
-// form is sent.
+// Confirm cancelling, skipping or reopening a task. A GET: nothing changes
+// until its form is sent.
 
-type Verb = "cancel" | "skip";
+const LABEL: Record<Verb, { title: string; button: string }> = {
+  cancel: { title: "Cancel a task", button: "Cancel" },
+  skip: { title: "Skip a task", button: "Skip" },
+  reopen: { title: "Reopen a task", button: "Reopen" },
+};
 
 async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: string): Promise<Reply> {
   return build(ctx, id, async (c, v) => {
     const back = planPath(id, path);
     if (!(await loadPlans(c, id)).some((x) => x.path === path)) return { back: tasksPath(id), note: `There’s no plan registered at ${shown(path)}.`, tone: "warning" };
-    if (!(await writablePath(c, v, path))) return { back, note: "Only someone who can write this plan’s file cancels or skips its tasks.", tone: "warning" };
+    if (!(await writablePath(c, v, path)))
+      return { back, note: `Only someone who can write this plan’s file ${verb === "reopen" ? "reopens" : "cancels or skips"} its tasks.`, tone: "warning" };
     const rows = await loadTasks(c, id, path);
     const t = rows.find((r) => r.key === key);
     if (!t) return { back, note: `There’s no task ${shown(key)} in this plan.`, tone: "warning" };
-    if (!unfinished(t)) return { back, note: `“${t.title}” is already ${t.state === "done" ? "done" : "cancelled"}, so there’s nothing to ${verb}.`, tone: "warning" };
+    if (verb === "reopen" && t.state !== "cancelled") return { back, note: `“${t.title}” isn’t cancelled, so there’s nothing to reopen.`, tone: "warning" };
+    if (verb !== "reopen" && !unfinished(t)) return { back, note: `“${t.title}” is already ${t.state === "done" ? "done" : "cancelled"}, so there’s nothing to ${verb}.`, tone: "warning" };
 
     // What waits on it: a task that lists it as a blocker and isn't finished either way.
     const waiting = rows.filter((r) => unfinished(r) && r.blockers.some((b) => b.key === key));
     const holder = t.state === "claimed" ? html`${who(ctx, t.holder, null)}${t.holder_label ? html` (“${t.holder_label}”)` : ""} holds it now and loses it. If their agent tries to finish it, that is refused.` : "";
+    const blockers = t.blockers.filter((b) => b.status !== "done");
     const consequences: (Raw | string)[] =
-      verb === "cancel"
+      verb === "reopen"
+        ? [
+            html`If the work has changed since it was cancelled, a new task that names this one (<code>${t.key}</code>) is usually better than reopening it: an agent adds it in a new plan file, and the history reads plainly. Reopen when the work really is the same task.`,
+            blockers.length
+              ? html`It waits on ${nameList(blockers)} again before anyone can take it.`
+              : "Nothing it waits on is unfinished, so it is ready for an agent to take.",
+            waiting.length
+              ? html`These tasks wait on it, and wait for it to be done, the same as for any other task: ${nameList(waiting)}.`
+              : "No other task is waiting on it.",
+            "It’s logged in the activity log.",
+          ]
+        : verb === "cancel"
         ? [
             waiting.length
               ? html`These tasks wait on it and stay blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them: ${nameList(waiting)}.`
               : "No other task is waiting on it.",
             holder,
-            "A cancelled task can’t be reopened.",
+            "A person can reopen it later from this page.",
             "It’s logged in the activity log.",
           ]
         : [
@@ -327,26 +353,28 @@ async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: 
             "The plan shows it as done. The activity log records that it was skipped.",
           ];
     const body = confirmPage({
-      title: verb === "cancel" ? `Cancel “${t.title}”?` : `Skip “${t.title}”?`,
-      crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Tasks", href: tasksPath(id) }, { label: path.split("/").pop()!, href: back }, { label: verb === "cancel" ? "Cancel a task" : "Skip a task" }],
+      title: `${LABEL[verb].button} “${t.title}”?`,
+      crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Tasks", href: tasksPath(id) }, { label: path.split("/").pop()!, href: back }, { label: LABEL[verb].title }],
       lede:
-        verb === "cancel"
+        verb === "reopen"
+          ? html`Reopening <strong>${t.title}</strong> <code>${t.key}</code> puts it back in the plan as open work, for an agent to take once what it waits on is done.`
+          : verb === "cancel"
           ? html`Cancelling <strong>${t.title}</strong> <code>${t.key}</code> drops it from the plan. A cancelled task never counts as done.`
           : html`Skipping <strong>${t.title}</strong> <code>${t.key}</code> marks it done, as if someone had finished it, without anyone doing the work.`,
       consequences: consequences.filter((x) => x !== ""),
       action: `${tasksPath(id)}/plan`,
       csrf: ctx.csrf,
       fields: { path, key, action: verb, confirm: "1" },
-      button: verb === "cancel" ? `Cancel “${t.title}”` : `Skip “${t.title}”`,
+      button: `${LABEL[verb].button} “${t.title}”`,
       cancel: back,
-      ...(verb === "cancel" ? { cancelLabel: "Keep the task" } : {}),
+      ...(verb === "cancel" ? { cancelLabel: "Keep the task" } : verb === "reopen" ? { cancelLabel: "Keep it cancelled" } : {}),
     });
-    return { body, title: verb === "cancel" ? "Cancel a task" : "Skip a task" };
+    return { body, title: LABEL[verb].title };
   });
 }
 
 // ---------------------------------------------------------------------------
-// POST: cancel or skip, once confirmed. The database refuses anyone who can't
+// POST: cancel, skip or reopen, once confirmed. The database refuses anyone who can't
 // write the path, an agent, a task already finished, and an unknown one; its
 // refusal comes back as a flash with its reference.
 
@@ -357,7 +385,7 @@ export async function taskAction(ctx: Ctx, id: string): Promise<Reply> {
   const key = ctx.form.get("key") ?? "";
   const action = ctx.form.get("action") ?? "";
   const back = planPath(id, path);
-  if (action !== "cancel" && action !== "skip") {
+  if (!(VERBS as readonly string[]).includes(action)) {
     ctx.setFlash(refuse("The form didn’t say what to do, so nothing changed"));
     return { redirect: back };
   }
@@ -367,12 +395,14 @@ export async function taskAction(ctx: Ctx, id: string): Promise<Reply> {
     const done = await asPerson(ctx.userId, async (c) => {
       if (!(await vault(c, ctx, id))) return null;
       const title = (await loadTasks(c, id, path)).find((r) => r.key === key)?.title ?? key;
-      await c.query(`select public.${action === "cancel" ? "cancel_step" : "skip_step"}($1, $2, $3)`, [id, path, key]);
+      await c.query(`select public.${action}_step($1, $2, $3)`, [id, path, key]);
       return title;
     });
     if (done === null) return notFound(ctx);
     ctx.setFlash(
-      action === "cancel"
+      action === "reopen"
+        ? `“${done}” is reopened. Tasks that waited on it now wait for it to be done.`
+        : action === "cancel"
         ? `“${done}” is cancelled. Tasks waiting on it stay blocked until a person cancels or skips them.`
         : `“${done}” is skipped and counts as done. Tasks that were waiting only on it are ready now.`,
       "success",
