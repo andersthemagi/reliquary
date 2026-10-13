@@ -13,7 +13,7 @@ A read-only connection makes the agent a viewer everywhere. A connection limited
 Some actions need the person, signed in, in the web app. No agent can do them, through any connection, even an owner's:
 
 - approve, request changes on or reject a proposal (and edit, then approve);
-- set or remove rules (canon or open, quorum);
+- set or remove rules (canon or open, quorum, [claim rules](claims.md#claim-rules));
 - name or remove a path's owners;
 - invite people, change roles, remove members, or see members' email addresses;
 - create a token or revoke a connection;
@@ -24,7 +24,8 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - redact a [thread](threads.md#redacting-a-message) message;
 - snooze a proposal;
 - start or stop watching a path for [flags](flags.md);
-- break someone else's [claim](claims.md), set a claim rule, or cancel, skip, reopen or approve a [work plan](claims.md#work-plans) step.
+- break someone else's [claim](claims.md);
+- approve, cancel, skip or reopen a [work plan](tasks.md) step (a task).
 
 This is the one list. Other pages, the glossary and the repo's own docs say "the ceiling" and link here instead of repeating it.
 
@@ -43,7 +44,7 @@ Within your role and the connection's access:
 - open, read and post in [threads](threads.md), and resolve or reopen them;
 - list their person's [flags](flags.md) and mark them shown, and list what the person watches;
 - list a vault's [links](links.md) and call the link tools their role is granted, as `<link>.<tool>`;
-- register a plan file as a [work plan](claims.md#work-plans), read its steps, and claim, check in on, complete or give back a step;
+- register a plan file as a [work plan](tasks.md), read its steps, ask for work and wait in line, see where they stand in every line, and claim, check in on, complete or give back a step;
 - create a vault for you, with a read-write connection that reaches all your vaults;
 - list environment variable names, and imports from the CLI waiting for you (never values);
 - send feedback or a bug report about Reliquary for you, even over a read-only connection, and list what you've sent with its status and replies. See [Send feedback or report a bug](../how-to/send-feedback.md).
