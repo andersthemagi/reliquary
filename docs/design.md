@@ -547,7 +547,7 @@ and phase 3 (work plans); waiting in line (item 11, CL-3.9, #74) built in
 the database on 2026-10-13, with its MCP tools (#75) and the view of who is
 waiting (#76) still to come; [progress.md](progress.md) has what shipped. Validated first in a throwaway
 PostgreSQL 16 model, not Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
-Twelve points, each with the reason it was decided that way.
+Twelve points, each with the reason it was decided that way, and a thirteenth added later.
 
 ### 1. Names
 
@@ -855,6 +855,49 @@ into this repo (CL-0.4). At 100 agents asking as fast as they can, the
 guarded design held 53,992 calls a second at 1.9 ms against 6,172 at 16
 ms for the earlier, connection-keyed one; the same shape held at 500
 agents and across 5,000 simulated vaults.
+
+### 13. Planning fields
+
+Added 2026-10-13 (owner's call, issue #334), so the Tasks page can read
+like a task list a person plans around, not only a dependency graph.
+Four optional lines per step in the `work_plan` block, each stored per
+step at registration from the registered version, the same as `title`:
+editing the file later changes none of them, consistent with item 6.
+
+- `due: 2026-10-20`, a calendar date with no time or zone. The Tasks
+  page groups by it (Overdue, Today, Upcoming, by the viewer's own
+  date). A date in the past is accepted: a plan written late is still a
+  plan.
+- `priority: 1` to `4`, 1 highest, Todoist's scale. It orders tasks
+  within a group and is shown as a word with its colour, never colour
+  alone.
+- `notes: ...`, one line of plain text up to 2000 characters, half a
+  proposal reason, because a step's notes are a pointer, and the plan
+  file is where long text belongs. Shown to agents between markers as
+  data, never as instructions, the same as `title` and a claim's label
+  (item 12).
+- `for: agents`, `for: people`, or a member's email. An email is
+  resolved to the member's user id at registration and refused, with
+  the line, if it names no member; the step stores the id, never the
+  email, so a member who changes address stays the one it means. A
+  page shows that member however people are shown everywhere else
+  (their display name and email today). A hint for who should pick the
+  task up, and only a hint.
+
+None of the four is an access rule or a claim rule. A step is claimable
+exactly as items 3, 4 and 12(c) say, whatever its `for`, `due` or
+`priority`: a hint that gated claims would be a second permission
+system living in file text, and an agent could not tell it from a rule
+it may break. A due date passing changes no state and starts no
+routine. When waiting in line (item 11) is built, whether `priority`
+orders which ready step a waiting agent is offered is its own decision,
+not settled here.
+
+Settled 2026-10-13 (owner's call): `for` names a member by email,
+because an email is unique and a display name is not. What identifies a
+person (their id, reached through their email) stays separate from how
+they are shown, so letting a person choose how co-members see them is
+its own change and never touches a stored plan.
 
 ### What this doesn't show
 
