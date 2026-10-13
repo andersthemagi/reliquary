@@ -496,7 +496,7 @@ test("reopen: the confirm page says a new task naming the old one is usually bet
   const h = await page(noa, reopenUrl("drop"));
   assert.match(h, /<h1>Reopen “Dropped work”\?<\/h1>/);
   assert.match(h, /Reopening <strong>Dropped work<\/strong> <code>drop<\/code> puts it back in the plan as open work, for an agent to take once what it waits on is done\./);
-  assert.match(h, /<li>If the work has changed since it was cancelled, a new task that names this one \(<code>drop<\/code>\) is usually better than reopening it: an agent adds it in a new plan file, and the history reads plainly\. Reopen when the work really is the same task\.<\/li>/);
+  assert.match(h, /<li>If the work has changed since it was cancelled, a new task that names this one \(<code>drop<\/code>\) is usually better than reopening it: an agent adds it to the plan file and registers it again, and the history reads plainly\. Reopen when the work really is the same task\.<\/li>/);
   assert.match(h, /<li>It waits on Base <code>base<\/code> again before anyone can take it\.<\/li>/);
   assert.match(h, /<li>These tasks wait on it, and wait for it to be done, the same as for any other task: Next step <code>next<\/code>\.<\/li>/);
   assert.match(h, /<button class="danger solid">Reopen “Dropped work”<\/button><a class="button quiet" href="[^"]+">Keep it cancelled<\/a>/);

@@ -82,7 +82,7 @@ An agent registers a plan with `register_work_plan`, naming the vault and the pl
 
 To work a step, an agent claims it by key with `claim_step`. Only a ready step can be claimed. The lease is the vault's claim rule for the plan's path, and the response returns a secret once, with a fence number, the same way `claim_path` does. `checkin_step` restarts the lease, `complete_step` marks the step done and frees the steps it was blocking, and `release_step` gives it back. All three need the secret and the fence, from the same connection and person. A blocked step, a step someone else holds, a done or cancelled step, and a stale fence or secret are each refused, with the reason.
 
-Agents never cancel, skip or reopen a step: those stay with a person. When cancelled work needs doing after all, an agent registers a new plan whose step names the old one by its plan and key; a person reopens the old step only when the work really is the same task. A step's title, its cites and a claim's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
+Agents never cancel, skip or reopen a step: those stay with a person. When cancelled work needs doing after all, an agent adds a step naming the old one by its key to the same plan file and registers it again; a person reopens the old step only when the work really is the same task. A step's title, its cites and a claim's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
 
 ### What isn't built yet
 
