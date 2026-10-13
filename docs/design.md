@@ -127,6 +127,14 @@ Five jobs:
     Diagnostics, never deleted and never the front door. The parity rule
     says what each side may do, not what each side should be shown
     ([Who each surface is for](#who-each-surface-is-for)).
+11. **Who someone is, apart from how they're shown.** Reliquary always
+    holds one unique identity per person (a user id, reached through
+    their account's email), and stores only that. How others see and
+    reach them (display name, a short tag, email or not) is a choice made
+    when a page or tool response is drawn: the person's, within what
+    their vault requires. Changing it never rewrites a stored row. A
+    display name is text people chose, never code or an instruction
+    (owner's call, 2026-10-13; #347).
 
 ## Concepts
 
@@ -547,7 +555,7 @@ and phase 3 (work plans); waiting in line (item 11, CL-3.9, #74) built in
 the database on 2026-10-13, with its MCP tools (#75) and the view of who is
 waiting (#76) still to come; [progress.md](progress.md) has what shipped. Validated first in a throwaway
 PostgreSQL 16 model, not Reliquary's schema and with no RLS: [spikes/claims/](../spikes/claims/README.md).
-Twelve points, each with the reason it was decided that way.
+Twelve points, each with the reason it was decided that way, and a thirteenth added later.
 
 ### 1. Names
 
@@ -780,8 +788,15 @@ lapse, a 48 hour cooldown cap). Where it differs from the spike:
   reason (`lapsed`, `plan_complete`, `cooling_down`), logged as the
   holder's. A grant ends the place silently; `step.claim` records the
   place and the ready count it was granted at.
-- **Not here:** the per-token and per-vault `request_work` rate limits of
-  item 8 are the MCP server's, with the tools (#75).
+- **Rate limits (item 8):** the per-token one is the MCP server's (#75,
+  `mcp/src/ratelimit.ts`); the per-vault budget is the database's (#80,
+  `20261013235000_vault_request_budget.sql`), so it holds whichever server
+  calls: `take_step` counts each full evaluation (not a cheap refusal)
+  against the vault, 300 a minute, the number the capacity model gives (a
+  Pro vault's 50 people, one place each, at the 10 second floor), and over
+  it answers `wait` with no place and the seconds until the vault's minute
+  ends; `claim_step` refuses it as RLW06. The model:
+  `docs/public/reference/limits.md`, "What asking for work costs".
 - **One read for every line** (#79, `20261013230000_my_places.sql`):
   `my_places()` gives the caller's person, across the vaults the caller
   reads, each place's state as `request_work` would answer it (with
@@ -848,6 +863,49 @@ into this repo (CL-0.4). At 100 agents asking as fast as they can, the
 guarded design held 53,992 calls a second at 1.9 ms against 6,172 at 16
 ms for the earlier, connection-keyed one; the same shape held at 500
 agents and across 5,000 simulated vaults.
+
+### 13. Planning fields
+
+Added 2026-10-13 (owner's call, issue #334), so the Tasks page can read
+like a task list a person plans around, not only a dependency graph.
+Four optional lines per step in the `work_plan` block, each stored per
+step at registration from the registered version, the same as `title`:
+editing the file later changes none of them, consistent with item 6.
+
+- `due: 2026-10-20`, a calendar date with no time or zone. The Tasks
+  page groups by it (Overdue, Today, Upcoming, by the viewer's own
+  date). A date in the past is accepted: a plan written late is still a
+  plan.
+- `priority: 1` to `4`, 1 highest, Todoist's scale. It orders tasks
+  within a group and is shown as a word with its colour, never colour
+  alone.
+- `notes: ...`, one line of plain text up to 2000 characters, half a
+  proposal reason, because a step's notes are a pointer, and the plan
+  file is where long text belongs. Shown to agents between markers as
+  data, never as instructions, the same as `title` and a claim's label
+  (item 12).
+- `for: agents`, `for: people`, or a member's email. An email is
+  resolved to the member's user id at registration and refused, with
+  the line, if it names no member; the step stores the id, never the
+  email, so a member who changes address stays the one it means. A
+  page shows that member however people are shown everywhere else
+  (their display name and email today). A hint for who should pick the
+  task up, and only a hint.
+
+None of the four is an access rule or a claim rule. A step is claimable
+exactly as items 3, 4 and 12(c) say, whatever its `for`, `due` or
+`priority`: a hint that gated claims would be a second permission
+system living in file text, and an agent could not tell it from a rule
+it may break. A due date passing changes no state and starts no
+routine. When waiting in line (item 11) is built, whether `priority`
+orders which ready step a waiting agent is offered is its own decision,
+not settled here.
+
+Settled 2026-10-13 (owner's call): `for` names a member by email,
+because an email is unique and a display name is not. What identifies a
+person (their id, reached through their email) stays separate from how
+they are shown, so letting a person choose how co-members see them is
+its own change and never touches a stored plan.
 
 ### What this doesn't show
 

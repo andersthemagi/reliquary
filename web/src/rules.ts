@@ -9,6 +9,7 @@ import { confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge
 import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
 import { filePath, message, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
+import { settingsPage } from "./vaultadmin.js";
 
 // ---------------------------------------------------------------------------
 // Rules
@@ -143,7 +144,7 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
               : html`A folder ends in <code>/</code>, like <code>clients/</code>, and covers everything inside it; a file is its full path, like <code>pricing.md</code>. Saving a path that has a rule replaces it.`
           }</p>
           <p class="hint" id="qq-hint">For canon: how many different people must approve a change, 1 to 20. Open paths are written directly.</p>
-          <div class="actions"><button class="primary">Save rule</button>${changing ? html`<a class="button quiet" href="${vaultPath(id, "/rules")}">Cancel</a>` : ""}</div>
+          <div class="actions"><button class="primary">Save rule</button><a class="button quiet" href="${vaultPath(id, "/rules")}">Cancel</a></div>
         </form>`
       : "";
 
@@ -177,8 +178,9 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
           body: html`Every path is ${policyBadge(def)}, the vault default.${owner ? " Add a rule to make a folder like clients/ canon." : ""}`,
         });
 
-    const checker = html`<form method="get" action="${vaultPath(id, "/rules")}" class="panel rule-check">
-        <label for="check">What applies to a path?</label>
+    const checker = html`<details class="panel rule-check"${check ? " open" : ""}><summary>What applies to a path?</summary>
+      <form method="get" action="${vaultPath(id, "/rules")}">
+        <label for="check">Path</label>
         <div class="inline-field"><input id="check" type="text" name="check" value="${check}" placeholder="clients/acme/brief.md">
           <button>Check</button></div>
         ${checked
@@ -190,28 +192,23 @@ export async function rules(ctx: Ctx, id: string, form?: RuleForm): Promise<Repl
                 : "by the vault default."
             }</p>`
           : ""}
-      </form>`;
+      </form></details>`;
 
-    // A refused or chosen form goes first, so its message is on the first
-    // screen; otherwise the rules, the thing people come to see, lead. With
-    // none, the form is already under the empty box, so a button that only
-    // scrolls to it is left out of the header.
-    const formFirst = !!(form?.error || changing);
-    const body = html`
-      ${pageHeader({
-        crumb: rulesCrumb(v),
-        title: "Rules",
+    // The rules, the thing people come to see, lead; the form shows only
+    // when asked for (Add rule, Change) or refused, and then goes first so
+    // its message is on the first screen.
+    const formOpen = !!(form?.error || changing || (ctx.method === "GET" && ctx.url.searchParams.has("add")));
+    const body = settingsPage(id, v, "rules", {
         description: html`Everything is ${policyBadge(def)} unless a rule says otherwise; the most specific rule wins.${
           owner ? html` <a href="${vaultPath(id, "/config")}">Change the default on General</a>` : ""
         }`,
-        primary: owner && !formFirst && list.length ? html`<a class="button primary" href="#add-rule">Add rule</a>` : "",
-      })}
-      ${formFirst ? addForm : ""}
+        primary: owner && !formOpen ? html`<a class="button primary" href="${vaultPath(id, "/rules")}?add=1#add-rule">Add rule</a>` : "",
+      }, html`
+      ${formOpen ? addForm : ""}
       ${table}
-      ${formFirst ? "" : addForm}
       ${checker}
       <p class="hint rules-help">Canon changes need approval from people; agents can only propose them.${owner ? "" : " Only owners change rules."} <a href="/docs/how-to/set-rules">How rules work</a></p>
-      ${claimRulesSummary(id, claimRules)}`;
+      ${claimRulesSummary(id, claimRules)}`);
     return { v, shell: await vaultShell(c, ctx, v, { section: "rules" }, body) };
   });
   if (!data) return notFound(ctx);

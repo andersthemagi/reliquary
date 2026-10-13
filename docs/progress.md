@@ -605,6 +605,16 @@ start the next one.
     `docs/public/concepts/tasks.md` ("Waiting in line"). Not yet: the MCP
     tools and their rate limits (#75), who is waiting on the Tasks page
     (#76).
+  - the capacity model and each vault's request budget (CL-3.13, #80,
+    `supabase/migrations/20261013235000_vault_request_budget.sql`): the
+    model in `docs/public/reference/limits.md` ("What asking for work
+    costs": agents / gap, 6 pooler round trips per `request_work`, measured
+    by `mcp/test/round_trips.test.mjs`), alert thresholds in
+    `docs/ops/runbook.md` ("Capacity"); a budget of 300 full evaluations a
+    minute per vault, counted in the database inside `take_step`, kept at
+    the design's number because the model gives it. Tests:
+    `supabase/tests/request_budget_test.sql`, mutation-checked. Registry:
+    `tests/features.md` F839-F840.
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
 plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.

@@ -207,13 +207,15 @@ test("variables page: an owner sees each environment set or not, its version, wh
   noValues(h);
   assert.match(h, /<th scope="col">Name<\/th><th scope="col"><span class="var-env">development<\/span><\/th><th scope="col"><span class="var-env">preview<\/span><\/th><th scope="col"><span class="var-env">production<\/span> <span class="badge var-owners"[^>]*>Owners only<\/span><\/th>/);
   assert.match(h, /<code>API_KEY<\/code>/);
-  assert.match(h, /<td data-label="development"><div class="var-cell">\s*<span class="var-state" title="Set by you, [^"]+ UTC \(version 1\)"><span class="var-set">Set<\/span> <span class="var-meta"><time datetime="[^"]+">[^<]+<\/time><span class="var-by"> by you<\/span>/);
+  assert.match(h, /<td data-label="development"><div class="var-cell"><span class="var-set" title="Set by you, [^"]+ UTC \(version 1\)">Set<\/span>/);
   assert.match(h, /<td data-label="preview"><div class="var-cell"><span class="var-none">Not set<\/span><a class="button ghost var-add" href="[^"]+\/set\?name=API_KEY&amp;environment=preview" aria-label="Set API_KEY in preview">Set<\/a>/);
-  // Reveal, Change value and Delete in both set environments, production included.
+  // Reveal, Change value and Delete in both set environments, production included, on each one's view.
   for (const env of ["development", "production"]) {
-    assert.match(h, new RegExp(`name="name" value="API_KEY"><input type="hidden" name="environment" value="${env}"><button class="menu-item"><span class="menu-item-title">Reveal</span>`));
-    assert.ok(h.includes(`href="${vp(V.own, "/set")}?name=API_KEY&amp;environment=${env}"><span class="menu-item-title">Change value`));
-    assert.ok(h.includes(`href="${vp(V.own, "/delete")}?name=API_KEY&amp;environment=${env}"><span class="menu-item-title">Delete`));
+    const e = await page(vp(V.own, `?env=${env}`));
+    noValues(e);
+    assert.match(e, new RegExp(`name="name" value="API_KEY"><input type="hidden" name="environment" value="${env}"><button class="menu-item"><span class="menu-item-title">Reveal</span>`));
+    assert.ok(e.includes(`href="${vp(V.own, "/set")}?name=API_KEY&amp;environment=${env}"><span class="menu-item-title">Change value`));
+    assert.ok(e.includes(`href="${vp(V.own, "/delete")}?name=API_KEY&amp;environment=${env}"><span class="menu-item-title">Delete`));
   }
   assert.match(h, new RegExp(`<a class="button" href="${vp(V.own, "/import")}">Import .env</a><a class="button primary" href="${vp(V.own, "/set")}">Add a variable</a>`));
   assert.match(h, new RegExp(`<a href="${vp(V.own, "/log")}">Access log</a>`));
@@ -224,11 +226,15 @@ test("variables page: an editor gets controls outside production only, and a lin
   noValues(h);
   assert.match(h, /<code>STRIPE_KEY<\/code>/);
   assert.match(h, /Only owners set, change, delete or reveal values in production\./);
-  assert.match(h, /name="environment" value="development"><button class="menu-item"><span class="menu-item-title">Reveal<\/span>/);
-  assert.doesNotMatch(h, /value="production"/);
-  assert.doesNotMatch(h, /environment=production/);
+  const dev = await page(vp(V.ed, "?env=development"));
+  const prod = await page(vp(V.ed, "?env=production"));
+  assert.match(dev, /name="environment" value="development"><button class="menu-item"><span class="menu-item-title">Reveal<\/span>/);
+  for (const x of [h, dev, prod]) {
+    assert.doesNotMatch(x, /value="production"/);
+    assert.doesNotMatch(x, /environment=production/);
+  }
   // The production cell still says it's set, and by whom.
-  assert.match(h, /<td data-label="production \(owners only\)"><div class="var-cell">\s*<span class="var-state" title="Set by 00000000, [^"]+"><span class="var-set">Set<\/span>/);
+  assert.match(h, /<td data-label="production \(owners only\)"><div class="var-cell"><span class="var-set" title="Set by 00000000, [^"]+">Set<\/span>/);
   assert.match(h, /Access log<\/a>/);
   // The form offers development and preview, not production.
   const f = await page(vp(V.ed, "/set"));
@@ -256,8 +262,8 @@ test("variables page: a viewer sees names only: no value, no control, no access 
 });
 
 test("variables page: the CLI instructions are for owners and editors; a viewer, who can’t read values, isn’t shown them", async () => {
-  for (const id of [V.own, V.ed]) assert.match(await page(vp(id)), /<h2>Use them<\/h2>/);
-  assert.doesNotMatch(await page(vp(V.view)), /Use them|npx @reliquary-ai\/cli run/);
+  for (const id of [V.own, V.ed]) assert.match(await page(vp(id)), /<summary>How to use these<\/summary>/);
+  assert.doesNotMatch(await page(vp(V.view)), /How to use these|npx @reliquary-ai\/cli run/);
 });
 
 test("variables page: a vault you're not in is not found, and nothing is revealed or logged", async () => {
@@ -476,14 +482,14 @@ test("variables log: next to a value, who read or revealed it since it was set, 
   const token = await cliToken(PIA, main.origin);
   const r = await fetch(`${main.origin}/api/env/${V.own}/development`, { headers: { authorization: `Bearer ${token}` } });
   assert.equal(r.status, 200);
-  const h = await page(vp(V.own));
+  const h = await page(vp(V.own, "?env=development"));
   noValues(h);
-  const dev = /<td data-label="development">[\s\S]*?<\/td>/.exec(h.slice(h.indexOf("<code>API_KEY</code>")))[0];
+  const dev = rowOf(h, "API_KEY");
   assert.match(dev, /Since then: .*read by you \(CLI\).*revealed by you|Since then: .*revealed by you.*read by you \(CLI\)/);
   assert.match(dev, /href="\/connections"><span class="menu-item-title">Manage connections<\/span>/);
   // Setting it again starts over.
   await post(vp(V.own, "/set"), { name: "API_KEY", environment: "development", replace: "development", value: value("own-dev-2") });
-  const after = /<td data-label="development">[\s\S]*?<\/td>/.exec((await page(vp(V.own))).split("<code>API_KEY</code>")[1])[0];
+  const after = rowOf(await page(vp(V.own, "?env=development")), "API_KEY");
   assert.doesNotMatch(after, /Since then/);
   assert.match(after, /title="Set by you, [^"]+ \(version 2\)"/);
 });
@@ -601,30 +607,80 @@ test("variables page: the Connect page shows the CLI: login, run and env pull", 
 // ---------------------------------------------------------------------------
 // One menu per value, tabs, the Add form, the log's cells
 
-// The cell of a variable in an environment, on the Values tab.
-const cellOf = (h, name, env) => new RegExp(`<td data-label="${env}[^"]*">[\\s\\S]*?</td>`).exec(h.slice(h.indexOf(`<code>${name}</code>`)))[0];
+// A variable's row, from its name to the end of the row.
+const rowOf = (h, name) => {
+  const s = h.slice(h.indexOf(`<code>${name}</code>`));
+  return s.slice(0, s.indexOf("</tr>"));
+};
 
-test("variables values: a set value reads Set and how long ago, with who, the exact time and its version in its title and at the top of its menu, and no version number in the cell", async () => {
-  const dev = cellOf(await page(vp(V.own)), "API_KEY", "development");
-  assert.match(dev, /<span class="var-set">Set<\/span> <span class="var-meta"><time datetime="\d{4}-\d\d-\d\dT[^"]+">[^<]+<\/time>/);
+test("variables values: a set value reads Set and how long ago, with who, the exact time and its version in its title and at the top of its menu, and no version number in the row", async () => {
+  const dev = rowOf(await page(vp(V.own, "?env=development")), "API_KEY");
+  assert.match(dev, /<span class="var-set">Set<\/span>[\s\S]*<td data-label="Updated" class="var-meta"><time datetime="\d{4}-\d\d-\d\dT[^"]+">[^<]+<\/time> by you<\/td>/);
   assert.match(dev, /title="Set by you, \d{4}-\d\d-\d\d \d\d:\d\d UTC \(version \d+\)"/);
   assert.match(dev, /<p class="menu-label">Set by you, \d{4}-\d\d-\d\d \d\d:\d\d UTC\./);
   assert.doesNotMatch(dev.replace(/title="[^"]*"/g, ""), /\bv\d+\b|version/);
 });
 
 test("variables values: each set value has one menu (Reveal as a POST, Change value, Delete) instead of loose buttons, and an empty one offers Set", async () => {
-  const h = await page(vp(V.own));
-  const row = h.slice(h.indexOf("<code>API_KEY</code>"));
-  const tr = row.slice(0, row.indexOf("</tr>"));
-  assert.equal((tr.match(/<details class="menu-wrap action-menu var-menu">/g) ?? []).length, (tr.match(/class="var-set"/g) ?? []).length);
+  const tr = rowOf(await page(vp(V.own, "?env=production")), "API_KEY");
+  assert.equal((tr.match(/<details class="menu-wrap action-menu var-menu">/g) ?? []).length, 1);
   assert.match(tr, /aria-label="Actions for API_KEY in production"/);
   assert.match(tr, new RegExp(`<form method="post" action="${vp(V.own, "/reveal")}"><input type="hidden" name="csrf" value="[0-9a-f]+">`));
   assert.doesNotMatch(tr, /href="[^"]*\/reveal/);
   assert.doesNotMatch(tr, /class="var-actions"/);
   assert.match(tr, new RegExp(`class="menu-item danger" href="${vp(V.own, "/delete")}\\?name=API_KEY&amp;environment=production"`));
-  assert.match(cellOf(h, "API_KEY", "preview"), /<span class="var-none">Not set<\/span><a class="button ghost var-add" [^>]*aria-label="Set API_KEY in preview">Set<\/a>/);
-  // Editors get no menu where they can't act: the owners-only column.
-  assert.doesNotMatch(cellOf(await page(vp(V.ed)), "STRIPE_KEY", "production"), /<details/);
+  assert.match(rowOf(await page(vp(V.own, "?env=preview")), "API_KEY"), /<span class="var-none">Not set<\/span>[\s\S]*<a class="button ghost var-add" [^>]*aria-label="Set API_KEY in preview">Set<\/a>/);
+  // Editors get no menu where they can't act: the owners-only environment.
+  assert.doesNotMatch(rowOf(await page(vp(V.ed, "?env=production")), "STRIPE_KEY"), /<details/);
+});
+
+// The environment switcher's links, the current one marked with a *.
+const envTabs = (h) =>
+  [...(/<nav class="tabs" aria-label="Environments">[\s\S]*?<\/nav>/.exec(h)?.[0] ?? "").matchAll(/<a href="[^"]+"( aria-current="page")?>([^<]+)/g)].map((m) => m[2] + (m[1] ? "*" : ""));
+
+test("variables all: the default view is names by environment, each cell Set or Not set with no menu, and a name missing in an environment says where", async () => {
+  for (const env of ["development", "preview", "production"]) await vars.setVariable(PIA, V.own, "EVERYWHERE_KEY", env, value(`everywhere-${env}`));
+  const h = await page(vp(V.own));
+  noValues(h);
+  assert.deepEqual(envTabs(h), ["All*", "development", "preview", "production"]);
+  const api = rowOf(h, "API_KEY");
+  assert.match(api, /<span class="badge warning var-missing">Missing in preview<\/span>/);
+  assert.equal(api.split(">Set</span>").length - 1, 2);
+  assert.equal(api.split(">Not set</span>").length - 1, 1);
+  assert.doesNotMatch(api, /<details|\/reveal|\/delete/);
+  assert.doesNotMatch(rowOf(h, "EVERYWHERE_KEY"), /Missing in/);
+});
+
+test("variables env view: each environment lists one row per variable with Set or Not set, when and by whom, and its actions; an unknown one shows All", async () => {
+  const h = await page(vp(V.own, "?env=preview"));
+  noValues(h);
+  assert.deepEqual(envTabs(h), ["All", "development", "preview*", "production"]);
+  assert.match(h, /<thead><tr><th scope="col">Name<\/th><th scope="col">Status<\/th><th scope="col">Updated<\/th><th scope="col"><span class="sr-only">Actions<\/span><\/th><\/tr><\/thead>/);
+  const body = /<tbody>[\s\S]*?<\/tbody>/.exec(h)[0];
+  const names = (await vars.listVariables(PIA, V.own)).variables.map((x) => x.name);
+  assert.equal(body.split("<tr>").length - 1, names.length, "one row per variable");
+  assert.match(rowOf(h, "API_KEY"), /<td data-label="Status"><span class="var-none">Not set<\/span><\/td><td data-label="Updated" class="muted">Never<\/td>/);
+  assert.match(rowOf(h, "EVERYWHERE_KEY"), /<td data-label="Updated" class="var-meta"><time datetime="[^"]+">[^<]+<\/time> by you<\/td>[\s\S]*aria-label="Actions for EVERYWHERE_KEY in preview"/);
+  const unknown = await get(vp(V.own, "?env=nope"));
+  assert.equal(unknown.status, 200);
+  const u = await unknown.text();
+  assert.deepEqual(envTabs(u).slice(0, 1), ["All*"]);
+  assert.match(u, /<table class="var-grid">/);
+  // A viewer sees each row's state, with no action.
+  const view = await page(vp(V.view, "?env=development"));
+  noValues(view);
+  assert.match(rowOf(view, "VIEW_KEY"), /<span class="var-set">Set<\/span>/);
+  assert.doesNotMatch(/<main id="main">[\s\S]*<\/main>/.exec(view)[0], /var-menu|\/reveal|\/delete/);
+});
+
+test("variables how to use: the CLI command and the two caveats are folded into a closed How to use these, once, naming the environment in view", async () => {
+  const h = await page(vp(V.own, "?env=preview"));
+  const howto = /<details class="var-howto"><summary>How to use these<\/summary>[\s\S]*?<\/details>/.exec(h)?.[0] ?? "";
+  assert.match(howto, /npx @reliquary-ai\/cli run --env preview -- &lt;command&gt;/);
+  assert.match(howto, /<strong>Agents can read what reaches them\.<\/strong>/);
+  assert.match(howto, /<strong>The hosted operator can decrypt\.<\/strong>/);
+  assert.equal(h.split("Agents can read what reaches them").length - 1, 1, "the caveats show once, inside the fold");
+  assert.match(await page(vp(V.own)), /npx @reliquary-ai\/cli run --env development -- &lt;command&gt;/);
 });
 
 test("variables tabs: owners get Values, Environments, Access log and Imports under one header; editors all but Environments; viewers no tabs", async () => {

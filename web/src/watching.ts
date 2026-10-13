@@ -19,7 +19,7 @@ import { flagsPath } from "./flagspage.js";
 import { Refusal } from "./failure.js";
 import { vaultShell } from "./files.js";
 import { filePath, message, notFound, render, treePath, UUID, vault, vaultPath, type Ctx, type Reply } from "./pages.js";
-import { settingsHeader } from "./vaultadmin.js";
+import { settingsPage } from "./vaultadmin.js";
 import { watchCovers } from "./watchrule.js";
 
 export const watchingPath = (id: string) => vaultPath(id, "/config/watching");
@@ -121,15 +121,14 @@ async function watchingPage(ctx: Ctx, id: string, form?: WatchForm): Promise<Rep
         <p class="hint" id="wp-hint">A folder ends in <code>/</code>, like <code>clients/</code>, and covers everything in it; a file is its full path, like <code>notes/plan.md</code>. It needn’t exist yet. Changes are flagged from when you start watching, not before.</p>
       </form>`;
     // A refused form goes first, so its reason is on the first screen.
-    const body = html`
-      ${settingsHeader(id, v, "watching", {
+    const body = settingsPage(id, v, "watching", {
         description: html`Folders and files you watch in ${v.name}. Changes there are flagged to you and to your agents. You see them in <a href="${flagsPath(id)}">Flags</a> (under Diagnostics) and in <a href="${changesPath(id, "watching")}">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>. Only you see this list.`,
         primary: form || !list.length ? "" : html`<a class="button primary" href="#watch-path">Watch a path</a>`,
-      })}
+      }, html`
       ${form ? addForm : ""}
       ${table}
       ${form ? "" : addForm}
-      <p class="hint">Any member can watch, a viewer too. Your agents can list what you watch, but only you start or stop it, here. <a href="/docs/concepts/flags#watching-a-path">Watching a path</a></p>`;
+      <p class="hint">Any member can watch, a viewer too. Your agents can list what you watch, but only you start or stop it, here. <a href="/docs/concepts/flags#watching-a-path">Watching a path</a></p>`);
     return vaultShell(c, ctx, v, { section: "settings" }, body);
   });
   if (!out) return notFound(ctx);
