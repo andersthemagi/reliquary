@@ -15,6 +15,8 @@ Every permission is a Postgres row-level security policy, a trigger, or a checke
 
 Each rule has a test that tries to break it: a session for one vault reading another, an agent approving a proposal, anyone editing a log row, an agent revealing a variable, a revoked token reading anything. They run against a real database on every push and pull request, with the MCP server, the web app and the CLI tested end to end. Each new rule is also broken on purpose once, to see its test fail.
 
+One test reads the database's own schema rather than its data: a column whose name suggests a secret (a token, a key, a password, a credential, a code) must be a hash or an encrypted value, or the test fails. Encrypted values all use the one scheme variable values use, so rotating the key re-encrypts every one of them. A short list of exceptions names each column and why it holds no secret, such as the id of a token rather than the token itself.
+
 ## Agents and text
 
 - The [ceiling](agents.md) keeps approving, rules, members, grants, secret values, export and deletion with people.
