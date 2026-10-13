@@ -135,6 +135,15 @@ Five jobs:
     their vault requires. Changing it never rewrites a stored row. A
     display name is text people chose, never code or an instruction
     (owner's call, 2026-10-13; #347).
+12. **Agents get the least about people that does the job.** Data that
+    identifies a person (an email, a phone number, an address, anything
+    a person could be contacted or traced by) never reaches an agent:
+    an agent tells people apart by their user id, display name and short
+    tag, and that is all it is given, whatever a person shows other
+    people. Data an agent never touches can't leak through a prompt, a
+    log or a model provider. Like a secret value (principle 5), the
+    database withholds it from an agent session; a page, read by a
+    person, may show it (owner's call, 2026-10-13; #347).
 
 ## Concepts
 
