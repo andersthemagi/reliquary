@@ -50,7 +50,9 @@ const BUDGET = {
   // Raised again for "context moved" in work_plan_status and list_flags (CL-3.6),
   // and for work_plan_status steering agents to a new step over a reopen (#76),
   // and for register_work_plan saying a plan gains steps (F812).
-  "tools/list": 26550,
+  // Raised again for request_work and leave_queue (F820), and claim_step
+  // pointing agents at request_work first.
+  "tools/list": 28550,
   // Raised for the sentence and markers that fence the names a listing starts
   // its lines with (list_vaults, list_files), and the path and writer in a
   // file's header (read_file): about 100 bytes a call.

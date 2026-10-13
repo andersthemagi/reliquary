@@ -756,12 +756,14 @@ lapse, a 48 hour cooldown cap). Where it differs from the spike:
 - **Item 12a's "one way in" is the API role's, not a separate agent
   role:** agents and people share `authenticated`, which writes neither
   places nor strikes, and reads places (who is waiting) as it reads steps.
-  `claim_step`, the named-step primitive `request_work` wraps, stays
-  executable by agents and ignores the line, the caps and the cooldown,
-  as it did before this; whether that should change is the MCP tools'
-  question (#75), where the caps for `claim_step` already are.
-- **A strike is counted when `request_work` hands a lapsed step on**, not
-  when `claim_step` does.
+  `claim_step`, naming one step, stays executable by agents, and since
+  #75 (`20261013220000_claim_step_follows_the_line.sql`) runs the same
+  function as `request_work` (`private.take_step`, which no API role
+  executes) with the pick narrowed to the named step: it is granted only
+  what `request_work` would grant that caller at that moment, so it keeps
+  the line, the caps and the cooldown, and a refusal takes no place.
+- **A strike is counted when a lapsed step is handed on**, by
+  `request_work` or, since #75, by `claim_step`.
 - **Lock order.** `request_work` and `leave_queue` take the vault's row
   first (for key share), the order `post_message` uses, because they
   insert places and an insert has no row `delete_vault` could lock ahead

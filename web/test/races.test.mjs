@@ -354,6 +354,11 @@ test("races, work plan gate: 30 people working a 120-step plan at once, abandoni
              on conflict (id) do nothing`, [crowd]);
   const v = await newVault(OWNER, "Races work plan crowd");
   for (const p of crowd) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  // claim_step strikes whoever let a claim lapse (20261013220000), and this
+  // crowd walks away on purpose: no lapse earns a cooldown here, so the
+  // gate, not the cooldown, is what gets tested.
+  const rule = await as(db, OWNER, "select public.set_claim_rule($1, '', 2880, 10080, null, 1, 5, null, null, null, 1000000)", [v]);
+  assert.ok(rule.ok, rule.message);
   const seededFile = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan') as v", [v]);
   assert.ok(seededFile.ok, seededFile.message);
   const steps = layeredPlan(seeded(72));
@@ -1166,7 +1171,9 @@ async function lineCrowd(name, abandon) {
       } else if (a.o_state === "cooling_down") {
         await c.query("update private.work_plan_strikes set cooldown_until = clock_timestamp() where vault_id = $1 and person = $2", [v, who]);
       } else if (a.o_state === "granted") {
-        if (abandon && rand() < 0.25) {
+        // The first grant of the run is always walked away from, so the
+        // hand-on is exercised whatever the interleaving; then a quarter.
+        if (abandon && (abandoned === 0 || rand() < 0.25)) {
           abandoned++;
           await c.query("update public.work_plan_steps set expires_at = clock_timestamp() where plan_id = $1 and key = $2 and fence = $3", [plan, a.o_key, a.o_fence]);
           continue;
@@ -1221,9 +1228,12 @@ test("races, waiting in line: 30 people asking for the steps of one 40-step plan
 });
 
 test("races, waiting in line: the same crowd walking away from a quarter of its steps still finishes every step, with the lapsed ones handed on through the line", async () => {
-  const { abandoned, states } = await lineCrowd("Races line crowd abandoning", true);
+  // Whether anyone in the crowd lapses twice before finishing a step, and so
+  // cools down, depends on the interleaving; the cooldown itself is proved
+  // deterministically in supabase/tests/waiting_test.sql ("strikes:"). Here
+  // every abandoned step is handed on through the line (the claims tally).
+  const { abandoned } = await lineCrowd("Races line crowd abandoning", true);
   assert.ok(abandoned > 0, "no step was abandoned");
-  assert.ok((states.cooling_down ?? 0) > 0, "no one ever cooled down");
 });
 
 // Two requests from one person at once: the first stops after taking its

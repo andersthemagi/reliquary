@@ -42,6 +42,8 @@ test("errors: SQLSTATE codes are named, with their class when the code isn't lis
   assert.equal(f.sqlstateName("RLW02"), "RLW02 step not available");
   assert.equal(f.sqlstateName("RLW03"), "RLW03 stale step claim");
   assert.equal(f.sqlstateName("RLW04"), "RLW04 step claim past its hold limit");
+  assert.equal(f.sqlstateName("RLW05"), "RLW05 not your turn in line");
+  assert.equal(f.sqlstateName("RLW06"), "RLW06 step claim limit or cooldown");
 });
 
 test("errors: each SQLSTATE maps to the HTTP status a person or client can act on", () => {
@@ -50,6 +52,7 @@ test("errors: each SQLSTATE maps to the HTTP status a person or client can act o
     "57014": 504, "55P03": 504, "08006": 503, "53300": 503, "57P01": 503, "40001": 503, "54000": 413, XX000: 500, "42883": 500,
     RLW01: 409, RLW02: 409, RLW03: 409,
     RLW04: 403,
+    RLW05: 409, RLW06: 403,
   };
   for (const [code, status] of Object.entries(cases)) assert.equal(f.sqlstateStatus(code), status, code);
 });
