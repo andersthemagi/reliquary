@@ -163,7 +163,10 @@ before(async () => {
       for each statement execute function test_races.stop('vault_deletions');
     drop trigger if exists zz_races_stop on public.path_claims;
     create trigger zz_races_stop after insert or update or delete on public.path_claims
-      for each statement execute function test_races.stop('path_claims');`);
+      for each statement execute function test_races.stop('path_claims');
+    drop trigger if exists zz_races_stop on public.work_plan_steps;
+    create trigger zz_races_stop after update on public.work_plan_steps
+      for each statement execute function test_races.stop('work_plan_steps');`);
 });
 
 after(async () => {
@@ -175,6 +178,7 @@ after(async () => {
              drop trigger if exists zz_races_stop on public.thread_messages;
              drop trigger if exists zz_races_stop on private.vault_deletions;
              drop trigger if exists zz_races_stop on public.path_claims;
+             drop trigger if exists zz_races_stop on public.work_plan_steps;
              drop schema if exists test_races cascade;`).catch(() => {});
   await Promise.all(open.map((c) => c.end().catch(() => {})));
 });
@@ -851,6 +855,83 @@ test("races, lock order: a message is posted while its vault is deleted, interle
     assert.equal((await sql("select count(*)::int as n from public.threads where vault_id = $1", [v]))[0].n, 0);
   }
   log("post vs delete_vault", outcomes);
+  assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
+});
+
+// Work plans (20261002200000_work_plans.sql): claim_step's update sets the
+// step's holder, so its foreign key check takes a FOR KEY SHARE lock on the
+// holder's vault_members row while it holds the step's row, and its log row
+// then needs the vault's. delete_vault takes the vault's row, then deletes
+// the vault's members and, through both foreign keys, its steps. complete_step
+// holds the step and its dependents, then needs the vault's row for its log.
+
+// A vault with a two-step plan (a, then b) and an editor to work it.
+async function planVault(name, who) {
+  const v = await newVault(OWNER, name);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, who, OWNER]);
+  const seeded = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan') as v", [v]);
+  assert.ok(seeded.ok, seeded.message);
+  const steps = [{ key: "a", title: "A" }, { key: "b", title: "B", blocked_by: ["a"] }];
+  const r = await as(db, OWNER, "select public.register_work_plan($1, 'plan.md', $2, $3::jsonb)", [v, seeded.rows[0].v, JSON.stringify(steps)]);
+  assert.ok(r.ok, r.message);
+  return v;
+}
+const claimA = (c, v, who, stop) => as(c, who, "select o_fence, o_secret from public.claim_step($1, 'plan.md', 'a')", [v], stop);
+
+test("races, lock order: claiming a step while its vault is deleted, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const name = `Races delete claim step ${round}`;
+    const who = people[round];
+    const v = await planVault(name, who);
+    // The deletion holds the vault's row and stops before its cascade.
+    const [de, cl] = await interleave(
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name], "vault_deletions"),
+      (c) => claimA(c, v, who),
+    );
+    outcomes.push(`${outcome(de)}/${outcome(cl)}`);
+  }
+  log("delete_vault vs claim_step", outcomes);
+  assert.deepEqual(outcomes, ["ok/P0002", "ok/P0002", "ok/P0002"]);
+});
+
+test("races, lock order: a step is claimed while its vault is deleted, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const name = `Races claim step delete ${round}`;
+    const who = people[3 + round];
+    const v = await planVault(name, who);
+    // The claim holds the step's row and its holder's membership, and stops
+    // before logging.
+    const [cl, de] = await interleave(
+      (c) => claimA(c, v, who, "work_plan_steps"),
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name]),
+    );
+    const [{ n }] = await sql("select count(*)::int as n from public.work_plan_steps where vault_id = $1", [v]);
+    outcomes.push(`${outcome(cl)}/${outcome(de)} (${n} steps left)`);
+  }
+  log("claim_step vs delete_vault", outcomes);
+  assert.deepEqual(outcomes, ["ok/ok (0 steps left)", "ok/ok (0 steps left)", "ok/ok (0 steps left)"]);
+});
+
+test("races, lock order: a step is completed while its vault is deleted, interleaved, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (let round = 0; round < 3; round++) {
+    const name = `Races complete step delete ${round}`;
+    const who = people[6 + round];
+    const v = await planVault(name, who);
+    const claimed = await claimA(db, v, who);
+    assert.ok(claimed.ok, claimed.message);
+    const { o_fence: fence, o_secret: secret } = claimed.rows[0];
+    // The completion holds the step's row and its dependent's, and stops
+    // before logging.
+    const [co, de] = await interleave(
+      (c) => as(c, who, "select public.complete_step($1, 'plan.md', 'a', $2, $3)::text", [v, fence, secret], "work_plan_steps"),
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name]),
+    );
+    outcomes.push(`${outcome(co)}/${outcome(de)}`);
+  }
+  log("complete_step vs delete_vault", outcomes);
   assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
 });
 
