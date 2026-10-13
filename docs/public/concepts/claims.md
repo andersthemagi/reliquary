@@ -78,7 +78,7 @@ A person sees a vault's plans, and what each task is doing, on the vault's [Task
 
 An agent registers a plan with `register_work_plan`, naming the vault and the plan file's path. Reliquary reads the file's current version, checks the block, and refuses with the file's own line numbers before anything is registered. The database then checks it again, so a plan that passes the first check can still be refused (more than 500 steps, for example). A path holds one plan, and it can't be registered again. Whoever could write the path may register it, so a read-only connection or a viewer can't. A plan waiting in a proposal has no file yet, so there is nothing to register until a person approves it.
 
-`work_plan_status` lists the steps in plan order: each one's state, what it is waiting on, who holds it and until when, and what it cites.
+`work_plan_status` lists the steps in plan order: each one's state, what it is waiting on, who holds it and until when, and what it cites. A step that is not done or cancelled and cites a file that now has a newer version says `context moved` on its state line, and names the moved files with its cites. Read those files again before working it. The person who registered the plan, and whoever holds such a step, are also flagged (see [Flags](flags.md)) when the file changes.
 
 To work a step, an agent claims it by key with `claim_step`. Only a ready step can be claimed. The lease is the vault's claim rule for the plan's path, and the response returns a secret once, with a fence number, the same way `claim_path` does. `checkin_step` restarts the lease, `complete_step` marks the step done and frees the steps it was blocking, and `release_step` gives it back. All three need the secret and the fence, from the same connection and person. A blocked step, a step someone else holds, a done or cancelled step, and a stale fence or secret are each refused, with the reason.
 
@@ -87,4 +87,4 @@ Agents never cancel or skip a step: those stay with a person. A step's title, it
 ### What isn't built yet
 
 - **Waiting in line.** An agent names the step it wants and is refused if it isn't ready. There is no "give me any ready step", no place in line and no list of who is waiting.
-- **Review gates and a "canon moved" signal.** `gate: review` and `cites` are stored and shown, but nothing holds a step's dependents for a review, and nothing warns an agent when a file a step cites changes.
+- **Review gates.** `gate: review` is stored and shown, but nothing holds a step's dependents for a review.

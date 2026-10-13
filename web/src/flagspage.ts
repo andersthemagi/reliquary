@@ -21,6 +21,7 @@ import { describe } from "./activity.js";
 import { emptyState, html, time, type Raw } from "./html.js";
 import { diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { vaultShell } from "./files.js";
+import { planPath } from "./tasks.js";
 import { threadPath } from "./threadrefs.js";
 import { filePath, notFound, proposalPath, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
 
@@ -39,6 +40,7 @@ type Flag = {
   watching: string | null;
   thread_id: string | null;
   message_id: number | null;
+  plan: string | null;
 };
 
 // The widest page list_flags takes, so "loading the page" and "marking it
@@ -50,6 +52,7 @@ function categoryBadge(f: Pick<Flag, "category" | "reason">): Raw {
   if (f.category === "thread") return html`<span class="badge info">Thread</span>`;
   if (f.category === "responsibility") return html`<span class="badge warning">Waiting on you</span>`;
   if (f.reason === "base_changed") return html`<span class="badge info">File changed</span>`;
+  if (f.reason === "cite_moved") return html`<span class="badge warning">Context moved</span>`;
   if (f.category === "working_set") return html`<span class="badge info">Your proposal</span>`;
   return html`<span class="badge info">Watching</span>`;
 }
@@ -72,7 +75,8 @@ function flagsTable(ctx: Ctx, id: string, rows: Flag[]): Raw {
       return html`<tr class="ev"><td class="small nowrap ev-when">${time(f.at)}</td>
         <td class="small">${categoryBadge(f)}</td>
         <td class="small ev-what">${whatCell}</td>
-        <td class="path-cell">${whereCell}${f.watching && f.watching !== f.path ? html`<span class="token-client">via ${f.watching}</span>` : ""}</td>
+        <td class="path-cell">${whereCell}${f.watching && f.watching !== f.path ? html`<span class="token-client">via ${f.watching}</span>` : ""}${
+          f.plan ? html`<span class="token-client">cited in <a href="${planPath(id, f.plan)}">${f.plan}</a></span>` : ""}</td>
         <td class="small">${who(ctx, f.actor, f.agent)}</td></tr>`;
     })}</tbody></table></div>`;
 }
@@ -88,7 +92,7 @@ export async function flags(ctx: Ctx, id: string): Promise<Reply> {
     // nothing (design.md, "A separate watermark").
     await c.query(`select public.advance_flags($1, $2)`, [id, r.through]);
     const body = html`
-      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: threads for you, a proposal waiting on you, your own proposals, and paths you watch.`)}
+      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: threads for you, a proposal waiting on you, your own proposals, paths you watch, and files cited by tasks of yours.`)}
       ${r.flags.length
         ? flagsTable(ctx, id, r.flags)
         : emptyState({

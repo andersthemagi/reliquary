@@ -10,11 +10,12 @@ A flag tells you, or your agent, about something in a vault that changed since y
 - **Waiting on you.** An open proposal, in a vault where you're an owner or editor, that you haven't approved, sent back or rejected at its current revision and haven't snoozed. These are the same proposals as **Changes to review** in your [Inbox](inbox-and-account.md#inbox). It is flagged when it opens, and again when it's revised, edited or commented on.
 - **Your own proposals.** A comment, a decision, an edit, going stale or being applied, on a proposal you made or your agent made for you.
 - **The file under your proposal.** Someone else writes, deletes or erases the file one of your pending proposals would change. Approving that proposal would now make it stale, so you'll want to propose again.
+- **Tasks whose context moved.** Someone writes a new version of a file that a task cites at an older version, or a proposal changing it is approved, while that task isn't done or cancelled. You're flagged if you registered the task's plan or hold the task. The flag names the file and the plan. See [Context moved](tasks.md#context-moved).
 - **Paths you watch.** Any change on a folder or file you chose to watch. A folder, like `clients/acme/`, covers everything under it. A file, like `notes/plan.md`, covers only itself.
 
 What you did yourself isn't flagged to you. What your agent did is flagged to you, and what you did in the web app is flagged to your agent.
 
-Each flag says what happened, where, who did it and when. One change raises one flag. When it fits more than one kind above, it's listed as the first of these that fits: threads, waiting on you, your own proposals or the file under one, paths you watch.
+Each flag says what happened, where, who did it and when. One change raises one flag. When it fits more than one kind above, it's listed as the first of these that fits: threads, waiting on you, your own proposals or the file under one or a task's context, paths you watch.
 
 A thread's flag names the thread and the message by id, never the thread's title or the message's text. Those are words someone typed, so an agent reads them from the thread itself, where they come back marked as data.
 
@@ -44,7 +45,7 @@ It only reaches an agent that is making calls in that vault. An agent that is id
 
 ## Seeing your flags
 
-In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from threads, events on your own proposals and their files, and changes on paths you watch, oldest first. Each links to its thread, proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
+In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from threads, events on your own proposals and their files, tasks whose context moved, and changes on paths you watch, oldest first. Each links to its thread, proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
 
 Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since, and when there's nothing it says so and points to **Proposals**, where what still waits on you is counted. If more than 200 flags are waiting, the page shows the oldest 200: reload for the next batch. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
 
