@@ -166,7 +166,15 @@ after(async () => {
 // ---------------------------------------------------------------------------
 // Settings
 
-test("vault settings: the sidebar links to Settings, whose tabs hold General (rename and default policy), Rules, Export and a Danger zone", async () => {
+// The Settings sub-nav as the given member sees it, with `current` (a path
+// under the vault) marked.
+const settingsNav = (v, current, owner = true) => {
+  const a = (path, label) => `<li><a href="/v/${v}${path}"${path === current ? ' aria-current="page"' : ""}>${label}</a></li>`;
+  const group = (label, items) => `<div class="settings-nav-group"><p class="settings-nav-label">${label}</p><ul>${items.join("")}</ul></div>`;
+  return `<nav class="settings-nav" aria-label="Settings">${group("Vault", [a("/config", "General"), a("/config/members", "Members"), a("/rules", "Rules"), a("/config/usage", "Usage")])}${group("You", [a("/config/watching", "Watching")])}${group("Advanced", [a("/diagnostics", "Diagnostics"), ...(owner ? [a("/config/export", "Export")] : [])])}</nav>`;
+};
+
+test("vault settings: the sidebar links to Settings, whose sub-nav holds General (rename and default policy), Rules and Export, and General ends in a Danger zone", async () => {
   const home = await page(`/v/${V.own}`);
   assert.equal(home.split(`href="/v/${V.own}/config"`).length - 1, 2, "the wide sidebar and the phone tabs");
   const sideLinks = home.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
@@ -181,8 +189,9 @@ test("vault settings: the sidebar links to Settings, whose tabs hold General (re
   assert.match(h, new RegExp(`href="/v/${V.own}/rules">Rules</a>`));
   assert.match(h, new RegExp(`<a href="/v/${V.own}/config" aria-current="page">General</a>`));
   assert.match(h, new RegExp(`<a href="/v/${V.own}/config/export">Export</a>`));
-  assert.match(h, new RegExp(`<a href="/v/${V.own}/config/danger">Danger zone</a>`));
-  assert.match(await page(`/v/${V.own}/config/danger`), new RegExp(`<a class="button danger" href="/v/${V.own}/config/delete">Delete vault</a>`));
+  assert.ok(h.indexOf('id="general"') < h.indexOf('<section class="settings-danger" id="danger" aria-labelledby="danger-title">'), "the form, then the Danger zone");
+  assert.match(h, /<h2 id="danger-title">Danger zone<\/h2>/);
+  assert.match(h, new RegExp(`<a class="button danger" href="/v/${V.own}/config/delete">Delete vault</a>`));
 });
 
 test("vault settings: the Rules page marks Settings as current", async () => {
@@ -193,18 +202,16 @@ test("vault settings: an editor sees the default, and no rename form, Export tab
   const h = await page(`/v/${V.walt}/config`);
   assert.match(h, /Only owners rename a vault or change its default\./);
   assert.doesNotMatch(h, /id="general"|config\/delete"|config\/export"/);
-  assert.doesNotMatch(await page(`/v/${V.walt}/config/danger`), /config\/delete"/);
 });
 
-test("settings tabs: every tab page is titled Settings, with a breadcrumb vault / Settings / tab and its tab marked", async () => {
-  const tabs = [["/config/members", "Members"], ["/config/usage", "Usage"], ["/config/watching", "Watching"], ["/diagnostics", "Diagnostics"], ["/config/export", "Export"], ["/config/danger", "Danger zone"]];
+test("settings tabs: every Settings page is titled Settings, with a breadcrumb vault / Settings / section and the grouped sub-nav beside it, its section marked", async () => {
+  const tabs = [["/config", "General"], ["/config/members", "Members"], ["/rules", "Rules"], ["/config/usage", "Usage"], ["/config/watching", "Watching"], ["/diagnostics", "Diagnostics"], ["/config/export", "Export"]];
   for (const [path, label] of tabs) {
     const h = await page(`/v/${V.own}${path}`);
     assert.match(h, /<h1>Settings<\/h1>/, path);
-    assert.match(h, /<div class="page-head has-tabs">/, path);
-    assert.match(h, new RegExp(`<li><a href="/v/${V.own}/config">Settings</a></li><li aria-current="page">${label}</li>`), path);
-    assert.match(h, new RegExp(`<a href="/v/${V.own}${path}" aria-current="page">${label}</a>`), path);
-    assert.match(h, new RegExp(`<nav class="tabs" aria-label="Settings"><a href="/v/${V.own}/config">General</a><a href="/v/${V.own}/config/members"(?: aria-current="page")?>Members</a><a href="/v/${V.own}/rules">Rules</a><a href="/v/${V.own}/config/usage"(?: aria-current="page")?>Usage</a><a href="/v/${V.own}/config/watching"(?: aria-current="page")?>Watching</a><a href="/v/${V.own}/diagnostics"(?: aria-current="page")?>Diagnostics</a><a href="/v/${V.own}/config/export"(?: aria-current="page")?>Export</a><a href="/v/${V.own}/config/danger"(?: aria-current="page")?>Danger zone</a></nav>`), path);
+    assert.doesNotMatch(h, /aria-label="Settings"><a /, `${path}: no tab row`);
+    if (path !== "/config") assert.match(h, new RegExp(`<li><a href="/v/${V.own}/config">Settings</a></li><li aria-current="page">${label}</li>`), path);
+    assert.ok(h.includes(`<div class="settings-layout">${settingsNav(V.own, path)}<div class="settings-main">`), `${path}: the sub-nav, then the section`);
     assert.match(h, new RegExp(`href="/v/${V.own}/config" aria-current="page">Settings`), `${path}: the sidebar's Settings is current`);
   }
   assert.equal((await get(`/v/${V.own}/config/usage`)).status, 200);
@@ -212,9 +219,9 @@ test("settings tabs: every tab page is titled Settings, with a breadcrumb vault 
   assert.equal((await post(`/v/${V.own}/config/danger`, {})).status, 404);
 });
 
-test("settings tabs: an editor's are General, Members, Rules, Usage, Watching, Diagnostics and Danger zone, with no Export", async () => {
+test("settings tabs: an editor's sub-nav has General, Members, Rules, Usage, Watching and Diagnostics, with no Export", async () => {
   const h = await page(`/v/${V.walt}/config/usage`);
-  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Settings"><a href="/v/${V.walt}/config">General</a><a href="/v/${V.walt}/config/members">Members</a><a href="/v/${V.walt}/rules">Rules</a><a href="/v/${V.walt}/config/usage" aria-current="page">Usage</a><a href="/v/${V.walt}/config/watching">Watching</a><a href="/v/${V.walt}/diagnostics">Diagnostics</a><a href="/v/${V.walt}/config/danger">Danger zone</a></nav>`));
+  assert.ok(h.includes(settingsNav(V.walt, "/config/usage", false)));
   const g = await page(`/v/${V.walt}/config`);
   assert.match(g, /<dt>Default policy<\/dt><dd><span class="badge policy open"/);
   assert.match(g, /<dt>Your role<\/dt><dd>Editor<\/dd>/);
@@ -228,18 +235,24 @@ test("settings tabs: Usage shows every member the vault's tier, people and stora
 });
 
 test("danger zone: Leave sits above Delete, each a button to its confirm page, whose Cancel comes back here", async () => {
-  const h = await page(`/v/${V.doomed}/config/danger`);
-  const leave = h.indexOf("<h2>Leave this vault</h2>");
+  const h = await page(`/v/${V.doomed}/config`);
+  const leave = h.indexOf("<h3>Leave this vault</h3>");
   const del = h.indexOf(`href="/v/${V.doomed}/config/delete">Delete vault</a>`);
   assert.ok(leave > 0 && del > leave, "Leave, then Delete");
   assert.match(h, /<div class="danger-rows">/);
-  assert.match(await page(`/v/${V.doomed}/config/delete`), new RegExp(`<a class="button quiet" href="/v/${V.doomed}/config/danger">Cancel</a>`));
-  const sole = await page(`/v/${V.own}/config/danger`);
+  assert.match(await page(`/v/${V.doomed}/config/delete`), new RegExp(`<a class="button quiet" href="/v/${V.doomed}/config#danger">Cancel</a>`));
+  const sole = await page(`/v/${V.own}/config`);
   assert.match(sole, /You’re the only owner, so you can’t leave\./);
   assert.doesNotMatch(sole, /config\/leave"/);
-  const editor = await page(`/v/${V.walt}/config/danger`);
+  const editor = await page(`/v/${V.walt}/config`);
   assert.match(editor, new RegExp(`<a class="button danger" href="/v/${V.walt}/config/leave">Leave this vault</a>`));
   assert.match(editor, /Only owners delete a vault\./);
+});
+
+test("old danger zone address: GET /config/danger sends you to the Danger zone at the foot of General", async () => {
+  const r = await get(`/v/${V.walt}/config/danger`);
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), `/v/${V.walt}/config#danger`);
 });
 
 test("vault settings: saving asks for confirmation first, and nothing changes until then", async () => {

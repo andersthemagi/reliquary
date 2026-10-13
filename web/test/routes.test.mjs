@@ -61,7 +61,6 @@ const pages = [
   [`${V}/config/export`, "export a vault"],
   [`${V}/config/delete`, "delete a vault (confirm)"],
   [`${V}/config/usage`, "vault usage"],
-  [`${V}/config/danger`, "vault danger zone"],
   [`${V}/config/members`, "vault members"],
   [`${V}/config/members/invite`, "invite someone"],
   [`${V}/config/watching`, "what you watch in a vault"],

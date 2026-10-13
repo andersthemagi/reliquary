@@ -7,6 +7,7 @@ A vault is the container for one team, client or project: its files, its environ
 Each vault has a name, a default policy (open or canon), members with roles, and an append-only log of everything that happened in it. A member of one vault sees no trace of any other vault.
 
 - **Create one** from Home with **New vault**, blank or from a [template](templates.md). You become its owner. An agent can create one too, through `create_vault`, but only with a read-write connection that reaches all your vaults; you still own it. See [Agents and the ceiling](agents.md).
+- **Find it on Home.** **Your vaults** has the vaults you created, the ones your plan counts. **Shared with you** has the vaults others created that you belong to, each with your role; it isn't shown when there are none. Each vault is a card: its first letter on a coloured tile, its name (choose anywhere on the card to open it), its tier, its people and storage with a bar each, its open proposals and ready [tasks](tasks.md) when there are any, and when anything last happened in it. The most recently active come first. Once you're in more than six vaults, Home adds a box to filter them by name (type, then press the search button) and sorts them by **Recent**, **Name** or **Needs attention**, which puts the vaults with proposals open or tasks ready first.
 - **Rename it or change its default policy** on the vault's **Settings** page. Only an owner can, in person, and each change is logged with the previous value. A name is 1 to 100 characters: a blank or longer one is refused on the form, with the reason, before the page that asks you to confirm, and what you typed stays there.
 - **Vault names** are 1 to 100 characters. Tools take a vault by name or by id; if two of your vaults share a name, use the id. If **Create vault** is refused (a blank name, or a template that doesn't fit your plan's storage), the form comes back with the reason and a reference, and the name, template and default you chose are still there.
 
@@ -36,6 +37,14 @@ In the web app, a vault's page is its folder tree: each folder and file shows wh
 On a phone, a vault's sections (**Files**, **Proposals**, **Threads**, **Tasks**, **Changes**, **Variables**, **Links**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
+
+## Settings
+
+A vault's **Settings** has a menu beside the page (above it on a phone), in three groups:
+
+- **Vault**: **General** (the name and default policy, and the **Danger zone** at the bottom, with **Leave this vault** and, for owners, **Delete vault**), **Members**, **Rules** and **Usage**.
+- **You**: **Watching**, the folders and files you watch.
+- **Advanced**: **Diagnostics** and, for owners, **Export**.
 
 ## Diagnostics
 

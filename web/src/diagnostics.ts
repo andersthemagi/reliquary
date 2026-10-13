@@ -17,7 +17,7 @@ import { html, tabs, type Raw } from "./html.js";
 import { asPerson } from "./db.js";
 import { vaultShell } from "./files.js";
 import { notFound, render, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
-import { settingsHeader } from "./vaultadmin.js";
+import { settingsPage } from "./vaultadmin.js";
 
 export type DiagTab = "flags" | "claims" | "log";
 
@@ -35,11 +35,11 @@ export const DIAGNOSTICS_NOTE = "For working out why something happened; most pe
 // A tab's heading and what it shows, under the frame's own heading.
 export const diagSection = (title: string, what: Raw | string): Raw => html`<h2>${title}</h2><p class="lede">${what}</p>`;
 
-// The Settings header with Diagnostics current, the tabs, then the tab's body.
+// The Settings frame with Diagnostics current: its own tabs, then the tab's body.
 export function diagnosticsFrame(id: string, v: Vault, current: DiagTab | undefined, body: Raw): Raw {
-  return html`${settingsHeader(id, v, "diagnostics", { description: DIAGNOSTICS_NOTE })}
+  return settingsPage(id, v, "diagnostics", { description: DIAGNOSTICS_NOTE }, html`
     <div class="diag-tabs">${tabs(DIAG_TABS.map((t) => ({ href: tabHref(id, t.tab), label: t.label, current: t.tab === current })), "Diagnostics")}</div>
-    ${body}`;
+    ${body}`);
 }
 
 export async function diagnostics(ctx: Ctx, id: string): Promise<Reply> {
