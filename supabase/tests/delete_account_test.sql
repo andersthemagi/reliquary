@@ -169,9 +169,9 @@ select t.expect('delete account: people who shared a vault see a deleted account
   || t.run('cal', format($q$select deleted::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('dee'))) || ' '
   || t.run('ana', format($q$select deleted::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ben'))),
   'true,no email,no name true false');
-select t.expect('delete account: an agent can''t ask who is deleted',
-  t.run('ana', format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('dee')), 'Claude Code'),
-  'ERR 42501');
+select t.expect('delete account: an agent sees a deleted account as its person does',
+  t.run('ana', format($q$select label from public.co_member_people(array[%L]::uuid[])$q$, t.id('dee')), 'Claude Code'),
+  'a deleted account');
 
 -- ---------------------------------------------------------------------------
 -- The address, later
