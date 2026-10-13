@@ -2,11 +2,18 @@
 -- otherwise lives in each table's own tests, which a table that doesn't exist
 -- yet doesn't have: this reads the catalog, so a new column fails here first.
 
--- Shapes allowed on any table: a hash, or the one sealing scheme
--- (private.variable_secrets: key_id, nonce, ciphertext; checked below). The
--- rest are named one by one, each with why it holds no secret.
+-- The one shape allowed on any table is the sealing scheme's key_id
+-- (private.variable_secrets: key_id, nonce, ciphertext; checked below). Hash
+-- columns are named one by one, not matched on a _hash suffix, so a plaintext
+-- column can't pass by its name; so is every other exception, with why.
 create temp table allowed (col text primary key, why text not null);
 insert into allowed values
+  ('private.oauth_codes.code_hash',      'SHA-256 of the OAuth code'),
+  ('private.oauth_tokens.token_hash',    'SHA-256 of the OAuth token'),
+  ('private.vault_invites.token_hash',   'SHA-256 of the invite link''s token'),
+  ('public.access_tokens.token_hash',    'SHA-256 of the personal token'),
+  ('public.path_claims.secret_hash',     'hash of the claim''s secret (private.token_hash)'),
+  ('public.work_plan_steps.secret_hash', 'hash of the step claim''s secret (private.token_hash)'),
   ('private.oauth_codes.code_challenge', 'PKCE S256 challenge: a hash of the verifier'),
   ('private.rate_limits.key',            'keyed hash of an address, 64 hex characters'),
   ('private.env_readers.names_key',      'the variable names read, joined; names are not values'),
@@ -25,11 +32,10 @@ create temp view secret_named as
    where c.table_schema in ('public', 'private') and t.table_type = 'BASE TABLE'
      and c.column_name ~* '(token|secret|key|password|credential|code|api)';
 
-select t.expect('secret columns: every column named like a secret is a hash, sealed, or listed with why',
+select t.expect('secret columns: every column named like a secret is sealed or listed with why',
   (select coalesce(string_agg(col || ' ' || data_type, ', ' order by col), 'none')
      from secret_named s
-    where not (s.column_name ~ '_hash$' and s.data_type = 'text')
-      and not (s.column_name = 'key_id' and s.data_type = 'text'
+    where not (s.column_name = 'key_id' and s.data_type = 'text'
                and exists (select 1 from information_schema.columns n
                             where (n.table_schema, n.table_name) = (s.table_schema, s.table_name)
                               and n.column_name = 'ciphertext'))
