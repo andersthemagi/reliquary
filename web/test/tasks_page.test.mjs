@@ -453,3 +453,23 @@ test("skip: an unknown task goes back with a warning, and a form naming no actio
   assert.match(text, /^The form didn’t say what to do, so nothing changed\. \(ref [0-9a-f]{8}\)$/);
   assert.equal((await stepOf("d")).status, "open");
 });
+
+// ---------------------------------------------------------------------------
+// Context moved (CL-3.6): a file a task cites has a newer version.
+
+test("context moved: a task citing a file with a newer version says context moved and links the file, and the registrant's flag names the plan", async () => {
+  await as(EDDA, "select public.write_file($1, 'notes/moved.md', 'first')", [V.main]);
+  const [{ v }] = await sql("select current_version_id as v from public.files where vault_id = $1 and path = 'notes/moved.md'", [V.main]);
+  await register(NOA, V.main, "plans/moved.md", [{ key: "uses", title: "Uses the note", cites: [{ path: "notes/moved.md", version: v }] }]);
+  assert.doesNotMatch(taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses"), /Context moved/);
+  await page(noa, `/v/${V.main}/flags`);
+
+  await as(EDDA, "select public.write_file($1, 'notes/moved.md', 'second')", [V.main]);
+  const row = taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses");
+  assert.match(row, /<span class="badge success">Ready<\/span> <span class="badge warning">Context moved<\/span>/);
+  assert.match(row, new RegExp(`Context moved: <a href="/v/${V.main}/file\\?path=notes%2Fmoved\\.md">notes/moved\\.md</a> has a newer version than the one this task cites\\.`));
+
+  const flags = await page(noa, `/v/${V.main}/flags`);
+  assert.match(flags, /<span class="badge warning">Context moved<\/span>/);
+  assert.match(flags, new RegExp(`cited in <a href="${tasksUrl(V.main)}/plan\\?path=plans%2Fmoved\\.md">plans/moved\\.md</a>`));
+});
