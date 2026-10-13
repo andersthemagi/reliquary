@@ -261,3 +261,19 @@ test("updates count: the sidebar's Updates shows how many flags wait, up to 20+,
   await as(GIL, "select public.write_file($1, 'w/more-' || g || '.md', 'Text') from generate_series(1, 21) g", [v]);
   assert.match(await side(`/v/${v}`), updates("20\\+"));
 });
+
+test("new for you: a task awaiting review is waiting on you, named in words and linked to its plan", async () => {
+  [{ id: V.tasks }] = await as(FRAN, "select public.create_vault('Flags tasks', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.tasks, GIL, FRAN]);
+  await as(FRAN, "select public.write_file($1, 'plans/p.md', 'a plan')", [V.tasks]);
+  await as(FRAN, `select public.register_work_plan($1, 'plans/p.md', (select current_version_id from public.files where vault_id = $1 and path = 'plans/p.md'),
+                    '[{"key":"brief","title":"Write the <brief>","gate":"review"}]'::jsonb)`, [V.tasks]);
+  assert.match(await page(flagsUrl(V.tasks)), /Nothing new since you last looked\./);
+  await as(GIL, "select public.complete_step($1, 'plans/p.md', 'brief', f.o_fence, f.o_secret) from public.claim_step($1, 'plans/p.md', 'brief') f", [V.tasks]);
+
+  const rows = [...(await page(flagsUrl(V.tasks))).matchAll(/<li class="flag">([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 1);
+  assert.match(rows[0], /<span class="badge warning">Waiting on you<\/span>/);
+  assert.match(rows[0], new RegExp(`<a href="/v/${V.tasks}/tasks/plan\\?path=plans%2Fp\\.md">Task “Write the &lt;brief&gt;” awaits your review</a>`));
+  assert.doesNotMatch(rows[0], /cited in/);
+});

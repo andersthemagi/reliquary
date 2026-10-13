@@ -36,6 +36,8 @@ type Flag = {
   thread_id: string | null;
   message_id: number | null;
   plan: string | null;
+  step: string | null;
+  step_title: string | null;
 };
 
 // The widest page list_flags takes, so "showing them" and "marking them
@@ -57,7 +59,9 @@ function categoryBadge(f: Pick<Flag, "category" | "reason">): Raw {
 function flagRows(ctx: Ctx, id: string, rows: Flag[]): Raw {
   return html`<ul class="rows feed">${rows.map((f) => {
     const what = describe(ctx.userId, { event: f.event });
-    const whatLink = f.proposal_id
+    const whatLink = f.reason === "step_review" && f.plan
+      ? html`<a href="${planPath(id, f.plan)}">Task “${f.step_title}” awaits your review</a>`
+      : f.proposal_id
       ? html`<a href="${proposalPath(id, f.proposal_id)}">${what}</a>`
       : f.thread_id
         ? html`<a href="${threadPath(id, f.thread_id)}${f.message_id === null ? "" : `#message-${f.message_id}`}">${what}</a>`
@@ -67,7 +71,7 @@ function flagRows(ctx: Ctx, id: string, rows: Flag[]): Raw {
           f.watching && f.watching !== f.path ? ` via ${f.watching}` : ""
         }</span>`
       : "";
-    const cited = f.plan ? html`<span>cited in <a href="${planPath(id, f.plan)}">${f.plan}</a></span>` : "";
+    const cited = f.reason === "cite_moved" && f.plan ? html`<span>cited in <a href="${planPath(id, f.plan)}">${f.plan}</a></span>` : "";
     return html`<li class="flag"><span class="change-what">${categoryBadge(f)} ${whatLink}</span><span class="meta">${where}${cited}<span>${who(ctx, f.actor, f.agent)}</span><span>${time(f.at)}</span></span></li>`;
   })}</ul>`;
 }

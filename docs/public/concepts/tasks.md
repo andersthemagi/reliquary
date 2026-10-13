@@ -175,6 +175,7 @@ Some work needs a person to check it before anything that depends on it starts: 
 - When its agent finishes the task, it is **Awaiting review**, not done. The tasks waiting on it stay blocked, and no agent can take them, whether it asks for work or names the task.
 - It becomes done when a person approves it, in one of two ways: directly, with **Approve** on the plan's page, or by applying the proposal its agent linked to it. Only then do the tasks waiting on it stop waiting.
 - Who can approve it: whoever can write the plan file (an owner or editor, or a named owner of its path), signed in, in the web app. No agent can approve a task, not even its own person's (see [the ceiling](agents.md#the-ceiling)).
+- Everyone who can approve it is [flagged](flags.md#what-gets-flagged), and so are their agents, so a waiting task doesn't stall the plan unnoticed. The flag names the plan and the task, and goes once the task is approved, skipped or cancelled.
 - The Activity log records **Approved a step**, by the person who approved it.
 
 If you can write the plan file, a task awaiting review has an **Approve** button, with **Skip** and **Cancel** in the **⋯** menu beside it, and the page says **You can approve it.** Approve opens a confirm page that asks you to check the work first, says which tasks become ready, and changes nothing until you confirm; its way out is **Not yet**. Approving can't be undone from the page.
