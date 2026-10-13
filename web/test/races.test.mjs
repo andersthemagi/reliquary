@@ -52,6 +52,7 @@ async function close(...cs) {
   }
 }
 let db;
+let budgetWas;
 const sql = async (q, params = []) => (await db.query(q, params)).rows;
 
 // One transaction as a person, on connection c. Optional: `stop` names the
@@ -129,6 +130,12 @@ before(async () => {
              values ('races_tiny', 'Races tiny', 4, 1000), ('races_three', 'Races three', 3, 1000000)
              on conflict (id) do nothing`);
   for (const u of everyone) await sql("select private.set_account_plan($1, 'races_roomy')", [u]);
+  // A vault's request budget (F839, proved in request_budget_test.sql) is
+  // 300 evaluations a minute: a crowd here that ran past it would spend the
+  // rest of the minute told to wait, and how far it got first would depend
+  // on the machine's speed. Lifted for this file, put back in after().
+  budgetWas = (await sql("select per_minute from private.request_budget"))[0].per_minute;
+  await sql("update private.request_budget set per_minute = 1000000");
   // The stopping trigger: AFTER each statement on a table, when this
   // transaction's races.stop_on names it, wait for the barrier. Test-only;
   // dropped in after().
@@ -173,6 +180,7 @@ before(async () => {
 });
 
 after(async () => {
+  if (budgetWas) await sql("update private.request_budget set per_minute = $1", [budgetWas]).catch(() => {});
   await sql(`drop trigger if exists zz_races_stop on public.files;
              drop trigger if exists zz_races_stop on private.env_import_secrets;
              drop trigger if exists zz_races_stop on public.log;
@@ -399,9 +407,10 @@ test("races, work plan gate: 30 people working a 120-step plan at once, abandoni
       }
       const { o_fence: fence, o_secret: secret } = cl.rows[0];
       const complete = () => as(c, who, "select public.complete_step($1, 'plan.md', $2, $3, $4)::text", [v, key, fence, secret]);
-      if (rand() < 0.25) {
+      if (abandoned === 0 || rand() < 0.25) {
         // Walked away: the lease lapses (the clock moved for this claim
-        // alone), and coming back late to finish it is refused.
+        // alone), and coming back late to finish it is refused. The first
+        // claim of the run always is, whatever the interleaving.
         abandoned++;
         await c.query("update public.work_plan_steps set expires_at = clock_timestamp() where plan_id = $1 and key = $2 and fence = $3", [plan, key, fence]);
         stale.push(outcome(await complete()));
@@ -415,6 +424,10 @@ test("races, work plan gate: 30 people working a 120-step plan at once, abandoni
 
   const watcher = await connect();
   const conns = await Promise.all(crowd.map(() => connect()));
+  // The crowd's first attempts, all at once before anything is done, are
+  // at steps of the last layer: every one is refused at the gate.
+  const opening = await Promise.all(crowd.map((p, i) =>
+    as(conns[i], p, "select o_fence from public.claim_step($1, 'plan.md', $2)", [v, steps[105 + (i % 15)].key])));
   const t0 = Date.now();
   const running = Promise.all(crowd.map((p, i) => work(conns[i], p, seeded(1000 + i))));
   let snapshots = 0;
@@ -469,7 +482,7 @@ test("races, work plan gate: 30 people working a 120-step plan at once, abandoni
   assert.deepEqual(tally, { done: 120, completions: 120, claims: 120 + abandoned, fences: 120 + abandoned });
   assert.ok(abandoned > 0, "no claim was abandoned");
   assert.deepEqual([...new Set(stale)], ["RLW03"]);
-  assert.ok((refusals.RLW02 ?? 0) > 0, "no claim ever hit the blocker gate");
+  assert.deepEqual([...new Set(opening.map((r) => r.code))], ["RLW02"], "a claim got past the blocker gate");
 });
 
 // ---------------------------------------------------------------------------
@@ -1298,9 +1311,31 @@ const placesStop = () =>
     create trigger zz_races_stop after insert or update or delete on public.work_plan_places
       for each statement execute function test_races.stop('work_plan_places');`);
 
+// Holds a plan's ready steps outside the line (the owner's claims, written
+// as the table owner, so no line or cap applies and nothing is logged).
+// Whoever asks meanwhile is told to wait, so a crowd starts with all of it
+// in line whatever the machine's speed; letGo makes those claims lapse, and
+// the line hands the steps on.
+const holdReady = async (plan) =>
+  (await sql(`update public.work_plan_steps set status = 'claimed', fence = fence + 1, holder = $2,
+                     claimed_at = clock_timestamp(), expires_at = clock_timestamp() + interval '1 hour'
+               where plan_id = $1 and status = 'open' and open_blockers = 0 returning key`, [plan, OWNER])).map((r) => r.key);
+const letGo = (plan, keys) =>
+  sql("update public.work_plan_steps set expires_at = clock_timestamp() where plan_id = $1 and key = any($2::text[])", [plan, keys]);
+// Runs every job, each connection taking its share one after another (a
+// connection runs one transaction at a time).
+const spread = async (conns, jobs, run) =>
+  (await Promise.all(conns.map(async (c, i) => {
+    const out = [];
+    for (const job of jobs.filter((_, j) => j % conns.length === i)) out.push(await run(c, job));
+    return out;
+  }))).flat();
+const statesOf = (results) => [...new Set(results.map((r) => (r.ok ? r.rows[0].o_state : r.code)))];
+
 // Thirty people ask request_work for the steps of one 40-step plan at once
 // (the first 40 steps of the layered plan above: its first two layers and
-// part of the third, each blocked only by steps among them). A caller told
+// part of the third, each blocked only by steps among them), all of them in
+// line first (holdReady), so places past the ready count wait. A caller told
 // to wait moves its own clock to its time and asks again; told to cool
 // down, it moves the cooldown's end to now. With `abandon`, a quarter of
 // the steps granted are walked away from (their lease made to lapse), so
@@ -1353,6 +1388,11 @@ async function lineCrowd(name, abandon) {
     }
   };
   const conns = await Promise.all(crowd.map(() => connect()));
+  const held = await holdReady(plan);
+  const first = await Promise.all(crowd.map((p, i) => as(conns[i], p, requestWork, [v])));
+  assert.deepEqual(statesOf(first), ["wait"], "someone asking while nothing was free wasn't told to wait");
+  assert.equal(await placesIn(v), 30, "the crowd isn't all in line");
+  await letGo(plan, held);
   const t0 = Date.now();
   await Promise.all(crowd.map((p, i) => work(conns[i], p, seeded(2000 + i))));
   const ms = Date.now() - t0;
@@ -1386,7 +1426,6 @@ async function lineCrowd(name, abandon) {
   );
   assert.deepEqual(tally, { done: 40, completions: 40, claims: 40 + abandoned });
   assert.equal(await placesIn(v), 0, "a place in line was left behind");
-  assert.ok((states.wait ?? 0) > 0, "nobody ever waited in line");
   return { ms, abandoned, states };
 }
 
@@ -1486,10 +1525,12 @@ test("races, lock order: leaving a line while the vault is deleted, interleaved,
 // hammering runs). A person's connection is an access token, so a hundred
 // connections are a hundred tokens, sent over fewer database connections
 // (the database allows 100), the way the MCP server's pool sends them.
-// Bounds on writes and errors, never on speed. On every push the hostile
-// crowd runs until the honest agents finish the plan (90 seconds at most)
-// and the hammering one for 5 seconds; the spike's full run keeps the
-// hostile crowd on for 90 seconds and hammers for 15:
+// Bounds on writes and errors, never on speed: the hostile crowd and the
+// honest agents are all in line before anyone is served (holdReady), and
+// the honest agents have 10 minutes, a bound only a hang reaches. On every
+// push the hostile crowd runs until the honest agents finish the plan and
+// the hammering one for 5 seconds; the spike's full run keeps the hostile
+// crowd on for 90 seconds and hammers for 15:
 //   WAITING_LOAD_FULL=1 WEB_TESTS=test/races.test.mjs ./web/test.sh
 
 const LOAD_FULL = Boolean(process.env.WAITING_LOAD_FULL);
@@ -1583,6 +1624,14 @@ test("races, waiting in line across vaults: many connections asking at once for 
     }
   };
   const conns = await Promise.all(Array.from({ length: 48 }, () => connect()));
+  // Every agent asks every vault at once while nothing is free: a person's
+  // three agents overlap on one place, and every vault's line is full first.
+  const held = await Promise.all(vaults.map((x) => holdReady(x.plan)));
+  const first = await spread(conns, agents.flatMap((ag) => vaults.map(({ v }) => [ag, v])),
+    (c, [{ who, tok }, v]) => asTok(c, who, tok, requestWork, [v]));
+  assert.deepEqual(statesOf(first), ["wait"], "someone asking while nothing was free wasn't told to wait");
+  for (const { v } of vaults) assert.equal(await placesIn(v), crowd.length, "a person's agents didn't share one place");
+  for (const [k, x] of vaults.entries()) await letGo(x.plan, held[k]);
   const t0 = Date.now();
   await Promise.all(conns.map((c, i) => work(c, seeded(3000 + i))));
   const ms = Date.now() - t0;
@@ -1598,11 +1647,11 @@ test("races, waiting in line across vaults: many connections asking at once for 
     assert.equal(await placesIn(v), 0, "a place in line was left behind");
   }
   assert.deepEqual(await drifted(db, vaults.map((x) => x.plan)), []);
-  assert.ok((states.at_capacity ?? 0) > 0 && (states.wait ?? 0) > 0, "no request overlapped another of the same agent or person");
 });
 
 test("races, waiting in line under load: 20 honest agents beside a hostile crowd of 100 connections run by 5 people finish the plan, never claim past an unfinished blocker, keep every stored count right and never deadlock", async () => {
   const seconds = 90;
+  const hang = 600;
   const honest = Array.from({ length: 20 }, (_, i) => uid(700 + i));
   const hostile = Array.from({ length: 5 }, (_, i) => uid(720 + i));
   await addUsers([...honest, ...hostile]);
@@ -1616,14 +1665,13 @@ test("races, waiting in line under load: 20 honest agents beside a hostile crowd
   for (const p of hostile) for (let k = 0; k < 20; k++) tokens.push({ who: p, tok: await tokenFor(p, v, `hostile ${k}`) });
   const ask = "select o_state, o_key, o_fence, o_secret from public.request_work($1, 'mix/plan.md')";
 
-  const deadline = Date.now() + seconds * 1000;
   const unexpected = [];
   const states = { honest: {}, hostile: {} };
   const count = (side, s) => (states[side][s] = (states[side][s] ?? 0) + 1);
   let finishedMs = null;
   // Honest: follows the hint, finishes what it is granted but walks away from a tenth.
   const honestAgent = async (c, who, rand) => {
-    while (Date.now() < deadline) {
+    while (Date.now() < hangAt) {
       const r = await as(c, who, ask, [v]);
       if (!r.ok) {
         unexpected.push(`honest request_work: ${r.code} ${r.message}`);
@@ -1642,13 +1690,13 @@ test("races, waiting in line under load: 20 honest agents beside a hostile crowd
         }
       }
     }
-    throw new Error(`the plan did not finish in ${seconds} s`);
+    throw new Error(`the plan did not finish in ${hang} s: a hang`);
   };
   // Hostile: ignores every hint and asks as fast as it can, through each of
   // its connections in turn, and never works: a step it is granted it sits
   // on until the lease runs out (made to lapse at once).
   const hostileConn = async (c, mine) => {
-    for (let n = 0; Date.now() < deadline && (LOAD_FULL || finishedMs === null); n++) {
+    for (let n = 0; LOAD_FULL ? Date.now() < fullUntil : finishedMs === null; n++) {
       const { who, tok } = mine[n % mine.length];
       const r = await asTok(c, who, tok, ask, [v]);
       if (!r.ok) {
@@ -1662,7 +1710,17 @@ test("races, waiting in line under load: 20 honest agents beside a hostile crowd
   const honestConns = await Promise.all(honest.map(() => connect()));
   const hostileConns = await Promise.all(Array.from({ length: 40 }, () => connect()));
   const watcher = await connect();
+  // The whole hostile crowd asks, then every honest agent, while the ready
+  // steps are held: everyone is told to wait, the hostile people first in line.
+  const held = await holdReady(plan);
+  const hostileFirst = await spread(hostileConns, tokens, (c, { who, tok }) => asTok(c, who, tok, ask, [v]));
+  const honestFirst = await spread(honestConns, honest, (c, who) => as(c, who, ask, [v]));
+  assert.deepEqual(statesOf([...hostileFirst, ...honestFirst]), ["wait"], "someone asking while nothing was free wasn't told to wait");
+  assert.equal(await placesIn(v), hostile.length + honest.length, "the crowd isn't all in line");
+  await letGo(plan, held);
   const t0 = Date.now();
+  const hangAt = t0 + hang * 1000;
+  const fullUntil = t0 + seconds * 1000;
   const honestDone = Promise.all(honest.map((p, i) => honestAgent(honestConns[i], p, seeded(4000 + i))))
     .finally(() => (finishedMs = Date.now() - t0));
   const running = Promise.allSettled([honestDone, ...hostileConns.map((c, i) => hostileConn(c, tokens.filter((_, k) => k % hostileConns.length === i)))]);
@@ -1684,7 +1742,6 @@ test("races, waiting in line under load: 20 honest agents beside a hostile crowd
   assert.deepEqual(seenDrift, [], "a stored blocker count disagreed with the plan while the crowd ran");
   assert.deepEqual(await drifted(db, [plan]), []);
   assert.equal(await placesIn(v), 0, "a place in line was left behind");
-  assert.ok((states.hostile.wait ?? 0) > 0, "the hostile crowd never reached the line");
 });
 
 test("races, waiting in line under load: 100 agents asking as fast as they can cause no error, and write their places no more than once per agent per minimum gap", async () => {
@@ -1714,7 +1771,8 @@ test("races, waiting in line under load: 100 agents asking as fast as they can c
   const deadline = t0 + seconds * 1000;
   await Promise.all(conns.map(async (c, i) => {
     const mine = crowd.filter((_, k) => k % conns.length === i);
-    for (let n = 0; Date.now() < deadline; n++) {
+    // Each agent asks at least once, however slow the machine.
+    for (let n = 0; n < mine.length || Date.now() < deadline; n++) {
       const r = await as(c, mine[n % mine.length], ask, [v]);
       calls++;
       if (!r.ok) unexpected.push(`${r.code} ${r.message}`);
