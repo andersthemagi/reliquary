@@ -1,6 +1,7 @@
--- Hostile tests for 20261014150000_display_preferences: showing your email
--- or hiding it, vaults that require emails, consent, and the one rule
--- (private.email_hidden) where people are resolved. Ana owns Team (Ben
+-- Hostile tests for 20261014150000_display_preferences and
+-- 20261014160000_drop_vault_email_requirement: showing your email or
+-- hiding it, and the one rule (private.email_hidden) where people are
+-- resolved. Ana owns Team (Ben
 -- edits, Cal views); Dee owns Side, where Ben is an editor too, so Ben
 -- shares Team with Ana and Cal and only Side with Dee. Eve has an account
 -- and an invite to Team.
@@ -31,9 +32,6 @@ create function t.member_email(p_reader text, p_vault text, p_user text) returns
 $$;
 create function t.shows(p_user text) returns text language sql as $$
   select coalesce((select show_email::text from public.display_preferences where user_id = t.id(p_user)), 'default')
-$$;
-create function t.requires(p_vault text) returns text language sql as $$
-  select require_emails::text from public.vaults where id = t.id(p_vault)
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -91,64 +89,13 @@ select t.expect('display: a hostile display name is kept as written and does not
   'Robert''); DROP TABLE students;-- | Robert''); DROP TABLE students;-- (cal@example.test) / cal@example.test | <script>alert(1)</script> | 5');
 
 -- ---------------------------------------------------------------------------
--- Vaults that require emails
+-- Agents and tokens
 
-select t.expect('require: only an owner, in person, sets a vault to require emails',
-  t.run('ben', format($q$select public.set_require_emails(%L, true)$q$, t.id('team'))) || ' '
-  || t.run('cal', format($q$select public.set_require_emails(%L, true)$q$, t.id('team'))) || ' '
-  || t.run('dee', format($q$select public.set_require_emails(%L, true)$q$, t.id('team'))) || ' '
-  || t.run('ana', format($q$select public.set_require_emails(%L, true)$q$, t.id('team')), 'Claude Code') || ' '
-  || t.run_tok('ana', 'ana-all', format($q$select public.set_require_emails(%L, true)$q$, t.id('team'))) || ' '
-  || t.requires('team'),
-  'ERR 42501 ERR 42501 ERR 42501 ERR 42501 ERR 42501 false');
-select t.expect('require: the owner turns it on',
-  (t.run('ana', format($q$select public.set_require_emails(%L, true)$q$, t.id('team'))) || 'ok') || ' ' || t.requires('team'),
-  'ok true');
-select t.expect('require: turning it on is logged',
-  (select detail ->> 'require_emails' from public.log where vault_id = t.id('team') and event = 'vault.require_emails'), 'true');
-select t.expect('require: a member who hid their email is asked in that vault, and only there',
-  t.run('ben', format($q$select public.email_consent_needed(%L)::text$q$, t.id('team'))) || ' '
-  || t.run('ben', format($q$select public.email_consent_needed(%L)::text$q$, t.id('side'))) || ' '
-  || t.run('cal', format($q$select public.email_consent_needed(%L)::text$q$, t.id('team'))),
-  'true false false');
-select t.expect('require: until they agree, their email is still hidden, in that vault too',
-  t.seen('ana', 'ben') || ' ' || t.member_email('ana', 'team', 'ben'), 'Ben · 00000000 / no email no email');
-select t.expect('require: only the member agrees, in person, in a vault they belong to that requires it',
-  t.run('ben', format($q$select public.consent_to_show_email(%L)$q$, t.id('team')), 'Claude Code') || ' '
-  || t.run('dee', format($q$select public.consent_to_show_email(%L)$q$, t.id('team'))) || ' '
-  || t.run('ben', format($q$select public.consent_to_show_email(%L)$q$, t.id('side'))) || ' '
-  || t.seen('ana', 'ben'),
-  'ERR 42501 ERR P0002 ERR 22023 Ben · 00000000 / no email');
-select t.expect('require: once they agree, people who share that vault see the email',
-  (t.run('ben', format($q$select public.consent_to_show_email(%L)$q$, t.id('team'))) || 'ok') || ' '
-  || t.run('ben', format($q$select public.email_consent_needed(%L)::text$q$, t.id('team'))) || ' | '
-  || t.seen('ana', 'ben') || ' | ' || t.member_email('cal', 'team', 'ben'),
-  'ok false | Ben (ben@example.test) / ben@example.test | ben@example.test');
-select t.expect('require: consent for one vault doesn''t show the email through another alone',
-  t.seen('dee', 'ben') || ' ' || t.member_email('dee', 'side', 'ben'), 'Ben · 00000000 / no email no email');
 insert into t.ids select 'alone', t.run('ana', $q$select public.create_vault('Ana alone')$q$)::uuid;
 select t.run('ana', format($q$select public.create_access_token('ana-other', 30, array[%L]::uuid[], 'read')$q$, t.id('alone')));
-select t.expect('require: an agent never gets the email, even after consent, and a token scoped away from the vault sees nobody',
-  t.seen('ana', 'ben', 'Claude Code') || ' | '
-  || t.run_tok('ana', 'ana-all', format($q$select label || ' / ' || coalesce(email, 'no email')
-                                         from public.co_member_people(array[%L]::uuid[])$q$, t.id('ben'))) || ' | '
-  || t.run_tok('ana', 'ana-other', format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ben'))),
-  'Ben · 00000000 / no email | Ben · 00000000 / no email | 0');
-select t.expect('require: turning it off forgets the consent, so turning it on again asks again',
-  (t.run('ana', format($q$select public.set_require_emails(%L, false)$q$, t.id('team'))) || 'ok') || ' '
-  || t.seen('ana', 'ben') || ' | '
-  || (t.run('ana', format($q$select public.set_require_emails(%L, true)$q$, t.id('team'))) || 'ok') || ' '
-  || t.run('ben', format($q$select public.email_consent_needed(%L)::text$q$, t.id('team'))) || ' '
-  || t.seen('ana', 'ben'),
-  'ok Ben · 00000000 / no email | ok true Ben · 00000000 / no email');
-select t.run('ben', format($q$select public.consent_to_show_email(%L)$q$, t.id('team')));
-select t.run('ben', format($q$select public.leave_vault(%L)$q$, t.id('team')));
-select t.expect('require: leaving takes the consent along',
-  (select count(*)::text from public.email_consents where user_id = t.id('ben')), '0');
-select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
-select t.expect('require: coming back asks again, and the email stays hidden until they agree',
-  t.run('ben', format($q$select public.email_consent_needed(%L)::text$q$, t.id('team'))) || ' ' || t.seen('ana', 'ben'),
-  'true Ben · 00000000 / no email');
+select t.expect('display: a token scoped away from every vault a person shares with its person sees nobody',
+  t.run_tok('ana', 'ana-other', format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ben'))),
+  '0');
 
 -- ---------------------------------------------------------------------------
 -- Invites and deletion notices name a hidden inviter without the email
