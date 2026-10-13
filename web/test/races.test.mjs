@@ -1089,3 +1089,216 @@ test("races, one wins: declining from the inbox while the link is accepted, eith
   log("inbox decline vs link", outcomes);
   assert.deepEqual(outcomes, ["ok/55000 (blocked)", "ok/55000 (blocked)"]);
 });
+
+// ---------------------------------------------------------------------------
+// Waiting in line (CL-3.9, 20261013170100_request_work.sql onwards)
+
+// One transaction as a person through one of their connections (an access
+// token), the way the MCP server acts: the token is the connection.
+async function asTok(c, user, tok, q, params = [], stop) {
+  await c.query("begin");
+  try {
+    await c.query("set local role authenticated");
+    await c.query("select set_config('request.jwt.claims', $1, true)", [
+      JSON.stringify({ sub: user, role: "authenticated", act: { sub: tok, name: "racer", tok } }),
+    ]);
+    if (stop) await c.query("select set_config('races.stop_on', $1, true)", [stop]);
+    const r = await c.query(q, params);
+    await c.query("commit");
+    return { ok: true, rows: r.rows };
+  } catch (e) {
+    await c.query("rollback").catch(() => {});
+    return { ok: false, code: e.code, message: e.message };
+  }
+}
+async function tokenFor(user, vault, name) {
+  const r = await as(db, user, "select public.create_access_token($1, 30, array[$2]::uuid[], 'write')", [name, vault]);
+  assert.ok(r.ok, r.message);
+  return (await sql("select id from public.access_tokens where user_id = $1 and name = $2", [user, name]))[0].id;
+}
+const requestWork = "select o_state, o_key, o_fence, o_secret, o_place, o_ready from public.request_work($1, 'plan.md')";
+const placesIn = async (v) => (await sql("select count(*)::int as n from public.work_plan_places where vault_id = $1", [v]))[0].n;
+
+// The stopping trigger on places (see the top of this file), made by the
+// tests that stop there; after() drops it with the test_races schema.
+const placesStop = () =>
+  sql(`drop trigger if exists zz_races_stop on public.work_plan_places;
+    create trigger zz_races_stop after insert or update or delete on public.work_plan_places
+      for each statement execute function test_races.stop('work_plan_places');`);
+
+// Thirty people ask request_work for the steps of one 40-step plan at once
+// (the first 40 steps of the layered plan above: its first two layers and
+// part of the third, each blocked only by steps among them). A caller told
+// to wait moves its own clock to its time and asks again; told to cool
+// down, it moves the cooldown's end to now. With `abandon`, a quarter of
+// the steps granted are walked away from (their lease made to lapse), so
+// the line hands them on and the strikes and cooldowns run. Checked after,
+// from the log (its seq is commit order) and the tables.
+async function lineCrowd(name, abandon) {
+  const crowd = Array.from({ length: 30 }, (_, i) => uid(500 + i));
+  await sql(`insert into auth.users (id, email) select u, 'races-' || right(u::text, 4) || '@example.test' from unnest($1::uuid[]) u
+             on conflict (id) do nothing`, [crowd]);
+  const v = await newVault(OWNER, name);
+  for (const p of crowd) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  const seededFile = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan') as v", [v]);
+  assert.ok(seededFile.ok, seededFile.message);
+  const steps = layeredPlan(seeded(74)).slice(0, 40);
+  const reg = await as(db, OWNER, "select public.register_work_plan($1, 'plan.md', $2, $3::jsonb)::text as id", [v, seededFile.rows[0].v, JSON.stringify(steps)]);
+  assert.ok(reg.ok, reg.message);
+  const plan = reg.rows[0].id;
+
+  const states = {};
+  const unexpected = [];
+  let abandoned = 0;
+  const work = async (c, who, rand) => {
+    for (let calls = 0; ; calls++) {
+      if (calls > 5000) throw new Error(`${who} gave up after ${calls} calls`);
+      const r = await as(c, who, requestWork, [v]);
+      if (!r.ok) {
+        unexpected.push(`request_work: ${r.code} ${r.message}`);
+        continue;
+      }
+      const a = r.rows[0];
+      states[a.o_state] = (states[a.o_state] ?? 0) + 1;
+      if (a.o_state === "plan_complete") return;
+      if (a.o_state === "wait") {
+        await c.query("update public.work_plan_places set next_allowed_at = clock_timestamp() where plan_id = $1 and holder = $2", [plan, who]);
+      } else if (a.o_state === "cooling_down") {
+        await c.query("update private.work_plan_strikes set cooldown_until = clock_timestamp() where vault_id = $1 and person = $2", [v, who]);
+      } else if (a.o_state === "granted") {
+        if (abandon && rand() < 0.25) {
+          abandoned++;
+          await c.query("update public.work_plan_steps set expires_at = clock_timestamp() where plan_id = $1 and key = $2 and fence = $3", [plan, a.o_key, a.o_fence]);
+          continue;
+        }
+        const done = await as(c, who, "select public.complete_step($1, 'plan.md', $2, $3, $4)::text", [v, a.o_key, a.o_fence, a.o_secret]);
+        if (!done.ok) unexpected.push(`complete ${a.o_key}: ${done.code} ${done.message}`);
+      } else {
+        unexpected.push(`request_work answered ${a.o_state}`);
+      }
+    }
+  };
+  const conns = await Promise.all(crowd.map(() => connect()));
+  const t0 = Date.now();
+  await Promise.all(crowd.map((p, i) => work(conns[i], p, seeded(2000 + i))));
+  const ms = Date.now() - t0;
+  await close(conns);
+  log(name, { ms, states, abandoned });
+  assert.deepEqual(unexpected, []);
+
+  const violations = await sql(
+    `with st as (select id, key from public.work_plan_steps where plan_id = $2),
+          edge as (select s.key as step, b.key as blocker from public.work_plan_step_blockers d
+                     join st s on s.id = d.step_id join st b on b.id = d.blocker_id),
+          ev as (select seq, event, detail->>'step' as key from public.log where vault_id = $1 and event in ('step.claim', 'step.complete'))
+     select e.step, e.blocker from edge e join ev c on c.event = 'step.claim' and c.key = e.step
+      where not exists (select 1 from ev x where x.event = 'step.complete' and x.key = e.blocker and x.seq < c.seq)
+     order by 1, 2`,
+    [v, plan],
+  );
+  assert.deepEqual(violations.slice(0, 10), [], `${violations.length} claims made while a blocker was unfinished`);
+  const beyond = await sql(
+    `select detail->>'step' as step, (detail->>'place')::int as place, (detail->>'ready')::int as ready from public.log
+      where vault_id = $1 and event = 'step.claim' and (detail->>'place')::int > (detail->>'ready')::int`,
+    [v],
+  );
+  assert.deepEqual(beyond, [], "a grant had a place in line beyond the number of ready steps");
+  const [tally] = await sql(
+    `select count(*) filter (where status = 'done')::int as done,
+            (select count(*)::int from public.log where vault_id = $1 and event = 'step.complete') as completions,
+            (select count(*)::int from public.log where vault_id = $1 and event = 'step.claim') as claims
+       from public.work_plan_steps where plan_id = $2`,
+    [v, plan],
+  );
+  assert.deepEqual(tally, { done: 40, completions: 40, claims: 40 + abandoned });
+  assert.equal(await placesIn(v), 0, "a place in line was left behind");
+  assert.ok((states.wait ?? 0) > 0, "nobody ever waited in line");
+  return { ms, abandoned, states };
+}
+
+test("races, waiting in line: 30 people asking for the steps of one 40-step plan at once finish every step, never claim past an unfinished blocker or beyond the ready steps, and leave no place in line", async () => {
+  await lineCrowd("Races line crowd", false);
+});
+
+test("races, waiting in line: the same crowd walking away from a quarter of its steps still finishes every step, with the lapsed ones handed on through the line", async () => {
+  const { abandoned, states } = await lineCrowd("Races line crowd abandoning", true);
+  assert.ok(abandoned > 0, "no step was abandoned");
+  assert.ok((states.cooling_down ?? 0) > 0, "no one ever cooled down");
+});
+
+// Two requests from one person at once: the first stops after taking its
+// place, holding it; the second, from the same connection or from another
+// of the person's connections, waits for it and answers too. One place.
+test("races, waiting in line: two requests at once, from one connection or from two of one person's connections, both answer and leave one place", async () => {
+  await placesStop();
+  const who = uid(600);
+  await sql(`insert into auth.users (id, email) values ($1, 'races-0600@example.test') on conflict (id) do nothing`, [who]);
+  const outcomes = [];
+  for (const twoConnections of [false, true]) {
+    const v = await planVault(`Races line twice ${twoConnections}`, who);
+    // Someone else holds a, so nothing is ready and both requests wait.
+    await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, people[23], OWNER]);
+    assert.ok((await claimA(db, v, people[23])).ok);
+    const [tokA, tokB] = twoConnections ? [await tokenFor(who, v, "line a"), await tokenFor(who, v, "line b")] : [null, null];
+    const ask = (c, tok, stop) => (tok ? asTok(c, who, tok, requestWork, [v], stop) : as(c, who, requestWork, [v], stop));
+    const [a, b, bState] = await interleave((c) => ask(c, tokA, "work_plan_places"), (c) => ask(c, tokB));
+    outcomes.push(`${a.ok ? a.rows[0].o_state : a.code}/${b.ok ? b.rows[0].o_state : b.code} (${bState}) places ${await placesIn(v)}`);
+  }
+  log("request_work twice", outcomes);
+  assert.deepEqual(outcomes, ["wait/wait (blocked) places 1", "wait/wait (blocked) places 1"]);
+});
+
+test("races, lock order: asking for work while the vault is deleted, interleaved, doesn't deadlock", async () => {
+  const name = "Races delete request work";
+  const who = uid(601);
+  await sql(`insert into auth.users (id, email) values ($1, 'races-0601@example.test') on conflict (id) do nothing`, [who]);
+  const v = await planVault(name, who);
+  // The deletion holds the vault's row and its steps, and stops before its cascade.
+  const [de, rw] = await interleave(
+    (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name], "vault_deletions"),
+    (c) => as(c, who, requestWork, [v]),
+  );
+  assert.deepEqual([outcome(de), rw.ok ? rw.rows[0].o_state : rw.code], ["ok", "no_such_plan"]);
+});
+
+test("races, lock order: a place in line taken, or a step granted, while the vault is deleted, interleaved, doesn't deadlock", async () => {
+  await placesStop();
+  const outcomes = [];
+  for (const [round, stop] of [[0, "work_plan_places"], [1, "work_plan_steps"]]) {
+    const name = `Races request work delete ${round}`;
+    const who = uid(602 + round);
+    await sql(`insert into auth.users (id, email) values ($1, $2) on conflict (id) do nothing`, [who, `races-060${2 + round}@example.test`]);
+    const v = await planVault(name, who);
+    // To take a place, the one ready step is someone else's first.
+    if (stop === "work_plan_places") {
+      await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, people[22], OWNER]);
+      assert.ok((await claimA(db, v, people[22])).ok);
+    }
+    // The request holds the vault's row, and its place or its step, and stops.
+    const [rw, de] = await interleave(
+      (c) => as(c, who, requestWork, [v], stop),
+      (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name]),
+    );
+    outcomes.push(`${rw.ok ? rw.rows[0].o_state : rw.code}/${outcome(de)} places ${await placesIn(v)}`);
+  }
+  log("request_work vs delete_vault", outcomes);
+  assert.deepEqual(outcomes, ["wait/ok places 0", "granted/ok places 0"]);
+});
+
+test("races, lock order: leaving a line while the vault is deleted, interleaved, doesn't deadlock", async () => {
+  await placesStop();
+  const name = "Races leave queue delete";
+  const who = uid(604);
+  await sql(`insert into auth.users (id, email) values ($1, 'races-0604@example.test') on conflict (id) do nothing`, [who]);
+  const v = await planVault(name, who);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, people[21], OWNER]);
+  assert.ok((await claimA(db, v, people[21])).ok);
+  const joined = await as(db, who, requestWork, [v]);
+  assert.equal(joined.rows?.[0]?.o_state, "wait");
+  // Leaving holds the vault's row and the place it deleted, and stops.
+  const [lq, de] = await interleave(
+    (c) => as(c, who, "select public.leave_queue($1, 'plan.md')::text as left", [v], "work_plan_places"),
+    (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name]),
+  );
+  assert.deepEqual([lq.ok ? lq.rows[0].left : lq.code, outcome(de), await placesIn(v)], ["true", "ok", 0]);
+});
