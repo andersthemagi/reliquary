@@ -37,6 +37,7 @@ import { NO_LIMIT_COUNT, accountPage, myAdmission, myPlan, notAdmittedNote, peop
 import { biggerPlanHref } from "./site.js";
 import { NOT_SNOOZED_SQL, postComment, snooze, snoozedList, snoozedSection, unsnooze } from "./thread.js";
 import { editView, fileAction, fileView, folder, newFile, vaultShell } from "./files.js";
+import { overview } from "./overview.js";
 import {
   decide,
   editAndApprove,
@@ -112,7 +113,8 @@ export const q = encodeURIComponent;
 export const vaultPath = (id: string, rest = "") => `/v/${id}${rest}`;
 export const filePath = (id: string, path: string, tab?: string) =>
   `/v/${id}/file?path=${q(path)}${tab ? `&tab=${tab}` : ""}`;
-export const treePath = (id: string, dir: string) => (dir ? `/v/${id}/tree?path=${q(dir)}` : `/v/${id}`);
+// The vault itself (/v/:id) is its Overview (overview.ts); its files start at /files.
+export const treePath = (id: string, dir: string) => (dir ? `/v/${id}/tree?path=${q(dir)}` : `/v/${id}/files`);
 export const proposalPath = (id: string, pid: string, rest = "") => `/v/${id}/proposals/${pid}${rest}`;
 
 export function ago(d: Date): string {
@@ -190,7 +192,7 @@ const withQuorums = (list: string) => `
 
 // Proposals waiting on this person: open, in a vault they can approve in, and
 // not yet decided by them at the current revision.
-const WAITING_SQL = `
+export const WAITING_SQL = `
   select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
          p.revision, p.status, cur.body as current_body, p.body,
          (select count(*) from public.approvals a
@@ -673,7 +675,8 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (!m) return notFound(ctx);
   const [, id, rest = ""] = m;
   if (!UUID.test(id)) return notFound(ctx);
-  if (get && rest === "") return folder(ctx, id, "");
+  if (get && rest === "") return overview(ctx, id);
+  if (get && rest === "/files") return folder(ctx, id, "");
   if (get && rest === "/tree") return folder(ctx, id, ctx.url.searchParams.get("path") ?? "");
   if (get && rest === "/file") return fileView(ctx, id);
   if (!get && rest === "/file") return fileAction(ctx, id);

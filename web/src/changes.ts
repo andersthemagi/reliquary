@@ -237,6 +237,15 @@ async function livePaths(c: pg.PoolClient, id: string, lines: Line[]): Promise<S
   );
 }
 
+// The newest few lines of the feed, in the same words, for the vault's
+// Overview (overview.ts); null when nothing has changed yet.
+export async function recentChanges(c: pg.PoolClient, ctx: Ctx, id: string, n: number): Promise<Raw | null> {
+  const lines = (await readPage(c, ctx.userId, id)).lines.slice(0, n);
+  if (!lines.length) return null;
+  const live = await livePaths(c, id, lines);
+  return html`<ul class="card-list">${lines.map((l) => changeLine(ctx, id, l, live))}</ul>`;
+}
+
 export async function changes(ctx: Ctx, id: string): Promise<Reply> {
   const before = /^\d{1,18}$/.test(ctx.url.searchParams.get("before") ?? "") ? ctx.url.searchParams.get("before")! : undefined;
   const show = showOf(ctx.url.searchParams.get("show"));

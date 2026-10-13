@@ -38,9 +38,9 @@ For some vaults, or another expiry, choose **use the full form** on the tab, or 
 
 The **Connect** page says **Connected** and names a connection used in the last 15 minutes, with when and from which client. If none was, it says so. Reload it after the last step. A revoked or expired connection never counts.
 
-A vault's page shows a **Connect an agent** step to its writers, for the first 14 days after the vault is made, until you have any connection at all (a token, an app or the CLI).
+A vault's **Overview** shows a **Connect an agent** step to its writers, for the first 14 days after the vault is made, until you have any connection at all (a token, an app or the CLI).
 
-Every vault's front page also has a **Connect an agent** button next to **New file**, so you can connect another agent from any vault at any time. Viewers see it too. It stays there while the step above is showing, too.
+Every vault's **Overview** also has a **Connect an agent** button next to **New file**, so you can connect another agent from any vault at any time. Viewers see it too. It stays there while the step above is showing, too.
 
 If **Create token** is refused (no name, **Only the vaults I tick** with none ticked, an expiry past a year), the form comes back with the reason and a reference, and everything you chose is still there to correct. Nothing was created.
 

@@ -146,10 +146,10 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   const tabs = /<div class="vault-tabs"><nav class="tabs" aria-label="Vault \(phone\)">([\s\S]*?)<\/nav><\/div>/.exec(h)?.[1];
   assert.ok(tabs, "a tabs row in the vault shell");
   assert.deepEqual([...tabs.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]), [
-    `/v/${V.main}`, `/v/${V.main}/proposals`, `/v/${V.main}/threads`, `/v/${V.main}/tasks`, `/v/${V.main}/changes`, `/v/${V.main}/variables`, `/v/${V.main}/links`,
+    `/v/${V.main}`, `/v/${V.main}/files`, `/v/${V.main}/proposals`, `/v/${V.main}/threads`, `/v/${V.main}/tasks`, `/v/${V.main}/changes`, `/v/${V.main}/variables`, `/v/${V.main}/links`,
     `/v/${V.main}/config`,
   ]);
-  assert.match(tabs, new RegExp(`<a href="/v/${V.main}" aria-current="page">Files</a>`));
+  assert.match(tabs, new RegExp(`<a href="/v/${V.main}" aria-current="page">Overview</a>`));
   assert.match(tabs, /Proposals<span class="count">1<\/span>/);
   const changes = await page(`/v/${V.main}/changes`);
   assert.match(changes, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/changes" aria-current="page">Changes</a>`), "Changes is marked on its page");
@@ -165,12 +165,12 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   }
 });
 
-test("vault sidebar: the sections are grouped, each with an icon, Work (Files, Proposals, Threads, Tasks, Changes) before Setup (Variables, Links, Settings)", async () => {
+test("vault sidebar: the sections are grouped, each with an icon, Work (Overview, Files, Proposals, Threads, Tasks, Changes) before Setup (Variables, Links, Settings)", async () => {
   const side = /<nav class="side-links" aria-label="Vault">([\s\S]*?)<\/nav>/.exec(await page(`/v/${V.main}`))?.[1];
   assert.ok(side, "a sidebar in the vault shell");
   const order = [...side.matchAll(/<span class="side-group">(\w+)<\/span>|<span class="side-label">(\w+)<\/span>/g)].map((m) => m[1] ? `[${m[1]}]` : m[2]);
-  assert.equal((side.match(/<a [^>]*><svg class="icon"[^>]*aria-hidden="true"/g) ?? []).length, 8, "every section has an icon, hidden from screen readers");
-  assert.deepEqual(order, ["[Work]", "Files", "Proposals", "Threads", "Tasks", "Changes", "[Setup]", "Variables", "Links", "Settings"]);
+  assert.equal((side.match(/<a [^>]*><svg class="icon"[^>]*aria-hidden="true"/g) ?? []).length, 9, "every section has an icon, hidden from screen readers");
+  assert.deepEqual(order, ["[Work]", "Overview", "Files", "Proposals", "Threads", "Tasks", "Changes", "[Setup]", "Variables", "Links", "Settings"]);
 });
 
 test("vault tabs: the phone's Browse files holds only the folder tree, not the sections", async () => {
@@ -185,31 +185,32 @@ test("vault tabs: the phone's Browse files holds only the folder tree, not the s
 // Folder pages
 
 test("folder: rows show each subfolder's policy as a badge, like its files", async () => {
-  const h = await page(`/v/${V.main}`);
+  const h = await page(`/v/${V.main}/files`);
   assert.match(h, /canon\/<\/a><\/td><td><span class="badge policy canon" title="Canon: changes are proposals that people approve">Canon<\/span><\/td>/);
   assert.match(h, /notes\/<\/a><\/td><td><span class="badge policy open" title="Open: members and agents write directly">Open<\/span><\/td>/);
   assert.match(h, /README\.md<\/a><\/td><td><span class="badge policy open"/);
 });
 
 test("folder: the root states what files without a rule are, how many rules there are, and links to Rules and what canon means", async () => {
-  const h = await page(`/v/${V.main}`);
+  const h = await page(`/v/${V.main}/files`);
   assert.match(h, new RegExp(
     `<p class="rule root-rule"><span>Files without a rule are</span> <span class="badge policy open"[^>]*>Open</span> <span>1 rule set · <a href="/v/${V.main}/rules">Rules</a> · <a href="/docs/concepts/canon-and-rules">What’s canon\\?</a></span></p>`,
   ));
-  assert.match(await page(`/v/${V.blank}`), /<span>No rules set · <a href/);
+  assert.match(await page(`/v/${V.blank}/files`), /<span>No rules set · <a href/);
 });
 
 test("folder: the README is boxed under the list with its name as the header bar, not a second heading", async () => {
-  const h = await page(`/v/${V.main}`);
+  const h = await page(`/v/${V.main}/files`);
   assert.match(h, new RegExp(`<section class="readme" aria-label="README\\.md"><p class="readme-head"><a href="${re(file(V.main, "README.md"))}">README\\.md</a></p><div class="prose entry"><h1>Main vault</h1>`));
   assert.doesNotMatch(h, /<h2>README\.md<\/h2>/);
   assert.ok(h.indexOf("</table>") < h.indexOf('class="readme"'), "after the list");
 });
 
-test("folder: the root's header offers Search, Connect an agent and New file, even while the first-run step shows its own; times are relative with the UTC time in the title", async () => {
-  const h = await page(`/v/${V.main}`);
+test("folder: the root's header offers Search and New file, Connect an agent being on the Overview; times are relative with the UTC time in the title", async () => {
+  const h = await page(`/v/${V.main}/files`);
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>/.exec(h)[1];
-  assert.match(actions, new RegExp(`<a class="button vault-search-link" href="/v/${V.main}/search">Search</a>\\s*<a class="button" href="/connect">Connect an agent</a>\\s*<a class="button primary" href="/v/${V.main}/new">New file</a>`));
+  assert.match(actions, new RegExp(`<a class="button vault-search-link" href="/v/${V.main}/search">Search</a>\\s*<a class="button primary" href="/v/${V.main}/new">New file</a>`));
+  assert.doesNotMatch(h, /Connect an agent/);
   assert.match(h, /<td class="num small muted hide-sm"><time datetime="[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/td>/);
 });
 
@@ -228,15 +229,15 @@ test("folder: once the first-run step is gone, the root's header puts Connect an
 });
 
 test("folder: an empty vault with a proposal waiting says so and links to it", async () => {
-  const h = await page(`/v/${V.waiting}`);
+  const h = await page(`/v/${V.waiting}/files`);
   assert.match(h, new RegExp(`<div class="empty"><strong>No files yet</strong><p>1 proposal waits to add the first file\\.</p><p class="empty-action"><a class="button" href="/v/${V.waiting}/proposals">Review it</a></p></div>`));
 });
 
-test("folder: an empty vault with nothing waiting offers New file to a writer, and Connect an agent in the header and the first-run step", async () => {
-  const h = await page(`/v/${V.blank}`);
+test("folder: an empty vault with nothing waiting offers New file to a writer on Files, and Connect an agent in the Overview's header and the first-run step", async () => {
+  const h = await page(`/v/${V.blank}/files`);
   assert.match(h, /<strong>No files yet<\/strong><p>Create the first file, or connect an agent and ask it to write one\.<\/p>/);
   assert.match(h, new RegExp(`<p class="empty-action"><a class="button" href="/v/${V.blank}/new">New file</a></p>`));
-  assert.equal(h.match(/>Connect an agent</g).length, 2);
+  assert.equal((await page(`/v/${V.blank}`)).match(/>Connect an agent</g).length, 2);
 });
 
 // ---------------------------------------------------------------------------
@@ -306,7 +307,7 @@ test("delete: confirming deletes the file and says so as a success", async () =>
   assert.deepEqual({ ...rest, csrf: "" }, { csrf: "", path: "notes/gone.md", action: "delete" });
   const r = await post(action, fields);
   assert.equal(r.status, 303);
-  assert.equal(r.headers.get("location"), `/v/${V.main}`);
+  assert.equal(r.headers.get("location"), `/v/${V.main}/files`);
   assert.match(await page(r.headers.get("location")), /<p class="callout success flash" role="status">Deleted notes\/gone\.md\.<\/p>/);
   assert.equal(await live(V.main, "notes/gone.md"), 0);
 });

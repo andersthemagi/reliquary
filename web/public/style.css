@@ -1876,6 +1876,12 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 }
 .card-counts a:hover { background: var(--border); }
 .card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--text-xs); line-height: var(--lh-xs); }
+/* A vault's Overview (overview.ts): its cards hold several links rather
+   than being one, so hovering a card darkens nothing. */
+.overview-card:hover, .overview-card:active { border-color: var(--border); }
+.overview-card .see-all { flex: none; font-size: var(--text-xs); line-height: var(--lh-xs); }
+.card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.card-list li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); min-width: 0; overflow-wrap: anywhere; }
 /* The first-vault checklist: three numbered steps, read left-aligned. */
 .first-steps { max-width: var(--measure); margin: 0 auto var(--space-5); padding-left: 1.5em; text-align: left; color: var(--fg); }
 .first-steps li + li { margin-top: var(--space-3); }
