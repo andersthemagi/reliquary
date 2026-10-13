@@ -426,3 +426,28 @@ select t.cool_off('kim');
 select t.plan('q/st/p6.md', '[{"key":"a","title":"A"}]');
 select t.save('kim-6', t.rw('kim', 'q/st/p6.md')::text);
 select t.expect('strikes: finishing a step clears the person''s strikes', t.finish('kim', 'q/st/p6.md', 'kim-6') || coalesce(t.strike_row('kim'), 'none'), 'none');
+
+-- ---------------------------------------------------------------------------
+-- leave_queue: give up your own place
+
+select t.plan('q/leave.md', '[{"key":"a","title":"A"}]');
+select t.run('ana', format($q$select o_fence::text from public.claim_step(%L, 'q/leave.md', 'a')$q$, t.id('wq')));
+select t.rw(p, 'q/leave.md') from unnest(array['lee', 'hal', 'jon']) p;
+create function t.leave_sql(p_path text) returns text language sql as $$
+  select format($q$select public.leave_queue(%L, %L)::text$q$, t.id('wq'), p_path)
+$$;
+select t.expect('leave: anonymous callers can''t leave a line', t.run(null, t.leave_sql('q/leave.md')), 'ERR 42501');
+select t.expect('leave: a viewer can''t', t.run('cal', t.leave_sql('q/leave.md')), 'ERR 42501');
+select t.expect('leave: a read-only connection can''t', t.run_tok('ana', 'wq-ro', t.leave_sql('q/leave.md')), 'ERR 42501');
+select t.expect('leave: a connection scoped to another vault can''t', t.run_tok('ana', 'wq-other-tok', t.leave_sql('q/leave.md')), 'ERR 42501');
+select t.expect('leave: an owner leaving takes nobody else out of line',
+  t.run('ana', t.leave_sql('q/leave.md')) || ' ' || t.line('q/leave.md'), 'false lee hal jon');
+select t.expect('leave: a caller leaves the line', t.run('lee', t.leave_sql('q/leave.md')), 'true');
+select t.expect('leave: and everyone else keeps their place', t.line('q/leave.md'), 'hal jon');
+select t.later('jon', 'q/leave.md');
+select t.expect('leave: those behind it move up', t.rw('jon', 'q/leave.md')->>'o_place', '2');
+select t.expect('leave: leaving is logged as queue.leave', t.events('queue.leave', 'q/leave.md'), 'lee');
+select t.expect('leave: leaving again, with no place, answers false and logs nothing',
+  t.run('lee', t.leave_sql('q/leave.md')) || ' ' || t.events('queue.leave', 'q/leave.md'), 'false lee');
+select t.expect('leave: an agent leaves its person''s place', t.run('hal', t.leave_sql('q/leave.md'), 'Claude Code') || ' ' || t.line('q/leave.md'), 'true jon');
+select t.expect('leave: a path with no plan answers false', t.run('jon', t.leave_sql('q/none.md')), 'false');

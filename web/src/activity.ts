@@ -79,6 +79,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["step.skip", "Skipped a step"],
   ["step.reopen", "Reopened a step"],
   ["queue.join", "Joined the line for a step"],
+  ["queue.leave", "Left the line for a step"],
   ["queue.expire", "Place in line ended"],
 ];
 
@@ -144,6 +145,7 @@ export const EVENT_KIND: Record<string, EventKind> = {
   "step.skip": "diagnostic",
   "step.reopen": "diagnostic",
   "queue.join": "diagnostic",
+  "queue.leave": "diagnostic",
   "queue.expire": "diagnostic",
   // Thread events log ids only: no path, proposal or title for a Changes
   // line to link or say, so threads are read on their own page.
