@@ -1250,8 +1250,8 @@ form.confirm .actions:first-child { margin-top: 0; }
 .task-done > summary { cursor: pointer; }
 .task-done > summary h2 { display: inline; }
 .plan-cards { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
-.plan-card { position: relative; padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); transition: border-color 120ms ease-out, box-shadow 160ms ease-out; }
-.plan-card:hover { border-color: var(--border-strong); box-shadow: 0 4px 14px rgb(0 0 0 / 0.08); }
+.plan-card { position: relative; padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); transition: border-color 120ms ease-out; }
+.plan-card:hover { border-color: var(--border-strong); }
 .plan-card h3 { margin: 0; overflow-wrap: anywhere; }
 .plan-card p { margin: var(--space-2) 0 0; overflow-wrap: anywhere; }
 .task-progress {
