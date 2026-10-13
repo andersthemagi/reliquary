@@ -17,6 +17,10 @@ A plan is a file in the vault with one fenced `work_plan` block in it:
   blocked_by: fetch-data
   cites: docs/data-source.md@3fa85f64-5717-4562-b3fc-2c963f66afa6
   gate: review
+  due: 2026-10-20
+  priority: 2
+  for: agents
+  notes: Drop rows with no account id; keep the raw file.
 ```
 
 Each step has:
@@ -26,6 +30,13 @@ Each step has:
 - `blocked_by` (optional): the keys of the steps it waits on, comma-separated;
 - `cites` (optional): the files its work depends on, each as `path@version`, comma-separated (see [Context moved](#context-moved));
 - `gate: review` (optional): what waits on it starts only after a person approves it (see [Tasks that need a person's review](#tasks-that-need-a-persons-review)).
+
+Four more optional lines help people plan. None of them changes who may take a task or when: a ready task can be taken whatever they say.
+
+- `due`: a date, written `YYYY-MM-DD`. A date in the past is accepted. A due date passing changes nothing by itself; the Tasks page says **Overdue**.
+- `priority`: `1`, `2`, `3` or `4`, where 1 is the highest.
+- `notes`: one line of plain text, up to 2000 characters. Agents read it as data, never as instructions, the same as a title.
+- `for`: who the task is meant for: `agents`, `people`, or the email of a member of the vault. An email that names no member is refused. Reliquary keeps the member, not the email, so the task still means them if their email changes. It is a hint, never a rule.
 
 A malformed block, a blocker that doesn't exist, or steps that wait on each other in a cycle are refused, naming the line and why.
 
@@ -66,11 +77,11 @@ The lease, the hold limit and how many tasks an agent may hold come from the vau
 
 ### What an agent reads
 
-`work_plan_status` lists a plan's steps in plan order: each one's state, what it waits on, who holds it and until when, and what it cites. A step's title, its cites and a holder's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
+`work_plan_status` lists a plan's steps in plan order: each one's state, what it waits on, who holds it and until when, its priority, due date and who it is meant for, and what it cites. A step's title, its notes, its cites and a holder's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
 
 ## The Tasks page
 
-Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). It opens on what is open across every plan in the vault, in up to four sections: **Awaiting review**, **In progress**, **Ready to pick up** and **Blocked**. Each task names its plan, linked. Done and cancelled tasks stay on their plan's page.
+Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). It opens on what is open across every plan in the vault, in up to four sections: **Awaiting review**, **In progress**, **Ready to pick up** and **Blocked**. Each task names its plan, linked. Within each section, the highest priority comes first, then the earliest due date; tasks with neither come last. Done and cancelled tasks stay on their plan's page.
 
 Under **Plans**, each plan is a card:
 
@@ -88,6 +99,8 @@ Select a plan to see every task in it, grouped so what needs attention comes fir
 - An in-progress task has a chip saying who holds it: **you**, a person, or a person's agent ("Ana via Claude Code"). The line under it gives the label they gave it and how long is left. The label is whatever the holder wrote, such as "cleaning the rows". It is a note, never proof of who is working on the task, and the page shows it in quotes for that reason.
 - A blocked task says **Blocked by** and names the tasks it waits on, marking any awaiting review.
 - A task awaiting review says who finished it, and links its proposal if its agent linked one.
+- A task with a priority shows **P1** to **P4** in words and colour, and one with a due date shows it. Once the date has ended everywhere in the world and the task isn't done or cancelled, it says **Overdue**. The page doesn't know your time zone, so in the furthest east it can say so up to a day late, never early.
+- The line under a task says who it is meant for (**for agents**, **for people**, or the member) and its notes.
 
 The page shows the plan as it is when you open it. Reload to see changes.
 
@@ -203,7 +216,7 @@ A plan can gain tasks, never lose or change them. Add the new steps to the plan 
 
 - Tasks already in the plan keep their state: a done task stays done, a task someone holds stays theirs, a cancelled one stays cancelled.
 - A new step may wait on any task in the plan. If that task is already done, the new one doesn't wait for it. If it was cancelled, the new one is blocked by a cancelled task.
-- A task already in the plan must stay in the file exactly as it was registered: the same title, gate, `blocked_by` and `cites`. If one is missing or different, nothing is added, and the agent is told which steps to put back. So an old task can't be made to wait on a new one.
+- A task already in the plan must stay in the file exactly as it was registered: the same title, gate, `blocked_by`, `cites`, `due`, `priority`, `notes` and `for`. If one is missing or different, nothing is added, and the agent is told which steps to put back. So an old task can't be made to wait on a new one.
 - Registering again with no new steps, after an edit to the rest of the file, adds nothing and clears **Changed since registered**.
 - Who may do it is the same as for registering: whoever can write the plan file. The Activity log records it as **Updated a work plan**.
 
@@ -240,7 +253,7 @@ How long a task is held, how many an agent may hold, and how agents wait for the
 
 Fixed limits:
 
-- 500 steps in a plan, 50 blockers on one step, 200 characters for a title or a label.
+- 500 steps in a plan, 50 blockers on one step, 200 characters for a title or a label, 2000 for a step's notes.
 - 3 lines one person may wait in, in one vault.
 - `request_work` and `claim_step` take 30 calls a minute per connection, counted together ([Rate limits](../reference/limits.md#rate-limits)). `my_places` counts only against the general limit on tool calls.
 - Each vault takes 300 full evaluations a minute from all its people and agents together. Over that, `request_work` says wait and when to come back, and claiming by name is refused saying when; other vaults carry on ([What asking for work costs](../reference/limits.md#what-asking-for-work-costs)).

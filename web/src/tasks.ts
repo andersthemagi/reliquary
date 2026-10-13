@@ -67,6 +67,11 @@ type Task = {
   proposal_id: string | null;
   blockers: Blocker[];
   moved: string[];
+  due: string | null; // YYYY-MM-DD
+  priority: number | null; // 1 (highest) to 4
+  notes: string | null;
+  for_kind: "agents" | "people" | "member" | null;
+  for_member: string | null;
 };
 
 // The title is the plan file's first "# " heading as it reads now, from its
@@ -97,6 +102,8 @@ async function loadTasks(c: pg.PoolClient, id: string, path: string | null): Pro
     await c.query(
       `select p.path as plan, st.o_key as key, st.o_title as title, st.o_state as state, s.status, s.holder,
               st.o_holder_label as holder_label, st.o_expires_at as expires_at, s.done_at, st.o_moved as moved, s.proposal_id,
+              to_char(st.o_due, 'YYYY-MM-DD') as due, st.o_priority as priority, st.o_notes as notes,
+              st.o_for_kind as for_kind, st.o_for_member as for_member,
               coalesce((select json_agg(json_build_object('key', b.key, 'title', b.title, 'status', b.status) order by b.id)
                           from public.work_plan_step_blockers d join public.work_plan_steps b on b.id = d.blocker_id
                          where d.step_id = s.id), '[]') as blockers,
@@ -197,7 +204,7 @@ const OPEN: Group[] = [
 export async function tasks(ctx: Ctx, id: string): Promise<Reply> {
   return build(ctx, id, async (c) => {
     const plans = await loadPlans(c, id);
-    const open = grouped(OPEN, plans.length ? await loadTasks(c, id, null) : []);
+    const open = grouped(OPEN, plans.length ? await loadTasks(c, id, null) : [], true);
     const names = new Map(plans.map((p) => [p.path, p.title ?? p.path]));
     const body = html`
       ${pageHeader({
@@ -254,11 +261,41 @@ const GROUPS: Group[] = [
   { id: "cancelled", title: "Cancelled", states: ["cancelled"] },
 ];
 
-// The groups in use, each in its states' order (a stable sort keeps the plan's).
-const grouped = (groups: Group[], rows: Task[]) =>
+// The groups in use, each in its states' order (a stable sort keeps the
+// plan's). Across plans there is no plan order to keep, so within a state
+// the most pressing comes first: priority, then due date, none of either last.
+const grouped = (groups: Group[], rows: Task[], byPlanning = false) =>
   groups
-    .map((g) => ({ ...g, rows: rows.filter((t) => g.states.includes(t.state)).sort((a, b) => g.states.indexOf(a.state) - g.states.indexOf(b.state)) }))
+    .map((g) => ({
+      ...g,
+      rows: rows
+        .filter((t) => g.states.includes(t.state))
+        .sort((a, b) => g.states.indexOf(a.state) - g.states.indexOf(b.state) || (byPlanning ? pressing(a, b) : 0)),
+    }))
     .filter((g) => g.rows.length);
+const pressing = (a: Task, b: Task) =>
+  (a.priority ?? 5) - (b.priority ?? 5) || (a.due ?? "9999-12-31").localeCompare(b.due ?? "9999-12-31");
+
+// ponytail: the page has no viewer's time zone (no script, no setting), so
+// a due date counts as passed once that day has ended everywhere (UTC-12):
+// never early, up to a day late east of it. A time zone setting would fix it.
+const overdue = (t: Task, now = Date.now()) =>
+  !!t.due && unfinished(t) && t.due < new Date(now - 12 * 3600_000).toISOString().slice(0, 10);
+
+const PRIORITY_TONE = ["", "danger", "warning", "info", ""];
+
+// A task's planning lines (docs/design.md item 13): priority as a word
+// with its colour, the due date, and Overdue in words once it has passed.
+function planning(t: Task): Raw | "" {
+  if (!t.priority && !t.due) return "";
+  return html`${t.priority ? html`<span class="badge${PRIORITY_TONE[t.priority] ? ` ${PRIORITY_TONE[t.priority]}` : ""}" title="Priority ${t.priority}, 1 is highest">P${t.priority}</span>` : ""}${
+    t.due ? html`<span class="task-due">Due <time datetime="${t.due}">${t.due}</time></span>` : ""}${
+    overdue(t) ? html`<span class="badge danger">Overdue</span>` : ""}`;
+}
+
+// Who the plan meant a task for: a hint, never who may take it.
+const meantFor = (ctx: Ctx, t: Task) =>
+  t.for_kind === "member" ? html`for ${who(ctx, t.for_member, null)}` : t.for_kind ? `for ${t.for_kind}` : "";
 
 // A task by its title only: keys are for agents and the plan file. The
 // confirm pages still give the key beside it, where exactness matters.
@@ -316,6 +353,8 @@ type Verb = (typeof VERBS)[number];
 function taskRow(ctx: Ctx, id: string, t: Task, o: { plan?: string; canAct?: boolean }): Raw {
   const href = (verb: Verb) => `${planPath(id, t.plan)}&${verb}=${q(t.key)}`;
   const line = detail(ctx, id, t, !!o.canAct);
+  // The notes are the plan's text: escaped like the title, never markup.
+  const meta = [meantFor(ctx, t), t.notes ?? ""].filter((m) => m !== "");
   const actions = !o.canAct
     ? ""
     : unfinished(t)
@@ -336,8 +375,10 @@ function taskRow(ctx: Ctx, id: string, t: Task, o: { plan?: string; canAct?: boo
       <strong class="task-title">${t.title}</strong>
       ${t.state === "claimed" ? html`<span class="chip task-holder">${who(ctx, t.holder, t.agent)}</span>` : ""}
       ${t.moved.length ? html`<span class="badge warning">A file it cites changed</span>` : ""}
+      ${planning(t)}
       ${actions}</div>
-    ${o.plan || line ? html`<p class="task-meta">${o.plan ? html`<a href="${planPath(id, t.plan)}">${o.plan}</a>${line ? " · " : ""}` : ""}${line}</p>` : ""}
+    ${o.plan || line || meta.length ? html`<p class="task-meta">${o.plan ? html`<a href="${planPath(id, t.plan)}">${o.plan}</a>${line || meta.length ? " · " : ""}` : ""}${line}${
+      line && meta.length ? " · " : ""}${meta.map((m, i) => html`${i ? " · " : ""}${m}`)}</p>` : ""}
     ${moved(id, t)}</li>`;
 }
 

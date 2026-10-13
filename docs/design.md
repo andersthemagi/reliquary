@@ -878,9 +878,12 @@ step at registration from the registered version, the same as `title`:
 editing the file later changes none of them, consistent with item 6.
 
 - `due: 2026-10-20`, a calendar date with no time or zone. The Tasks
-  page groups by it (Overdue, Today, Upcoming, by the viewer's own
-  date). A date in the past is accepted: a plan written late is still a
-  plan.
+  page sorts by it within each state, and says **Overdue** once the day
+  has ended everywhere (UTC-12): the server can't know a viewer's zone
+  without a script or a setting, so it is never early and at most a day
+  late in the far east (as built, #374). Grouping by Overdue, Today and
+  Upcoming waits for a viewer's zone. A date in the past is accepted: a
+  plan written late is still a plan.
 - `priority: 1` to `4`, 1 highest, Todoist's scale. It orders tasks
   within a group and is shown as a word with its colour, never colour
   alone.

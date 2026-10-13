@@ -55,8 +55,9 @@ const BUDGET = {
   // Raised again for my_places (F831), and for complete_step's review gate
   // and proposal argument, and work_plan_status saying who approves a step
   // awaiting review (#78). Raised again for list_flags naming a task
-  // awaiting review (#357).
-  "tools/list": 29450,
+  // awaiting review (#357), and for register_work_plan and
+  // work_plan_status naming a step's due, priority, notes and for (F887).
+  "tools/list": 29800,
   // Raised for the sentence and markers that fence the names a listing starts
   // its lines with (list_vaults, list_files), and the path and writer in a
   // file's header (read_file): about 100 bytes a call.

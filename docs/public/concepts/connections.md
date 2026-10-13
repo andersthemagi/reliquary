@@ -24,6 +24,8 @@ Every connection acts as you, minus the [ceiling](agents.md). It can never do mo
 
 When a client signs in, there is no secret to copy: it signs in through your browser and keeps its own refreshed tokens. Make a token only for clients that can't sign in, and keep it out of chats and config files an agent can read: read it from an environment variable or a password prompt. See [Connect Cursor](../how-to/connect-cursor.md) and [Connect VS Code](../how-to/connect-vs-code.md).
 
+The **Connect** page has a tab for each client with only that client's steps. Under the steps, once for every tab, it says what an agent can't do (approve, change rules, manage members or read variable values: [the ceiling](agents.md#the-ceiling)) and how to keep a token safe.
+
 ## Make a token
 
 Quickest, for Cursor, VS Code or another client that can't sign in:
