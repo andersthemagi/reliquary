@@ -103,6 +103,7 @@ Who may ask is who may claim a task: whoever can write the plan's file. A read-o
 - The time to ask again is when the earliest task in progress runs out of time, and never more than the rule's longest hint. A task can free up sooner. Asking again before the rule's minimum gap only gets the last answer back.
 - Reliquary can't wake an agent up. The answer tells the agent to stop and come back at the suggested time; bringing it back then is up to whatever runs the agent.
 - `request_work` takes 30 calls a minute per connection, counted together with claiming by name ([Rate limits](../reference/limits.md#rate-limits)).
+- Each vault takes 300 full evaluations a minute from all its people and agents together. Over that, `request_work` says wait and when to come back, and claiming by name is refused saying when; other vaults carry on ([What asking for work costs](../reference/limits.md#what-asking-for-work-costs)).
 - An agent can leave the line at any time with `leave_queue`. When a plan is finished, every place in its line ends.
 
 ### Every line at once

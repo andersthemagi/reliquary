@@ -214,3 +214,24 @@ test("claim in line: naming a step while someone waits ahead, or past the caps, 
     /^Limit reached: you already hold as many steps as this vault's claim rule allows \(1 per connection, 5 per person\); complete or release one first\.\n\(what: /,
   );
 });
+
+// The budget itself (what counts, who is unaffected) is proved in
+// supabase/tests/request_budget_test.sql; this is what the agent reads.
+test("request work: over the vault's budget, the agent is told to stop and when to call again, with its place kept", async () => {
+  const t = await team();
+  await plan(t, "work.md", [{ key: "a", title: "A" }]);
+  // Full for this minute and the next, so the call lands over it whenever it runs.
+  await sql(
+    `insert into private.rate_limits (bucket, key, window_start, expires_at, hits)
+     select 'vault_request_work_minute', encode(sha256(convert_to('vault:' || $1::text, 'UTF8')), 'hex'), to_timestamp(w), to_timestamp(w + 60),
+            (select per_minute from private.request_budget)
+       from (select floor(extract(epoch from clock_timestamp()) / 60) * 60 + k * 60 as w from generate_series(0, 1) k) x`,
+    [t.id],
+  );
+  const r = await ask(t, t.editorTok, "work.md");
+  assert.equal(r.isError, false, r.text);
+  assert.match(
+    r.text,
+    /^Wait: this vault's people and agents together have asked for work as often as its budget allows this minute\. Stop now, and call request_work again in ([1-9]|[1-5]\d|60) seconds? \(at \d{4}-[\d-]+T[\d:]+Z\)\. Asking sooner gets this same answer\. Your place in line, if you have one, is kept\.$/,
+  );
+});

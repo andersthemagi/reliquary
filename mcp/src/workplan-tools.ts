@@ -330,6 +330,13 @@ export function registerWorkPlanTools(
             );
           }
           case "wait": {
+            // No place: the vault's budget, not the line (20261013235000_vault_request_budget.sql).
+            if (a.o_place === null) {
+              return ok(
+                `Wait: this vault's people and agents together have asked for work as often as its budget allows this minute. ` +
+                  `Stop now, and call request_work again in ${when(a.o_wait_seconds)}. Asking sooner gets this same answer. Your place in line, if you have one, is kept.`,
+              );
+            }
             const lead =
               `Wait: you are number ${a.o_place} in line for ${path}; ${a.o_ready} step${a.o_ready === 1 ? " is" : "s are"} ready, none free for you yet. ` +
               `Stop now, and call request_work again in ${when(a.o_wait_seconds)}. Asking sooner gets this same answer. Your place lasts while you come back in time; call leave_queue if you no longer want a step here.`;
