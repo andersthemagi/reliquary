@@ -77,7 +77,7 @@ The lease, the hold limit and how many tasks an agent may hold come from the vau
 
 ### What an agent reads
 
-`work_plan_status` lists a plan's steps in plan order: each one's state, what it waits on, who holds it and until when, and what it cites. A step's title, its cites and a holder's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
+`work_plan_status` lists a plan's steps in plan order: each one's state, what it waits on, who holds it and until when, its priority, due date and who it is meant for, and what it cites. A step's title, its notes, its cites and a holder's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
 
 ## The Tasks page
 

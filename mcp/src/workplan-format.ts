@@ -7,19 +7,28 @@
 //
 // Grammar, chosen for a person reading the plan file as much as a parser:
 // each step opens with "- key: <key>", then zero or more two-space
-// "field: value" lines (title, blocked_by, cites, gate), until the next
+// "field: value" lines (title, blocked_by, cites, gate, due, priority,
+// notes, for), until the next
 // "- key:" or the block's closing fence. blocked_by is a comma-separated
 // list of other steps' keys; cites is a comma-separated list of
 // "path@version" (version a file version id, matching tools-shared.ts's
-// VERSION); gate, if given, is "review" (docs/design.md item 7). No
-// nesting, no quoting: a strict, small syntax over a flexible one.
+// VERSION); gate, if given, is "review" (docs/design.md item 7). due,
+// priority, notes and for are item 13's planning fields: hints, never a
+// claim rule. No nesting, no quoting: a strict, small syntax over a
+// flexible one.
 
 const FENCE_OPEN = "```work_plan";
 const FENCE_CLOSE = "```";
 const KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VERSION_RE = /^[0-9a-fA-F-]{36}$/; // tools-shared.ts's VERSION
 const TITLE_MAX = 200; // docs/design.md item 8, confirmed by the maintainer
-const FIELDS = ["title", "blocked_by", "cites", "gate"] as const;
+const NOTES_MAX = 2000; // docs/design.md item 13
+const FIELDS = ["title", "blocked_by", "cites", "gate", "due", "priority", "notes", "for"] as const;
+// The database's check on notes (20261014100000_step_planning_fields.sql):
+// a tab is fine, any other control character is not.
+const CONTROL_RE = /[\u0000-\u0008\u000a-\u001f\u007f]/;
+// Only the shape: whether it names a member is the database's to say.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+$/;
 
 export type WorkPlanCite = { path: string; version: string };
 export type WorkPlanStep = {
@@ -28,6 +37,10 @@ export type WorkPlanStep = {
   blockedBy: string[];
   cites: WorkPlanCite[];
   gate: "review" | null;
+  due: string | null; // YYYY-MM-DD
+  priority: number | null; // 1 (highest) to 4
+  notes: string | null;
+  for: string | null; // "agents", "people" or a member's email
   line: number; // the line its "- key:" opened on, 1-based
 };
 export type WorkPlan = { steps: WorkPlanStep[] };
@@ -77,7 +90,7 @@ export function parseWorkPlanBlock(fileText: string): WorkPlanParseResult {
       if (!KEY_RE.test(key)) {
         errors.push(`line ${lineNo}: "${key}" isn't a valid step key (lowercase letters, digits and hyphens, e.g. "fetch-data")`);
       }
-      cur = { key, title: "", blockedBy: [], cites: [], gate: null, line: lineNo };
+      cur = { key, title: "", blockedBy: [], cites: [], gate: null, due: null, priority: null, notes: null, for: null, line: lineNo };
       seenFields.clear();
       continue;
     }
@@ -130,6 +143,21 @@ export function parseWorkPlanBlock(fileText: string): WorkPlanParseResult {
     } else if (name === "gate") {
       if (value !== "review") errors.push(`line ${lineNo}: gate must be "review"`);
       else cur.gate = "review";
+    } else if (name === "due") {
+      if (!realDate(value)) errors.push(`line ${lineNo}: due must be a real date written YYYY-MM-DD, e.g. 2026-10-20`);
+      else cur.due = value;
+    } else if (name === "priority") {
+      if (!/^[1-4]$/.test(value)) errors.push(`line ${lineNo}: priority must be 1, 2, 3 or 4 (1 is highest)`);
+      else cur.priority = Number(value);
+    } else if (name === "notes") {
+      if (!value) errors.push(`line ${lineNo}: notes can't be empty`);
+      else if (value.length > NOTES_MAX) errors.push(`line ${lineNo}: notes are longer than ${NOTES_MAX} characters`);
+      else if (CONTROL_RE.test(value)) errors.push(`line ${lineNo}: notes have a control character in them`);
+      else cur.notes = value;
+    } else if (name === "for") {
+      if (value !== "agents" && value !== "people" && !EMAIL_RE.test(value)) {
+        errors.push(`line ${lineNo}: for must be agents, people or a member's email`);
+      } else cur.for = value;
     }
   }
   finish();
@@ -156,6 +184,12 @@ export function parseWorkPlanBlock(fileText: string): WorkPlanParseResult {
 
   if (errors.length) return { ok: false, errors };
   return { ok: true, plan: { steps } };
+}
+
+function realDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
 // One cycle among defined keys (ignoring an unknown blocker, reported on
@@ -202,6 +236,10 @@ export function renderWorkPlanBlock(plan: WorkPlan): string {
     if (step.blockedBy.length) lines.push(`  blocked_by: ${step.blockedBy.join(", ")}`);
     if (step.cites.length) lines.push(`  cites: ${step.cites.map((c) => `${c.path}@${c.version}`).join(", ")}`);
     if (step.gate) lines.push(`  gate: ${step.gate}`);
+    if (step.due) lines.push(`  due: ${step.due}`);
+    if (step.priority) lines.push(`  priority: ${step.priority}`);
+    if (step.notes) lines.push(`  notes: ${step.notes}`);
+    if (step.for) lines.push(`  for: ${step.for}`);
   }
   lines.push(FENCE_CLOSE);
   return lines.join("\n");
