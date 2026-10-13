@@ -89,21 +89,29 @@ test("threads list: newest activity first, each row with its title, opener, mess
   ].map((t) => t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")));
   const h = await page(noa, threads(V.main));
   const wide = rowOf(h, "Plan the launch");
-  assert.match(wide, /Opened by you · <time datetime="[^"]+" title="[^"]+ UTC">[^<]+<\/time>/);
-  assert.match(wide, /2 messages · last <time/);
+  assert.match(wide, /<span class="muted">you<\/span>/);
+  assert.match(wide, /<span class="muted">2 messages<\/span><span class="muted"><time datetime="[^"]+" title="[^"]+ UTC">[^<]+<\/time><\/span>/);
   assert.match(wide, /<span class="badge info">Open<\/span>/);
   const old = rowOf(h, "Old question");
   assert.match(old, /^<li class="is-resolved">/);
   assert.match(old, /<span class="badge success">Resolved<\/span>/);
-  assert.match(old, /1 message · last/);
+  assert.match(old, /1 message<\/span><span class="muted"><time /);
   assert.doesNotMatch(wide, /Side thread|Resolved/);
 });
 
-test("threads list: each row says what the thread is about, linked only to what is there", async () => {
+test("review rows: a thread and a proposal share one row: title, path chip, who, then badges, count and time at the end", async () => {
+  const shape =
+    /^<li[^>]*>\s*<span class="review-main"><a class="name" href="[^"]+">[^<]+<\/a>\s*<span class="review-meta small"><span class="path-chip">[^<]+<\/span><span class="muted">[^<]+<\/span><\/span><\/span>\s*<span class="row-end small">[\s\S]*<span class="badge[^"]*">[^<]+<\/span>[\s\S]*<span class="muted">(?:\d+ messages?|\d+ of \d+ approvals?)<\/span><span class="muted"><time [^>]+>[^<]+<\/time><\/span><\/span>\s*<\/li>$/;
+  assert.match(rowOf(await page(noa, threads(V.main)), "Plan the launch"), shape);
+  assert.match(rowOf(await page(noa, `/v/${V.main}/proposals`), "Create brief.md"), shape);
+});
+
+test("threads list: each row says what the thread is about, a file as its path chip, a task or proposal linked only when it is there", async () => {
   const h = await page(noa, threads(V.main));
   const enc = encodeURIComponent;
-  assert.match(rowOf(h, "Plan the launch"), new RegExp(`About the file <a href="/v/${V.main}/file\\?path=${enc("notes/plan.md")}">notes/plan\\.md</a>`));
-  assert.match(rowOf(h, "About a file to come"), /About the file <code>notes\/later\.md<\/code>/, "a file that isn't there yet is only text");
+  assert.match(rowOf(h, "Plan the launch"), /<span class="path-chip">notes\/plan\.md<\/span>/);
+  assert.match(rowOf(h, "About a file to come"), /<span class="path-chip">notes\/later\.md<\/span>/, "a file that isn't there yet has its chip too");
+  assert.doesNotMatch(rowOf(h, "Plan the launch"), /About the file/, "the chip says it once");
   assert.match(rowOf(h, "Copy review"), new RegExp(`About the task <a href="/v/${V.main}/file\\?path=${enc("plans/launch.md")}">Write the copy</a> in <code>plans/launch\\.md</code>`));
   assert.match(rowOf(h, "The brief"), new RegExp(`About the proposal for <a href="/v/${V.main}/proposals/[0-9a-f-]{36}">canon/brief\\.md</a>`));
   assert.doesNotMatch(rowOf(h, "Old question"), /About/);
@@ -111,10 +119,10 @@ test("threads list: each row says what the thread is about, linked only to what 
 
 test("threads list: who opened it, and the agent that opened it for them", async () => {
   const h = await page(noa, threads(V.main));
-  assert.match(rowOf(h, "Question for Rex"), /Opened by edda@example\.test’s agent \(Hermes on Linux\)/);
-  assert.match(rowOf(h, "The brief"), /Opened by edda@example\.test ·/);
+  assert.match(rowOf(h, "Question for Rex"), /<span class="muted">edda@example\.test via Hermes on Linux · Addressed to 1 person<\/span>/);
+  assert.match(rowOf(h, "The brief"), /<span class="muted">edda@example\.test · About the proposal/);
   const mine = await page(edda, threads(V.main));
-  assert.match(rowOf(mine, "Question for Rex"), /Opened by your agent \(Hermes on Linux\)/);
+  assert.match(rowOf(mine, "Question for Rex"), /<span class="muted">you via Hermes on Linux · /);
 });
 
 test("threads list: a side thread is marked in words, and every member of the vault sees it", async () => {
@@ -134,7 +142,7 @@ test("threads list: the threads addressed to you come first, under their own hea
   assert.deepEqual([...h.matchAll(/<h([12])>([^<]*)<\/h\1>/g)].map((m) => m[2]), ["Threads", "Addressed to you", "Other threads"]);
   const [first, second] = h.split("<h2>Other threads</h2>");
   assert.deepEqual(titlesIn(first), ["Question for Rex"]);
-  assert.match(rowOf(first, "Question for Rex"), /Side thread<\/span> Addressed to you · Opened by/);
+  assert.match(rowOf(first, "Question for Rex"), /<span class="muted">edda@example\.test via Hermes on Linux · Addressed to you<\/span>/);
   assert.ok(titlesIn(second).includes("Between Edda and Noa") && titlesIn(second).includes("Plan the launch"));
   assert.ok(!titlesIn(second).includes("Question for Rex"), "it is listed once");
   // Noa has one addressed to her; Edda has none, so no heading and one list.

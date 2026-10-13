@@ -1,6 +1,7 @@
-// Account settings (/settings): the person's display name, their email,
-// the theme, links to Plan and usage, Connections, and Connect,
-// and (hosted) change of email, sign out and sign out everywhere. The name
+// Account settings (/settings): Profile (display name, email and, hosted,
+// change of email), Appearance (the theme), Sessions (hosted: sign out and
+// sign out everywhere) and Danger zone (delete account), with a sub-nav
+// that also links to Plan and usage, Connections and Connect. The name
 // is the database's to keep and check
 // (public.set_display_name, public.profiles with RLS: your own row, in
 // person only; 20260926100000_shell_inbox.sql). An agent can't set it: it's
@@ -64,8 +65,8 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
   const hosted = signsOut();
   // A change of address waiting for its link, as Supabase Auth has it.
   const pending = hosted && ctx.session ? await ctx.session.pendingEmail() : null;
-  const profile = html`<section aria-labelledby="profile">
-      <h2 id="profile" class="form-title">Profile</h2>
+  const name = html`<section aria-labelledby="display-name-title">
+      <h3 id="display-name-title">Display name</h3>
       <form method="post" action="/settings/name" class="panel settings-form">
         ${csrfField(ctx.csrf)}
         ${d.name ? html`<p class="callout danger" role="alert" id="name-error">${d.name.error}</p>` : ""}
@@ -78,7 +79,7 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
       </form>
     </section>`;
   const email = html`<section aria-labelledby="email">
-      <h2 id="email">Email</h2>
+      <h3 id="email">Email</h3>
       <p>${me.email ? html`<strong>${me.email}</strong>` : html`<span class="muted">No email on this account (local sign-in).</span>`}</p>
       ${hosted
         ? html`${pending === "unavailable"
@@ -102,13 +103,29 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
           </form>`
         : html`<p class="small muted">You sign in with this address, and invites to vaults are made out to it. It can’t be changed here: to use another address, ask the operator of this Reliquary.</p>`}
     </section>`;
-  // The refused form goes first, so its reason is on the first screen.
+  // One page with a sub-nav to its anchored sections, rather than a page per
+  // section: a refused form answers the whole page, and every section is a
+  // short form. Plan, Connections and Connect are pages of their own, so
+  // the sub-nav links to them instead of repeating them here.
+  const sections: [string, string][] = [["profile", "Profile"], ["appearance", "Appearance"], ...(hosted ? [["sessions", "Sessions"] as [string, string]] : []), ["danger", "Danger zone"]];
+  const nav = html`<nav class="settings-nav" aria-label="Account settings">
+      <div class="settings-nav-group"><p class="settings-nav-label">On this page</p><ul>${sections.map(([id, label]) => html`<li><a href="#${id}">${label}</a></li>`)}</ul></div>
+      <div class="settings-nav-group"><p class="settings-nav-label">Elsewhere</p><ul>
+        <li><a href="/account">Plan and usage</a></li>
+        <li><a href="/connections">Connections</a></li>
+        <li><a href="/connect">Connect an agent</a></li>
+      </ul></div>
+    </nav>`;
   const reply = render(
     ctx,
     "Account settings",
     html`${pageHeader({ title: "Account settings", meta: html`<p class="meta">${me.email ?? `Account ${shortId(ctx.userId)}`}</p>` })}
-    ${d.email ? email : profile}
-    ${d.email ? profile : email}
+    <div class="settings-layout">${nav}<div class="settings-main">
+    <section aria-labelledby="profile">
+      <h2 id="profile">Profile</h2>
+      ${d.email ? email : name}
+      ${d.email ? name : email}
+    </section>
     <section aria-labelledby="appearance">
       <h2 id="appearance">Appearance</h2>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
@@ -117,22 +134,13 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
         ${themeButtons(ctx.theme)}
       </form>
     </section>
-    <section aria-labelledby="more">
-      <h2 id="more">Plan and connections</h2>
-      <ul class="rows">
-        <li><span><a class="name" href="/account">Plan and usage</a><span class="muted small"> · your plan, and the people and storage of the vaults you own</span></span></li>
-        <li><span><a class="name" href="/connections">Connections</a><span class="muted small"> · everything that can act as you: tokens, apps and the Reliquary CLI, each with Revoke</span></span></li>
-        <li><span><a class="name" href="/connect">Connect an agent</a><span class="muted small"> · set up Claude, ChatGPT, Cursor, VS Code or the CLI</span></span></li>
-      </ul>
-    </section>
     ${hosted
-      ? html`<section aria-labelledby="signout">
-      <h2 id="signout">Sign out</h2>
+      ? html`<section aria-labelledby="sessions">
+      <h2 id="sessions">Sessions</h2>
+      <h3 id="signout">Sign out</h3>
       <p class="small muted">Ends your session in this browser. Your connections stay until you revoke them on Connections.</p>
       <form method="post" action="/signout">${csrfField(ctx.csrf)}<button>Sign out</button></form>
-    </section>
-    <section aria-labelledby="everywhere">
-      <h2 id="everywhere">Sign out everywhere</h2>
+      <h3 id="everywhere">Sign out everywhere</h3>
       <p>Ends every session of your account at once, in every browser and on every device, this one included. Use it if you signed in on a computer you no longer use, or lost a phone.</p>
       <p class="small muted">Connections are separate: tokens, apps (Claude, ChatGPT, Cursor and others) and the Reliquary CLI keep working after you sign out everywhere. Revoke them all here, or one at a time on <a href="/connections">Connections</a>.</p>
       <form method="post" action="/settings/sign-out-everywhere" class="panel settings-form">
@@ -142,15 +150,17 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
       </form>
     </section>`
       : ""}
-    <section aria-labelledby="delete-account">
-      <h2 id="delete-account">Delete account</h2>
+    <section class="settings-danger" id="danger" aria-labelledby="danger-title">
+      <h2 id="danger-title">Danger zone</h2>
       <div class="danger-rows">
         <div class="danger-row">
-          <div><p>Deletes your account now: you leave every vault, your connections are deleted, and Reliquary forgets your email address and name. What you wrote in vaults stays there, shown as written by a deleted account. This can’t be undone.</p></div>
+          <div><h3 id="delete-account">Delete account</h3>
+            <p>Deletes your account now: you leave every vault, your connections are deleted, and Reliquary forgets your email address and name. What you wrote in vaults stays there, shown as written by a deleted account. This can’t be undone.</p></div>
           <a class="button danger" href="/settings/delete">Delete account</a>
         </div>
       </div>
-    </section>`,
+    </section>
+    </div></div>`,
     "settings",
   );
   return d.name || d.email ? { ...reply, status: 400 } : reply;

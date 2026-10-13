@@ -67,15 +67,15 @@ test("review: nav count and the cross-vault list show what waits on me", async (
   assert.match(await page("/"), /<a class="button" href="\/inbox">Review 4 waiting<\/a>/);
   const h = await page("/inbox");
   assert.match(h, /<summary class="button quiet icon-button" aria-label="Inbox, [1-9]\d* waiting"[^>]*>/);
-  assert.match(h, /Change canon\/pricing\.md/);
-  assert.match(h, /Create canon\/terms\.md/);
+  assert.match(h, /Change pricing\.md<\/a>\s*<span class="review-meta small"><span class="path-chip">canon\/pricing\.md</);
+  assert.match(h, /Create terms\.md<\/a>\s*<span class="review-meta small"><span class="path-chip">canon\/terms\.md</);
   assert.doesNotMatch(h, /Dee private/);
 });
 
 test("home: leads with what needs review, then vaults", async () => {
   const h = await page("/");
   assert.ok(h.indexOf("Needs your review") < h.indexOf("Your vaults"));
-  assert.match(h, /Team · Change canon\/pricing\.md|Change canon\/pricing\.md/);
+  assert.match(h, /Change pricing\.md<\/a>\s*<span class="review-meta small"><span class="path-chip">canon\/pricing\.md<\/span><span class="muted">[^<]* · Team<\/span>/);
 });
 
 test("proposal: evidence first, the agent's reason after it and labelled unverified", async () => {

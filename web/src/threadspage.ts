@@ -14,10 +14,10 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { emptyState, html, pageHeader, plural, time, type Raw } from "./html.js";
+import { emptyState, html, pageHeader, plural, reviewItem, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
-import { canWrite, notFound, q, render, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
-import { anchorLines, byline, THREAD_COLS, threadPath, threadsPath, type ThreadRow } from "./threadrefs.js";
+import { canWrite, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
+import { anchorLines, THREAD_COLS, threadPath, threadsPath, type ThreadRow } from "./threadrefs.js";
 
 const PAGE = 100;
 
@@ -33,13 +33,22 @@ export const sideBadge = (t: Pick<ThreadRow, "scope">): Raw | "" =>
 // A path typed into a URL, said back only when it's plain.
 const shown = (path: string) => (/^[^\u0000-\u001f\u007f]{1,200}$/.test(path) ? path : "that file");
 
+// The row proposals use (reviewItem). A file the thread is about is its path
+// chip; a task or proposal, which a chip can't name, stays a line of words.
 function row(ctx: Ctx, id: string, t: ThreadRow, about?: Raw): Raw {
   const to = t.scope === "side" ? (t.addressed_to_me ? "Addressed to you" : `Addressed to ${plural(t.addressees.length, "person", "people")}`) : "";
-  return html`<li${t.resolved_at ? html` class="is-resolved"` : ""}>
-    <span class="thread-main"><a class="name" href="${threadPath(id, t.id)}">${t.title}</a>
-      <span class="muted small thread-meta">${sideBadge(t)}${to ? html` ${to} · ` : ""}Opened by ${byline(ctx, t.opened_by, t.agent)} · ${time(t.opened_at)}${about ? html` · ${about}` : ""}</span></span>
-    <span class="row-end small"><span class="muted">${plural(t.messages, "message")} · last ${time(t.last_message_at)}</span> ${stateBadge(t)}</span>
-  </li>`;
+  const onFile = t.anchor_kind === "path";
+  const words = onFile ? undefined : about;
+  return reviewItem({
+    href: threadPath(id, t.id),
+    title: t.title,
+    path: onFile ? t.anchor_path : null,
+    who: who(ctx, t.opened_by, t.agent),
+    meta: to && words ? html`${to} · ${words}` : (words ?? to),
+    end: html`${sideBadge(t)}${t.scope === "side" ? " " : ""}${stateBadge(t)} <span class="muted">${plural(t.messages, "message")}</span>`,
+    at: t.last_message_at,
+    className: t.resolved_at ? "is-resolved" : undefined,
+  });
 }
 
 async function load(c: pg.PoolClient, id: string, path: string | null, before: string | null): Promise<{ rows: ThreadRow[]; more: boolean }> {

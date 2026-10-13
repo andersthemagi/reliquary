@@ -937,9 +937,22 @@ section { scroll-margin-top: var(--space-5); }
 
 /* Proposal page ------------------------------------------------------------- */
 
-/* Above the diff: feedback, risks, the decision and snooze. */
-.review-top { margin: 0 0 var(--space-6); max-width: 80ch; display: grid; gap: var(--space-4); }
-.review-top > * { margin: 0; }
+/* Above the diff, one status strip: each message a ruled row of one box,
+   keeping its tone's mark, instead of a stack of separate boxes. */
+.review-top { margin: 0 0 var(--space-6); border: 1px solid var(--border); background: var(--bg); }
+.review-top:not(:has(> *)) { display: none; }
+.review-top > * { margin: 0; border: 0; border-radius: 0; max-width: none; }
+.review-top > * + * { border-top: 1px solid var(--border); }
+.review-top > :not(.callout):not(.feedback) { padding: var(--space-3) var(--space-5); }
+.review-top > .callout p { max-width: none; }
+/* The decision beside the diff when there's room; above it otherwise. */
+@media (min-width: 1100px) {
+  .review-layout:has(> .review-side) { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: var(--space-6); align-items: start; }
+  .review-layout > .review-side { grid-column: 2; grid-row: 1; position: sticky; top: var(--space-4); }
+  .review-layout > .review-body { grid-column: 1; grid-row: 1; min-width: 0; }
+}
+.review-side { margin: 0 0 var(--space-6); }
+.review-body > :first-child { margin-top: 0; }
 .risks { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .risks .badge { min-height: 24px; font-size: var(--text-sm); }
 
@@ -974,12 +987,16 @@ blockquote.claim {
 form.comment { margin-top: var(--space-5); }
 form.comment .actions { margin-top: var(--space-4); }
 
-/* Threads (threadspage.ts): the list reuses .rows. A resolved thread's title is
-   quieter, and its state is always a word beside it, never only the shade. */
-.thread-rows .thread-main { min-width: 0; }
-.thread-rows .thread-meta { display: block; margin-top: var(--space-2); }
-.thread-rows .thread-meta .badge { margin-right: var(--space-2); }
-.thread-rows li.is-resolved .name { color: var(--fg-muted); }
+/* Review rows (reviewItem in html.ts): proposals and threads alike. The path
+   is a mono chip, not a link: the title is the row's one link. A resolved
+   thread's title is quieter, and its state is always a word beside it. */
+.rows .review-main { min-width: 0; }
+.rows .review-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
+.path-chip {
+  display: inline-block; padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-full);
+  background: var(--bg-subtle); color: var(--fg); font: 400 var(--text-xs)/1.7 var(--font-mono); overflow-wrap: anywhere;
+}
+.rows li.is-resolved .name { color: var(--fg-muted); }
 /* One thread (threadview.ts): a message's text keeps its line breaks and breaks long words. */
 .thread li p { overflow-wrap: anywhere; }
 .page-actions .inline-form { margin: 0; }

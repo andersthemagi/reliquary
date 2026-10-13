@@ -171,12 +171,27 @@ after(async () => {
   for (const c of servers) c.kill();
 });
 
-test("links page: an empty vault says so, and shows an owner the Add form under it, with no button that only scrolls to it", async () => {
+test("links page: an empty vault says so, and offers an owner Add link in the header, not an open form", async () => {
   const h = await page(lp(V.empty));
   assert.match(h, /No links yet/);
-  assert.match(h, /Add a link/);
-  assert.doesNotMatch(h, /href="#add-link"/);
-  assert.match(h, /<div class="empty">(?:(?!<\/div>)[\s\S])*<\/div>\s*<form [^>]*class="panel rule-form"/, "the form follows the empty box, where the stylesheet spaces them");
+  assert.match(h, new RegExp(`<div class="page-actions"><a class="button primary" href="/v/${V.empty}/links\\?add=1#add-link">Add link</a></div>`));
+  assert.doesNotMatch(h, /id="add-link"/);
+});
+
+test("links list first: Add link opens the form first on the page, with Cancel back to the list", async () => {
+  const h = await page(lp(V.empty, "?add=1"));
+  assert.match(h, /<h2 id="add-link-title" class="form-title">Add a link<\/h2>/);
+  assert.ok(h.indexOf('id="add-link"') < h.indexOf('<div class="empty">'), "the form comes before the list");
+  assert.match(h, new RegExp(`<a class="button quiet" href="/v/${V.empty}/links">Cancel</a>`));
+  assert.doesNotMatch(h, /class="page-actions"/, "no Add link while the form is open");
+});
+
+test("links list first: the form's hints say what to type in plain words, not MCP terms", async () => {
+  const h = await page(lp(V.empty, "?add=1"));
+  const hints = [...h.matchAll(/<p class="hint" id="l[nuc]-hint">([\s\S]*?)<\/p>/g)].map((m) => m[1]).join(" ");
+  assert.match(hints, /the address where this service offers its tools to agents/i);
+  assert.match(hints, /a key or token never goes here/);
+  assert.doesNotMatch(hints, /upstream|MCP server|&lt;tool&gt;/);
 });
 
 test("links page: says a granted tool can be called over MCP, not that calling isn’t built", async () => {
@@ -186,7 +201,7 @@ test("links page: says a granted tool can be called over MCP, not that calling i
 });
 
 test("links page: the URL example is an MCP endpoint, not a product’s API host", async () => {
-  assert.match(await page(lp(V.own)), /name="url" placeholder="https:\/\/mcp\.example\.com\/mcp"/);
+  assert.match(await page(lp(V.own, "?add=1")), /name="url" placeholder="https:\/\/mcp\.example\.com\/mcp"/);
 });
 
 test("links page: owner adds a link; the credential never appears on any page", async () => {
@@ -204,7 +219,7 @@ test("links page: owner adds a link; the credential never appears on any page", 
   assert.match(flash?.[2] ?? "", /^Added linear, but its tools couldn’t be discovered\. This link’s address isn’t public\. \(ref [0-9a-f]{8}\)$/);
   assert.match(h2, /linear/);
   assert.match(h2, /https:\/\/127\.0\.0\.1\/mcp/);
-  assert.match(h2, /<div class="page-actions"><a class="button primary" href="#add-link">Add link<\/a><\/div>/, "with links listed, the form may be a scroll away, so the header offers it");
+  assert.match(h2, new RegExp(`<div class="page-actions"><a class="button primary" href="/v/${V.own}/links\\?add=1#add-link">Add link</a></div>`), "with links listed, the header still offers Add link");
   assert.match(h2, /<td data-label="URL" class="small link-url">https:\/\/127\.0\.0\.1\/mcp<\/td>/, "its own class, so the URL can wrap");
   assert.match(h2, /<td data-label="Added by" class="small muted"><div>you · <time [^>]+>[^<]+<\/time><\/div><\/td>/, "who and when stay in one block on a phone");
   noCredentials(h2);
@@ -304,7 +319,7 @@ test("links page: deleting goes through a confirm page, not a bare button", asyn
 
 test("links page: without VARIABLES_KEY, links still list but Add is disabled", async () => {
   const [{ id: bareVault }] = await as(LU, "select public.create_vault('Links Bare') as id");
-  const h = await page(lp(bareVault), bare);
+  const h = await page(lp(bareVault, "?add=1"), bare);
   assert.match(h, /no key for encrypting credentials/);
   assert.match(h, /<button class="primary" disabled>Add link<\/button>/);
 });

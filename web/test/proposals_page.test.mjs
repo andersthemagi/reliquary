@@ -189,6 +189,18 @@ test("proposal page: Snooze is a menu in the header's actions, three choices pos
   assert.doesNotMatch(body.slice(at(body, '<div class="review-top">')), /\/snooze"/, "no second snooze control under the header");
 });
 
+test("proposal page layout: one status strip under the header, then the decision in its own column ahead of the diff", async () => {
+  const h = await page("rhea", pp(P.edit));
+  const strip = h.slice(at(h, '<div class="review-top">'), at(h, '<div class="review-layout">'));
+  assert.match(strip, /<ul class="risks" aria-label="Worth a closer look">/, "the messages are in the strip");
+  assert.doesNotMatch(strip, /\/decide"/, "the decision is not");
+  assert.match(h, /<div class="review-layout">\s*<aside class="review-side" aria-label="Decide"><form method="post" action="[^"]+\/decide" class="panel decide"/);
+  assert.ok(at(h, 'class="review-side"') < at(h, '<div class="review-body">') && at(h, '<div class="review-body">') < at(h, 'class="diff'), "decide, then the diff");
+  const decided = await page("rhea", pp(P.apply));
+  assert.doesNotMatch(decided, /review-side/, "no column without a decision to make");
+  assert.ok(at(decided, '<div class="review-body">') < at(decided, 'class="diff'));
+});
+
 test("proposal page: a snoozed proposal says so above the decision, with Unsnooze, and has no Snooze menu", async () => {
   await as(RHEA, "select public.snooze_proposal($1)", [P.create]);
   try {
@@ -292,7 +304,7 @@ test("proposals list: older links to Rejected or Stale open Closed", async () =>
   for (const s of ["rejected", "stale"]) {
     const h = await page("rhea", `/v/${V}/proposals?status=${s}`);
     assert.match(h, /aria-current="page">Closed<span class="count">1<\/span>/, s);
-    assert.match(h, /Change canon\/old\.md/, s);
+    assert.match(h, /Change old\.md<\/a>/, s);
   }
 });
 
@@ -300,17 +312,17 @@ test("proposals list: decided rows say how they ended, not approvals or risks", 
   const closed = await page("rhea", `/v/${V}/proposals?status=closed`);
   assert.match(
     closed,
-    /<span class="row-end small"><span class="muted outcome">Rejected by you · <time [^>]+>just now<\/time><\/span> <span class="badge state rejected">Rejected<\/span><\/span>/,
+    /<span class="row-end small"><span class="muted outcome">Rejected by you<\/span> <span class="badge state rejected">Rejected<\/span><span class="muted"><time [^>]+>just now<\/time><\/span><\/span>/,
   );
   const applied = await page("rhea", `/v/${V}/proposals?status=applied`);
-  assert.match(applied, /<span class="muted outcome">Applied, approved by you · <time /);
+  assert.match(applied, /<span class="muted outcome">Applied, approved by you<\/span>/);
   for (const h of [closed, applied]) assert.doesNotMatch(h, /\d of \d approval|risk-count/);
 });
 
-test("proposals list: live rows lead with the agent, and count approvals", async () => {
+test("proposals list: live rows name the person and their agent, and count approvals", async () => {
   const h = await page("rhea", `/v/${V}/proposals`);
-  assert.match(h, /Change canon\/rates\.md<\/a>\s*<span class="muted small"> · Desk agent for sol@example\.test · <time /);
-  assert.match(h, /<span class="badge attention risk-count" title="Rewrites 2 of the file’s 4 lines: read each change\.">Rewrites 2 of 4 lines<\/span> <span class="muted">0 of 1 approval<\/span>/);
+  assert.match(h, /Change rates\.md<\/a>\s*<span class="review-meta small"><span class="path-chip">canon\/rates\.md<\/span><span class="muted">sol@example\.test via Desk agent<\/span>/);
+  assert.match(h, /<span class="badge state open">Open<\/span> <span class="badge attention risk-count" title="Rewrites 2 of the file’s 4 lines: read each change\.">Rewrites 2 of 4 lines<\/span> <span class="muted">0 of 1 approval<\/span><span class="muted"><time /);
 });
 
 test("proposals list: an empty tab says what's missing and when it fills", async () => {
@@ -472,5 +484,5 @@ test("inbox: one sentence under the title, and a count of what's waiting to revi
   assert.match(h, /<h1>Inbox<\/h1><span class="badge count-badge">3 to review<\/span>/);
   assert.match(h, /<p class="page-desc">What needs you across your vaults: changes to review, proposals sent back, \.env imports and invites\.<\/p>/);
   assert.doesNotMatch(h, /<p class="lede">/);
-  assert.match(h, /Change canon\/rates\.md<\/a>\s*<span class="muted small"> · Desk agent for sol@example\.test · <time /);
+  assert.match(h, /Change rates\.md<\/a>\s*<span class="review-meta small"><span class="path-chip">canon\/rates\.md<\/span><span class="muted">sol@example\.test via Desk agent<\/span>/);
 });

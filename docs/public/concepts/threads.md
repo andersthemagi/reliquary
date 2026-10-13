@@ -44,7 +44,7 @@ A thread's messages come oldest first, each with who wrote it, through which age
 
 In the web app, **Threads** in a vault's navigation lists every thread in the vault, most recently active first. Unlike an agent's default listing it leaves none out: a side thread is shown to every member, marked **Side thread**, with how many people it is addressed to.
 
-Each row has the title, who opened it (the person, or their agent and its name), what it is about, how many messages it has, when the last one was posted, and **Open** or **Resolved**. A thread's state and a side thread's marker are words, never only a colour.
+Each row reads like a row on the Proposals page: the title, the file it is about as its path (a task or proposal it is about is named in words), and who opened it, such as "sol@example.com via Claude Code". At the end are **Open** or **Resolved**, how many messages it has, and when the last one was posted. A thread's state and a side thread's marker are words, never only a colour.
 
 The threads addressed to you come first, under **Addressed to you**. Nothing marks a thread as read or unread: the page doesn't track what you have seen. Past 100 threads, **Older threads** shows the next page.
 
