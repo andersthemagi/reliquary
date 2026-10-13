@@ -1785,12 +1785,13 @@ label.choice-card input:focus-visible { outline: none; }
 }
 @media (max-width: 640px) { .settings-nav a { min-height: var(--control-md); } }
 /* Diagnostics (diagnostics.ts): Flags, Claims and the log are a second row
-   under the Settings tabs, lighter than them so the two read as two levels. */
-.diag-tabs > .tabs { box-shadow: none; gap: var(--space-1); margin: var(--space-2) 0 var(--space-5); }
-.diag-tabs > .tabs a { min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); }
-.diag-tabs > .tabs a[aria-current="page"] { background: var(--bg-muted); }
-.diag-tabs > .tabs a[aria-current="page"]::after { content: none; }
-@media (max-width: 640px) { .diag-tabs > .tabs a { min-height: var(--control-md); } }
+   under the Settings tabs, lighter than them so the two read as two levels;
+   the Variables page's environment views (values.ts) are the same second row. */
+:is(.diag-tabs, .var-envtabs) > .tabs { box-shadow: none; gap: var(--space-1); margin: var(--space-2) 0 var(--space-5); }
+:is(.diag-tabs, .var-envtabs) > .tabs a { min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); }
+:is(.diag-tabs, .var-envtabs) > .tabs a[aria-current="page"] { background: var(--bg-muted); }
+:is(.diag-tabs, .var-envtabs) > .tabs a[aria-current="page"]::after { content: none; }
+@media (max-width: 640px) { :is(.diag-tabs, .var-envtabs) > .tabs a { min-height: var(--control-md); } }
 .diag-tabs + h2 { margin-top: 0; }
 /* A section heading with a quiet line at its right: "People · 3 of 10 places". */
 .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-5); margin: var(--space-8) 0 var(--space-4); }
@@ -1868,10 +1869,15 @@ td.row-actions { width: 1%; white-space: nowrap; }
 }
 
 /* Package F: variables */
-/* The Values table (variablespage.ts): a column per environment, the name
-   column sticky while the rest scrolls sideways inside its box; each set
-   value one line and one ⋯ menu. On a phone, one block per variable. */
+/* The All view (values.ts): a column per environment, the name column
+   sticky while the rest scrolls sideways inside its box; each cell Set or
+   Not set. On a phone, one block per variable. */
 .var-values { margin: 0 0 var(--space-6); }
+.var-missing { margin-left: var(--space-2); font-weight: 500; }
+.var-list .var-meta { white-space: nowrap; }
+.var-howto { margin: 0 0 var(--space-6); }
+.var-howto > summary { cursor: pointer; width: fit-content; font-weight: 600; }
+.var-howto[open] > summary { margin-bottom: var(--space-3); }
 .var-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
 /* No clipping on the table itself (the base table hides overflow), so the
    sticky column sticks to the scrolling box and the menus aren't cut off. */
@@ -1902,11 +1908,6 @@ table.var-grid { border: 0; border-radius: 0; overflow: visible; }
 .var-set { font-weight: 600; font-size: var(--text-sm); color: var(--fg); }
 .var-meta { color: var(--fg-muted); font-size: var(--text-sm); }
 .var-none { color: var(--fg-muted); font-size: var(--text-sm); }
-/* Who set it: read out everywhere, shown where a cell has room (a phone's
-   stacked rows); in the table it's in the title and the menu. */
-/* In flow, not absolute: an absolute box here would sit outside the
-   scrolling box and widen the page. */
-.var-grid .var-by { display: inline-block; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; vertical-align: top; }
 .var-readers { display: inline-flex; align-items: center; gap: 6px; color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); flex-basis: 100%; }
 .var-readers::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--info); flex: none; }
 td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
@@ -1947,7 +1948,6 @@ td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
     overflow-wrap: anywhere;
   }
   .var-grid th[scope="row"] code { white-space: normal; overflow-wrap: anywhere; }
-  .var-grid .var-by { display: inline; width: auto; height: auto; margin: 0; overflow: visible; clip-path: none; white-space: normal; }
   .var-grid td {
     min-width: 0; height: auto; border-top: 1px solid var(--border);
     display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); column-gap: var(--space-3); align-items: center;
@@ -1955,10 +1955,10 @@ td .button.var-add { min-height: 26px; padding: 0 var(--space-3); }
   .var-grid td::before { content: attr(data-label); font-size: 0.8125rem; font-weight: 600; color: var(--fg-muted); overflow-wrap: anywhere; }
 }
 
-/* Environments: a menu at the end of each row; the stacked phone layout
-   keeps it on its own line, at the right. */
+/* Environments and an environment's view: a menu at the end of each row;
+   the stacked phone layout keeps it on its own line, at the right. */
 @media (max-width: 640px) {
-  .var-envtable td.var-row-end { width: auto; display: flex; justify-content: flex-end; }
+  :is(.var-envtable, .var-list) td.var-row-end { width: auto; display: flex; justify-content: flex-end; }
   .var-imports td[data-label=""] .button { width: 100%; }
 }
 
