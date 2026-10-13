@@ -19,7 +19,7 @@ import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
-import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnauthorized, rateLimitedBody, THREAD_WRITES } from "./ratelimit.js";
+import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnauthorized, rateLimitedBody, THREAD_WRITES, WORK_REQUESTS } from "./ratelimit.js";
 import { needsLinkTools, registerTools } from "./tools.js";
 import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
@@ -314,6 +314,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
   const toolCalls = messages.filter((m) => (m as { method?: unknown } | null)?.method === "tools/call") as { params?: { name?: unknown } }[];
   const calls = toolCalls.length;
   const threadWrites = toolCalls.filter((m) => THREAD_WRITES.has(String(m.params?.name))).length;
+  const workRequests = toolCalls.filter((m) => WORK_REQUESTS.has(String(m.params?.name))).length;
   let session: Session | null = null;
   let identity: Identity | null;
   // Tool calls per token (ratelimit.ts), counted while the token resolves.
@@ -325,7 +326,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
   const checked = <T,>(p: Promise<T>) => p.catch((err) => ((broken = err), null));
   if (calls) {
     session = new Session(ref);
-    [identity, wait] = await Promise.all([checked(session.open()), limitToolCalls(ref.hash, calls, threadWrites)]);
+    [identity, wait] = await Promise.all([checked(session.open()), limitToolCalls(ref.hash, calls, threadWrites, workRequests)]);
   } else {
     identity = await checked(identify(bearer![1]));
   }

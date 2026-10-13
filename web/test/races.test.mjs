@@ -167,6 +167,9 @@ before(async () => {
   await sql(`drop trigger if exists zz_races_stop on public.work_plan_steps;
     create trigger zz_races_stop after update on public.work_plan_steps
       for each statement execute function test_races.stop('work_plan_steps');`);
+  await sql(`drop trigger if exists zz_races_stop_step_log on public.log;
+    create trigger zz_races_stop_step_log after insert on public.log
+      for each row when (new.event like 'step.%') execute function test_races.stop('step_log');`);
 });
 
 after(async () => {
@@ -179,6 +182,7 @@ after(async () => {
              drop trigger if exists zz_races_stop on private.vault_deletions;
              drop trigger if exists zz_races_stop on public.path_claims;
              drop trigger if exists zz_races_stop on public.work_plan_steps;
+             drop trigger if exists zz_races_stop_step_log on public.log;
              drop schema if exists test_races cascade;`).catch(() => {});
   await Promise.all(open.map((c) => c.end().catch(() => {})));
 });
@@ -354,6 +358,11 @@ test("races, work plan gate: 30 people working a 120-step plan at once, abandoni
              on conflict (id) do nothing`, [crowd]);
   const v = await newVault(OWNER, "Races work plan crowd");
   for (const p of crowd) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  // claim_step strikes whoever let a claim lapse (20261013220000), and this
+  // crowd walks away on purpose: no lapse earns a cooldown here, so the
+  // gate, not the cooldown, is what gets tested.
+  const rule = await as(db, OWNER, "select public.set_claim_rule($1, '', 2880, 10080, null, 1, 5, null, null, null, 1000000)", [v]);
+  assert.ok(rule.ok, rule.message);
   const seededFile = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan') as v", [v]);
   assert.ok(seededFile.ok, seededFile.message);
   const steps = layeredPlan(seeded(72));
@@ -970,6 +979,169 @@ test("races, a plan gains a step: a step completed while a new step waiting on i
   assert.deepEqual(outcomes, Array(4).fill("ok/ok n 1/1"));
 });
 
+// Review gates (20261013233000_review_gate.sql): a proposal applied
+// approves the steps linked to it, from a trigger inside decide(), so
+// decide now reaches step rows, and approve_step is a new way in. The lock
+// order the migration relies on: the proposal's row, then the plan's shared
+// advisory lock, then steps in id order, with the vault's row last (for the
+// log). Each pair runs in both orders and must end without 40P01, with every
+// stored count of unfinished blockers matching the plan.
+
+// A vault with canon/ under review and a plan of `steps`; `who` (an editor)
+// holds the plan's gated step g. Returns its fence and secret.
+async function gateVault(name, who, steps) {
+  const v = await newVault(OWNER, name);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, who, OWNER]);
+  assert.ok((await as(db, OWNER, "select public.set_policy($1, 'canon/', 'canon', 1)", [v])).ok);
+  const seeded = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan') as v", [v]);
+  assert.ok(seeded.ok, seeded.message);
+  const r = await as(db, OWNER, "select public.register_work_plan($1, 'plan.md', $2, $3::jsonb)", [v, seeded.rows[0].v, JSON.stringify(steps)]);
+  assert.ok(r.ok, r.message);
+  return v;
+}
+const claimStep = async (v, who, key) => {
+  const r = await as(db, who, "select o_fence, o_secret from public.claim_step($1, 'plan.md', $2)", [v, key]);
+  assert.ok(r.ok, r.message);
+  return r.rows[0];
+};
+const completeSql = "select public.complete_step($1, 'plan.md', $2, $3, $4, $5)::text";
+const stepStates = async (v) =>
+  Object.fromEntries((await sql(
+    `select s.key, s.status from public.work_plan_steps s join public.work_plans p on p.id = s.plan_id where p.vault_id = $1 order by s.id`,
+    [v],
+  )).map((r) => [r.key, r.status]));
+// Every step of the vault whose stored count of unfinished blockers is wrong.
+const miscounted = async (v) =>
+  (await sql(
+    `select s.key from public.work_plan_steps s
+      where s.vault_id = $1
+        and s.open_blockers <> (select count(*) from public.work_plan_step_blockers d join public.work_plan_steps b on b.id = d.blocker_id
+                                 where d.step_id = s.id and b.status <> 'done')`,
+    [v],
+  )).map((r) => r.key);
+const APPLY = {
+  decide: "select public.decide($1, 'approve') as r",
+  edit: "select public.edit_and_approve($1, 'edited') as r",
+};
+
+test("races, review gate: a proposal applied while a completion links it, either first, doesn't deadlock, and the step is approved only if the link came first", async () => {
+  const outcomes = [];
+  for (const [round, [how, first]] of [["decide", "apply"], ["decide", "complete"], ["edit", "apply"], ["edit", "complete"]].entries()) {
+    const who = people[20];
+    const v = await gateVault(`Races gate link ${round}`, who, [{ key: "g", title: "G", gate: "review" }, { key: "d", title: "D", blocked_by: ["g"] }]);
+    const g = await claimStep(v, who, "g");
+    const pid = await propose(v, who, "canon/g.md", "the work");
+    const apply = (stop) => (c) => as(c, OWNER, APPLY[how], [pid], stop);
+    const complete = (stop) => (c) => as(c, who, completeSql, [v, "g", g.o_fence, g.o_secret, pid], stop);
+    // The application stops once it has written the file, holding the
+    // proposal's row; the completion once it has stored the step, holding
+    // its key share on the proposal and the step's row.
+    const [a, b, waited] = first === "apply"
+      ? await interleave(apply("files"), complete())
+      : await interleave(complete("work_plan_steps"), apply());
+    const [x, y] = first === "apply" ? [decided(a), outcome(b)] : [outcome(a), decided(b)];
+    const s = await stepStates(v);
+    outcomes.push(`${how} ${first} first: ${x}/${y} g ${s.g} d ${s.d} miscounted [${await miscounted(v)}] (${waited})`);
+  }
+  log("apply vs complete linking it", outcomes);
+  assert.deepEqual(outcomes, [
+    "decide apply first: applied/22023 g claimed d open miscounted [] (blocked)",
+    "decide complete first: ok/applied g done d open miscounted [] (blocked)",
+    "edit apply first: applied/22023 g claimed d open miscounted [] (blocked)",
+    "edit complete first: ok/applied g done d open miscounted [] (blocked)",
+  ]);
+});
+
+// g awaits review linked to a proposal; x is held; d waits on both.
+async function gateAndHeld(name, who) {
+  const v = await gateVault(name, who, [
+    { key: "g", title: "G", gate: "review" },
+    { key: "x", title: "X" },
+    { key: "d", title: "D", blocked_by: ["g", "x"] },
+  ]);
+  const g = await claimStep(v, who, "g");
+  const pid = await propose(v, who, "canon/g.md", "the work");
+  const done = await as(db, who, completeSql, [v, "g", g.o_fence, g.o_secret, pid]);
+  assert.ok(done.ok, done.message);
+  return { v, pid, x: await claimStep(v, who, "x") };
+}
+
+// The first stops either at its own step ("own": holding that row and the
+// plan's shared lock, before the dependent they share) or once its step
+// event is logged ("dependent": holding the dependent too, so the second
+// waits for it).
+const ROUNDS = [["apply", "own"], ["apply", "dependent"], ["complete", "own"], ["complete", "dependent"]];
+const STOP = { own: "work_plan_steps", dependent: "step_log" };
+
+test("races, review gate: a proposal applied, approving its step, while another step waited on by the same step completes, either first, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (const [round, [first, at]] of [...ROUNDS, ...ROUNDS].entries()) {
+    const how = round < ROUNDS.length ? "decide" : "edit";
+    const who = people[21];
+    const { v, pid, x } = await gateAndHeld(`Races gate apply complete ${round}`, who);
+    const apply = (stop) => (c) => as(c, OWNER, APPLY[how], [pid], stop);
+    const complete = (stop) => (c) => as(c, who, completeSql, [v, "x", x.o_fence, x.o_secret, null], stop);
+    const [a, b, waited] = first === "apply"
+      ? await interleave(apply(STOP[at]), complete())
+      : await interleave(complete(STOP[at]), apply());
+    const [ap, co] = first === "apply" ? [decided(a), outcome(b)] : [decided(b), outcome(a)];
+    const s = await stepStates(v);
+    outcomes.push(`${how} ${first} first, stopped at ${at}: ${ap}/${co} g ${s.g} x ${s.x} d ${s.d} miscounted [${await miscounted(v)}] (${waited})`);
+  }
+  log("apply vs complete another", outcomes);
+  assert.deepEqual(
+    outcomes,
+    ["decide", "edit"].flatMap((how) =>
+      ROUNDS.map(([first, at]) => `${how} ${first} first, stopped at ${at}: applied/ok g done x done d open miscounted [] (${at === "own" ? "done" : "blocked"})`),
+    ),
+  );
+});
+
+test("races, review gate: a step approved while another step waited on by the same step completes, either first, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (const [round, [first, at]] of ROUNDS.map(([f, a]) => [f === "apply" ? "approve" : f, a]).entries()) {
+    const who = people[22];
+    const { v, x } = await gateAndHeld(`Races gate approve complete ${round}`, who);
+    const approve = (stop) => (c) => as(c, OWNER, "select public.approve_step($1, 'plan.md', 'g')::text", [v], stop);
+    const complete = (stop) => (c) => as(c, who, completeSql, [v, "x", x.o_fence, x.o_secret, null], stop);
+    const [a, b, waited] = first === "approve"
+      ? await interleave(approve(STOP[at]), complete())
+      : await interleave(complete(STOP[at]), approve());
+    const s = await stepStates(v);
+    outcomes.push(`${first} first, stopped at ${at}: ${outcome(a)}/${outcome(b)} g ${s.g} x ${s.x} d ${s.d} miscounted [${await miscounted(v)}] (${waited})`);
+  }
+  log("approve vs complete another", outcomes);
+  assert.deepEqual(
+    outcomes,
+    ROUNDS.map(([f, at]) => `${f === "apply" ? "approve" : f} first, stopped at ${at}: ok/ok g done x done d open miscounted [] (${at === "own" ? "done" : "blocked"})`),
+  );
+});
+
+test("races, review gate: a step approved while its vault is deleted, either first, doesn't deadlock", async () => {
+  const outcomes = [];
+  for (const [round, first] of ["approve", "delete", "approve", "delete"].entries()) {
+    const who = people[23];
+    const name = `Races gate approve delete ${round}`;
+    const { v } = await gateAndHeld(name, who);
+    const approve = (stop) => (c) => as(c, OWNER, "select public.approve_step($1, 'plan.md', 'g')::text", [v], stop);
+    const del = (stop) => (c) => as(c, OWNER, "select public.delete_vault($1, $2)::text", [v, name], stop);
+    // The approval stops once it has stored the step, holding its row; the
+    // deletion once it holds the steps and the vault's row.
+    const [a, b, waited] = first === "approve"
+      ? await interleave(approve("work_plan_steps"), del())
+      : await interleave(del("vault_deletions"), approve());
+    const [{ n }] = await sql("select count(*)::int as n from public.work_plan_steps where vault_id = $1", [v]);
+    outcomes.push(`${first} first: ${outcome(a)}/${outcome(b)} (${n} steps left) (${waited})`);
+  }
+  log("approve vs delete_vault", outcomes);
+  assert.deepEqual(outcomes, [
+    "approve first: ok/ok (0 steps left) (blocked)",
+    "delete first: ok/RLW02 (0 steps left) (blocked)",
+    "approve first: ok/ok (0 steps left) (blocked)",
+    "delete first: ok/RLW02 (0 steps left) (blocked)",
+  ]);
+});
+
 // ---------------------------------------------------------------------------
 // The operator's changes wait for what they limit
 
@@ -1166,7 +1338,9 @@ async function lineCrowd(name, abandon) {
       } else if (a.o_state === "cooling_down") {
         await c.query("update private.work_plan_strikes set cooldown_until = clock_timestamp() where vault_id = $1 and person = $2", [v, who]);
       } else if (a.o_state === "granted") {
-        if (abandon && rand() < 0.25) {
+        // The first grant of the run is always walked away from, so the
+        // hand-on is exercised whatever the interleaving; then a quarter.
+        if (abandon && (abandoned === 0 || rand() < 0.25)) {
           abandoned++;
           await c.query("update public.work_plan_steps set expires_at = clock_timestamp() where plan_id = $1 and key = $2 and fence = $3", [plan, a.o_key, a.o_fence]);
           continue;
@@ -1221,9 +1395,12 @@ test("races, waiting in line: 30 people asking for the steps of one 40-step plan
 });
 
 test("races, waiting in line: the same crowd walking away from a quarter of its steps still finishes every step, with the lapsed ones handed on through the line", async () => {
-  const { abandoned, states } = await lineCrowd("Races line crowd abandoning", true);
+  // Whether anyone in the crowd lapses twice before finishing a step, and so
+  // cools down, depends on the interleaving; the cooldown itself is proved
+  // deterministically in supabase/tests/waiting_test.sql ("strikes:"). Here
+  // every abandoned step is handed on through the line (the claims tally).
+  const { abandoned } = await lineCrowd("Races line crowd abandoning", true);
   assert.ok(abandoned > 0, "no step was abandoned");
-  assert.ok((states.cooling_down ?? 0) > 0, "no one ever cooled down");
 });
 
 // Two requests from one person at once: the first stops after taking its

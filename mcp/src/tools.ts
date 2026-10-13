@@ -9,8 +9,9 @@
 //   claims-tools.ts      claim_path, renew_claim, release_claim,
 //                        list_claims (break_claim needs a person present,
 //                        so no tool here offers it)
-//   workplan-tools.ts    register_work_plan, work_plan_status, claim_step,
-//                        checkin_step, complete_step, release_step
+//   workplan-tools.ts    register_work_plan, work_plan_status, request_work,
+//                        leave_queue, my_places, claim_step, checkin_step, complete_step,
+//                        release_step
 //                        (cancel_step, skip_step and reopen_step need a person present,
 //                        so no tool here offers them)
 //   proposals-tools.ts   propose, list_proposals, revise_proposal,

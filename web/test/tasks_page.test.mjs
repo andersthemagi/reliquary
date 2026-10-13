@@ -119,6 +119,10 @@ before(async () => {
   [{ id: V.main }] = await as(NOA, "select public.create_vault('Tasks main', 'open') as id");
   await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.main, EDDA, NOA]);
   await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.main, REX, NOA]);
+  // claim_step keeps to the claim rule's caps (20261013220000): Edda holds
+  // a task in two plans from one connection, so the rule allows two. The
+  // rest is the Org preset, the settings with no rule.
+  await as(NOA, "select public.set_claim_rule($1, '', 2880, 10080, null, 2, 5, 360, 60, 900, 1, 2880)", [V.main]);
 
   // fetch: done. clean: held by Edda. check: ready. ship: blocked on clean and
   // check. side: cancelled. after: blocked by the cancelled side job.
@@ -273,6 +277,8 @@ test("plan page: done tasks are folded into a closed Done section at the bottom,
 test("plan page: a task an agent holds shows a chip naming the person and their agent", async () => {
   const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks agent', 'open') as id");
   await register(NOA, v, "plans/agent.md", [{ key: "one", title: "Agent work" }, { key: "two", title: "My own work" }]);
+  // Both claims come from one connection as claim_step counts them, so the rule allows two (as in before()).
+  await as(NOA, "select public.set_claim_rule($1, '', 2880, 10080, null, 2, 5, 360, 60, 900, 1, 2880)", [v]);
   await as(NOA, "select public.claim_step($1, 'plans/agent.md', 'one', null)", [v], { sub: "tok-1", name: "Claude Code" });
   await claim(NOA, v, "plans/agent.md", "two", null);
   const h = await page(noa, planUrl(v, "plans/agent.md"));
@@ -712,4 +718,123 @@ test("waiting: a plan with no one in line says so plainly", async () => {
   const h = await page(noa, planUrl(V.main, "plans/second.md"));
   assert.deepEqual(lineRows(h), []);
   assert.match(h, /<h2 id="g-waiting">Waiting for work <span class="muted">0<\/span><\/h2><p class="muted">No one is waiting for work in this plan\.<\/p>/);
+});
+
+// ---------------------------------------------------------------------------
+// Review gates (issue #78). approve_step is the database's to allow (a person
+// who can write the path, only a step awaiting review: review_gate_test.sql);
+// these check what the page shows of a task awaiting review, the Approve
+// button and its confirm page, and the note on a linked proposal's page. Its
+// own vault, Noa's, with Rex as a viewer: brief (gated) is awaiting review
+// and build waits on it; spec (gated) is awaiting review with a proposal
+// linked; open is plain and open.
+
+const GATE = "plans/gate.md";
+let gated;
+const seedGate = () => (gated ??= (async () => {
+  const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks gate', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'viewer', $3)", [v, REX, NOA]);
+  await as(NOA, "select public.set_policy($1, 'canon/', 'canon', 1)", [v]);
+  await register(NOA, v, GATE, [
+    { key: "brief", title: "Write the brief", gate: "review" },
+    { key: "build", title: "Build it", blocked_by: ["brief"] },
+    { key: "spec", title: "Write the spec", gate: "review" },
+    { key: "open", title: "Plain task" },
+  ]);
+  const b = await claim(NOA, v, GATE, "brief", null);
+  await as(NOA, "select public.complete_step($1, $2, 'brief', $3, $4)", [v, GATE, b.o_fence, b.o_secret]);
+  const s = await claim(NOA, v, GATE, "spec", null);
+  const [{ pid }] = await as(NOA, "select public.propose($1, 'canon/spec.md', 'The spec', 'the spec task') as pid", [v]);
+  await as(NOA, "select public.complete_step($1, $2, 'spec', $3, $4, $5)", [v, GATE, s.o_fence, s.o_secret, pid]);
+  return { v, pid };
+})());
+const gateUrl = (v, verb, key) => `${planUrl(v, GATE)}&${verb}=${key}`;
+const gateStatus = async (v, key) =>
+  (await sql("select s.status from public.work_plan_steps s join public.work_plans p on p.id = s.plan_id where p.vault_id = $1 and p.path = $2 and s.key = $3",
+    [v, GATE, key]))[0].status;
+
+test("review gate: the list counts a task awaiting review, and the plan shows it first, who finished it, who approves it and what waits on it", async () => {
+  const { v } = await seedGate();
+  const list = await page(noa, tasksUrl(v));
+  assert.match(list, /<strong>0 of 4 done<\/strong> <span class="muted">· 2 awaiting review · 1 ready · 1 blocked<\/span>/);
+  assert.ok(list.indexOf('<h2 id="open-awaiting-review">Awaiting review <span class="muted">2</span></h2>') >= 0, "the open list has awaiting review");
+  assert.ok(list.indexOf('<h2 id="open-awaiting-review">') < list.indexOf('<h2 id="open-ready">'), "and it comes first");
+  const h = await page(noa, planUrl(v, GATE));
+  assert.ok(h.indexOf('<h2 id="g-awaiting-review">Awaiting review <span class="muted">2</span></h2>') < h.indexOf('<h2 id="g-ready">'), "awaiting review comes first");
+  const row = taskRow(h, "brief");
+  assert.match(row, /<span class="badge warning">Awaiting review<\/span>/);
+  assert.match(row, /Finished by you, and waiting for a person who can write the plan’s file to approve it\. The tasks waiting on it start only then\. You can approve it\./);
+  assert.match(taskRow(h, "build"), /Blocked by Write the brief \(awaiting review\)\./);
+});
+
+test("review gate: an owner is offered Approve on a task awaiting review and on no other; a viewer is offered nothing, is sent back, and a crafted form is refused", async () => {
+  const { v } = await seedGate();
+  const h = await page(noa, planUrl(v, GATE));
+  assert.match(taskRow(h, "brief"), new RegExp(`<a class="button" href="${planUrl(v, GATE).replace("?", "\\?")}&amp;approve=brief" aria-label="Approve the task Write the brief">Approve</a><details class="menu-wrap action-menu[\\s\\S]*&amp;cancel=brief"><span class="menu-item-title">Cancel</span>`));
+  for (const key of ["build", "open"]) assert.doesNotMatch(taskRow(h, key), /Approve/, `no Approve on ${key}`);
+  assert.match(h, /Approve passes a finished task’s review, so the tasks waiting on it can start\./);
+
+  const r = await page(rex, planUrl(v, GATE));
+  assert.doesNotMatch(r, /Approve<\/a>/);
+  assert.doesNotMatch(taskRow(r, "brief"), /You can approve it/);
+  const back = await landed(rex, await get(rex, gateUrl(v, "approve", "brief")));
+  assert.deepEqual(flashOf(back), ["warning", "status", "Only someone who can write this plan’s file approves its tasks."]);
+  const [tone, , text] = flashOf(await landed(rex, await post(rex, `/v/${v}/tasks/plan`, { csrf: csrfOf(back), path: GATE, key: "brief", action: "approve", confirm: "1" })));
+  assert.equal(tone, "danger");
+  assert.match(text, /\(ref [0-9a-f]{8}\)$/);
+  assert.equal(await gateStatus(v, "brief"), "review", "nothing approved");
+});
+
+test("review gate: the confirm page says to check the work first and what becomes ready, and opening it approves nothing", async () => {
+  const { v } = await seedGate();
+  const h = await page(noa, gateUrl(v, "approve", "brief"));
+  assert.match(h, /<h1>Approve “Write the brief”\?<\/h1>/);
+  assert.match(h, /Approving <strong>Write the brief<\/strong> <code>brief<\/code> passes its review\. It was finished by you, and has waited for a person to check the work\./);
+  assert.match(h, /<li>Approve only once you’ve checked the work: the plan counts it as done from then on\.<\/li>/);
+  assert.match(h, /<li>These tasks stop waiting on it, and any with nothing else left to wait for become ready for an agent to take: Build it <code>build<\/code>\.<\/li>/);
+  assert.match(h, /<button class="danger solid">Approve “Write the brief”<\/button><a class="button quiet" href="[^"]+">Not yet<\/a>/);
+  const { fields } = formFields(h, "Approve “Write the brief”");
+  assert.deepEqual({ ...fields, csrf: undefined }, { csrf: undefined, path: GATE, key: "brief", action: "approve", confirm: "1" });
+  assert.equal(await gateStatus(v, "brief"), "review", "asking approves nothing");
+});
+
+test("review gate: confirming approves it, says so as a success, logs it, and what waited on it is ready", async () => {
+  const { v } = await seedGate();
+  const { action, fields } = formFields(await page(noa, gateUrl(v, "approve", "brief")), "Approve “Write the brief”");
+  const h = await landed(noa, await post(noa, action, fields));
+  assert.deepEqual(flashOf(h), ["success", "status", "“Write the brief” is approved and counts as done. Tasks that were waiting only on it are ready now."]);
+  assert.equal(await gateStatus(v, "brief"), "done");
+  assert.deepEqual(
+    await sql("select actor, detail->>'step' as step from public.log where vault_id = $1 and path = $2 and event = 'step.approve' order by seq", [v, GATE]),
+    [{ actor: NOA, step: "brief" }],
+  );
+  assert.match(taskRow(h, "brief"), /<span class="badge">Done<\/span>/);
+  assert.match(taskRow(h, "build"), /<span class="badge success">Ready<\/span>/);
+});
+
+test("review gate: a task not awaiting review goes back with a warning, and a crafted form is refused with a reference and changes nothing", async () => {
+  const { v } = await seedGate();
+  const back = await landed(noa, await get(noa, gateUrl(v, "approve", "open")));
+  assert.deepEqual(flashOf(back), ["warning", "status", "“Plain task” isn’t awaiting review, so there’s nothing to approve."]);
+  const [tone, , text] = flashOf(await landed(noa, await post(noa, `/v/${v}/tasks/plan`, { csrf: csrfOf(back), path: GATE, key: "open", action: "approve", confirm: "1" })));
+  assert.equal(tone, "danger");
+  assert.match(text, /^Step &quot;open&quot; is not awaiting review; only a review-gated step its holder completed is approved\. \(ref [0-9a-f]{8}\)$/);
+  assert.equal(await gateStatus(v, "open"), "open");
+});
+
+test("review gate: a task with a linked proposal links it, and the proposal's page says applying it also approves the task", async () => {
+  const { v, pid } = await seedGate();
+  assert.match(taskRow(await page(noa, planUrl(v, GATE)), "spec"), new RegExp(`Applying <a href="/v/${v}/proposals/${pid}">its proposal</a> also approves it\\.`));
+  assert.match(
+    await page(noa, gateUrl(v, "approve", "spec")),
+    new RegExp(`<li>Its agent linked <a href="/v/${v}/proposals/${pid}">a proposal</a> as its work\\. Approving the task here leaves that proposal waiting for its own review\\.</li>`),
+  );
+  const p = await page(noa, `/v/${v}/proposals/${pid}`);
+  assert.match(
+    p,
+    new RegExp(`<p class="callout info">This is the work of the task Write the spec <code>spec</code> in <a href="${planUrl(v, GATE).replace("?", "\\?")}">plans/gate\\.md</a>, which waits for a person’s review\\. Applying this proposal also approves the task, and the tasks waiting on it can start\\.</p>`),
+  );
+  await as(NOA, "select public.decide($1, 'approve')", [pid]);
+  assert.equal(await gateStatus(v, "spec"), "done");
+  assert.doesNotMatch(await page(noa, `/v/${v}/proposals/${pid}`), /This is the work of the task/, "once applied, the note goes");
 });

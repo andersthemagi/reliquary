@@ -88,6 +88,13 @@ create function t.lapse_step(p_path text, p_key text) returns void language sql 
   update public.work_plan_steps set expires_at = clock_timestamp() - interval '1 second'
    where plan_id = t.plan_id(p_path) and key = p_key
 $$;
+-- Someone outside the line is working p_key: Ana's claim, written as the
+-- table owner, so a test's setup isn't held to her caps or the line.
+create function t.occupy(p_path text, p_key text, p_minutes int default 48 * 60) returns void language sql as $$
+  update public.work_plan_steps set status = 'claimed', fence = fence + 1, holder = t.id('ana'),
+         claimed_at = clock_timestamp(), expires_at = clock_timestamp() + p_minutes * interval '1 minute'
+   where plan_id = t.plan_id(p_path) and key = p_key
+$$;
 create function t.events(p_event text, p_path text) returns text language sql as $$
   select coalesce(string_agg(coalesce(i.name, '?') || coalesce(' ' || (l.detail->>'reason'), '') || coalesce(' ' || (l.detail->>'place'), ''), ', ' order by l.seq), '')
     from public.log l left join t.ids i on i.id = l.actor
@@ -249,7 +256,7 @@ select t.expect('request: and takes no place in line', t.line('q/cancel.md'), ''
 
 -- Three places per person in a vault.
 select t.plan(p, '[{"key":"a","title":"A"}]') from unnest(array['q/r1.md', 'q/r2.md', 'q/r3.md', 'q/r4.md']) p;
-select t.run('ana', format($q$select o_fence::text from public.claim_step(%L, %L, 'a')$q$, t.id('wq'), p))
+select t.occupy(p, 'a')
   from unnest(array['q/r1.md', 'q/r2.md', 'q/r3.md', 'q/r4.md']) p;
 select t.expect('request: a person takes a place in line on each of three plans',
   (select string_agg(t.rw('ivy', p)->>'o_state', ' ') from unnest(array['q/r1.md', 'q/r2.md', 'q/r3.md']) p), 'wait wait wait');
@@ -346,7 +353,7 @@ select t.expect('line: with no rule, the suggested time is the longest hint, an 
 select t.expect_true('line: and the caller may ask again after the minimum gap, 15 minutes, not later',
   (t.place('kim', 'q/hint.md')).next_allowed_at between now() + interval '14 minutes 58 seconds' and now() + interval '15 minutes 1 second');
 select t.plan('q/hint2.md', '[{"key":"a","title":"A"}]');
-select t.run('ana', format($q$select o_fence::text from public.claim_step(%L, 'q/hint2.md', 'a', null, 5)$q$, t.id('wq')));
+select t.occupy('q/hint2.md', 'a', 5);
 select t.save('kim-hint2', t.rw('kim', 'q/hint2.md')::text);
 select t.expect_true('line: a lease ending sooner suggests its end',
   (t.j('kim-hint2')->>'o_wait_seconds')::int between 295 and 300);
@@ -431,7 +438,7 @@ select t.expect('strikes: finishing a step clears the person''s strikes', t.fini
 -- leave_queue: give up your own place
 
 select t.plan('q/leave.md', '[{"key":"a","title":"A"}]');
-select t.run('ana', format($q$select o_fence::text from public.claim_step(%L, 'q/leave.md', 'a')$q$, t.id('wq')));
+select t.occupy('q/leave.md', 'a');
 select t.rw(p, 'q/leave.md') from unnest(array['lee', 'hal', 'jon']) p;
 create function t.leave_sql(p_path text) returns text language sql as $$
   select format($q$select public.leave_queue(%L, %L)::text$q$, t.id('wq'), p_path)
@@ -451,3 +458,83 @@ select t.expect('leave: leaving again, with no place, answers false and logs not
   t.run('lee', t.leave_sql('q/leave.md')) || ' ' || t.events('queue.leave', 'q/leave.md'), 'false lee');
 select t.expect('leave: an agent leaves its person''s place', t.run('hal', t.leave_sql('q/leave.md'), 'Claude Code') || ' ' || t.line('q/leave.md'), 'true jon');
 select t.expect('leave: a path with no plan answers false', t.run('jon', t.leave_sql('q/none.md')), 'false');
+
+-- ---------------------------------------------------------------------------
+-- claim_step follows the line (20261013220000_claim_step_follows_the_line.sql,
+-- issue #75; design items 12a and 12c): naming a step grants it only when
+-- request_work would grant that caller a step, so no call jumps the line or
+-- passes a cap or a cooldown. Mia to Sam are new, holding nothing.
+
+insert into t.ids values
+  ('mia', '00000000-0000-0000-0000-0000000000e9'), ('ned', '00000000-0000-0000-0000-0000000000ea'),
+  ('ola', '00000000-0000-0000-0000-0000000000eb'), ('pia', '00000000-0000-0000-0000-0000000000ec'),
+  ('rex', '00000000-0000-0000-0000-0000000000ed'), ('sam', '00000000-0000-0000-0000-0000000000ee');
+select test_support.add_member(t.id('wq'), t.id(p), 'editor', t.id('ana')) from unnest(array['mia', 'ned', 'ola', 'pia', 'rex', 'sam']) p;
+select t.run('mia', format($q$select public.create_access_token('mia-a', 30, array[%L]::uuid[], 'write')$q$, t.id('wq')));
+select t.run('mia', format($q$select public.create_access_token('mia-b', 30, array[%L]::uuid[], 'write')$q$, t.id('wq')));
+create function t.cs_sql(p_path text, p_key text) returns text language sql as $$
+  select format($q$select o_fence::text from public.claim_step(%L, %L, %L)$q$, t.id('wq'), p_path, p_key)
+$$;
+create function t.step_state(p_path text, p_key text) returns text language sql as $$
+  select status || coalesce(' ' || i.name, '') from public.work_plan_steps s left join t.ids i on i.id = s.holder
+   where s.plan_id = t.plan_id(p_path) and s.key = p_key
+$$;
+
+select t.expect('claim in line: an agent cannot call the function that skips claim_step''s checks',
+  t.run('ned', format($q$select o_state from private.take_step(%L, 'q/one.md', null, null, null)$q$, t.id('wq')), 'Claude Code'), 'ERR 42501');
+
+select t.plan('q/cl/free.md', '[{"key":"a","title":"A"},{"key":"b","title":"B"}]');
+select t.expect('claim in line: with nobody waiting, a named ready step is claimed', t.run('ola', t.cs_sql('q/cl/free.md', 'b')), '1');
+select t.expect('claim in line: the claim is logged as step.claim at the front of the line',
+  (select string_agg(format('%s place %s ready %s', l.detail->>'step', l.detail->>'place', l.detail->>'ready'), ', ')
+     from public.log l where l.vault_id = t.id('wq') and l.event = 'step.claim' and l.path = 'q/cl/free.md'),
+  'b place 1 ready 1');
+
+-- One step ready, and Hal waiting for it before Ned names it.
+select t.plan('q/cl/jump.md', '[{"key":"a","title":"A"}]');
+select t.occupy('q/cl/jump.md', 'a');
+select t.expect('claim in line: (setup) Hal waits for the plan''s only step', t.rw('hal', 'q/cl/jump.md')->>'o_state', 'wait');
+select t.lapse_step('q/cl/jump.md', 'a');
+select t.save('log-jump', (select count(*)::text from public.log where vault_id = t.id('wq')));
+select t.expect('claim in line: naming the one ready step while someone waits ahead is refused, not your turn',
+  t.run('ned', t.cs_sql('q/cl/jump.md', 'a'), 'Claude Code'), 'ERR RLW05');
+select t.expect_true('claim in line: the refusal took no step and no place, and logged nothing',
+  t.step_state('q/cl/jump.md', 'a') = 'claimed ana' and t.line('q/cl/jump.md') = 'hal'
+  and (select count(*)::text from public.log where vault_id = t.id('wq')) = t.val('log-jump'));
+select t.later('hal', 'q/cl/jump.md');
+select t.expect('claim in line: the one waiting still gets the step', t.rw('hal', 'q/cl/jump.md')->>'o_state', 'granted');
+
+-- Two steps ready, one person waiting: a newcomer is second in line, so may take one.
+select t.plan('q/cl/two.md', '[{"key":"a","title":"A"},{"key":"b","title":"B"}]');
+select t.occupy('q/cl/two.md', 'a');
+select t.occupy('q/cl/two.md', 'b');
+select t.rw('jon', 'q/cl/two.md');
+select t.lapse_step('q/cl/two.md', 'a');
+select t.lapse_step('q/cl/two.md', 'b');
+select t.expect('claim in line: with more steps ready than people waiting ahead, a named step is claimed',
+  t.run('ned', t.cs_sql('q/cl/two.md', 'b')) || ' ' || t.step_state('q/cl/two.md', 'b'), '2 claimed ned');
+select t.later('jon', 'q/cl/two.md');
+select t.expect('claim in line: and the one waiting gets the other', (t.rw('jon', 'q/cl/two.md')->>'o_key'), 'a');
+
+-- Caps: the q/cap/ rule allows one step per connection and two per person.
+select t.plan('q/cap/named.md', '[{"key":"a","title":"A"},{"key":"b","title":"B"},{"key":"c","title":"C"}]');
+select t.expect('claim in line: (setup) Mia claims a step', t.run('mia', t.cs_sql('q/cap/named.md', 'a')), '1');
+select t.expect('claim in line: a connection already holding its cap of steps is refused another',
+  t.run('mia', t.cs_sql('q/cap/named.md', 'b')) || ' ' || t.step_state('q/cap/named.md', 'b'), 'ERR RLW06 open');
+select t.expect('claim in line: another connection of the same person may claim one', t.run_tok('mia', 'mia-a', t.cs_sql('q/cap/named.md', 'b')), '1');
+select t.expect('claim in line: past the rule''s claims per person, every connection of theirs is refused',
+  t.run_tok('mia', 'mia-b', t.cs_sql('q/cap/named.md', 'c')) || ' ' || t.step_state('q/cap/named.md', 'c'), 'ERR RLW06 open');
+
+-- Strikes and the cooldown.
+select t.plan('q/cl/lapse.md', '[{"key":"a","title":"A"}]');
+select t.run('pia', t.cs_sql('q/cl/lapse.md', 'a'));
+select t.lapse_step('q/cl/lapse.md', 'a');
+select t.expect('claim in line: naming a step whose claim lapsed takes it, and strikes the person who let it lapse',
+  t.run('rex', t.cs_sql('q/cl/lapse.md', 'a')) || ' ' || t.strike_row('pia'), '2 1 none');
+-- Pia holds nothing now, so only a cooldown can stop her.
+update private.work_plan_strikes set cooldown_until = clock_timestamp() + interval '1 hour'
+ where vault_id = t.id('wq') and person = t.id('pia');
+select t.plan('q/cl/cool.md', '[{"key":"a","title":"A"}]');
+select t.expect('claim in line: a person cooling down is refused a named step',
+  t.run('pia', t.cs_sql('q/cl/cool.md', 'a'), 'Claude Code') || ' ' || t.step_state('q/cl/cool.md', 'a'), 'ERR RLW06 open');
+select t.expect('claim in line: another person is served meanwhile', t.run('sam', t.cs_sql('q/cl/cool.md', 'a')), '1');

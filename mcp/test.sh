@@ -77,7 +77,7 @@ wait_until "$srv" "the MCP server to answer /healthz" curl -sf "http://127.0.0.1
 "$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$rlport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
-  -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2" \
+  -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2,mcp_request_work_minute=1/2" \
   -e PORT=$rlport "$node" node dist/server.js >/dev/null
 wait_until "$rl" "the rate-limit MCP server to answer /healthz" curl -sf "http://127.0.0.1:$rlport/healthz"
 wait_until "$web" "the web app (authorization server) to answer /healthz" curl -sf "http://127.0.0.1:$webport/healthz"

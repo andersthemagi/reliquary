@@ -1219,7 +1219,8 @@ form.confirm .actions:first-child { margin-top: 0; }
 .task-row + .task-row { border-top: 1px solid var(--border); }
 .task-row:hover { background: var(--bg-subtle); }
 /* The state as a shape, Todoist's circle: a ring when it can be picked up,
-   half filled while someone has it, dashed while it waits, filled with a
+   half filled while someone has it, a ring with a dot while it waits for
+   a person's review, dashed while it waits, filled with a
    tick when done, struck through when cancelled. The word beside it is
    the state; the shape only lets the eye scan a long list. */
 .task-dot {
@@ -1228,6 +1229,8 @@ form.confirm .actions:first-child { margin-top: 0; }
 }
 .task-dot.ready { border-color: var(--success); }
 .task-dot.claimed { border-color: var(--info); background: linear-gradient(90deg, var(--info) 50%, transparent 50%); }
+.task-dot.awaiting_review { border-color: var(--attention); }
+.task-dot.awaiting_review::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--attention); }
 .task-dot.blocked { border-style: dashed; border-color: var(--attention); }
 .task-dot.blocked_by_cancelled { border-style: dashed; border-color: var(--danger); }
 .task-dot.done { border-color: var(--success); background: var(--success); }
