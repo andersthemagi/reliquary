@@ -259,6 +259,13 @@ test("search: no query shows the form; no match says so", async () => {
   assert.match(await page("dora", "/search?q=nothing-matches-this"), /Nothing in your vaults matches “nothing-matches-this”/);
 });
 
+test("search empty: no match is the shared empty state, a title and what to try", async () => {
+  assert.match(
+    await page("dora", "/search?q=nothing-matches-this"),
+    /<div class="empty"><strong>Nothing in your vaults matches “nothing-matches-this”<\/strong><p>Try fewer words, or part of a file name\.<\/p><\/div>/,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Account settings
 
@@ -268,12 +275,24 @@ test("settings: the page shows my email, the theme, and links to Plan and usage,
   assert.match(h, /<strong>dora@example\.test<\/strong>/);
   assert.match(h, /<input id="display-name" type="text" name="display_name" value="" maxlength="80"/);
   assert.match(h, /<form method="post" action="\/theme" class="theme" aria-label="Theme">/);
-  for (const href of ["/account", "/connections", "/connect"]) assert.match(h, new RegExp(`<a class="name" href="${href}">`));
+  const at = h.indexOf('<nav class="settings-nav" aria-label="Account settings">');
+  const nav = h.slice(at, h.indexOf("</nav>", at));
+  for (const href of ["/account", "/connections", "/connect"]) assert.match(nav, new RegExp(`<li><a href="${href}">`));
   const menu = accountMenu(h);
   assert.match(menu, /Signed in as <strong>dora@example\.test<\/strong>/);
   for (const [href, label] of [["/settings", "Account settings"], ["/account", "Plan and usage"], ["/connections", "Connections"]]) {
     assert.match(menu, new RegExp(`<li><a href="${href}"[^>]*>${label}</a></li>`));
   }
+});
+
+test("account sections: signed in locally, the sub-nav lists Profile, Appearance and Danger zone, each an anchor on the page, and no Sessions", async () => {
+  const h = await page("dora", "/settings");
+  const at = h.indexOf('<nav class="settings-nav" aria-label="Account settings">');
+  const nav = h.slice(at, h.indexOf("</nav>", at));
+  assert.deepEqual([...nav.matchAll(/<a href="#([a-z-]+)">([^<]+)<\/a>/g)].map((m) => [m[1], m[2]]), [["profile", "Profile"], ["appearance", "Appearance"], ["danger", "Danger zone"]]);
+  for (const id of ["profile", "appearance", "danger"]) assert.match(h, new RegExp(` id="${id}"`));
+  assert.match(nav, /<p class="settings-nav-label">On this page<\/p>/, "the group's name is a label, not a link");
+  assert.doesNotMatch(h, /id="sessions"/);
 });
 
 test("settings: a display name is saved trimmed, shown in my account menu, and to co-members next to my email", async () => {

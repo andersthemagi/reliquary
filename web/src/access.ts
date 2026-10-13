@@ -65,8 +65,10 @@ type Client = (typeof CLIENTS)[number]["id"];
 
 const RECENT_MINUTES = 15;
 const CEILING = "The agent acts as you, but can’t approve, change rules, manage members or read variable values.";
+// Said once below the open tab, never inside a client's section, so no
+// client's steps repeat what holds for all of them.
 const TOKEN_SAFETY =
-  "Keep the token out of config files and chats: anything an agent can read, it can leak. Read it from an environment variable or a password prompt, as below.";
+  "If you use a token, keep it out of config files and chats: anything an agent can read, it can leak. Read it from an environment variable or a password prompt, as the steps do.";
 
 export async function connect(ctx: Ctx): Promise<Reply> {
   const url = ctx.mcpUrl;
@@ -99,7 +101,8 @@ export async function connect(ctx: Ctx): Promise<Reply> {
     ${last
       ? callout("success", html`<p><strong>Connected.</strong> ${last.name} was last used ${lastUse(last)}. <a href="/connections">All connections</a></p>`)
       : callout("info", html`<p><strong>Nothing has connected in the last ${RECENT_MINUTES} minutes.</strong> When your agent does, it shows here: reload this page after the last step.</p>`)}
-    <div class="connect-panel">${clientSection(ctx, client, many)}</div>`,
+    <div class="connect-panel">${clientSection(ctx, client, many)}</div>
+    ${callout("info", html`<p>${CEILING}</p><p>${TOKEN_SAFETY}</p>`, { title: "Whichever client you use" })}`,
     "connect",
   );
 }
@@ -111,34 +114,26 @@ function clientSection(ctx: Ctx, client: Client, many: boolean): Raw {
       return html`<section id="claude-code"><h2>Claude Code (app or CLI)</h2>
       <p>Claude Code signs in with your Reliquary account: no token to copy. On each computer, add Reliquary once for your user:</p>
       <pre class="code" tabindex="0">claude mcp add --transport http --scope user reliquary ${url}</pre>
-      <p>Then in Claude Code run <code>/mcp</code>, choose <strong>reliquary</strong> and <strong>Authenticate</strong>. Your browser opens Reliquary: sign in, pick the vaults and access, and approve. Claude Code keeps the connection and refreshes it by itself. It shows on <a href="/connections">Connections</a>, where you can revoke it.</p>
-      ${callout("info", CEILING)}</section>`;
+      <p>Then in Claude Code run <code>/mcp</code>, choose <strong>reliquary</strong> and <strong>Authenticate</strong>. Your browser opens Reliquary: sign in, pick the vaults and access, and approve. Claude Code keeps the connection and refreshes it by itself. It shows on <a href="/connections">Connections</a>, where you can revoke it.</p></section>`;
     case "chat":
       return html`<section id="chat"><h2>Claude.ai and ChatGPT</h2>
       <p>Both sign in with your Reliquary account: no token to copy.</p>
       <p><strong>Claude.ai:</strong> Settings, Connectors, <strong>Add custom connector</strong>. Name it Reliquary and paste the MCP URL. Claude sends you here to sign in and approve.</p>
       <p><strong>ChatGPT:</strong> Settings, Apps and Connectors, turn on developer mode under Advanced, then create a connector with the MCP URL and OAuth authentication. ChatGPT sends you here to sign in and approve.</p>
-      <p>Each shows on <a href="/connections">Connections</a> under the app’s name, where you can revoke it.</p>
-      ${callout("info", CEILING)}</section>`;
+      <p>Each shows on <a href="/connections">Connections</a> under the app’s name, where you can revoke it.</p></section>`;
     case "cursor":
       return html`<section id="cursor"><h2>Cursor</h2>
       <p>Cursor can’t sign in, so it uses a token.</p>
-      ${tokenList(ctx, "cursor", many)}
-      ${callout("warning", TOKEN_SAFETY)}
-      ${callout("info", CEILING)}</section>`;
+      ${tokenList(ctx, "cursor", many)}</section>`;
     case "vscode":
       return html`<section id="vscode"><h2>VS Code</h2>
       <p>VS Code uses a token.</p>
-      ${tokenList(ctx, "vscode", many)}
-      ${callout("warning", TOKEN_SAFETY)}
-      ${callout("info", CEILING)}</section>`;
+      ${tokenList(ctx, "vscode", many)}</section>`;
     case "other": {
       const helper = JSON.stringify({ reliquary: { type: "http", url, headersHelper: "/path/to/reliquary/mcp/headers-helper.sh" } }, null, 2);
       return html`<section id="other"><h2>Other clients</h2>
       <p>A client that supports MCP sign-in (OAuth) only needs the MCP URL: it sends you here to sign in and approve. Any other client that speaks Streamable HTTP uses a token.</p>
       ${tokenList(ctx, "other", many)}
-      ${callout("warning", TOKEN_SAFETY)}
-      ${callout("info", CEILING)}
       <details><summary>Local development (a Reliquary checkout on this machine)</summary>
         <p>With <code>./mcp/dev.sh token "Claude Code on Linux"</code> the token stays in a file, and Claude Code reads it through a helper at connect time. Add this under <code>mcpServers</code> in <code>~/.claude.json</code>:</p>
         <pre class="code" tabindex="0">${helper}</pre></details></section>`;

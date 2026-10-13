@@ -5,7 +5,7 @@
 // A vault's own search, from its sidebar, stays at /v/<vault>/search.
 
 import { asPerson } from "./db.js";
-import { html, pageHeader } from "./html.js";
+import { emptyState, html, pageHeader } from "./html.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 
 // Matches per vault, and in all.
@@ -57,7 +57,7 @@ export async function searchAll(ctx: Ctx): Promise<Reply> {
               <span class="muted small"> · ${r.vault}</span>
               <span class="snippet">${r.body.replace(/\s+/g, " ").slice(0, 200)}</span></span></li>`,
           )}</ul>`
-        : html`<div class="empty">Nothing in your vaults matches “${query}”. Try fewer words, or part of a file name.</div>`
+        : emptyState({ title: `Nothing in your vaults matches “${query}”`, body: "Try fewer words, or part of a file name." })
       : ""}`;
   return render(ctx, query ? `Search: ${query}` : "Search", body, "search");
 }

@@ -91,12 +91,12 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
               ? ""
               : html`<div><label for="lc">Credential</label><input id="lc" type="password" name="credential" autocomplete="new-password" required maxlength="65536"${described("credential", "lc-hint")}></div>`}
           </div>
-          <p class="hint" id="ln-hint">Letters, digits and underscores, not starting with a digit: an agent calls this link’s granted tools as <code>&lt;name&gt;.&lt;tool&gt;</code>.</p>
-          <p class="hint" id="lu-hint">The upstream MCP server’s URL: https://, a host and a path, with no user name, password, query string or fragment. Every member and agent can read it, so a key or token goes in the credential.</p>
+          <p class="hint" id="ln-hint">A short name like <code>linear</code>: letters, digits and underscores, not starting with a digit. Agents use it to tell this service’s tools apart from others.</p>
+          <p class="hint" id="lu-hint">The address where this service offers its tools to agents, from the service’s own setup page: https://, a host and a path. Everyone in the vault can read it, so a key or token never goes here.</p>
           ${editing
             ? html`<p class="hint" id="lc-hint">The credential isn’t shown or changed here. To replace it, delete this link and add it again; its grants are deleted too. Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered.</p>`
-            : html`<p class="hint" id="lc-hint">An API key or token for the upstream server. Stored encrypted, the same way environment variable values are; never shown again once saved.</p>`}
-          <div class="actions"><button class="primary"${!editing && !configured ? " disabled" : ""}>${editing ? "Save changes" : "Add link"}</button>${editing ? html`<a class="button quiet" href="${vaultPath(id, "/links")}">Cancel</a>` : ""}</div>
+            : html`<p class="hint" id="lc-hint">The service’s API key or token. It is stored encrypted and never shown again, to anyone, once saved.</p>`}
+          <div class="actions"><button class="primary"${!editing && !configured ? " disabled" : ""}>${editing ? "Save changes" : "Add link"}</button><a class="button quiet" href="${vaultPath(id, "/links")}">Cancel</a></div>
         </form>`
       : "";
 
@@ -124,23 +124,23 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
       : emptyState({
           title: "No links yet",
           body: owner
-            ? "A link holds a shared credential to an upstream MCP server, like Linear or Stripe, so a member’s agent can use it without ever seeing the key."
+            ? "A link holds a shared key to a service like Linear or Stripe, so a member’s agent can use that service’s tools without ever seeing the key."
             : "Only owners add links. Ask an owner of this vault.",
         });
 
-    // With no links the form is already under the empty box, so a button
-    // that only scrolls to it is left out of the header.
-    const formFirst = !!(form?.error || editing);
+    // The list is what people come for; the form shows only when asked for
+    // (Add link, Edit) or refused, and then goes first so its message is on
+    // the first screen.
+    const formOpen = !!(form?.error || editing || (ctx.method === "GET" && ctx.url.searchParams.has("add")));
     const body = html`
       ${pageHeader({
         crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Links" }],
         title: "Links",
-        description: "A vault’s credentials to upstream MCP servers, shared by everyone with access, seen by no one.",
-        primary: owner && !formFirst && list.length ? html`<a class="button primary" href="#add-link">Add link</a>` : "",
+        description: "A vault’s keys to outside services, shared by everyone with access, seen by no one.",
+        primary: owner && !formOpen ? html`<a class="button primary" href="${vaultPath(id, "/links")}?add=1#add-link">Add link</a>` : "",
       })}
-      ${formFirst ? addForm : ""}
+      ${formOpen ? addForm : ""}
       ${table}
-      ${formFirst ? "" : addForm}
       <p class="hint">Adding a link discovers its tools. An owner grants a tool per role from its Grants page, and an agent with a granted role can then call it over MCP as <code>&lt;link&gt;.&lt;tool&gt;</code>. An agent can list a vault’s links, never their credentials, with <code>list_links</code>. <a href="/docs/concepts/links">How links work</a></p>`;
     return { v, shell: await vaultShell(c, ctx, v, { section: "links" }, body) };
   });
