@@ -78,14 +78,14 @@ When cancelled work needs doing after all, prefer a new task that names the old 
 
 ## Waiting in line
 
-When a plan has more agents than ready tasks, the agents wait in line for them, first come, first served. Reliquary keeps the line itself; the MCP tools that ask for work and leave a line are not here yet (see [Not here yet](#not-here-yet)), so today an agent claims a task by name, and the line holds for that too ([Claiming a task by name](#claiming-a-task-by-name)).
+When a plan has more agents than ready tasks, the agents wait in line for them, first come, first served. Reliquary keeps the line itself.
 
-An agent asks for any ready task of a plan and gets an answer at once. Nothing is held open while it waits.
+An agent asks for any ready task of a plan with the MCP tool `request_work`, naming the vault and the plan file's path, and gets an answer at once. Nothing is held open while it waits.
 
 | Answer | What it means |
 |---|---|
 | Granted | The agent now holds a task, the same as if it had claimed it by name: a lease, a secret and a fence. |
-| Wait | Nothing is free for it yet. The answer gives its place in line, how many tasks are ready, and how many seconds until it should ask again. |
+| Wait | Nothing is free for it yet. The answer gives its place in line, how many tasks are ready, and how many seconds until it should ask again. If no task is ready, it also lists each unfinished task and what holds it up: who holds it and until when, or which tasks it waits on. |
 | At capacity | The agent, or all of its person's agents together, already hold as many tasks in the vault as the [claim rule](claims.md#claim-rules) allows. Finish or give one back first. |
 | Cooling down | Its person's agents let tasks run out of time unfinished, so its person waits before getting more. The answer says how many seconds. |
 | Blocked by a cancelled task | Nothing in the plan can move until a person reopens, cancels or skips a task. Stop asking. |
@@ -101,8 +101,9 @@ Who may ask is who may claim a task: whoever can write the plan's file. A read-o
 - The oldest place goes first. With one task ready, only the first in line gets it; with two ready, the first two do. Nobody behind them can take a task ahead of them.
 - A place lasts while its agent keeps asking, each time within the rule's place-in-line time. An agent that stops asking drops out, and the next in line is served. If it comes back later, it starts at the back.
 - The time to ask again is when the earliest task in progress runs out of time, and never more than the rule's longest hint. A task can free up sooner. Asking again before the rule's minimum gap only gets the last answer back.
-- Reliquary can't wake an agent up. Bringing it back at the suggested time is up to whatever runs the agent.
-- An agent can leave the line at any time. When a plan is finished, every place in its line ends.
+- Reliquary can't wake an agent up. The answer tells the agent to stop and come back at the suggested time; bringing it back then is up to whatever runs the agent.
+- `request_work` takes 30 calls a minute per connection, counted together with claiming by name ([Rate limits](../reference/limits.md#rate-limits)).
+- An agent can leave the line at any time with `leave_queue`. When a plan is finished, every place in its line ends.
 
 ### Running out of time
 
@@ -121,7 +122,7 @@ A task whose holder ran out of time goes to the next agent in line. That counts 
 
 ### Claiming a task by name
 
-An agent can also claim one task by its key. That follows the same line, limits and cooldown: it gets the task only when asking for any task would have got it one. So it is refused when:
+An agent can also claim one task by its key, with `claim_step`. That follows the same line, limits and cooldown: it gets the task only when asking for any task would have got it one. So it is refused when:
 
 - others are waiting ahead of it and there aren't enough ready tasks for them and it too. It doesn't take a place in line by trying;
 - the agent, or its person's agents together, already hold as many tasks as the claim rule allows;
@@ -134,5 +135,4 @@ Activity records **Joined the line for a step**, **Left the line for a step** an
 ## Not here yet
 
 - Who is waiting for a task, and their place in line.
-- Asking for any ready task, and leaving a line, over MCP.
 - Registering a plan from the web app. Agents register plans.

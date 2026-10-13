@@ -1,8 +1,8 @@
 // Rate limits on the MCP endpoint (src/ratelimit.ts,
 // supabase/migrations/20260925200000_rate_limits.sql), against mcp/test.sh's
 // rate-limit server: 3 tool calls per 2-second window and 5 a day per token,
-// 1 thread write per window, 3 401s a minute per address, addresses from
-// x-real-ip. Each test makes its own person's tokens (in the database, as
+// 1 thread write and 1 request for work per window, 3 401s a minute per
+// address, addresses from x-real-ip. Each test makes its own person's tokens (in the database, as
 // the Tokens page does) and sends from addresses of its own (documentation
 // ranges; test.sh checks none reaches the log).
 
@@ -11,6 +11,7 @@ import { randomBytes } from "node:crypto";
 import { before, test } from "node:test";
 import pg from "pg";
 import { clientIp, configureRateLimits } from "../dist/ratelimit.js";
+import { DEFAULT_LIMITS } from "../dist/ratelimit.js";
 
 const { MCP_RL_URL: URL_, TEST_SUPER_URL: SUPER } = process.env;
 let n = 0;
@@ -119,6 +120,20 @@ test("rate limits: thread writes per token: the 2nd in a window is refused, and 
   assert.equal((await write("open_thread")).status, 200);
   await limited(await write("post_message"), { max: 2, rpcId: id });
   assert.equal((await call(tok)).status, 200, "the refused write counted nothing against the tool call limit");
+});
+
+test("rate limits: asking for work per token: past its own limit request_work and claim_step are refused, other tool calls still go through, and the shipped limit is 30 a minute", async () => {
+  assert.deepEqual(DEFAULT_LIMITS.mcp_request_work_minute, { limit: 30, window: 60 });
+  const tok = await token();
+  // Counted by the tool's name before it runs, so whether the call itself
+  // succeeds (there's no such vault here) doesn't matter.
+  const ask = (name) =>
+    rpc({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name, arguments: { vault: "Nowhere", path: "plan.md", key: "a" } } }, { tok });
+  await nextWindow();
+  assert.equal((await ask("request_work")).status, 200);
+  await limited(await ask("request_work"), { max: 2, rpcId: id });
+  await limited(await ask("claim_step"), { max: 2, rpcId: id });
+  assert.equal((await call(tok)).status, 200, "the refused requests counted nothing against the tool call limit");
 });
 
 test("rate limits: 401s per address: the 4th request without a live token from one address is a 429; other addresses still get 401", async () => {
