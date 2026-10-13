@@ -115,7 +115,7 @@ before(async () => {
   [{ id: V.main }] = await as(NOA, "select public.create_vault('Tasks main', 'open') as id");
   await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.main, EDDA, NOA]);
   await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.main, REX, NOA]);
-  // claim_step keeps to the claim rule's caps (20261013180000): Edda holds
+  // claim_step keeps to the claim rule's caps (20261013220000): Edda holds
   // a task in two plans from one connection, so the rule allows two. The
   // rest is the Org preset, the settings with no rule.
   await as(NOA, "select public.set_claim_rule($1, '', 2880, 10080, null, 2, 5, 360, 60, 900, 1, 2880)", [V.main]);

@@ -460,7 +460,7 @@ select t.expect('leave: an agent leaves its person''s place', t.run('hal', t.lea
 select t.expect('leave: a path with no plan answers false', t.run('jon', t.leave_sql('q/none.md')), 'false');
 
 -- ---------------------------------------------------------------------------
--- claim_step follows the line (20261013180000_claim_step_follows_the_line.sql,
+-- claim_step follows the line (20261013220000_claim_step_follows_the_line.sql,
 -- issue #75; design items 12a and 12c): naming a step grants it only when
 -- request_work would grant that caller a step, so no call jumps the line or
 -- passes a cap or a cooldown. Mia to Sam are new, holding nothing.

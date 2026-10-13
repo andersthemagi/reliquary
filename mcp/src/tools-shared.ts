@@ -169,7 +169,7 @@ export function explain(err: unknown): ToolResult {
         lead = `Refused: ${e.message}`;
         break;
       // claim_step keeps request_work's line, caps and cooldown
-      // (20261013180000_claim_step_follows_the_line.sql); the message names
+      // (20261013220000_claim_step_follows_the_line.sql); the message names
       // the step key and counts, never a label.
       case "RLW05":
         lead = `Not your turn: ${e.message}.`;

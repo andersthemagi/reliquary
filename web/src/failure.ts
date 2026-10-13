@@ -217,7 +217,7 @@ export function sqlstateStatus(code: string): number {
   // conflict (already claimed, not currently claimable, or a stale
   // fence/secret/connection) is 409; the hold limit is 403.
   if (code === "RLW01" || code === "RLW02" || code === "RLW03") return 409;
-  // Waiting in line (20261013180000_claim_step_follows_the_line.sql):
+  // Waiting in line (20261013220000_claim_step_follows_the_line.sql):
   // someone is ahead of you is a conflict; a cap or a cooldown is a limit.
   if (code === "RLW05") return 409;
   if (code === "RLW04" || code === "RLW06") return 403;

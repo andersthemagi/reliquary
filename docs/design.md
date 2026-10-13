@@ -757,7 +757,7 @@ lapse, a 48 hour cooldown cap). Where it differs from the spike:
   role:** agents and people share `authenticated`, which writes neither
   places nor strikes, and reads places (who is waiting) as it reads steps.
   `claim_step`, naming one step, stays executable by agents, and since
-  #75 (`20261013180000_claim_step_follows_the_line.sql`) runs the same
+  #75 (`20261013220000_claim_step_follows_the_line.sql`) runs the same
   function as `request_work` (`private.take_step`, which no API role
   executes) with the pick narrowed to the named step: it is granted only
   what `request_work` would grant that caller at that moment, so it keeps

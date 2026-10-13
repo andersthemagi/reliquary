@@ -77,7 +77,7 @@ create function t.lapse_step(p_path text, p_key text) returns void language sql 
    where plan_id = t.plan_id(p_path) and key = p_key
 $$;
 -- Someone outside the line is working p_key: Ana's claim, written as the
--- table owner, since claim_step keeps the caps (20261013180000) and the
+-- table owner, since claim_step keeps the caps (20261013220000) and the
 -- g/ rule lets her hold only two.
 create function t.occupy(p_path text, p_key text) returns void language sql as $$
   update public.work_plan_steps set status = 'claimed', fence = fence + 1, holder = t.id('ana'),

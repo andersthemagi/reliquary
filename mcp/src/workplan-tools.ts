@@ -1,7 +1,7 @@
 // Work plan MCP tools: register_work_plan, work_plan_status, request_work,
 // leave_queue, claim_step, checkin_step, complete_step, release_step
 // (20261002200000_work_plans.sql, 20261002210000_work_plan_checkin.sql,
-// 20261013170100_request_work.sql, 20261013180000_claim_step_follows_the_line.sql,
+// 20261013170100_request_work.sql, 20261013220000_claim_step_follows_the_line.sql,
 // docs/design.md "Claims and work plans", CL-3.4).
 //
 // Not here, on purpose: cancel_step, skip_step and reopen_step need a person
