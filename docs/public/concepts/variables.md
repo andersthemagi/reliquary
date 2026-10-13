@@ -10,12 +10,18 @@ Every vault starts with three environments: `development`, `preview` and `produc
 
 A vault's **Variables** page has up to four tabs:
 
-- **Values**: a table with a row per variable and a column per environment. The name column stays in place while wide tables scroll sideways. On a phone each variable is a block with a line per environment.
+- **Values**: your variables, with a view for all environments and one for each.
 - **Environments** (owners): each environment, how many values it holds and who can set it.
 - **Access log** (owners and editors): see [The access log](#the-access-log).
 - **Imports** (owners and editors): imports from the CLI waiting to be applied, counted on the tab. See [Imports](imports.md).
 
-In the Values table a value reads **Set** and how long ago; hover it for who set it, the exact time and how many times it has been set. **Not set** cells offer **Set**. Each value has one **⋯** menu with **Reveal**, **Change value** and **Delete**, for people whose role lets them.
+**Add a variable** and **Import .env** are at the top right of the page.
+
+On the Values tab, **All** shows a row per variable and a column per environment, each cell **Set** or **Not set** (hover **Set** for who set it, the exact time and how many times it has been set). A variable that isn't set in every environment says **Missing in** and names them, and a **Not set** cell offers **Set**. The name column stays in place while wide tables scroll sideways; on a phone each variable is a block with a line per environment.
+
+Choose an environment next to **All** to see one row per variable in it: **Set** or **Not set**, when it was last set and by whom, and one **⋯** menu with **Reveal**, **Change value** and **Delete**, for people whose role lets them.
+
+**How to use these**, folded under the table, has the command that runs a program with these values and the two things they can't protect against (see [Stated plainly](#stated-plainly)).
 
 ## Who can do what
 
@@ -53,7 +59,7 @@ The **Access log** tab on the Variables page lists every set, rotate, delete, re
 
 The row for a value that an applied [import](imports.md) set says where it came from, **from a pasted import** or **from a CLI import sent by** whoever sent it, so it doesn't look like one typed by hand.
 
-A value that someone has read or revealed since it was last set is marked **Read since set** (or **Revealed since set**) in the Values table. Its **⋯** menu names who, and after a CLI read offers **Manage connections** to revoke the Reliquary CLI that read it. When you rotate a leaked value, that tells you whose copies are old.
+A value that someone has read or revealed since it was last set is marked **Read since set** (or **Revealed since set**) in its environment's view on the Values tab. Its **⋯** menu names who, and after a CLI read offers **Manage connections** to revoke the Reliquary CLI that read it. When you rotate a leaked value, that tells you whose copies are old.
 
 ## Encryption
 

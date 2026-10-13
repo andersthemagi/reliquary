@@ -1,5 +1,6 @@
 // The Values tab of the Variables page (docs/variables.md, "Web: the
-// Variables page"): the grid of names by environment, and set/change,
+// Variables page"): the All view (names by environment) and one view per
+// environment (a row per variable, ?env=), and set/change,
 // delete and reveal for people whose role allows it. Every call goes
 // through src/variables.ts as the signed-in person, and the database
 // decides: this file only chooses what to offer. Split out of
@@ -24,6 +25,7 @@ import {
   pageHeader,
   raw,
   relativeTime,
+  tabs,
   time,
   utc,
   type MenuItem,
@@ -69,18 +71,30 @@ function readersOf(ctx: Ctx, rows: ReaderRow[]): Readers {
 // The environment's name as each cell carries it, for the stacked layout.
 const label = (e: Environment) => (e.ownersOnly ? `${e.name} (owners only)` : e.name);
 
-// One cell: "Set 6 min ago" ("by you" is read out, and shown on a phone;
-// who, the exact time and the version are in its title and at the top of
-// its menu), a "Read since set" mark when someone has, and one ⋯ menu with
-// Reveal, Change value and Delete; or "Not set" with a Set link.
-function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByCell: Readers | null, keyed: boolean): Raw {
+const setLink = (v: Vault, name: string, e: Environment) =>
+  html`<a class="button ghost var-add" href="${base(v.id, "/set")}${slotQuery(name, e.name)}" aria-label="Set ${name} in ${e.name}">Set</a>`;
+
+// One cell of the All view: Set or Not set and nothing more, so a gap shows
+// at a glance; who set it, when and the version stay in its title, and the
+// actions live on the environment's own view.
+function overviewCell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, keyed: boolean): Raw {
+  const value = variable.values.find((x) => x.environment === e.name);
+  if (!value) {
+    return html`<td data-label="${label(e)}"><div class="var-cell"><span class="var-none">Not set</span>${keyed && writes(v.role, e) ? setLink(v, variable.name, e) : ""}</div></td>`;
+  }
+  return html`<td data-label="${label(e)}"><div class="var-cell"><span class="var-set" title="Set by ${who(ctx, value.updatedBy, null)}, ${utc(value.updatedAt)} (version ${value.version})">Set</span></div></td>`;
+}
+
+// One row of an environment's view: the name, Set (with a mark when someone
+// read or revealed it since) or Not set, when and by whom, and one ⋯ menu
+// with Reveal, Change value and Delete; or Set where there's no value.
+function envRow(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByCell: Readers | null, keyed: boolean): Raw {
   const value = variable.values.find((x) => x.environment === e.name);
   const may = keyed && writes(v.role, e);
-  const where = `${variable.name} in ${e.name}`;
+  const name = html`<th scope="row" data-label="Name"><code>${variable.name}</code></th>`;
   if (!value) {
-    return html`<td data-label="${label(e)}"><div class="var-cell"><span class="var-none">Not set</span>${
-      may ? html`<a class="button ghost var-add" href="${base(v.id, "/set")}${slotQuery(variable.name, e.name)}" aria-label="Set ${where}">Set</a>` : ""
-    }</div></td>`;
+    return html`<tr>${name}<td data-label="Status"><span class="var-none">Not set</span></td><td data-label="Updated" class="muted">Never</td><td data-label="" class="var-row-end">${
+      may ? setLink(v, variable.name, e) : ""}</td></tr>`;
   }
   const readers = readersByCell?.get(slot(variable.name, e.name)) ?? { who: [], read: false };
   const setBy = who(ctx, value.updatedBy, null);
@@ -91,11 +105,9 @@ function cell(ctx: Ctx, v: Vault, variable: Variable, e: Environment, readersByC
     ...(readers.read ? [{ href: "/connections", label: "Manage connections", description: "Revoke the Reliquary CLI that read it" }] : []),
     { href: `${base(v.id, "/delete")}${slotQuery(variable.name, e.name)}`, label: "Delete", description: `Remove it from ${e.name}`, danger: true },
   ];
-  return html`<td data-label="${label(e)}"><div class="var-cell">
-    <span class="var-state" title="Set by ${setBy}, ${utc(value.updatedAt)} (version ${value.version})"><span class="var-set">Set</span> <span class="var-meta"><time datetime="${value.updatedAt.toISOString()}">${relativeTime(value.updatedAt)}</time><span class="var-by"> by ${setBy}</span></span>${
-      seen ? html`<span class="var-readers" title="Since it was set: ${seen}">${readers.read ? "Read since set" : "Revealed since set"}</span>` : ""}</span>
-    ${may ? menu({ label: `Actions for ${where}`, icon: "more", items, heading: `Set by ${setBy}, ${utc(value.updatedAt)}.${seen ? ` Since then: ${seen}.` : ""}` }) : ""}
-  </div></td>`;
+  return html`<tr>${name}<td data-label="Status"><span class="var-state" title="Set by ${setBy}, ${utc(value.updatedAt)} (version ${value.version})"><span class="var-set">Set</span>${
+    seen ? html`<span class="var-readers" title="Since it was set: ${seen}">${readers.read ? "Read since set" : "Revealed since set"}</span>` : ""}</span></td><td data-label="Updated" class="var-meta"><time datetime="${value.updatedAt.toISOString()}">${relativeTime(value.updatedAt)}</time> by ${setBy}</td><td data-label="" class="var-row-end">${
+    may ? menu({ label: `Actions for ${variable.name} in ${e.name}`, icon: "more", items, heading: `Set by ${setBy}, ${utc(value.updatedAt)}.${seen ? ` Since then: ${seen}.` : ""}` }) : ""}</td></tr>`;
 }
 
 // Imports from the CLI waiting, as one line on the Values tab.
@@ -115,10 +127,30 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
   if (!v) return notFound(ctx);
   const { environments, variables } = await listVariables(ctx.userId, id);
   const keyed = variablesConfigured();
-  const readers = readsLog(v.role) && variables.length ? readersOf(ctx, await readersSinceSet(ctx.userId, id)) : null;
+  // An unknown ?env= (a link from before a rename) shows All rather than not found.
+  const env = environments.find((e) => e.name === ctx.url.searchParams.get("env"));
+  const readers = env && readsLog(v.role) && variables.length ? readersOf(ctx, await readersSinceSet(ctx.userId, id)) : null;
   const canSet = keyed && environments.some((e) => writes(v.role, e));
   const ownersOnly = environments.filter((e) => e.ownersOnly).map((e) => e.name);
   const pushes = await waitingIn(ctx, v);
+  const envTabs = tabs(
+    [{ href: base(id), label: "All", current: !env }, ...environments.map((e) => ({ href: `${base(id)}?env=${q(e.name)}`, label: e.name, current: e === env }))],
+    "Environments",
+  );
+  const missing = (x: Variable) => environments.filter((e) => !x.values.some((y) => y.environment === e.name)).map((e) => e.name);
+  const table = env
+    ? html`<div class="table-wrap"><table class="table-stack var-list">
+        <thead><tr><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Updated</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>${variables.map((x) => envRow(ctx, v, x, env, readers, keyed))}</tbody></table></div>
+      ${env.ownersOnly ? html`<p class="small muted"><span class="badge var-owners">Owners only</span> ${OWNERS_ONLY_HELP}.</p>` : ""}`
+    : html`<div class="var-values"><div class="var-grid-wrap"><table class="var-grid">
+        <thead><tr><th scope="col">Name</th>${environments.map(
+          (e) => html`<th scope="col"><span class="var-env">${e.name}</span>${e.ownersOnly ? html` <span class="badge var-owners" title="${OWNERS_ONLY_HELP}">Owners only</span>` : ""}</th>`,
+        )}</tr></thead>
+        <tbody>${variables.map((x) => {
+          const gaps = missing(x);
+          return html`<tr><th scope="row"><code>${x.name}</code>${gaps.length ? html` <span class="badge warning var-missing">Missing in ${gaps.join(", ")}</span>` : ""}</th>${environments.map((e) => overviewCell(ctx, v, x, e, keyed))}</tr>`;
+        })}</tbody></table></div></div>`;
 
   const body = html`
     ${sectionHeader(v, "values", pushes.length, {
@@ -134,13 +166,7 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
         ? html`<p class="muted small">Only owners set, change, delete or reveal values in ${ownersOnly.join(", ")}.</p>`
         : ""}
     ${variables.length
-      ? html`<div class="var-values"><div class="var-grid-wrap"><table class="var-grid">
-        <thead><tr><th scope="col">Name</th>${environments.map(
-          (e) => html`<th scope="col"><span class="var-env">${e.name}</span>${e.ownersOnly ? html` <span class="badge var-owners" title="${OWNERS_ONLY_HELP}">Owners only</span>` : ""}</th>`,
-        )}</tr></thead>
-        <tbody>${variables.map(
-          (x) => html`<tr><th scope="row"><code>${x.name}</code></th>${environments.map((e) => cell(ctx, v, x, e, readers, keyed))}</tr>`,
-        )}</tbody></table></div></div>`
+      ? html`<div class="var-envtabs">${envTabs}</div>${table}`
       : emptyState({
           title: "No variables yet.",
           body: html`Keep your projects’ secrets here instead of in <code>.env</code> files passed around by hand. Each value is encrypted, and every set, read and reveal is logged.`,
@@ -148,14 +174,14 @@ export async function list(ctx: Ctx, id: string): Promise<Reply> {
         })}
     ${v.role === "viewer"
       ? ""
-      : html`<h2>Use them</h2>
+      : html`<details class="var-howto"><summary>How to use these</summary>
     <p>Run a command with this vault’s variables, without writing them to disk:</p>
-    <pre class="code">npx @reliquary-ai/cli run --env development -- &lt;command&gt;</pre>
-    <p class="small muted">The first time, <code>npx @reliquary-ai/cli login</code> connects the Reliquary CLI to your account. <code>env pull</code> writes a <code>.env</code> instead, only where git ignores it. Setup is on the <a href="/connect?client=cli">Connect</a> page.</p>`}
+    <pre class="code">npx @reliquary-ai/cli run --env ${env?.name ?? "development"} -- &lt;command&gt;</pre>
+    <p class="small muted">The first time, <code>npx @reliquary-ai/cli login</code> connects the Reliquary CLI to your account. <code>env pull</code> writes a <code>.env</code> instead, only where git ignores it. Setup is on the <a href="/connect?client=cli">Connect</a> page.</p>
     <div class="callout warning var-caveats">
       <p><strong>Agents can read what reaches them.</strong> An agent that runs commands where a value was delivered can read it. <code>run</code> limits a value to one process; prefer short-lived, narrowly scoped keys.</p>
       <p><strong>The hosted operator can decrypt.</strong> Values are encrypted with a key the database never sees, but whoever runs this server holds both.</p>
-    </div>`;
+    </div></details>`}`;
   return shell(ctx, v, "Variables", body);
 }
 

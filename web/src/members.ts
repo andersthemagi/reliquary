@@ -23,7 +23,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { callout, confirmPage, csrfField, emptyState, html, pageHeader, plural, raw, time, type Raw } from "./html.js";
+import { callout, confirmPage, csrfField, emptyState, html, menu, pageHeader, plural, raw, time, type Raw } from "./html.js";
 import { deliverInvite, INVITE_TOKEN, type Delivery, invitePageBody, inviteLink, peekInvite, ROLE_TEXT, roleName } from "./invites.js";
 import { publicSiteOrigin } from "./hosts.js";
 import { mailerOn } from "./mailer.js";
@@ -33,7 +33,7 @@ import { limit, tooManyPage } from "./ratelimit.js";
 import { message, notFound, render, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
 import { peopleFullNote, peopleLimited, peopleOver, placesText, vaultUsages, type VaultUsage } from "./plans.js";
-import { settingsCrumb, settingsHeader } from "./vaultadmin.js";
+import { dangerPath, settingsCrumb, settingsPage } from "./vaultadmin.js";
 
 const ROLES = ["viewer", "editor", "owner"] as const;
 const membersPath = (id: string, rest = "") => vaultPath(id, `/config/members${rest}`);
@@ -143,11 +143,10 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
         ? html`<button type="button" class="primary" disabled title="No places left: see below">Invite someone</button>`
         : html`<a class="button primary" href="${membersPath(id, "/invite")}">Invite someone</a>`;
 
-    return html`
-      ${settingsHeader(id, v, "members", {
+    return settingsPage(id, v, "members", {
         description: `The people in ${v.name} and what each can do.`,
         primary: invite,
-      })}
+      }, html`
       ${fresh
         ? fresh.email && fresh.delivery
           ? html`<div class="callout ${fresh.delivery.sent || !fresh.delivery.failure ? "success" : "warning"} reveal" role="status" id="invite-link">
@@ -182,7 +181,11 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
             ${owner
               ? html`<td class="num row-actions">${m.user_id === ctx.userId || (m.role === "owner" && owners <= 1)
                   ? ""
-                  : html`<a class="button quiet" href="${membersPath(id, `/remove?user=${m.user_id}`)}">Remove</a>`}</td>`
+                  : menu({
+                      label: `Actions for ${label(m)}`,
+                      icon: "more",
+                      items: [{ href: membersPath(id, `/remove?user=${m.user_id}`), label: "Remove", description: "Asks you to confirm first", danger: true }],
+                    })}</td>`
               : ""}</tr>`,
         )}</tbody>
       </table></div>
@@ -205,8 +208,8 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
                 title: "No invites waiting",
                 body: "An invite shows here until it is used, revoked, or expires after 7 days.",
               })}
-          <h2>Connections</h2>
-          <p class="section-lede">Each member’s connections that reach this vault: tokens, apps and the Reliquary CLI. Revoking one here cuts it off from ${v.name} only; the member’s other vaults keep it.</p>
+          <h2>Agents</h2>
+          <p class="section-lede">How each member’s agents reach this vault: tokens, apps and the Reliquary CLI. Revoking one here cuts it off from ${v.name} only; the member’s other vaults keep it.</p>
           ${conns.length
             ? html`<div class="table-wrap"><table class="table-stack token-list connection-list">
                 <thead><tr><th>Connection</th><th>Member</th><th>Access</th><th>Created</th><th>Last used</th><th><span class="sr-only">Actions</span></th></tr></thead>
@@ -222,10 +225,10 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
                 )}</tbody>
               </table></div>`
             : emptyState({
-                title: "No connections",
+                title: "No agents connected",
                 body: "When a member connects a token, an app or the Reliquary CLI with access to this vault, it shows here.",
               })}`
-        : ""}`;
+        : ""}`);
   });
 }
 
@@ -461,13 +464,13 @@ async function revokeConnection(ctx: Ctx, id: string, tid: string): Promise<Repl
 
 // ---------------------------------------------------------------------------
 // Leaving a vault (public.leave_vault: a member, in person; the last owner
-// can't). The Danger zone tab links here; GET confirms, POST leaves.
+// can't). General's Danger zone links here; GET confirms, POST leaves.
 
 async function leavePage(ctx: Ctx, id: string): Promise<Reply> {
   return shell(ctx, id, "Leave vault", async (c, v) => {
     const owners = (await c.query(`select count(*)::int as n from public.vault_members where vault_id = $1 and role = 'owner'`, [id]))
       .rows[0].n as number;
-    const where = settingsCrumb(id, v, { label: "Danger zone", href: vaultPath(id, "/config/danger") }, { label: "Leave" });
+    const where = settingsCrumb(id, v, { label: "Danger zone", href: dangerPath(id) }, { label: "Leave" });
     if (v.role === "owner" && owners <= 1) {
       return html`${pageHeader({ crumb: where, title: `Leave ${v.name}` })}${callout(
         "info",
@@ -482,7 +485,7 @@ async function leavePage(ctx: Ctx, id: string): Promise<Reply> {
       action: vaultPath(id, "/config/leave"),
       csrf: ctx.csrf,
       button: `Leave ${v.name}`,
-      cancel: vaultPath(id, "/config/danger"),
+      cancel: dangerPath(id),
     });
   });
 }
@@ -500,7 +503,7 @@ async function leave(ctx: Ctx, id: string): Promise<Reply> {
     return { redirect: "/" };
   } catch (err) {
     ctx.setFlash(message(err));
-    return { redirect: vaultPath(id, "/config/danger") };
+    return { redirect: dangerPath(id) };
   }
 }
 
