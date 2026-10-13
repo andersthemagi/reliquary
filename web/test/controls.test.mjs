@@ -144,8 +144,9 @@ test("review: a row's risk badge names the first reason, not a bare count", asyn
   const h = await page("/inbox");
   assert.doesNotMatch(h, /\d+ to check/);
   assert.match(h, /<span class="badge attention risk-count" title="[^"]+">(Deletes the file|Removes \d+ of \d+ lines|Rewrites \d+ of \d+ lines|Revised [^<]+|First proposal [^<]+)( \+\d+ more)?<\/span>/);
-  // Creating a file is not a risk: a neutral label, never the amber badge.
-  assert.match(h, /<span class="badge">New file<\/span>/);
+  // Creating a file is not a risk: the title says Create, and no amber badge.
+  assert.match(h, /<a class="name" href="[^"]+">Create [^<]+<\/a>/);
+  assert.doesNotMatch(h, /<span class="badge">New file<\/span>/, "the row's title already says Create");
   assert.doesNotMatch(h, /risk-count"[^>]*>Creates a new file/);
 });
 

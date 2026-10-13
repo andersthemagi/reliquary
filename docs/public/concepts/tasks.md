@@ -94,12 +94,12 @@ If the plan file is edited after it was registered, its card says **Changed sinc
 
 ### One plan
 
-Select a plan to see every task in it, grouped so what needs attention comes first: Awaiting review, In progress, Ready, Blocked, Cancelled. Done tasks are folded away at the bottom under **Done**; select it to see them. Each task is one row: a circle whose shape shows its state at a glance, the state in words (so no state depends on colour or shape alone), and its title. Keys are for agents and the plan file, so rows show titles only.
+Select a plan to see every task in it, grouped so what needs attention comes first: Awaiting review, In progress, Ready, Blocked, Cancelled. Done tasks are folded away at the bottom under **Done**; select it to see them. Each task is one row: a circle whose shape shows its state at a glance, and its title. The group's heading says the state in words, so no state depends on colour or shape alone, and a screen reader hears it at the start of each row. Under the title, one quiet line gathers the task's facts. Keys are for agents and the plan file, so rows show titles only.
 
-- An in-progress task has a chip saying who holds it: **you**, a person, or a person's agent ("Ana via Claude Code"). The line under it gives the label they gave it and how long is left. The label is whatever the holder wrote, such as "cleaning the rows". It is a note, never proof of who is working on the task, and the page shows it in quotes for that reason.
+- An in-progress task's line starts with who holds it: **you**, a person, or a person's agent ("Ana via Claude Code"), then the label they gave it and how long is left. The label is whatever the holder wrote, such as "cleaning the rows". It is a note, never proof of who is working on the task, and the page shows it in quotes for that reason.
 - A blocked task says **Blocked by** and names the tasks it waits on, marking any awaiting review.
 - A task awaiting review says who finished it, and links its proposal if its agent linked one.
-- A task with a priority shows **P1** to **P4** in words and colour, and one with a due date shows it. Once the date has ended everywhere in the world and the task isn't done or cancelled, it says **Overdue**. The page doesn't know your time zone, so in the furthest east it can say so up to a day late, never early.
+- A task with a priority shows **P1** to **P4** on its line, with only P1 and P2 in colour, and one with a due date shows it. Once the date has ended everywhere in the world and the task isn't done or cancelled, it says **Overdue, due** and the date, in red. The page doesn't know your time zone, so in the furthest east it can say so up to a day late, never early.
 - The line under a task says who it is meant for (**for agents**, **for people**, or the member) and its notes.
 
 The page shows the plan as it is when you open it. Reload to see changes.

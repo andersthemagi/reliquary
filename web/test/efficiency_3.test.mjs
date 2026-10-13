@@ -136,7 +136,7 @@ test("waiting lists: Review and Home show each proposal's quorum from its own va
   });
   const review = await page("/inbox");
   const row = (vault, path) => {
-    const m = new RegExp(`href="/v/${vault}/proposals/[^"]+">Create ${path.split("/").pop().replace(".", "\\.")}</a>\\s*<span class="review-meta small"><span class="path-chip">${path.replace(".", "\\.")}</span>[\\s\\S]*?(\\d+) of (\\d+)`).exec(review);
+    const m = new RegExp(`href="/v/${vault}/proposals/[^"]+">Create ${path.split("/").pop().replace(".", "\\.")}</a>\\s*<span class="review-meta small">${path.includes("/") ? `<span class="path-chip">${path.replace(".", "\\.")}</span>` : ""}[\\s\\S]*?(\\d+) of (\\d+)`).exec(review);
     assert.ok(m, `${path} is listed`);
     return `${m[1]} of ${m[2]}`;
   };

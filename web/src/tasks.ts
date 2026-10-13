@@ -243,15 +243,6 @@ const STATE_LABEL: Record<Task["state"], string> = {
   cancelled: "Cancelled",
   done: "Done",
 };
-const STATE_TONE: Record<Task["state"], string> = {
-  awaiting_review: "warning",
-  claimed: "info",
-  ready: "success",
-  blocked: "warning",
-  blocked_by_cancelled: "danger",
-  cancelled: "",
-  done: "",
-};
 type Group = { id: string; title: string; states: Task["state"][] };
 const GROUPS: Group[] = [
   { id: "awaiting-review", title: "Awaiting review", states: ["awaiting_review"] },
@@ -282,15 +273,18 @@ const pressing = (a: Task, b: Task) =>
 const overdue = (t: Task, now = Date.now()) =>
   !!t.due && unfinished(t) && t.due < new Date(now - 12 * 3600_000).toISOString().slice(0, 10);
 
-const PRIORITY_TONE = ["", "danger", "warning", "info", ""];
-
-// A task's planning lines (docs/design.md item 13): priority as a word
-// with its colour, the due date, and Overdue in words once it has passed.
-function planning(t: Task): Raw | "" {
-  if (!t.priority && !t.due) return "";
-  return html`${t.priority ? html`<span class="badge${PRIORITY_TONE[t.priority] ? ` ${PRIORITY_TONE[t.priority]}` : ""}" title="Priority ${t.priority}, 1 is highest">P${t.priority}</span>` : ""}${
-    t.due ? html`<span class="task-due">Due <time datetime="${t.due}">${t.due}</time></span>` : ""}${
-    overdue(t) ? html`<span class="badge danger">Overdue</span>` : ""}`;
+// A task's planning facts for its quiet line (docs/design.md item 13): the
+// priority, coloured only at P1 and P2, and the due date, which says
+// Overdue in words once it has passed.
+function planning(t: Task): Raw[] {
+  return [
+    ...(t.priority ? [html`<span class="task-prio p${t.priority}" title="Priority ${t.priority}, 1 is highest">P${t.priority}</span>`] : []),
+    ...(t.due
+      ? [overdue(t)
+          ? html`<span class="task-due overdue">Overdue, due <time datetime="${t.due}">${t.due}</time></span>`
+          : html`<span class="task-due">Due <time datetime="${t.due}">${t.due}</time></span>`]
+      : []),
+  ];
 }
 
 // Who the plan meant a task for: a hint, never who may take it.
@@ -345,9 +339,10 @@ const unfinished = (t: Task) => t.state !== "done" && t.state !== "cancelled";
 const VERBS = ["cancel", "skip", "reopen", "approve"] as const;
 type Verb = (typeof VERBS)[number];
 
-// One task as a compact row: its state in words (never colour alone), its
-// title, a chip for who holds it, and a quiet line under it. On the Tasks
-// page (`plan` given) the line also names the plan; on a plan's page, whoever
+// One task as a compact row: its state as the dot's shape under a heading
+// that names it (never colour alone), its title, then one quiet line of
+// facts: who holds it, priority, due date, who it's for, notes, what it
+// waits on. On the Tasks page (`plan` given) the line starts with the plan; on a plan's page, whoever
 // can write the plan file gets the row's actions (`canAct`). Approve is the
 // one visible button: it is the action a task awaiting review is waiting for.
 function taskRow(ctx: Ctx, id: string, t: Task, o: { plan?: string; canAct?: boolean }): Raw {
@@ -369,16 +364,22 @@ function taskRow(ctx: Ctx, id: string, t: Task, o: { plan?: string; canAct?: boo
       : t.state === "cancelled"
         ? html`<a class="button quiet" href="${href("reopen")}" aria-label="Reopen the task ${t.title}">Reopen</a>`
         : "";
+  // The state is the group's heading and the dot's shape; its words are
+  // still here for screen readers, which skip the dot.
+  const facts: (Raw | string)[] = [
+    ...(o.plan ? [html`<a href="${planPath(id, t.plan)}">${o.plan}</a>`] : []),
+    ...(t.state === "claimed" ? [html`<span class="task-holder">${who(ctx, t.holder, t.agent)}</span>`] : []),
+    ...planning(t),
+    ...meta,
+    ...(line ? [line] : []),
+  ];
   // A key is unique only within its plan, so only a plan's page gives rows an id.
   return html`<li class="task-row"${o.plan ? "" : html` id="task-${t.key}"`}><div class="task-line">
-      <span class="task-dot ${t.state}" aria-hidden="true"></span><span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span>
+      <span class="task-dot ${t.state}" aria-hidden="true"></span><span class="sr-only">${STATE_LABEL[t.state]}:</span>
       <strong class="task-title">${t.title}</strong>
-      ${t.state === "claimed" ? html`<span class="chip task-holder">${who(ctx, t.holder, t.agent)}</span>` : ""}
       ${t.moved.length ? html`<span class="badge warning">A file it cites changed</span>` : ""}
-      ${planning(t)}
       ${actions}</div>
-    ${o.plan || line || meta.length ? html`<p class="task-meta">${o.plan ? html`<a href="${planPath(id, t.plan)}">${o.plan}</a>${line || meta.length ? " · " : ""}` : ""}${line}${
-      line && meta.length ? " · " : ""}${meta.map((m, i) => html`${i ? " · " : ""}${m}`)}</p>` : ""}
+    ${facts.length ? html`<p class="task-meta">${facts.map((f, i) => html`${i ? " · " : ""}${f}`)}</p>` : ""}
     ${moved(id, t)}</li>`;
 }
 

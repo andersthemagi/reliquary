@@ -1,6 +1,7 @@
 // A vault's Overview, the page /v/:id opens on (issue #261): what is waiting
 // on the reader, what is being worked on and by whom, what changed lately and
-// who is here, each a card linking to its full page, then the root README.
+// who is here, each a short list or a fact linking to its full page, then
+// the root README.
 // Built only from what the other pages already read (owner, 2026-10-13: no
 // generated summary), as the signed-in person, so RLS decides what shows.
 // Nothing here marks a flag shown: the count reads list_flags without
@@ -19,11 +20,11 @@ import { filePath, notFound, proposalPath, render, vault, vaultPath, WAITING_SQL
 // connection of any kind yet. The age bound is the dismiss, so someone who
 // never connects an agent isn't pointed at Connect on every visit, forever.
 const NUDGE_DAYS = 14;
+// One line: Connect an agent is already the header's button.
 const CONNECT_NUDGE = callout(
   "info",
-  html`<p>Your agents read and propose to your vaults once they’re connected. It takes about a minute.</p>
-    <p class="callout-actions"><a class="button primary" href="/connect">Connect an agent</a></p>`,
-  { title: "Next: connect an agent" },
+  html`<p><strong>Next: connect an agent.</strong> It reads and proposes here once it’s connected, about a minute to set up. <a href="/connect">Connect an agent</a></p>`,
+  { id: "connect-nudge" },
 );
 
 // How many rows a card lists before its See all link is the way on.
@@ -98,12 +99,12 @@ async function held(c: pg.PoolClient, id: string): Promise<Held[]> {
   ).rows;
 }
 
-// One card: its title, a See all link to the full page, then its body.
-function card(title: string, href: string, body: Raw): Raw {
-  return html`<li class="card overview-card">
-    <div class="card-head"><h2 class="card-title">${title}</h2><a class="see-all" href="${href}" aria-label="See all: ${title}">See all</a></div>
+// One section: its heading with a See all link to the full page, then its rows.
+function section(title: string, href: string, body: Raw): Raw {
+  return html`<section class="overview-section" aria-label="${title}">
+    <div class="section-head"><h2>${title}</h2><a class="see-all" href="${href}" aria-label="See all: ${title}">See all</a></div>
     ${body}
-  </li>`;
+  </section>`;
 }
 
 const verb = (p: Waiting) => (p.kind === "delete" ? "Delete" : p.current_body === null ? "Create" : "Change");
@@ -118,19 +119,30 @@ export async function overview(ctx: Ctx, id: string): Promise<Reply> {
     const writer = await writablePath(c, v, "");
 
     const quiet = (line: string) => html`<p class="muted">${line}</p>`;
-    const waiting = html`${f.waiting.length
-      ? html`<ul class="card-list">${f.waiting.map(
-          (p) => html`<li><a href="${proposalPath(id, p.id)}">${verb(p)} ${p.path}</a> <span class="muted">· ${who(ctx, p.proposed_by, p.agent)} · ${time(p.created_at)}</span></li>`,
-        )}</ul>${f.waiting_n > f.waiting.length ? html`<p class="small muted">and ${f.waiting_n - f.waiting.length} more</p>` : ""}`
-      : f.flags ? "" : quiet("Nothing is waiting on you.")}${f.flags ? html`<p class="small"><a href="${vaultPath(id, "/changes")}">${f.flags_more ? "More than " : ""}${plural(f.flags, "unread flag")}</a></p>` : ""}`;
-    const progress = html`${tasks.length
-      ? html`<ul class="card-list">${tasks.slice(0, ROWS).map(
-          (t) => html`<li><a href="${planPath(id, t.plan)}">${t.title}</a> <span class="chip task-holder">${who(ctx, t.holder, t.agent)}</span></li>`,
-        )}</ul>${tasks.length > ROWS ? html`<p class="small muted">and ${tasks.length - ROWS} more</p>` : ""}`
-      : quiet("Nobody is working on a task.")}${f.ready ? html`<p class="small">${plural(f.ready, "task")} ready to pick up</p>` : ""}`;
+    const more = (n: number) => (n > 0 ? html`<p class="small muted">and ${n} more</p>` : "");
+    const waiting = f.waiting.length
+      ? section(
+          "Waiting on you",
+          vaultPath(id, "/proposals"),
+          html`<ul class="overview-list">${f.waiting.map(
+            (p) => html`<li><a href="${proposalPath(id, p.id)}">${verb(p)} ${p.path}</a> <span class="muted">${who(ctx, p.proposed_by, p.agent)} · ${time(p.created_at)}</span></li>`,
+          )}</ul>${more(f.waiting_n - f.waiting.length)}`,
+        )
+      : "";
+    const progress = tasks.length
+      ? html`<ul class="overview-list">${tasks.slice(0, ROWS).map(
+          (t) => html`<li><a href="${planPath(id, t.plan)}">${t.title}</a> <span class="muted">${who(ctx, t.holder, t.agent)}</span></li>`,
+        )}</ul>${more(tasks.length - ROWS)}`
+      : quiet("Nobody is working on a task.");
+    // The vault at a glance, one line: each fact links to where it's managed.
     const members = Object.values(f.roles).reduce((a, b) => a + b, 0);
-    const people = html`<p>${plural(members, "member")}: ${ROLES.filter((r) => f.roles[r]).map((r) => plural(f.roles[r], r)).join(", ")}</p>
-      <p class="muted">${v.role === "owner" ? `${plural(f.connections, "agent connection")} to this vault` : `Your agents: ${plural(f.connections, "connection")} to this vault`}</p>`;
+    const glance = [
+      f.waiting.length ? null : html`<span>Nothing waiting on you</span>`,
+      f.flags ? html`<a href="${vaultPath(id, "/changes")}">${f.flags_more ? "More than " : ""}${plural(f.flags, "unread flag")}</a>` : null,
+      f.ready ? html`<a href="${tasksPath(id)}">${plural(f.ready, "task")} ready to pick up</a>` : null,
+      html`<a href="${vaultPath(id, "/config/members")}" title="${ROLES.filter((r) => f.roles[r]).map((r) => plural(f.roles[r], r)).join(", ")}">${plural(members, "member")}</a>`,
+      html`<a href="/connect">${v.role === "owner" ? plural(f.connections, "agent connection") : `Your agents: ${plural(f.connections, "connection")}`}</a>`,
+    ].filter((x) => x !== null);
 
     const body = html`
       ${pageHeader({
@@ -140,14 +152,14 @@ export async function overview(ctx: Ctx, id: string): Promise<Reply> {
         // shows (owner, 2026-10-13): the header is where people look for it.
         secondary: html`<a class="button vault-search-link" href="${vaultPath(id, "/search")}">Search</a> <a class="button" href="/connect">Connect an agent</a>`,
         primary: writer ? html`<a class="button primary" href="${vaultPath(id, "/new")}">New file</a>` : "",
+        meta: html`<p class="overview-glance">${glance.map((x, i) => html`${i ? html`<span class="sep" aria-hidden="true">·</span>` : ""}${x}`)}</p>`,
       })}
       ${writer && f.young && !f.connected ? CONNECT_NUDGE : ""}
-      <ul class="card-grid overview-grid">
-        ${card("Waiting on you", vaultPath(id, "/proposals"), waiting)}
-        ${card("Tasks in progress", tasksPath(id), progress)}
-        ${card("Recent changes", vaultPath(id, "/changes"), changes ?? quiet("Nothing has changed yet."))}
-        ${card("People", vaultPath(id, "/config/members"), people)}
-      </ul>
+      ${waiting}
+      <div class="overview-cols">
+        ${section("In progress", tasksPath(id), progress)}
+        ${section("Recent changes", vaultPath(id, "/changes"), changes ?? quiet("Nothing has changed yet."))}
+      </div>
       ${f.readme && f.readme_path
         ? html`<section class="readme" aria-label="${f.readme_path}"><p class="readme-head"><a href="${filePath(id, f.readme_path)}">${f.readme_path}</a></p><div class="prose entry">${raw(renderMarkdown(f.readme))}</div></section>`
         : ""}`;

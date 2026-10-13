@@ -204,11 +204,11 @@ test("tasks page: opens on what is open across every plan, in progress, ready to
   const row = (g, title) => section(g).split('<li class="task-row">').find((r) => r.includes(`<strong class="task-title">${title}</strong>`));
   const launch = new RegExp(`<p class="task-meta"><a href="${tasksUrl(V.main)}/plan\\?path=plans%2Flaunch\\.md">plans/launch\\.md</a>`);
   assert.match(row("open-in-progress", "Clean it"), launch);
-  assert.match(row("open-in-progress", "Clean it"), /<span class="chip task-holder">edda@example\.test<\/span>/);
+  assert.match(row("open-in-progress", "Clean it"), /<span class="task-holder">edda@example\.test<\/span>/);
   assert.match(row("open-in-progress", "Held task"), /plans\/work\.md<\/a>/);
   assert.match(row("open-ready", "The only task"), /plans\/second\.md<\/a>/);
-  assert.match(row("open-blocked", "After the side job"), /<span class="badge danger">Blocked by a cancelled task<\/span>/);
-  assert.match(row("open-blocked", "Ship it"), /<span class="badge warning">Blocked<\/span>/);
+  assert.match(row("open-blocked", "After the side job"), /<span class="sr-only">Blocked by a cancelled task:<\/span>/);
+  assert.match(row("open-blocked", "Ship it"), /<span class="sr-only">Blocked:<\/span>/);
   assert.ok(section("open-blocked").indexOf("After the side job") < section("open-blocked").indexOf("Ship it"), "blocked by a cancelled task first");
   for (const title of ["Fetch the data", "Side job", "Done thing"]) assert.doesNotMatch(h, new RegExp(`<strong class="task-title">${title}</strong>`), `${title} is finished`);
   assert.doesNotMatch(h, /id="task-/, "keys repeat across plans, so no row ids here");
@@ -282,24 +282,24 @@ test("plan page: a task an agent holds shows a chip naming the person and their 
   await as(NOA, "select public.claim_step($1, 'plans/agent.md', 'one', null)", [v], { sub: "tok-1", name: "Claude Code" });
   await claim(NOA, v, "plans/agent.md", "two", null);
   const h = await page(noa, planUrl(v, "plans/agent.md"));
-  assert.match(taskRow(h, "one"), /<span class="chip task-holder">you via Claude Code<\/span>/);
-  assert.match(taskRow(h, "two"), /<span class="chip task-holder">you<\/span>/);
-  assert.match(await page(noa, tasksUrl(v)), /<span class="chip task-holder">you via Claude Code<\/span>/, "and on the Tasks page");
+  assert.match(taskRow(h, "one"), /<span class="task-holder">you via Claude Code<\/span>/);
+  assert.match(taskRow(h, "two"), /<span class="task-holder">you<\/span>/);
+  assert.match(await page(noa, tasksUrl(v)), /<span class="task-holder">you via Claude Code<\/span>/, "and on the Tasks page");
 });
 
 test("plan page: every task's state is a word in its row, not only a colour", async () => {
   const h = await page(noa, planUrl(V.main, "plans/launch.md"));
   const states = { clean: "In progress", check: "Ready", ship: "Blocked", after: "Blocked by a cancelled task", side: "Cancelled", fetch: "Done" };
   for (const [key, label] of Object.entries(states)) {
-    assert.match(taskRow(h, key), new RegExp(`<div class="task-line">\\s*<span class="task-dot [a-z_]+" aria-hidden="true"></span><span class="badge[^"]*">${label}</span>`), key);
+    assert.match(taskRow(h, key), new RegExp(`<div class="task-line">\\s*<span class="task-dot [a-z_]+" aria-hidden="true"></span><span class="sr-only">${label}:</span>`), key);
   }
-  assert.equal(h.match(/<div class="task-line">\s*<span class="task-dot [a-z_]+" aria-hidden="true"><\/span><span class="badge/g).length, 6, "a state for every task, its shape hidden from screen readers");
+  assert.equal(h.match(/<div class="task-line">\s*<span class="task-dot [a-z_]+" aria-hidden="true"><\/span><span class="sr-only">/g).length, 6, "a state for every task, its shape hidden from screen readers");
 });
 
 test("plan page: a task in progress names who holds it, quotes the label as data, and shows the time left", async () => {
   const row = taskRow(await page(noa, planUrl(V.main, "plans/launch.md")), "clean");
-  assert.match(row, /<span class="chip task-holder">edda@example\.test<\/span>/);
-  assert.match(row, /<p class="task-meta">“&lt;b&gt;cleaning&lt;\/b&gt; the rows” · Time left: <time [^>]*>in 2 days<\/time><\/p>/, "the label is text, in quotes");
+  assert.match(row, /<span class="task-holder">edda@example\.test<\/span>/);
+  assert.match(row, /<p class="task-meta"><span class="task-holder">edda@example\.test<\/span> · “&lt;b&gt;cleaning&lt;\/b&gt; the rows” · Time left: <time [^>]*>in 2 days<\/time><\/p>/, "the label is text, in quotes");
 });
 
 test("plan page: a blocked task names what it waits on", async () => {
@@ -326,7 +326,7 @@ test("plan page: a lapsed claim reads as ready again, and says why", async () =>
     [V.main],
   );
   const h = await page(noa, planUrl(V.main, "plans/launch.md"));
-  assert.match(taskRow(h, "clean"), /<span class="badge success">Ready<\/span>/);
+  assert.match(taskRow(h, "clean"), /<span class="sr-only">Ready:<\/span>/);
   assert.match(taskRow(h, "clean"), /Its last claim ran out, so it can be taken again\./);
   assert.match(await page(noa, tasksUrl(V.main)), /<strong>1 of 6 done<\/strong> <span class="muted">· 2 ready · 2 blocked · 1 cancelled<\/span>/);
 });
@@ -450,7 +450,7 @@ test("cancel: confirming cancels it, says so as a success, logs it, and what wai
   assert.deepEqual(flashOf(h), ["success", "status", "“Draft” is cancelled. Tasks waiting on it stay blocked until a person reopens it, or cancels or skips them."]);
   assert.equal((await stepOf("a")).status, "cancelled");
   assert.deepEqual(await logged("step.cancel"), [{ path: WORK, actor: NOA, step: "a" }]);
-  assert.match(taskRow(h, "a"), /<span class="badge">Cancelled<\/span>/);
+  assert.match(taskRow(h, "a"), /<span class="sr-only">Cancelled:<\/span>/);
   assert.match(taskRow(h, "b"), /Blocked by a cancelled task: Draft\./);
   assert.doesNotMatch(taskRow(h, "a"), /Cancel<\/a>|Skip<\/a>/, "no more actions on it");
 });
@@ -491,7 +491,7 @@ test("skip: confirming marks it done, the task that waited on it is ready, and i
   const h = await landed(noa, await post(noa, action, fields));
   assert.deepEqual(flashOf(h), ["success", "status", "“Outline” is skipped and counts as done. Tasks that were waiting only on it are ready now."]);
   assert.equal((await stepOf("c")).status, "done");
-  assert.match(taskRow(h, "d"), /<span class="badge success">Ready<\/span>/);
+  assert.match(taskRow(h, "d"), /<span class="sr-only">Ready:<\/span>/);
   assert.deepEqual(await logged("step.skip"), [{ path: WORK, actor: NOA, step: "c" }]);
 });
 
@@ -575,8 +575,8 @@ test("reopen: confirming reopens it, says so as a success, logs it, and what wai
     await sql("select actor, detail->>'step' as step from public.log where vault_id = $1 and path = $2 and event = 'step.reopen' order by seq", [V.main, REOPEN]),
     [{ actor: NOA, step: "drop" }],
   );
-  assert.match(taskRow(h, "drop"), /<span class="badge warning">Blocked<\/span>/);
-  assert.match(taskRow(h, "next"), /<span class="badge warning">Blocked<\/span>/);
+  assert.match(taskRow(h, "drop"), /<span class="sr-only">Blocked:<\/span>/);
+  assert.match(taskRow(h, "next"), /<span class="sr-only">Blocked:<\/span>/);
   assert.match(taskRow(h, "next"), /Blocked by Dropped work\./);
 });
 
@@ -586,7 +586,7 @@ test("reopen: a cancelled task with nothing unfinished to wait on says it will b
   assert.match(h, /<li>Nothing it waits on is unfinished, so it is ready for an agent to take\.<\/li>/);
   assert.match(h, /<li>No other task is waiting on it\.<\/li>/);
   const { action, fields } = formFields(h, "Reopen “Solo work”");
-  assert.match(taskRow(await landed(noa, await post(noa, action, fields)), "solo"), /<span class="badge success">Ready<\/span>/);
+  assert.match(taskRow(await landed(noa, await post(noa, action, fields)), "solo"), /<span class="sr-only">Ready:<\/span>/);
 });
 
 test("reopen: a task that isn't cancelled goes back with a warning, and a crafted form is refused with a reference and changes nothing", async () => {
@@ -612,7 +612,7 @@ test("context moved: a task citing a file with a newer version says a file it ci
 
   await as(EDDA, "select public.write_file($1, 'notes/moved.md', 'second')", [V.main]);
   const row = taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses");
-  assert.match(row, /<span class="badge success">Ready<\/span>[\s\S]*<span class="badge warning">A file it cites changed<\/span>/);
+  assert.match(row, /<span class="sr-only">Ready:<\/span>[\s\S]*<span class="badge warning">A file it cites changed<\/span>/);
   assert.match(row, new RegExp(`A file it cites changed: <a href="/v/${V.main}/file\\?path=notes%2Fmoved\\.md">notes/moved\\.md</a> has a newer version than the one this task cites\\.`));
 
   const flags = await page(noa, `/v/${V.main}/changes`);
@@ -640,8 +640,8 @@ test("plan gains tasks: registering the changed file again clears the marker, ad
   assert.match(planCard(list, path), /<span class="muted">Unchanged<\/span>/);
   assert.match(list, /1 of 2 done/);
   const h = await page(noa, planUrl(v, path));
-  assert.match(taskRow(h, "first"), /<span class="badge">Done<\/span>/);
-  assert.match(taskRow(h, "second"), /<span class="badge success">Ready<\/span>/);
+  assert.match(taskRow(h, "first"), /<span class="sr-only">Done:<\/span>/);
+  assert.match(taskRow(h, "second"), /<span class="sr-only">Ready:<\/span>/);
 });
 
 // ---------------------------------------------------------------------------
@@ -762,7 +762,7 @@ test("review gate: the list counts a task awaiting review, and the plan shows it
   const h = await page(noa, planUrl(v, GATE));
   assert.ok(h.indexOf('<h2 id="g-awaiting-review">Awaiting review <span class="muted">2</span></h2>') < h.indexOf('<h2 id="g-ready">'), "awaiting review comes first");
   const row = taskRow(h, "brief");
-  assert.match(row, /<span class="badge warning">Awaiting review<\/span>/);
+  assert.match(row, /<span class="sr-only">Awaiting review:<\/span>/);
   assert.match(row, /Finished by you, and waiting for a person who can write the plan’s file to approve it\. The tasks waiting on it start only then\. You can approve it\./);
   assert.match(taskRow(h, "build"), /Blocked by Write the brief \(awaiting review\)\./);
 });
@@ -808,8 +808,8 @@ test("review gate: confirming approves it, says so as a success, logs it, and wh
     await sql("select actor, detail->>'step' as step from public.log where vault_id = $1 and path = $2 and event = 'step.approve' order by seq", [v, GATE]),
     [{ actor: NOA, step: "brief" }],
   );
-  assert.match(taskRow(h, "brief"), /<span class="badge">Done<\/span>/);
-  assert.match(taskRow(h, "build"), /<span class="badge success">Ready<\/span>/);
+  assert.match(taskRow(h, "brief"), /<span class="sr-only">Done:<\/span>/);
+  assert.match(taskRow(h, "build"), /<span class="sr-only">Ready:<\/span>/);
 });
 
 test("review gate: a task not awaiting review goes back with a warning, and a crafted form is refused with a reference and changes nothing", async () => {
@@ -855,13 +855,13 @@ test("planning: a task row shows its priority as a word with its colour, its due
   ]);
   const h = await page(noa, planUrl(v, path));
   const hi = taskRow(h, "hi");
-  assert.match(hi, /<span class="badge danger" title="Priority 1, 1 is highest">P1<\/span>/);
+  assert.match(hi, /<span class="task-prio p1" title="Priority 1, 1 is highest">P1<\/span>/);
   assert.match(hi, /Due <time datetime="2999-01-01">2999-01-01<\/time>/);
-  assert.match(hi, /<p class="task-meta">for edda@example\.test · &lt;b&gt;not markup&lt;\/b&gt; &amp; kept<\/p>/);
+  assert.match(hi, /<p class="task-meta"><span class="task-prio p1"[^>]*>P1<\/span> · <span class="task-due">Due <time datetime="2999-01-01">2999-01-01<\/time><\/span> · for edda@example\.test · &lt;b&gt;not markup&lt;\/b&gt; &amp; kept<\/p>/);
   assert.doesNotMatch(hi, /Overdue/);
   assert.match(taskRow(h, "ag"), /<p class="task-meta">for agents<\/p>/);
   assert.match(taskRow(h, "pe"), />P4<\/span>/);
-  assert.match(taskRow(h, "pe"), /<p class="task-meta">for people<\/p>/);
+  assert.match(taskRow(h, "pe"), /<p class="task-meta"><span class="task-prio p4"[^>]*>P4<\/span> · for people<\/p>/);
 });
 
 test("planning: a task past its due date says Overdue in words; one due later, or done, doesn't", async () => {
@@ -875,7 +875,7 @@ test("planning: a task past its due date says Overdue in words; one due later, o
   const c = await claim(NOA, v, path, "finished", null);
   await as(NOA, "select public.complete_step($1, $2, 'finished', $3, $4)", [v, path, c.o_fence, c.o_secret]);
   const h = await page(noa, planUrl(v, path));
-  assert.match(taskRow(h, "late"), /<span class="badge danger">Overdue<\/span>/);
+  assert.match(taskRow(h, "late"), /<span class="task-due overdue">Overdue, due <time datetime="2020-01-01">2020-01-01<\/time><\/span>/);
   assert.doesNotMatch(taskRow(h, "later"), /Overdue/);
   assert.doesNotMatch(taskRow(h, "finished"), /Overdue/);
 });

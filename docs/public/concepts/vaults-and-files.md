@@ -32,14 +32,13 @@ The refusal says which rule the path broke. In the web app the same form comes b
 
 ## A vault's overview
 
-A vault opens on its **Overview**, the first item in its sidebar: a start-here page for someone joining mid-project. The top has **Connect an agent** and, if you can write, **New file**. Under it are four cards, each with **See all** for the full page:
+A vault opens on its **Overview**, the first item in its sidebar: a start-here page for someone joining mid-project. The top has **Connect an agent** and, if you can write, **New file**. Under the vault's name is one line of facts, each a link: **Nothing waiting on you** (or how many [flags](flags.md) you haven't seen), how many [tasks](tasks.md) are ready to pick up, how many members (by role when you point at it), and agent connections. An owner sees every member's connections to the vault; everyone else sees their own. Under it are short lists, each with **See all** for the full page:
 
-- **Waiting on you**: proposals waiting for your review, oldest first, and how many [flags](flags.md) you haven't seen. Opening the overview doesn't mark flags seen; only the **Flags** page does.
-- **Tasks in progress**: each [task](tasks.md) someone is working on, and who: a person, or a person via their agent. Under it, how many tasks are ready to pick up.
-- **Recent changes**: the last five lines of **Changes**, in the same words.
-- **People**: how many members, by role, and agent connections. An owner sees every member's connections to the vault; everyone else sees their own.
+- **Waiting on you**, only when something is: proposals waiting for your review, oldest first.
+- **In progress**: each task someone is working on, and who: a person, or a person via their agent.
+- **Recent changes**: the last five lines of **Updates**, in the same words.
 
-A card with nothing to show says so in one line. Under the cards is the vault's top `README.md`, if it has one. The overview is built from what the vault already records: nothing on it is generated or summarised.
+Opening the overview doesn't mark flags seen; only **Updates** does. A list with nothing to show says so in one line. Under the lists is the vault's top `README.md`, if it has one. The overview is built from what the vault already records: nothing on it is generated or summarised.
 
 ## Reading and searching
 

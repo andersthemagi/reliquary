@@ -99,8 +99,8 @@ test("first run: a new vault's page points its writer at Connect", async () => {
   vault = made.headers.get("location");
   const h = await page(vault);
   assert.match(h, NEXT);
-  assert.match(h, /<a class="button primary" href="\/connect">Connect an agent<\/a>/);
-  assert.doesNotMatch(h, /<a class="button ghost" href="\/connect">/, "the empty vault does not offer Connect twice");
+  assert.match(h, /<div class="callout info" id="connect-nudge"><p><strong>Next: connect an agent\.<\/strong> [^<]+<a href="\/connect">Connect an agent<\/a><\/p><\/div>/, "one line, its way on a link: the header has the button");
+  assert.equal(h.match(/class="button[^"]*" href="\/connect"/g).length, 1, "the empty vault offers the Connect button once");
 });
 
 test("first run: an old vault doesn't show it, so nobody is pointed at Connect on every visit, forever", async () => {

@@ -322,7 +322,7 @@ test("proposals list: decided rows say how they ended, not approvals or risks", 
 test("proposals list: live rows name the person and their agent, and count approvals", async () => {
   const h = await page("rhea", `/v/${V}/proposals`);
   assert.match(h, /Change rates\.md<\/a>\s*<span class="review-meta small"><span class="path-chip">canon\/rates\.md<\/span><span class="muted">sol@example\.test via Desk agent<\/span>/);
-  assert.match(h, /<span class="badge state open">Open<\/span> <span class="badge attention risk-count" title="Rewrites 2 of the file’s 4 lines: read each change\.">Rewrites 2 of 4 lines<\/span> <span class="muted">0 of 1 approval<\/span><span class="muted"><time /);
+  assert.match(h, /<span class="row-end small"><span class="badge attention risk-count" title="Rewrites 2 of the file’s 4 lines: read each change\.">Rewrites 2 of 4 lines<\/span> <span class="muted">0 of 1 approval<\/span><span class="muted"><time /);
 });
 
 test("proposals list: an empty tab says what's missing and when it fills", async () => {
