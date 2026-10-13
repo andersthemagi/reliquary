@@ -330,8 +330,25 @@ test("site legal: every legal page answers signed out on each instance, marked d
 
 test("site legal: facts not known yet are visible placeholders, not invented", async () => {
   const h = await text(A, "/terms");
-  assert.match(h, /<mark class="placeholder">\[to be filled: registration number\]<\/mark>/);
+  assert.match(h, /<mark class="placeholder">\[to be filled: Colorado Secretary of State ID\]<\/mark>/);
   assert.match(h, /<mark class="placeholder">\[to be filled: address\]<\/mark>/);
+});
+
+test("site legal: the operator is the Colorado LLC under Colorado law, with US state privacy rights, and what applies in Europe is one marked section of placeholders", async () => {
+  const terms = await text(A, "/terms");
+  assert.match(terms, /Memento Vivre Fine Arts LLC, doing business as Red Mage, a single-member limited liability company registered in Colorado, United States/);
+  assert.doesNotMatch(terms, /VAT/);
+  assert.match(terms, /governed by the laws of the State of Colorado/);
+  assert.match(terms, /You must be at least 18 and able to enter a binding contract/);
+  const privacy = await text(A, "/privacy");
+  assert.match(privacy, /<h2 id="us-states">US state privacy rights<\/h2>/);
+  assert.match(privacy, /We don't sell your personal information, share it for cross-context behavioral advertising/);
+  assert.match(privacy, /children under 13/);
+  const eu = /<h2 id="eu">[\s\S]*?<\/ul>/.exec(privacy)?.[0] ?? "";
+  assert.match(eu, /We're not yet set up for people in the EU, EEA, UK or Switzerland, so please <a href="[^"]*\/request-access">request access<\/a>/);
+  for (const p of ["EU representative", "UK representative", "supervisory authority"]) assert.match(eu, new RegExp(`\\[to be filled: ${p}\\]`), p);
+  assert.match(eu, /\[to be filled: transfer safeguard/);
+  assert.doesNotMatch(privacy.replace(eu, ""), /to be filled: (supervisory authority|transfer safeguard|EU representative)/, "EU placeholders stay in the EU section");
 });
 
 test("site legal: sub-processors names Supabase in Frankfurt, Netlify in the United States, Resend for email, and no model providers", async () => {

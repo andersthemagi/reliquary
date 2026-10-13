@@ -1,6 +1,8 @@
 // Legal and trust pages: terms, privacy, data processing, sub-processors,
-// security. Drafts for a small EU-based service run by Red Mage, each marked
-// "Draft, pending legal review". Facts come from docs/design.md (privacy,
+// security. Drafts for a service run by a Colorado LLC (Red Mage), offered
+// in the US and outside the EU first, each marked "Draft, pending legal
+// review" (#8). What only applies once it is offered in the EU sits in one
+// marked section of the privacy policy, with its placeholders (#315, #212). Facts come from docs/design.md (privacy,
 // compliance, variables) and docs/research/hosting.md (where things run);
 // anything not known yet is an OPERATOR field shown as a placeholder.
 //
@@ -9,6 +11,7 @@
 // here: `/` is Home for a signed-in person, so server.ts decides.
 
 import { docsPaths, docsRoute } from "./docs.js";
+import { appHref } from "./hosts.js";
 import { ALPHA, html, type Raw, type Theme } from "./html.js";
 import { BUILD } from "./version.js";
 import { OPERATOR, draftNote, fill, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
@@ -30,7 +33,7 @@ function legalPage(theme: Theme, path: string, title: string, description: strin
   });
 }
 
-const operatorBlock = () => html`<p>Reliquary is run by ${OPERATOR.tradingName} (${OPERATOR.person}): ${fill("legalName", "legal name")}, ${fill("legalForm", "legal form")}, registered in ${fill("country", "country")} under ${fill("registrationNumber", "registration number")}, VAT ${fill("vatId", "VAT ID")}, ${fill("address", "address")}. Contact: ${mail(OPERATOR.contactEmail)}.</p>`;
+const operatorBlock = () => html`<p>Reliquary is run by ${OPERATOR.tradingName} (${OPERATOR.person}): ${fill("legalName", "legal name")}, ${fill("legalForm", "legal form")} registered in ${fill("country", "country")} under ID ${fill("registrationNumber", "Colorado Secretary of State ID")}, ${fill("address", "address")}. Contact: ${mail(OPERATOR.contactEmail)}.</p>`;
 
 // Terms ---------------------------------------------------------------------
 
@@ -46,6 +49,7 @@ ${operatorBlock()}
 
 <h2>Your account and your team</h2>
 <ul>
+  <li>You must be at least ${fill("minimumAge", "minimum age")} and able to enter a binding contract. If you use Reliquary for an organisation, you confirm you may accept these terms for it.</li>
   <li>Keep your sign-in email secure. You're responsible for what happens under your account, including what the agents you connect do with your permissions.</li>
   <li>A vault's owners decide who is a member and what each member and their agents may do. Owners are responsible for inviting only people entitled to see the vault's content.</li>
   <li>Revoke tokens and connections you no longer use.</li>
@@ -56,7 +60,7 @@ ${operatorBlock()}
 <p>You're responsible for having the right to put content and credentials in Reliquary, including your clients' credentials.</p>
 
 <h2>Acceptable use</h2>
-<p>Don't use Reliquary to break the law, to store content you have no right to, to attack or probe the service or other customers (except under our <a href="/security#disclosure">disclosure policy</a>), or to get around its limits. Don't store health data or payment card data: Reliquary isn't built or certified for them.</p>
+<p>Don't use Reliquary to break the law, to store content you have no right to, to attack or probe the service or other customers (except under our <a href="/security#disclosure">disclosure policy</a>), or to get around its limits. Don't store health data or payment card data: Reliquary isn't built or certified for them. Don't use Reliquary where United States sanctions or export controls forbid it.</p>
 
 <h2>Fees</h2>
 <p>Reliquary is free while in alpha. Before any fee applies to you, we'll tell you the price and give you ${fill("feeNoticeDays", "notice period")} to decide; you can export and leave at any time.</p>
@@ -74,13 +78,16 @@ ${operatorBlock()}
 <p>During the alpha the service is provided as it is, without warranties of availability or fitness for a purpose, to the extent the law allows. Keep your own copy of anything you can't lose; export makes that easy.</p>
 
 <h2>Liability</h2>
-<p>Nothing in these terms limits liability that the law doesn't allow to be limited. Otherwise, each side's total liability is limited to ${fill("liabilityCap", "liability cap")}, and neither side is liable for indirect or consequential loss.</p>
+<p>Nothing in these terms limits liability that the law doesn't allow to be limited. Otherwise, each side's total liability is limited to ${fill("liabilityCap", "liability cap")}, and neither side is liable for indirect, incidental, special or consequential loss, or for lost profits or data.</p>
+
+<h2>Indemnity</h2>
+<p>If someone else brings a claim against us because of content you put in Reliquary or because you broke these terms, you'll cover our reasonable costs of that claim.</p>
 
 <h2>Changes</h2>
 <p>We'll post changes to these terms here and tell account holders by email before significant changes take effect.</p>
 
 <h2>Law</h2>
-<p>These terms are governed by ${fill("governingLaw", "governing law and courts")}. If you're a consumer, you keep the protection of the mandatory law where you live.</p>
+<p>These terms are governed by ${fill("governingLaw", "governing law and courts")}. If you're a consumer, you keep the protection of the mandatory law where you live. If a court finds part of these terms unenforceable, the rest still applies.</p>
 
 <h2>Contact</h2>
 <p>${mail(OPERATOR.contactEmail)}</p>`);
@@ -119,12 +126,12 @@ ${operatorBlock()}
   <li>Nobody at ${OPERATOR.tradingName} reads your content unless you ask us to (for support) or the law requires it.</li>
 </ul>
 
-<h2>Why, and on what basis</h2>
+<h2>Why we use it</h2>
 <ul>
-  <li>To run the service you signed up for: performance of a contract.</li>
-  <li>To answer an access request: steps you asked us to take before a contract.</li>
-  <li>To keep it secure and fix faults (server logs, access logs, refused attempts): our legitimate interest in a secure service.</li>
-  <li>To tell you about changes that affect you: contract and legitimate interest. No marketing email without your consent.</li>
+  <li>To run the service you signed up for.</li>
+  <li>To answer an access request.</li>
+  <li>To keep it secure and fix faults (server logs, access logs, refused attempts).</li>
+  <li>To tell you about changes that affect you. No marketing email without your consent.</li>
 </ul>
 
 <h2>Cookies</h2>
@@ -149,13 +156,34 @@ ${operatorBlock()}
 </ul>
 
 <h2>Your rights</h2>
-<p>You can change your email address and delete your account yourself, on Account settings. You can also ask for access to, correction of, or deletion of your personal data, ask us to restrict or stop processing it, and take it with you (vault owners can export a vault themselves). Email ${mail(OPERATOR.contactEmail)}. For data in a vault, we'll pass your request to the vault's owner, who decides as controller. You can also complain to a data protection authority; ours is ${fill("supervisoryAuthority", "supervisory authority")}.</p>
+<p>You can change your email address and delete your account yourself, on Account settings. You can also ask for access to, correction of, or deletion of your personal data, ask us to restrict or stop processing it, and take it with you (vault owners can export a vault themselves). Email ${mail(OPERATOR.contactEmail)}. For data in a vault, we'll pass your request to the vault's owner, who decides as controller.</p>
+
+<h2 id="us-states">US state privacy rights</h2>
+<p>Residents of California, Colorado, Virginia, Connecticut and other states with privacy laws have these rights, and we give them to everyone:</p>
+<ul>
+  <li>We don't sell your personal information, share it for cross-context behavioral advertising, or use it for profiling that has legal or similar effects.</li>
+  <li>What we collect, by category: identifiers (email address, account id, IP address in host logs), internet activity (the request and access logs above), and what you write in vaults. Sources: you, your team, and the AI tools you connect. Who receives it: the <a href="/subprocessors">sub-processors</a>, for the purposes above.</li>
+  <li>You can ask to know, access, correct or delete your personal information, and get a copy you can take with you. Email ${mail(OPERATOR.contactEmail)}; we answer within 45 days and confirm who you are by your account's email address. Someone you authorise can ask for you.</li>
+  <li>We won't treat you differently for using these rights. If we turn a request down, reply to say so and we'll review it again; if that doesn't settle it, you can contact your state's attorney general.</li>
+</ul>
 
 <h2>Security and breaches</h2>
-<p>See the <a href="/security">security page</a>. If a breach affects your personal data, we'll tell the vault owners and, where required, the authority within 72 hours of becoming aware of it.</p>
+<p>See the <a href="/security">security page</a>. If a breach affects your personal data, we'll tell the vault owners without undue delay, and tell you and the authorities as the law where you live requires.</p>
 
 <h2>Children</h2>
-<p>Reliquary is a work tool, not meant for anyone under ${fill("minimumAge", "minimum age")}.</p>
+<p>Reliquary is a work tool, not meant for anyone under ${fill("minimumAge", "minimum age")}. We don't knowingly collect personal information from children under 13; if you believe we have, email ${mail(OPERATOR.contactEmail)} and we'll delete it.</p>
+
+<h2 id="eu">If you're in the EU, EEA, UK or Switzerland</h2>
+<p class="callout attention" role="note">The alpha is offered in the United States and outside Europe first. We're not yet set up for people in the EU, EEA, UK or Switzerland, so please <a href="${appHref("/request-access")}">request access</a> rather than signing up, and we'll tell you when we are. What follows is what will apply then; the bracketed items are still to be put in place.</p>
+<ul>
+  <li><strong>Controller:</strong> ${OPERATOR.tradingName}, as above. For vault content, the vault's owner is the controller and we are their processor (<a href="/dpa">data processing terms</a>).</li>
+  <li><strong>Legal bases:</strong> running the service and answering an access request, performance of a contract (or steps you asked for before one); security, fault-fixing and telling you about changes, our legitimate interest; marketing email, only your consent.</li>
+  <li><strong>Your rights</strong> under the GDPR: access, correction, erasure, restriction, objection and portability, as in Your rights above, and to withdraw consent at any time.</li>
+  <li><strong>Representative in the EU</strong> (Article 27): ${fill("euRepresentative", "EU representative")}. <strong>In the UK:</strong> ${fill("ukRepresentative", "UK representative")}.</li>
+  <li><strong>Data protection authority:</strong> you can complain to the authority where you live or work; our lead authority is ${fill("supervisoryAuthority", "supervisory authority")}.</li>
+  <li><strong>Transfers:</strong> the database is in the EU; the app and some sub-processors are in the United States. Transfers rely on ${fill("transferSafeguard", "transfer safeguard, e.g. the EU-US Data Privacy Framework or Standard Contractual Clauses")}.</li>
+  <li><strong>Breaches:</strong> we'll tell the authority within 72 hours of becoming aware of one that affects you, where the GDPR requires it.</li>
+</ul>
 
 <h2>Changes</h2>
 <p>We'll post changes here with a new date, and email account holders about significant ones.</p>`);
@@ -164,11 +192,11 @@ ${operatorBlock()}
 // Data processing -------------------------------------------------------------
 
 function dpa(theme: Theme): string {
-  return legalPage(theme, "/dpa", "Data processing", "A summary of how Reliquary by Red Mage processes personal data for its customers, as processor under GDPR Article 28.", html`
-<p class="lede">A plain summary of the data processing terms that apply when your vault holds personal data. To sign a data processing agreement, email ${mail(OPERATOR.contactEmail)}.</p>
+  return legalPage(theme, "/dpa", "Data processing", "A summary of how Reliquary by Red Mage processes personal data for its customers, as their processor or service provider.", html`
+<p class="lede">A plain summary of the data processing terms that apply when your vault holds personal data: as your service provider under US state privacy laws, and as your processor under GDPR Article 28 once Reliquary is offered in the EU. To sign a data processing agreement, email ${mail(OPERATOR.contactEmail)}.</p>
 
 <h2>Roles</h2>
-<p>The vault's owner (you) is the controller. ${OPERATOR.tradingName} is the processor.</p>
+<p>The vault's owner (you) is the controller (the business, under US state laws). ${OPERATOR.tradingName} is the processor (your service provider), and doesn't sell, share or use your data for anything but providing the service to you.</p>
 ${operatorBlock()}
 
 <h2>What we process, and why</h2>
@@ -195,7 +223,7 @@ ${operatorBlock()}
   <li>Give you the information you need to show compliance, and answer reasonable audit questions in writing.</li>
 </ul>
 
-<h2>Transfers outside the EU</h2>
+<h2 id="transfers">Transfers outside the EU (once offered in the EU)</h2>
 <p>The database is in the EU; the app runs in the United States, and other sub-processors may access data from outside the EU. Each such transfer relies on ${fill("transferSafeguard", "transfer safeguard, e.g. the provider's Standard Contractual Clauses")}. The <a href="/subprocessors">sub-processor list</a> names each provider and its location.</p>`);
 }
 

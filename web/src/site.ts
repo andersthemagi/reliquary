@@ -23,24 +23,25 @@ export const OPERATOR = {
   // Where the site lives when neither SITE_URL nor PUBLIC_URL is set
   // (links in the sitemap, canonical and Open Graph URLs).
   defaultOrigin: "https://reliquary.redmage.cc",
-  lastUpdated: "2026-09-24",
-  legalName: null as string | null, // the legal entity or sole trader's full name
-  legalForm: null as string | null, // e.g. sole trader, limited company
-  registrationNumber: null as string | null,
-  vatId: null as string | null,
+  lastUpdated: "2026-10-13",
+  legalName: "Memento Vivre Fine Arts LLC, doing business as Red Mage" as string | null, // the legal entity or sole trader's full name
+  legalForm: "a single-member limited liability company" as string | null, // e.g. sole trader, limited company
+  registrationNumber: null as string | null, // the Colorado Secretary of State ID
   address: null as string | null, // registered or postal address
-  country: null as string | null, // country of establishment
-  governingLaw: null as string | null, // law and courts for the terms
-  supervisoryAuthority: null as string | null, // lead data protection authority
-  liabilityCap: null as string | null, // e.g. fees paid in the 12 months before the claim
-  feeNoticeDays: null as string | null, // notice before any fee applies
-  closureNotice: null as string | null, // notice before the service closes
-  subprocessorNoticeDays: null as string | null, // notice before a new sub-processor
-  transferSafeguard: null as string | null, // basis for any transfer outside the EU
+  country: "Colorado, United States" as string | null, // country of establishment
+  governingLaw: "the laws of the State of Colorado, United States, without regard to its conflict-of-laws rules, and disputes go to the state or federal courts in Denver, Colorado" as string | null, // law and courts for the terms
+  supervisoryAuthority: null as string | null, // lead EU data protection authority, once offered in the EU
+  liabilityCap: "the greater of what you paid us in the 12 months before the claim and US$100" as string | null, // e.g. fees paid in the 12 months before the claim
+  feeNoticeDays: "30 days" as string | null, // notice before any fee applies
+  closureNotice: "60 days’ notice" as string | null, // notice before the service closes
+  subprocessorNoticeDays: "30 days" as string | null, // notice before a new sub-processor
+  euRepresentative: null as string | null, // GDPR Article 27 representative (#212), once offered in the EU
+  ukRepresentative: null as string | null, // UK GDPR Article 27 representative, once offered in the UK
+  transferSafeguard: null as string | null, // basis for any transfer outside the EU, once offered in the EU
   backupRetention: "Supabase keeps daily backups for 7 days; the operator also keeps up to 14 off-site copies, in which variable values exist only as ciphertext" as string | null, // how long database backups are kept
   hostingLogRetention: null as string | null, // how long the host keeps request logs
-  disclosureResponse: null as string | null, // how soon a security report is acknowledged
-  minimumAge: null as string | null, // e.g. 16
+  disclosureResponse: "5 business days" as string | null, // how soon a security report is acknowledged
+  minimumAge: "18" as string | null,
 };
 
 // A config value, or a visible placeholder naming what goes there.
