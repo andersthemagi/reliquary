@@ -8,6 +8,8 @@ Give the client the MCP URL, `https://mcp.reliquary.redmage.cc/mcp` (your Connec
 
 Reliquary identifies clients by a Client ID Metadata Document (an https URL); there is no dynamic client registration.
 
+A client that lists servers from the official MCP registry finds Reliquary as `cc.redmage/reliquary`, with the same MCP URL and the same sign-in. The entry is `server.json` at the root of [Reliquary's repository](https://github.com/andersthemagi/reliquary).
+
 ## With a token
 
 1. On the **Connect** page, choose the **Other clients** tab and choose **Create read-only token** (or **Create read and write token**). It reaches all your vaults and expires in 90 days; for some vaults or another expiry, choose **use the full form**. If you belong to more than one vault, the tab takes you to the full form, where nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md). The page that follows shows the token once.
