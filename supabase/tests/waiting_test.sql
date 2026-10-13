@@ -364,3 +364,65 @@ select t.expect_true('line: the rule''s minimum gap is when the caller may ask a
 select t.finish('hal', 'q/hint.md', 'hal-hint');
 select t.finish('lee', 'q/hint/p.md', 'lee-hint');
 
+-- ---------------------------------------------------------------------------
+-- Strikes: a claim let lapse, taken over from the line, counts against its
+-- person; past the free one, a cooldown that doubles up to the rule's cap
+
+-- Lease 10 minutes, hold 1 hour, 1 per connection, 5 per person, a place
+-- lives 30 minutes, longest hint 5 minutes, gap 10 seconds, 1 free lapse,
+-- cooldown at most 25 minutes.
+select t.run('ana', format($q$select public.set_claim_rule(%L, 'q/st/', 10, 60, null, 1, 5, 30, 5, 10, 1, 25)::text$q$, t.id('wq')));
+select t.plan(p, '[{"key":"a","title":"A"}]')
+  from unnest(array['q/st/p1.md', 'q/st/p2.md', 'q/st/p3.md', 'q/st/p4.md', 'q/st/p5.md']) p;
+create function t.strike_row(p_user text) returns text language sql as $$
+  select strikes || ' ' || coalesce(round(extract(epoch from cooldown_until - clock_timestamp()) / 60)::text, 'none')
+    from private.work_plan_strikes where vault_id = t.id('wq') and person = t.id(p_user)
+$$;
+create function t.cool_off(p_user text) returns void language sql as $$
+  update private.work_plan_strikes set cooldown_until = clock_timestamp() - interval '1 second'
+   where vault_id = t.id('wq') and person = t.id(p_user)
+$$;
+
+select t.save('kim-1', t.rw('kim', 'q/st/p1.md')::text);
+select t.lapse_step('q/st/p1.md', 'a');
+select t.save('lee-1', t.rw('lee', 'q/st/p1.md')::text);
+select t.expect('strikes: a lapsed step is granted to the next caller', (t.j('lee-1')->>'o_state') || ' ' || (t.j('lee-1')->>'o_fence'), 'granted 2');
+select t.expect('strikes: the first claim a person lets lapse is a strike with no cooldown', t.strike_row('kim'), '1 none');
+select t.finish('lee', 'q/st/p1.md', 'lee-1');
+select t.save('kim-2', t.rw('kim', 'q/st/p2.md')::text);
+select t.expect('strikes: so the person is still served at once', t.j('kim-2')->>'o_state', 'granted');
+
+select t.expect('strikes: before the second lapse, the person holds places in other lines', t.line('q/hint.md') || ', ' || t.line('q/hint2.md'), 'kim, kim');
+select t.lapse_step('q/st/p2.md', 'a');
+select t.save('lee-2', t.rw('lee', 'q/st/p2.md')::text);
+select t.expect('strikes: the second lapse earns a cooldown of the rule''s lease', t.strike_row('kim'), '2 10');
+select t.expect('strikes: a person entering a cooldown gives up every place they hold in the vault''s lines',
+  t.line('q/hint.md') || ', ' || t.line('q/hint2.md'), ', ');
+select t.expect('strikes: each given-up place is logged as queue.expire for its holder, reason cooling_down',
+  t.events('queue.expire', 'q/hint.md') || ', ' || t.events('queue.expire', 'q/hint2.md'), 'kim cooling_down, kim cooling_down');
+select t.save('kim-3', t.rw('kim', 'q/st/p3.md')::text);
+select t.expect_true('strikes: a person cooling down is answered cooling_down, with how long',
+  t.j('kim-3')->>'o_state' = 'cooling_down' and (t.j('kim-3')->>'o_wait_seconds')::int between 595 and 600);
+select t.expect('strikes: and takes no place in line', t.line('q/st/p3.md'), '');
+select t.expect('strikes: another person is served meanwhile', t.rw('ivy', 'q/st/p3.md')->>'o_state', 'granted');
+select t.finish('lee', 'q/st/p2.md', 'lee-2');
+
+select t.cool_off('kim');
+select t.save('kim-4', t.rw('kim', 'q/st/p4.md')::text);
+select t.expect('strikes: once the cooldown is over, the person is served', t.j('kim-4')->>'o_state', 'granted');
+select t.lapse_step('q/st/p4.md', 'a');
+select t.save('lee-4', t.rw('lee', 'q/st/p4.md')::text);
+select t.expect('strikes: each later lapse doubles the cooldown', t.strike_row('kim'), '3 20');
+select t.finish('lee', 'q/st/p4.md', 'lee-4');
+
+select t.cool_off('kim');
+select t.save('kim-5', t.rw('kim', 'q/st/p5.md')::text);
+select t.lapse_step('q/st/p5.md', 'a');
+select t.save('lee-5', t.rw('lee', 'q/st/p5.md')::text);
+select t.expect('strikes: the cooldown never passes the rule''s cap', t.strike_row('kim'), '4 25');
+select t.finish('lee', 'q/st/p5.md', 'lee-5');
+
+select t.cool_off('kim');
+select t.plan('q/st/p6.md', '[{"key":"a","title":"A"}]');
+select t.save('kim-6', t.rw('kim', 'q/st/p6.md')::text);
+select t.expect('strikes: finishing a step clears the person''s strikes', t.finish('kim', 'q/st/p6.md', 'kim-6') || coalesce(t.strike_row('kim'), 'none'), 'none');
