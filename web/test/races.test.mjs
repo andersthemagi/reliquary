@@ -163,8 +163,8 @@ before(async () => {
       for each statement execute function test_races.stop('vault_deletions');
     drop trigger if exists zz_races_stop on public.path_claims;
     create trigger zz_races_stop after insert or update or delete on public.path_claims
-      for each statement execute function test_races.stop('path_claims');
-    drop trigger if exists zz_races_stop on public.work_plan_steps;
+      for each statement execute function test_races.stop('path_claims');`);
+  await sql(`drop trigger if exists zz_races_stop on public.work_plan_steps;
     create trigger zz_races_stop after update on public.work_plan_steps
       for each statement execute function test_races.stop('work_plan_steps');`);
 });
