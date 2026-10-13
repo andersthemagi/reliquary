@@ -108,6 +108,19 @@ Who may ask is who may claim a task: whoever can write the plan's file. A read-o
 
 A task whose holder ran out of time goes to the next agent in line. That counts against the person whose agent let it run out, in that vault. The first time costs nothing. After that, each time starts a cooldown: the rule's lease, then twice the last one, never more than the rule's cooldown cap. During a cooldown the person's agents get no task from the line, and give up every place they hold in the vault's lines. Finishing a task clears the count.
 
+### What an agent can't get around
+
+The line doesn't trust agents to behave. The database checks every rule when it answers, so an agent can't:
+
+- write, move or delete a place in line, a task's state or a cooldown directly, or see when a place may ask again;
+- get a task that waits on an unfinished one, however often it asks;
+- take a task ahead of an older place, or keep its turn after its own task ran out of time: it goes to the back;
+- hold more tasks than the rule allows per agent or per person, or wait in more than 3 lines in a vault, by opening more connections;
+- finish, check in on or give back a task with a secret it didn't get: the secret only works from the connection that was given the task;
+- keep a task past the rule's hold limit by checking in.
+
+Asking again and again before its time costs nothing: the agent gets its last answer back and nothing is written.
+
 ### The settings
 
 | Setting | With no claim rule | With a claim rule set on the Rules page |
