@@ -935,6 +935,41 @@ test("races, lock order: a step is completed while its vault is deleted, interle
   assert.deepEqual(outcomes, ["ok/ok", "ok/ok", "ok/ok"]);
 });
 
+// A plan gaining a step (20261013160000_work_plan_gains_steps.sql) while a
+// step it will wait on is completed. complete_step holds a and then locks
+// its dependent b; the new step n waits on both, so adding it checks both
+// rows, in whichever order its blockers come. Both orders are run.
+test("races, a plan gains a step: a step completed while a new step waiting on it and its dependent is added doesn't deadlock, and the new step's count is right", async () => {
+  const outcomes = [];
+  for (const [round, order] of [["a", "b"], ["b", "a"], ["a", "b"], ["b", "a"]].entries()) {
+    const name = `Races plan gains step ${round}`;
+    const who = people[9 + round];
+    const v = await planVault(name, who);
+    const claimed = await claimA(db, v, who);
+    assert.ok(claimed.ok, claimed.message);
+    const { o_fence: fence, o_secret: secret } = claimed.rows[0];
+    const next = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan, more') as v", [v]);
+    assert.ok(next.ok, next.message);
+    const steps = [{ key: "a", title: "A" }, { key: "b", title: "B", blocked_by: ["a"] }, { key: "n", title: "N", blocked_by: order }];
+    // The completion holds a, and stops before it locks b.
+    const [co, re] = await interleave(
+      (c) => as(c, who, "select public.complete_step($1, 'plan.md', 'a', $2, $3)::text", [v, fence, secret], "work_plan_steps"),
+      (c) => as(c, OWNER, "select public.register_work_plan($1, 'plan.md', $2, $3::jsonb)::text", [v, next.rows[0].v, JSON.stringify(steps)]),
+    );
+    const [n] = await sql(
+      `select s.open_blockers as stored,
+              (select count(*)::int from public.work_plan_step_blockers d join public.work_plan_steps b on b.id = d.blocker_id
+                where d.step_id = s.id and b.status <> 'done') as real
+         from public.work_plan_steps s join public.work_plans p on p.id = s.plan_id
+        where p.vault_id = $1 and s.key = 'n'`,
+      [v],
+    );
+    outcomes.push(`${outcome(co)}/${outcome(re)} n ${n?.stored}/${n?.real}`);
+  }
+  log("complete_step vs register_work_plan", outcomes);
+  assert.deepEqual(outcomes, Array(4).fill("ok/ok n 1/1"));
+});
+
 // ---------------------------------------------------------------------------
 // The operator's changes wait for what they limit
 
