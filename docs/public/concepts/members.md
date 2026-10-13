@@ -36,14 +36,3 @@ Leaving, removal and role changes are logged, by id, never by email.
 ## How people are shown
 
 Where the web app names a person (Activity, proposals, threads, the Inbox, Members), it shows their email if they share a vault with you now, with their display name before it if they set one ("Ana Ruiz (ana@example.com)"; see [Display name](inbox-and-account.md#display-name)). Someone who chose to hide their email shows as their name and a short tag ("Ana Ruiz · 3f2a1b9c"; see [Show me to others as](inbox-and-account.md#show-me-to-others-as)). Anyone else, like a former member, shows as a short id. Agents see people by display name and tag only, never an email.
-
-## Vaults that require emails
-
-An owner can make a vault require that its members' emails be visible to the other members: on **Settings**, **General**, under **Members' emails**, choose **Required** and select **Save**. **Each member decides** is the default. Only owners change it, signed in to the web app; the change is logged.
-
-When a vault requires emails, a member who hid theirs sees a notice on the vault's pages, with two choices:
-
-- **Show my email in this vault**: the people who share this vault with them see their email from then on. People who share only other vaults with them still don't, and agents never do.
-- **Leave this vault**.
-
-Until they choose, their email stays hidden, in that vault too. Nobody's email is shown without their agreement. Leaving takes the agreement with it, and so does an owner turning the requirement off: if it is turned on again, members who hid their email are asked again.

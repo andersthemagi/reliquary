@@ -71,7 +71,7 @@ Under the display name on **Account settings**, **Show me to others as** chooses
 
 Choose one and select **Save**. You always see your own email. Agents, yours and everyone else's, never see an email, whatever you choose: a tool that names people (for example `changes_since` or `list_flags`) shows them by display name and tag alone. Your display name is text, never code: a name like `Robert'); DROP TABLE students;--` or `<script>` is shown exactly as written and does nothing.
 
-Your email stays hidden everywhere: on Members, in Activity, in an invite you send and in the notice when you delete a vault. The one exception is a vault that requires members' emails, and only once you agree: see [Vaults that require emails](members.md#vaults-that-require-emails).
+Your email stays hidden everywhere: on Members, in Activity, in an invite you send and in the notice when you delete a vault. No vault can override your choice.
 
 Only you can change this, signed in to the web app.
 

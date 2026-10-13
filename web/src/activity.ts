@@ -51,6 +51,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
   ["vault.create", "Created the vault"],
   ["vault.rename", "Renamed the vault"],
   ["vault.default_policy", "Changed the default policy"],
+  // No longer logged (20261014160000_drop_vault_email_requirement.sql); old rows keep their label.
   ["vault.require_emails", "Changed whether members’ emails are required"],
   ["vault.export", "Exported the vault"],
   ["variable.set", "Set a variable"],
