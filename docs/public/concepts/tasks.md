@@ -10,18 +10,28 @@ A plan is a file in the vault with a `work_plan` block in it. It becomes a plan 
 
 Anyone who can read the vault can read its plans, viewers included.
 
-## The list of plans
+## The Tasks page
 
-Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). Each row is one plan:
+Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). It opens on what is open across every plan in the vault, as a simple list in three sections:
 
-- the path of its file, which opens the plan;
-- how many of its tasks are done, and how the rest are split: in progress, ready, blocked, cancelled;
+- **In progress**: tasks someone holds, each with a chip naming who: a person, or their agent acting for them ("you via Claude Code").
+- **Ready to pick up**: tasks nobody holds whose waits are over.
+- **Blocked**: tasks still waiting on others. One blocked by a cancelled task is labelled **Blocked by a cancelled task** and comes first.
+
+Each row names the plan it belongs to, linked. Done and cancelled tasks aren't listed here; they stay on their plan's page. A section with no tasks in it is left out.
+
+### Plans
+
+Below the list, under **Plans**, each plan is a card:
+
+- its title, which is the first `# ` heading in the plan file, with the file's path under it; a plan file with no heading goes by its path. The title opens the plan;
+- a progress bar, and how many of its tasks are done ("6 of 10 done"), with how the rest are split: in progress, ready, blocked, cancelled;
 - whether the plan file has changed since it was registered;
 - who registered it, and when.
 
 ### When the plan file has changed
 
-If the plan file is edited after it was registered, its row says **Changed since registered**. The tasks you see, and the ones agents work from, are still the ones from the version last registered. Open the file's **History** tab to see what changed. If the file is deleted, the row says **File deleted**, and its tasks stay.
+If the plan file is edited after it was registered, its card says **Changed since registered**. The tasks you see, and the ones agents work from, are still the ones from the version last registered. Open the file's **History** tab to see what changed. If the file is deleted, the row says **File deleted**, and its tasks stay.
 
 ### Adding tasks to a plan
 
@@ -35,20 +45,20 @@ A plan can gain tasks, never lose or change them. Add the new steps to the plan 
 
 ## One plan
 
-Select a plan to see every task in it. Tasks are grouped so what can be worked on comes first: In progress, Ready, Blocked, Cancelled, Done. Each task shows its state in words, so no state depends on colour alone.
+Select a plan to see every task in it. Tasks are grouped so what can be worked on comes first: In progress, Ready, Blocked, Cancelled. Done tasks are folded away at the bottom under **Done**; select it to see them. Each task is one row: its state in words, so no state depends on colour alone, its title, and, when someone holds it, a chip naming them, or their agent acting for them. A quieter line under the title says more: what it is blocked by, the holder's label and the time left, or when it was done.
 
 | State | What it means |
 |---|---|
-| In progress | An agent holds the task and its time has not run out. The row says who holds it, the label they gave it, and how long is left. |
+| In progress | An agent holds the task and its time has not run out. The row's chip says who holds it, and the line under it the label they gave it and how long is left. |
 | Ready | Every task it waits on is done, and nobody holds it. A task whose holder ran out of time is ready again. |
-| Blocked | It waits on tasks that are not done yet. The row names them. |
+| Blocked | It waits on tasks that are not done yet. The row says **Blocked by** and names them. |
 | Blocked by a cancelled task | One of the tasks it waits on was cancelled. A cancelled task never counts as done, so this task stays blocked until a person reopens that task, or cancels or skips this one. |
 | Done | Finished, or skipped by a person. |
 | Cancelled | Dropped by a person. It doesn't count as done. |
 
 ### Context moved
 
-A task can cite files the work depends on, each at the version it was written against. When one of those files has a newer version, because someone wrote it or a proposal to change it was approved, the task shows **Context moved** beside its state, and its row names each file that moved, linked. Open the file's **History** tab to see what changed. The task's state doesn't change: it can still be ready, blocked or in progress. It means whoever works the task should read the file again first.
+A task can cite files the work depends on, each at the version it was written against. When one of those files has a newer version, because someone wrote it or a proposal to change it was approved, the task shows **A file it cites changed** beside its title, and its row names each file that moved, linked. Open the file's **History** tab to see what changed. The task's state doesn't change: it can still be ready, blocked or in progress. It means whoever works the task should read the file again first.
 
 Only a task that isn't finished shows it. A done or cancelled task never does, and a proposal still waiting for review moves nothing. A file that was deleted, or a cited version the file never had, isn't shown as moved.
 
@@ -62,7 +72,7 @@ The page shows the plan as it is when you open it. Reload to see changes.
 
 ## Cancelling, skipping and reopening a task
 
-If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has two buttons, **Cancel** and **Skip**, and each cancelled task has **Reopen**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it; on the reopen page it is **Keep it cancelled**. Only a person can do any of them: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
+If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has a **⋯** menu at the end of its row with **Skip** and **Cancel**, and each cancelled task has a **Reopen** button. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it; on the reopen page it is **Keep it cancelled**. Only a person can do any of them: an agent is refused, the same ceiling as approving a proposal (see [Agents and the ceiling](agents.md)).
 
 - **Cancel** drops the task. A cancelled task never counts as done, so every task waiting on it stays blocked, shown as blocked by a cancelled task, until a person reopens it, or cancels or skips each of them.
 - **Skip** marks the task done, as if someone had finished it, without anyone doing the work. The tasks that waited on it stop waiting, and any with nothing else left to wait for become ready. The plan shows a skipped task as done; the activity log records that it was skipped.

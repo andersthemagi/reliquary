@@ -19,7 +19,7 @@
 // issue #76). The buttons are shown to whoever can write the plan's path,
 // which is what the database checks too.
 //
-//   GET  /v/:id/tasks                          the plans, with counts and a marker when a plan file changed
+//   GET  /v/:id/tasks                          what is open across every plan, then the plans with their progress
 //   GET  /v/:id/tasks/plan?path=               one plan: every task, ready or in progress first
 //   GET  /v/:id/tasks/plan?path=&cancel=<key>  confirm cancelling a task
 //   GET  /v/:id/tasks/plan?path=&skip=<key>    confirm skipping a task
@@ -28,7 +28,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { callout, confirmPage, emptyState, html, pageHeader, plural, time, type Raw } from "./html.js";
+import { callout, confirmPage, emptyState, html, menu, pageHeader, plural, time, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { filePath, message, notFound, q, render, vault, vaultPath, who, writablePath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
@@ -38,6 +38,7 @@ export const planPath = (id: string, path: string) => `${tasksPath(id)}/plan?pat
 
 type Plan = {
   path: string;
+  title: string | null;
   registered_at: Date;
   registered_by: string;
   file: "unchanged" | "changed" | "deleted";
@@ -50,11 +51,13 @@ type Plan = {
 
 type Blocker = { key: string; title: string; status: string };
 type Task = {
+  plan: string;
   key: string;
   title: string;
   state: "ready" | "blocked" | "blocked_by_cancelled" | "claimed" | "done" | "cancelled";
   status: string;
   holder: string | null;
+  agent: string | null;
   holder_label: string | null;
   expires_at: Date | null;
   done_at: Date | null;
@@ -62,31 +65,46 @@ type Task = {
   moved: string[];
 };
 
+// The title is the plan file's first "# " heading as it reads now, from its
+// first few KB only: a plan with none, or whose file is gone, goes by its path.
 async function loadPlans(c: pg.PoolClient, id: string): Promise<Plan[]> {
   return (
     await c.query(
-      `select o_path as path, o_registered_at as registered_at, o_registered_by as registered_by, o_file as file,
-              o_ready as ready, o_blocked as blocked, o_claimed as claimed, o_done as done, o_cancelled as cancelled
-         from public.list_work_plans($1)`,
+      `select l.o_path as path, l.o_registered_at as registered_at, l.o_registered_by as registered_by, l.o_file as file,
+              l.o_ready as ready, l.o_blocked as blocked, l.o_claimed as claimed, l.o_done as done, l.o_cancelled as cancelled,
+              substring(left(fv.body, 4000) from '(?n)^#[[:blank:]]+(.*[^[:space:]])') as title
+         from public.list_work_plans($1) l
+         left join public.files f on f.vault_id = $1 and f.path = l.o_path and f.deleted_at is null
+         left join public.file_versions fv on fv.id = f.current_version_id
+        order by l.o_path`,
       [id],
     )
   ).rows;
 }
 
-// One round trip: the state from work_plan_status (the one definition), the
-// holder and finish time from the step, and the steps blocking it by name.
-async function loadTasks(c: pg.PoolClient, id: string, path: string): Promise<Task[]> {
+// One round trip, for one plan or (path null) every plan in the vault: the
+// state from work_plan_status (the one definition), the holder and finish
+// time from the step, the steps blocking it by name, and the agent that took
+// it, which only the log's step.claim keeps (claimlookup.ts claimAgents,
+// same reasoning: any new holder comes with a new claim).
+async function loadTasks(c: pg.PoolClient, id: string, path: string | null): Promise<Task[]> {
   return (
     await c.query(
-      `select st.o_key as key, st.o_title as title, st.o_state as state, s.status, s.holder,
+      `select p.path as plan, st.o_key as key, st.o_title as title, st.o_state as state, s.status, s.holder,
               st.o_holder_label as holder_label, st.o_expires_at as expires_at, s.done_at, st.o_moved as moved,
               coalesce((select json_agg(json_build_object('key', b.key, 'title', b.title, 'status', b.status) order by b.id)
                           from public.work_plan_step_blockers d join public.work_plan_steps b on b.id = d.blocker_id
-                         where d.step_id = s.id), '[]') as blockers
-         from public.work_plan_status($1, $2) st
-         join public.work_plans p on p.vault_id = $1 and p.path = $2
+                         where d.step_id = s.id), '[]') as blockers,
+              case when st.o_state = 'claimed' then
+                (select l.agent from public.log l
+                  where l.vault_id = $1 and l.path = p.path and l.event = 'step.claim'
+                    and l.detail ->> 'step' = s.key and l.actor = s.holder
+                  order by l.seq desc limit 1) end as agent
+         from public.work_plans p
+         cross join lateral public.work_plan_status($1, p.path) st
          join public.work_plan_steps s on s.plan_id = p.id and s.key = st.o_key
-        order by s.id`,
+        where p.vault_id = $1 and ($2::text is null or p.path = $2)
+        order by p.path, s.id`,
       [id, path],
     )
   ).rows;
@@ -109,15 +127,19 @@ function fileState(p: Pick<Plan, "file">): Raw {
   return html`<span class="muted">Unchanged</span>`;
 }
 
-function plansTable(ctx: Ctx, id: string, plans: Plan[]): Raw {
-  return html`<div class="table-wrap"><table class="table-stack member-list plan-table">
-    <thead><tr><th scope="col">Plan</th><th scope="col">Tasks</th><th scope="col">Plan file</th><th scope="col">Registered</th></tr></thead>
-    <tbody>${plans.map(
-      (p) => html`<tr><td><a href="${planPath(id, p.path)}">${p.path}</a></td>
-        <td class="small" data-label="Tasks"><div><strong>${p.done} of ${total(p)} done</strong>${counts(p) ? html`<span class="token-client">${counts(p)}</span>` : ""}</div></td>
-        <td class="small" data-label="Plan file">${fileState(p)}</td>
-        <td class="small" data-label="Registered"><div>${who(ctx, p.registered_by, null)} ${time(p.registered_at)}</div></td></tr>`,
-    )}</tbody></table></div>`;
+// A plan as a card: its title (or path), a bar and "6 of 10 done" (the bar
+// is a <progress>, since the CSP allows no inline width), the rest in words,
+// then the file's state and who registered it.
+function planCards(ctx: Ctx, id: string, plans: Plan[]): Raw {
+  return html`<ul class="plan-cards">${plans.map(
+    (p) => html`<li class="plan-card">
+      <h3><a href="${planPath(id, p.path)}">${p.title ?? p.path}</a></h3>
+      ${p.title ? html`<p class="path small muted">${p.path}</p>` : ""}
+      <progress class="task-progress" max="${Math.max(total(p), 1)}" value="${p.done}" aria-label="${p.done} of ${total(p)} done">${p.done} of ${total(p)} done</progress>
+      <p class="small"><strong>${p.done} of ${total(p)} done</strong>${counts(p) ? html` <span class="muted">· ${counts(p)}</span>` : ""}</p>
+      <p class="small muted">${fileState(p)} · registered by ${who(ctx, p.registered_by, null)} ${time(p.registered_at)}</p>
+    </li>`,
+  )}</ul>`;
 }
 
 // The page, in the vault shell; or, when it can't be shown, a note for the
@@ -141,20 +163,36 @@ async function build(ctx: Ctx, id: string, fn: (c: pg.PoolClient, v: Vault) => P
   return render(ctx, out.title, out.shell, "vaults");
 }
 
+// What is open across every plan, Todoist-style: what is being done, what
+// can be picked up, what is stuck. Done and cancelled tasks stay on their plan.
+const OPEN: Group[] = [
+  { id: "in-progress", title: "In progress", states: ["claimed"] },
+  { id: "ready", title: "Ready to pick up", states: ["ready"] },
+  { id: "blocked", title: "Blocked", states: ["blocked_by_cancelled", "blocked"] },
+];
+
 export async function tasks(ctx: Ctx, id: string): Promise<Reply> {
   return build(ctx, id, async (c) => {
     const plans = await loadPlans(c, id);
+    const open = grouped(OPEN, plans.length ? await loadTasks(c, id, null) : []);
+    const names = new Map(plans.map((p) => [p.path, p.title ?? p.path]));
     const body = html`
       ${pageHeader({
         title: "Tasks",
-        description: "The plans your agents are working through, and where each task in them stands.",
+        description: "What your agents are working on, what is ready to pick up and what is stuck, across every plan.",
       })}
       ${plans.length
-        ? html`${plansTable(ctx, id, plans)}
+        ? html`${open.length
+            ? open.map(
+                (g) => html`<section aria-labelledby="open-${g.id}"><h2 id="open-${g.id}">${g.title} <span class="muted">${g.rows.length}</span></h2>
+                  <ul class="task-list">${g.rows.map((t) => taskRow(ctx, id, t, { plan: names.get(t.plan) ?? t.plan }))}</ul></section>`,
+              )
+            : html`<p class="muted">Every task in every plan is done or cancelled.</p>`}
+          <section aria-labelledby="plans"><h2 id="plans">Plans <span class="muted">${plans.length}</span></h2>${planCards(ctx, id, plans)}</section>
           <p class="hint">A plan is a file that lists tasks, some of which wait on others. <a href="/docs/concepts/tasks">About tasks</a></p>`
         : emptyState({
             title: "No plans yet",
-            body: html`A plan comes to exist when an agent registers a plan file that holds a <code>work_plan</code> block. Registered plans, and the tasks in them, show up here.`,
+            body: "A plan comes to exist when an agent registers a plan file, a file in the vault that lists tasks. Registered plans, and the tasks in them, show up here.",
             action: html`<a href="/docs/concepts/tasks">About tasks</a>`,
           })}`;
     return { body, title: "Tasks" };
@@ -182,43 +220,46 @@ const STATE_TONE: Record<Task["state"], string> = {
   cancelled: "",
   done: "",
 };
-const GROUPS: { id: string; title: string; states: Task["state"][] }[] = [
+type Group = { id: string; title: string; states: Task["state"][] };
+const GROUPS: Group[] = [
   { id: "in-progress", title: "In progress", states: ["claimed"] },
   { id: "ready", title: "Ready", states: ["ready"] },
   { id: "blocked", title: "Blocked", states: ["blocked_by_cancelled", "blocked"] },
   { id: "cancelled", title: "Cancelled", states: ["cancelled"] },
-  { id: "done", title: "Done", states: ["done"] },
 ];
 
+// The groups in use, each in its states' order (a stable sort keeps the plan's).
+const grouped = (groups: Group[], rows: Task[]) =>
+  groups
+    .map((g) => ({ ...g, rows: rows.filter((t) => g.states.includes(t.state)).sort((a, b) => g.states.indexOf(a.state) - g.states.indexOf(b.state)) }))
+    .filter((g) => g.rows.length);
+
+// A task by its title only: keys are for agents and the plan file. The
+// confirm pages still give the key beside it, where exactness matters.
+const titles = (list: Pick<Blocker, "title">[]) => list.map((b) => b.title).join(", ");
 const taskName = (t: Pick<Blocker, "key" | "title">) => html`${t.title} <code>${t.key}</code>`;
 const nameList = (list: Pick<Blocker, "key" | "title">[]) => list.map((b, i) => html`${i ? ", " : ""}${taskName(b)}`);
 
-// What a task is waiting on, or who has it, in words. Its cell holds one
-// element (the caller's div): a stacked row on a phone is a grid, and loose
-// text and <code> would each become a grid item of their own.
-function detail(ctx: Ctx, t: Task): Raw {
+// The quiet line under a task: the holder's label (in quotes: it is their
+// note, never proof) and time left, what it is blocked by, or when it ended.
+function detail(t: Task): Raw | string {
   switch (t.state) {
     case "claimed":
-      return html`Held by ${who(ctx, t.holder, null)}
-        ${t.holder_label ? html`<span class="token-client">“${t.holder_label}”</span>` : ""}
-        <span class="token-client">Time left: ${time(t.expires_at)}</span>`;
+      return html`${t.holder_label ? html`“${t.holder_label}” · ` : ""}Time left: ${time(t.expires_at)}`;
     case "ready":
-      return t.status === "claimed" ? html`Its last claim ran out, so it can be taken again.` : html`Nobody has taken it yet.`;
-    case "blocked": {
-      const open = t.blockers.filter((b) => b.status !== "done");
-      return html`Waiting on ${nameList(open)}.`;
-    }
+      return t.status === "claimed" ? "Its last claim ran out, so it can be taken again." : "";
+    case "blocked":
+      return `Blocked by ${titles(t.blockers.filter((b) => b.status !== "done"))}.`;
     case "blocked_by_cancelled": {
-      const cancelled = t.blockers.filter((b) => b.status === "cancelled");
       const others = t.blockers.filter((b) => b.status !== "done" && b.status !== "cancelled");
-      return html`Blocked by a cancelled task: ${nameList(cancelled)}. A cancelled task never counts as done, so this one stays blocked until a person reopens that task, or cancels or skips this one.${
-        others.length ? html`<span class="token-client">Also waiting on ${nameList(others)}.</span>` : ""
+      return html`Blocked by a cancelled task: ${titles(t.blockers.filter((b) => b.status === "cancelled"))}. A cancelled task never counts as done, so this one stays blocked until a person reopens that task, or cancels or skips this one.${
+        others.length ? ` Also blocked by ${titles(others)}.` : ""
       }`;
     }
     case "done":
       return html`Done ${time(t.done_at)}.`;
     case "cancelled":
-      return html`Doesn’t count as done.`;
+      return "Doesn’t count as done.";
   }
 }
 
@@ -226,8 +267,8 @@ function detail(ctx: Ctx, t: Task): Raw {
 // (work_plan_status's o_moved, only ever set on a task not yet finished).
 function moved(id: string, t: Task): Raw | "" {
   if (!t.moved.length) return "";
-  return html`<span class="token-client">Context moved: ${t.moved.map((p, i) => html`${i ? ", " : ""}<a href="${filePath(id, p)}">${p}</a>`)} ${
-    t.moved.length === 1 ? "has" : "have"} a newer version than the one this task cites.</span>`;
+  return html`<p class="task-meta">A file it cites changed: ${t.moved.map((p, i) => html`${i ? ", " : ""}<a href="${filePath(id, p)}">${p}</a>`)} ${
+    t.moved.length === 1 ? "has" : "have"} a newer version than the one this task cites.</p>`;
 }
 
 // Cancel and skip are offered on a task that isn't finished either way,
@@ -236,25 +277,36 @@ const unfinished = (t: Task) => t.state !== "done" && t.state !== "cancelled";
 const VERBS = ["cancel", "skip", "reopen"] as const;
 type Verb = (typeof VERBS)[number];
 
-function taskTable(ctx: Ctx, id: string, path: string, rows: Task[], canAct: boolean): Raw {
-  const href = (verb: Verb, t: Task) => `${planPath(id, path)}&${verb}=${q(t.key)}`;
-  return html`<div class="table-wrap"><table class="table-stack member-list task-table">
-    <thead><tr><th scope="col">Task</th><th scope="col">State</th><th scope="col">Details</th>${
-      canAct ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""
-    }</tr></thead>
-    <tbody>${rows.map(
-      (t) => html`<tr><td><strong>${t.title}</strong><span class="token-client"><code>${t.key}</code></span></td>
-        <td class="small" data-label="State"><span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span>${
-          t.moved.length ? html` <span class="badge warning">Context moved</span>` : ""}</td>
-        <td class="small" data-label="Details"><div>${detail(ctx, t)}${moved(id, t)}</div></td>
-        ${canAct
-          ? unfinished(t)
-            ? html`<td class="row-actions"><a class="button quiet" href="${href("cancel", t)}" aria-label="Cancel the task ${t.title}">Cancel</a> <a class="button quiet" href="${href("skip", t)}" aria-label="Skip the task ${t.title}">Skip</a></td>`
-            : t.state === "cancelled"
-              ? html`<td class="row-actions"><a class="button quiet" href="${href("reopen", t)}" aria-label="Reopen the task ${t.title}">Reopen</a></td>`
-              : html`<td class="row-actions"></td>`
-          : ""}</tr>`,
-    )}</tbody></table></div>`;
+// One task as a compact row: its state in words (never colour alone), its
+// title, a chip for who holds it, and a quiet line under it. On the Tasks
+// page (`plan` given) the line also names the plan; on a plan's page, whoever
+// can write the plan file gets the row's actions (`canAct`).
+function taskRow(ctx: Ctx, id: string, t: Task, o: { plan?: string; canAct?: boolean }): Raw {
+  const href = (verb: Verb) => `${planPath(id, t.plan)}&${verb}=${q(t.key)}`;
+  const line = detail(t);
+  const actions = !o.canAct
+    ? ""
+    : unfinished(t)
+      ? menu({
+          label: `Actions for the task ${t.title}`,
+          icon: "more",
+          items: [
+            { href: href("skip"), label: "Skip", description: "Mark it done without anyone doing it" },
+            { href: href("cancel"), label: "Cancel", description: "Drop it from the plan", danger: true },
+          ],
+        })
+      : t.state === "cancelled"
+        ? html`<a class="button quiet" href="${href("reopen")}" aria-label="Reopen the task ${t.title}">Reopen</a>`
+        : "";
+  // A key is unique only within its plan, so only a plan's page gives rows an id.
+  return html`<li class="task-row"${o.plan ? "" : html` id="task-${t.key}"`}><div class="task-line">
+      <span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span>
+      <strong class="task-title">${t.title}</strong>
+      ${t.state === "claimed" ? html`<span class="chip task-holder">${who(ctx, t.holder, t.agent)}</span>` : ""}
+      ${t.moved.length ? html`<span class="badge warning">A file it cites changed</span>` : ""}
+      ${actions}</div>
+    ${o.plan || line ? html`<p class="task-meta">${o.plan ? html`<a href="${planPath(id, t.plan)}">${o.plan}</a>${line ? " · " : ""}` : ""}${line}</p>` : ""}
+    ${moved(id, t)}</li>`;
 }
 
 function fileNote(id: string, p: Plan): Raw | "" {
@@ -278,21 +330,26 @@ export async function plan(ctx: Ctx, id: string): Promise<Reply> {
     if (!p) return { back: tasksPath(id), note: `There’s no plan registered at ${shown(path)}.`, tone: "warning" };
     const rows = await loadTasks(c, id, path);
     const canAct = await writablePath(c, v, path);
-    const groups = GROUPS.map((g) => ({
-      ...g,
-      rows: rows.filter((t) => g.states.includes(t.state)).sort((a, b) => g.states.indexOf(a.state) - g.states.indexOf(b.state)),
-    })).filter((g) => g.rows.length);
+    const groups = grouped(GROUPS, rows);
+    const done = rows.filter((t) => t.state === "done");
     const body = html`
       ${pageHeader({
         crumb: [{ label: v.name, href: vaultPath(id) }, { label: "Tasks", href: tasksPath(id) }, { label: path.split("/").pop()! }],
-        title: path,
-        path: true,
+        title: p.title ?? path,
+        path: !p.title,
         description: `${p.done} of ${plural(total(p), "task")} done.`,
         meta: html`<p class="meta">${p.file === "deleted" ? "The plan file is gone" : html`<a href="${filePath(id, path)}">Open the plan file</a>`} · registered by ${who(ctx, p.registered_by, null)} ${time(p.registered_at)}</p>`,
       })}
       ${fileNote(id, p)}
-      ${groups.map((g) => html`<section aria-labelledby="g-${g.id}"><h2 id="g-${g.id}">${g.title} <span class="muted">${g.rows.length}</span></h2>${taskTable(ctx, id, path, g.rows, canAct)}</section>`)}
-      <p class="hint">${canAct ? "Cancel drops a task, and Reopen puts a cancelled one back. Skip marks a task done without anyone doing it, and can’t be undone from here. Each asks you to confirm first. " : ""}<a href="/docs/concepts/tasks">About tasks</a></p>`;
+      ${groups.map(
+        (g) => html`<section aria-labelledby="g-${g.id}"><h2 id="g-${g.id}">${g.title} <span class="muted">${g.rows.length}</span></h2>
+          <ul class="task-list">${g.rows.map((t) => taskRow(ctx, id, t, { canAct }))}</ul></section>`,
+      )}
+      ${done.length
+        ? html`<details class="task-done"><summary><h2 id="g-done">Done <span class="muted">${done.length}</span></h2></summary>
+            <ul class="task-list">${done.map((t) => taskRow(ctx, id, t, { canAct }))}</ul></details>`
+        : ""}
+      <p class="hint">${canAct ? "Cancel and Skip are in each open task’s ⋯ menu. Cancel drops a task, and Reopen puts a cancelled one back. Skip marks a task done without anyone doing it, and can’t be undone from here. Each asks you to confirm first. " : ""}<a href="/docs/concepts/tasks">About tasks</a></p>`;
     return { body, title: path };
   });
 }
