@@ -69,7 +69,7 @@ export function registerWorkPlanTools(
     {
       title: "Register a work plan",
       description:
-        "Register the steps in a plan file as a work plan, so they can be claimed in order. The file holds one fenced work_plan block (steps with a key, a title, and optionally blocked_by, cites, gate). This reads the file's current version and checks the block first, refusing with line-numbered errors before anything is registered; the database then checks it again. A path holds one plan: registering it again from a newer version adds the steps whose keys are new and keeps every registered step and its state; one removed or changed is refused. Whoever could write the path may register it; a read-only connection or a viewer can't.",
+        "Register the steps in a plan file as a work plan, so they can be claimed in order. The file holds one fenced work_plan block (steps with a key, a title, and optionally blocked_by, cites, gate). This reads the file's current version and checks the block first, refusing with line-numbered errors before anything is registered; the database then checks it again. Registering a newer version again adds steps with new keys; registered ones keep their state and can't change. Whoever could write the path may register it; a read-only connection or a viewer can't.",
       inputSchema: { vault: VAULT, path: PLAN_PATH },
       annotations: ADDITIVE,
     },
