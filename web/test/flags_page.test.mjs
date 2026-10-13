@@ -239,3 +239,19 @@ test("flags page: past 200 flags it says to reload for the next batch, and the r
   assert.equal((second.match(/<tr class="ev">/g) ?? []).length, 1);
   assert.doesNotMatch(second, /More than 200 flags/);
 });
+
+test("flags page: a task awaiting review is waiting on you, named in words and linked to its plan", async () => {
+  [{ id: V.tasks }] = await as(FRAN, "select public.create_vault('Flags tasks', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.tasks, GIL, FRAN]);
+  await as(FRAN, "select public.write_file($1, 'plans/p.md', 'a plan')", [V.tasks]);
+  await as(FRAN, `select public.register_work_plan($1, 'plans/p.md', (select current_version_id from public.files where vault_id = $1 and path = 'plans/p.md'),
+                    '[{"key":"brief","title":"Write the <brief>","gate":"review"}]'::jsonb)`, [V.tasks]);
+  assert.match(await page(flagsUrl(V.tasks)), /<strong>Nothing new<\/strong>/);
+  await as(GIL, "select public.complete_step($1, 'plans/p.md', 'brief', f.o_fence, f.o_secret) from public.claim_step($1, 'plans/p.md', 'brief') f", [V.tasks]);
+
+  const rows = [...(await page(flagsUrl(V.tasks))).matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 1);
+  assert.match(rows[0], /<span class="badge warning">Waiting on you<\/span>/);
+  assert.match(rows[0], new RegExp(`<a href="/v/${V.tasks}/tasks/plan\\?path=plans%2Fp\\.md">Task “Write the &lt;brief&gt;” awaits your review</a>`));
+  assert.doesNotMatch(rows[0], /cited in/);
+});

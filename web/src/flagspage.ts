@@ -41,6 +41,8 @@ type Flag = {
   thread_id: string | null;
   message_id: number | null;
   plan: string | null;
+  step: string | null;
+  step_title: string | null;
 };
 
 // The widest page list_flags takes, so "loading the page" and "marking it
@@ -62,7 +64,9 @@ function flagsTable(ctx: Ctx, id: string, rows: Flag[]): Raw {
     <thead><tr><th>When</th><th>Why</th><th>What</th><th>Where</th><th>By</th></tr></thead>
     <tbody>${rows.map((f) => {
       const what = describe(ctx.userId, { event: f.event });
-      const whatCell = f.proposal_id
+      const whatCell = f.reason === "step_review" && f.plan
+        ? html`<a href="${planPath(id, f.plan)}">Task “${f.step_title}” awaits your review</a>`
+        : f.proposal_id
         ? html`<a href="${proposalPath(id, f.proposal_id)}">${what}</a>`
         : f.thread_id
           ? html`<a href="${threadPath(id, f.thread_id)}${f.message_id === null ? "" : `#message-${f.message_id}`}">${what}</a>`
@@ -76,7 +80,7 @@ function flagsTable(ctx: Ctx, id: string, rows: Flag[]): Raw {
         <td class="small">${categoryBadge(f)}</td>
         <td class="small ev-what">${whatCell}</td>
         <td class="path-cell">${whereCell}${f.watching && f.watching !== f.path ? html`<span class="token-client">via ${f.watching}</span>` : ""}${
-          f.plan ? html`<span class="token-client">cited in <a href="${planPath(id, f.plan)}">${f.plan}</a></span>` : ""}</td>
+          f.reason === "cite_moved" && f.plan ? html`<span class="token-client">cited in <a href="${planPath(id, f.plan)}">${f.plan}</a></span>` : ""}</td>
         <td class="small">${who(ctx, f.actor, f.agent)}</td></tr>`;
     })}</tbody></table></div>`;
 }
@@ -92,7 +96,7 @@ export async function flags(ctx: Ctx, id: string): Promise<Reply> {
     // nothing (design.md, "A separate watermark").
     await c.query(`select public.advance_flags($1, $2)`, [id, r.through]);
     const body = html`
-      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: threads for you, a proposal waiting on you, your own proposals, paths you watch, and files cited by tasks of yours.`)}
+      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: threads for you, a proposal or a task waiting on you, your own proposals, paths you watch, and files cited by tasks of yours.`)}
       ${r.flags.length
         ? flagsTable(ctx, id, r.flags)
         : emptyState({
