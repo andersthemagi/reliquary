@@ -22,13 +22,13 @@ Whoever could write a path can claim it; a read-only connection can't. One activ
 
 How long a claim lasts, and how many a connection or person may hold, is a rule, not a fixed number: one for the whole vault, with optional overrides by path prefix, the same specificity as [canon and open rules](canon-and-rules.md) (an exact path, then the longest folder that covers it, then the whole vault). With no rule at all, a claim lasts 48 hours, with a seven-day hold limit, one claim per connection and five per person.
 
-A rule sets four things:
+A rule sets:
 
 - **Lease:** how long a claim lasts if its agent goes quiet. Every check-in starts the lease again.
 - **Hold limit:** the longest one claim can be kept, however often it checks in. After that the agent releases it and claims again. At least the lease, at most 365 days.
-- **Claims per connection:** how many claims one connection (one agent) may hold in the vault at once.
+- **Claims per connection:** how many claims one connection (one agent) may hold in the vault at once. Held steps of a work plan count separately, under the same numbers.
 - **Claims per person:** how many all of one person's agents may hold together.
-- **Place in line, longest check-again hint and minimum gap:** how an agent waits for a task when none is free. See [Waiting in line](tasks.md#the-settings).
+- **Place in line, longest check-again hint and minimum gap:** how an agent waits for a task when none is free. See [Waiting in line](tasks.md#waiting-in-line) and [Limits and settings](tasks.md#limits-and-settings).
 
 Three presets are starting points, not measurements: tune one once it actually causes a problem.
 
@@ -58,31 +58,4 @@ Claims are state, not content: deleting a vault clears its claims along with eve
 
 ## Work plans
 
-A work plan is steps with dependencies, so no agent is handed a step before the ones it's blocked by are done. A plan lives in its own file, as a fenced block:
-
-```work_plan
-- key: fetch-data
-  title: Fetch raw data from the api
-  cites: docs/data-source.md@3fa85f64-5717-4562-b3fc-2c963f66afa6
-- key: clean-data
-  title: Clean and normalize
-  blocked_by: fetch-data
-  cites: docs/data-source.md@3fa85f64-5717-4562-b3fc-2c963f66afa6
-  gate: review
-```
-
-Each step has a `key` (lowercase letters, digits and hyphens, unique in the plan) and a `title`. `blocked_by` names other steps' keys, comma-separated; `cites` names canon paths this step's work depends on, each as `path@version`, comma-separated; `gate: review` holds what waits on the step until a person approves it, directly or by applying the proposal its agent linked ([Tasks that need a person's review](tasks.md#tasks-that-need-a-persons-review)). A malformed block, a blocker that doesn't exist, or a cycle of steps blocking each other is refused, naming the line and why.
-
-Registering a plan from its file turns each step into a row with a status (`open`, `claimed`, awaiting review, `done` or `cancelled`) and a live, computed one layered on top for people and agents to read (`ready`, `blocked`, `blocked_by_cancelled`, or the stored status itself once it's `claimed`, `awaiting_review`, `done` or `cancelled`): a step is `ready` exactly when every step blocking it is done. Claiming a ready step works the same way claiming a path does (a lease, a secret returned once, the same check-again-later shape); finishing it frees every step it was blocking. Checking in restarts a claimed step's lease without finishing it, the same shape checking in on a path claim already has, and is capped the same way: no amount of checking in holds a step past its hold limit, counted from when it was first claimed. Only a person can cancel a step (its dependents stay blocked forever, on purpose, until a person acts), skip one (marks it done without anyone having claimed it, so dependents proceed as if it were), or reopen a cancelled one (it is open again, and its dependents wait for it to be done).
-
-A person sees a vault's plans, and what each task is doing, on the vault's [Tasks](tasks.md) page, and cancels, skips or reopens a task there.
-
-### Registering and working a plan (agents)
-
-An agent registers a plan with `register_work_plan`, naming the vault and the plan file's path. Reliquary reads the file's current version, checks the block, and refuses with the file's own line numbers before anything is registered. The database then checks it again, so a plan that passes the first check can still be refused (more than 500 steps, for example). A path holds one plan. Registering it again from a newer version of the file adds the steps whose keys are new, and keeps every registered step and its state; a registered step that is missing from the file or changed in it is refused, by name, and nothing is added ([Adding tasks to a plan](tasks.md#adding-tasks-to-a-plan)). Whoever could write the path may register it, so a read-only connection or a viewer can't. A plan waiting in a proposal has no file yet, so there is nothing to register until a person approves it.
-
-`work_plan_status` lists the steps in plan order: each one's state, what it is waiting on, who holds it and until when, and what it cites. A step that is not done or cancelled and cites a file that now has a newer version says `context moved` on its state line, and names the moved files with its cites. Read those files again before working it. The person who registered the plan, and whoever holds such a step, are also flagged (see [Flags](flags.md)) when the file changes.
-
-To get work, an agent calls `request_work` with the plan's path, and is given any ready step or told to wait its turn ([Waiting in line](tasks.md#waiting-in-line)). It can also claim one step by key with `claim_step`. Only a ready step can be claimed. The lease is the vault's claim rule for the plan's path, and the response returns a secret once, with a fence number, the same way `claim_path` does. `checkin_step` restarts the lease, `complete_step` marks the step done and frees the steps it was blocking (a review-gated step waits for a person's approval first, and its agent may name the proposal holding its output), and `release_step` gives it back. All three need the secret and the fence, from the same connection and person. A blocked step, a step someone else holds, a done or cancelled step, and a stale fence or secret are each refused, with the reason. Claiming by key keeps to the line, the claim rule's caps and the cooldown ([Claiming a task by name](tasks.md#claiming-a-task-by-name)): while others wait ahead for the ready steps, while the connection or its person holds as many steps as the rule allows, or while its person cools down, it is refused.
-
-Agents never cancel, skip, reopen or approve a step: those stay with a person. When cancelled work needs doing after all, an agent adds a step naming the old one by its key to the same plan file and registers it again; a person reopens the old step only when the work really is the same task. A step's title, its cites and a claim's label are text that people and agents wrote, so an agent sees them between markers as data, never as instructions. A title that says "ignore your instructions" is only a title.
+An agent holds a step of a [work plan](tasks.md) the same way it holds a claim on a path: a lease, a secret returned once and a fence, with checking in, giving it back and a hold limit, all set by the same claim rules. Unlike a path claim, a step is handed out in order: an agent gets one only when every step it waits on is done, and when it is its turn in line. See [Tasks](tasks.md).
