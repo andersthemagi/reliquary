@@ -253,7 +253,7 @@ function fileNote(id: string, p: Plan): Raw | "" {
   if (p.file === "changed")
     return callout(
       "warning",
-      html`<p>This plan’s file has changed since the plan was registered. The tasks below come from the version it was registered from, and that is what agents work from. A plan is registered once, so they don’t follow the change. <a href="${filePath(id, p.path, "history")}">See the file’s history</a></p>`,
+      html`<p>This plan’s file has changed since the plan was registered. The tasks below come from the version last registered, and that is what agents work from. If the change adds tasks, an agent registers the file again to add them; tasks already here keep their state. <a href="${filePath(id, p.path, "history")}">See the file’s history</a></p>`,
     );
   if (p.file === "deleted") return callout("warning", "This plan’s file has been deleted. The tasks below stay, and agents can still work from them.");
   return "";

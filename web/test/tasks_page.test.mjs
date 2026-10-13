@@ -473,3 +473,27 @@ test("context moved: a task citing a file with a newer version says context move
   assert.match(flags, /<span class="badge warning">Context moved<\/span>/);
   assert.match(flags, new RegExp(`cited in <a href="${tasksUrl(V.main)}/plan\\?path=plans%2Fmoved\\.md">plans/moved\\.md</a>`));
 });
+
+// ---------------------------------------------------------------------------
+// A plan that gained tasks (20261013160000_work_plan_gains_steps.sql)
+
+test("plan gains tasks: registering the changed file again clears the marker, adds the new task and keeps the old one's state", async () => {
+  const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks grows', 'open') as id");
+  const path = "plans/grows.md";
+  await register(NOA, v, path, [{ key: "first", title: "First task" }]);
+  const first = await claim(NOA, v, path, "first", null);
+  await as(NOA, "select public.complete_step($1, $2, 'first', $3, $4)", [v, path, first.o_fence, first.o_secret]);
+  await as(NOA, "select public.write_file($1, $2, 'The plan, with a second task')", [v, path]);
+  assert.match(
+    await page(noa, planUrl(v, path)),
+    /The tasks below come from the version last registered, and that is what agents work from\. If the change adds tasks, an agent registers the file again to add them; tasks already here keep their state\./,
+  );
+
+  await register(NOA, v, path, [{ key: "first", title: "First task" }, { key: "second", title: "Second task", blocked_by: ["first"] }]);
+  const list = await page(noa, tasksUrl(v));
+  assert.match(list.split("<tr>").find((r) => r.includes(path)), /<span class="muted">Unchanged<\/span>/);
+  assert.match(list, /1 of 2 done/);
+  const h = await page(noa, planUrl(v, path));
+  assert.match(taskRow(h, "first"), /<span class="badge">Done<\/span>/);
+  assert.match(taskRow(h, "second"), /<span class="badge success">Ready<\/span>/);
+});
