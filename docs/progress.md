@@ -19,7 +19,7 @@ not the whole file top to bottom.
 - [Flags](#alongside-milestone-3-flags), alongside milestone 3: built, except addressed notes.
 - [Docs, plans, limits, admission, concurrency](#also-alongside-docs-plans-limits-admission-concurrency): built.
 - [Compare-and-swap writes, claims and work plans](#alongside-milestone-3-compare-and-swap-writes-claims-and-work-plans): built, except waiting in line.
-- [Threads, the audience split and the Tasks view](#alongside-milestone-3-threads-the-audience-split-and-the-tasks-view): built, except threads in the export.
+- [Threads, the audience split and the Tasks view](#alongside-milestone-3-threads-the-audience-split-and-the-tasks-view): built.
 
 ## Decisions
 
@@ -619,7 +619,9 @@ requests. Each pull request that builds a part adds its own line here.
   `20261005100000_thread_flags.sql`), flags for messages (#127), the web page
   (#128, `web/src/threadspage.ts` with `threadnew.ts`, `threadview.ts` and
   `threadredact.ts`) and the MCP tools (#129, `mcp/src/thread-tools.ts`).
-  Not built: threads in a vault's export.
+  Threads in a vault's export built 2026-10-13 (#197,
+  `20261013150000_export_threads.sql`, `web/src/export.ts`): a Markdown
+  file per thread under `threads/` and a `threads` list in the manifest.
 - **The Tasks view and the MCP step tools.** A page where a person sees and
   steers the steps agents are working, shown as tasks, and MCP tools over
   the step functions the database already has (`register_work_plan`,
