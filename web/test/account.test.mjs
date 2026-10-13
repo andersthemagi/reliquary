@@ -381,7 +381,7 @@ test("delete account: while I'm the only owner of a vault, the page lists it wit
   const h = main(await (await get("/settings/delete", jar)).text());
   assert.match(h, /Your account can’t be deleted yet/);
   assert.match(h, /You’re the only owner of this vault, and a vault always keeps an owner\. Before you can delete your account, for each one make someone else an owner on its Members page, or delete the vault\./);
-  assert.match(h, new RegExp(`<li><span><strong>Acct Wes Solo</strong></span><span class="actions"><a href="/v/${W.solo}/config/members">Members</a> <a href="/v/${W.solo}/config/danger">Delete vault</a></span></li>`));
+  assert.match(h, new RegExp(`<li><span><strong>Acct Wes Solo</strong></span><span class="actions"><a href="/v/${W.solo}/config/members">Members</a> <a href="/v/${W.solo}/config#danger">Delete vault</a></span></li>`));
   assert.doesNotMatch(h, /Acct Shared/);
   assert.doesNotMatch(h, /action="\/settings\/delete"/);
 });
