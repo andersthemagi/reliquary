@@ -99,9 +99,9 @@ test("threads list: newest activity first, each row with its title, opener, mess
   assert.doesNotMatch(wide, /Side thread|Resolved/);
 });
 
-test("review rows: a thread and a proposal share one row: title, path chip, who, then badges, count and time at the end", async () => {
+test("review rows: a thread and a proposal share one row: title, path chip, who, then any badges, count and time at the end", async () => {
   const shape =
-    /^<li[^>]*>\s*<span class="review-main"><a class="name" href="[^"]+">[^<]+<\/a>\s*<span class="review-meta small"><span class="path-chip">[^<]+<\/span><span class="muted">[^<]+<\/span><\/span><\/span>\s*<span class="row-end small">[\s\S]*<span class="badge[^"]*">[^<]+<\/span>[\s\S]*<span class="muted">(?:\d+ messages?|\d+ of \d+ approvals?)<\/span><span class="muted"><time [^>]+>[^<]+<\/time><\/span><\/span>\s*<\/li>$/;
+    /^<li[^>]*>\s*<span class="review-main"><a class="name" href="[^"]+">[^<]+<\/a>\s*<span class="review-meta small"><span class="path-chip">[^<]+<\/span><span class="muted">[^<]+<\/span><\/span><\/span>\s*<span class="row-end small">(?:[\s\S]*<span class="badge[^"]*">[^<]+<\/span>[\s\S]*)?<span class="muted">(?:\d+ messages?|\d+ of \d+ approvals?)<\/span><span class="muted"><time [^>]+>[^<]+<\/time><\/span><\/span>\s*<\/li>$/;
   assert.match(rowOf(await page(noa, threads(V.main)), "Plan the launch"), shape);
   assert.match(rowOf(await page(noa, `/v/${V.main}/proposals`), "Create brief.md"), shape);
 });

@@ -32,20 +32,19 @@ The refusal says which rule the path broke. In the web app the same form comes b
 
 ## A vault's overview
 
-A vault opens on its **Overview**, the first item in its sidebar: a start-here page for someone joining mid-project. The top has **Connect an agent** and, if you can write, **New file**. Under it are four cards, each with **See all** for the full page:
+A vault opens on its **Overview**, the first item in its sidebar: a start-here page for someone joining mid-project. The top has **Connect an agent** and, if you can write, **New file**. Under the vault's name is one line of facts, each a link: **Nothing waiting on you** (or how many [flags](flags.md) you haven't seen), how many [tasks](tasks.md) are ready to pick up, how many members (by role when you point at it), and agent connections. An owner sees every member's connections to the vault; everyone else sees their own. Under it are short lists, each with **See all** for the full page:
 
-- **Waiting on you**: proposals waiting for your review, oldest first, and how many [flags](flags.md) you haven't seen. Opening the overview doesn't mark flags seen; only the **Flags** page does.
-- **Tasks in progress**: each [task](tasks.md) someone is working on, and who: a person, or a person via their agent. Under it, how many tasks are ready to pick up.
-- **Recent changes**: the last five lines of **Changes**, in the same words.
-- **People**: how many members, by role, and agent connections. An owner sees every member's connections to the vault; everyone else sees their own.
+- **Waiting on you**, only when something is: proposals waiting for your review, oldest first.
+- **In progress**: each task someone is working on, and who: a person, or a person via their agent.
+- **Recent changes**: the last five lines of **Updates**, in the same words.
 
-A card with nothing to show says so in one line. Under the cards is the vault's top `README.md`, if it has one. The overview is built from what the vault already records: nothing on it is generated or summarised.
+Opening the overview doesn't mark flags seen; only **Updates** does. A list with nothing to show says so in one line. Under the lists is the vault's top `README.md`, if it has one. The overview is built from what the vault already records: nothing on it is generated or summarised.
 
 ## Reading and searching
 
 In the web app, **Files** in a vault's sidebar is its folder list: each folder and file shows whether it is canon or open, the top says what files without a rule are, and a folder's `README.md` is shown under its list. The vault's name at the start of a breadcrumb goes to its **Overview**; deleting or erasing a file takes you back to **Files**. **Search** finds files by their words and paths. **New file** in a folder follows that folder's rule: in a canon folder it asks why and becomes a proposal. In an open folder it never writes over a file that is already there: it says so and keeps what you typed, so open that file and choose **Edit**, or pick another path.
 
-On a wide screen, a vault's sidebar lists its sections in two groups: **Work** (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Updates**), the ones you use every day, then **Setup** (**Variables**, **Links**, **Settings**). **Proposals** counts the open proposals, and **Updates** counts the [flags](flags.md) waiting for you. Under them, **Files** heads the folder tree, and the search box has its own search button. On a phone, a vault's sections (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Updates**, **Variables**, **Links**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
+On a wide screen, a vault's sidebar lists its sections in two groups: **Work** (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Updates**), the ones you use every day, then **Setup** (**Variables**, **Links**, **Settings**). **Proposals** counts the open proposals, and **Updates** counts the [flags](flags.md) waiting for you. Under them, **Files** heads the folder tree, and the search box has its own search button. On a phone, one menu at the top names the section you're in, with a count when proposals or flags are waiting; open it for the same sections and groups as the sidebar, then the folder tree. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
 

@@ -18,7 +18,7 @@ A proposal is one of:
 | Rejected | a reviewer rejected it, with a note |
 | Stale | the file changed after it was proposed, so it can't apply; **Propose again** (or `propose` with the same text) starts a new one on the current file |
 
-A vault's **Proposals** page lists them in tabs, each with its count: **Open**, **Changes requested**, **Applied** and **Closed** (rejected and stale ones, each marked). Each row reads the same way here, on Home and in the Inbox, and like a row on the Threads page: what it does and to which file, such as "Change rates.md", the file's full path, and who proposed it, such as "sol@example.com via Claude Code". At the end are its state, the first thing worth a closer look, its approvals as "0 of 1 approval", and when it was proposed. A decided proposal's row says who decided instead of its approvals, such as "Rejected by you", and when.
+A vault's **Proposals** page lists them in tabs, each with its count: **Open**, **Changes requested**, **Applied** and **Closed** (rejected and stale ones, each marked). Each row reads the same way here, on Home and in the Inbox, and like a row on the Threads page: what it does and to which file, such as "Change rates.md", the file's full path when it is in a folder, and who proposed it, such as "sol@example.com via Claude Code". At the end are its state when it isn't open, the first thing worth a closer look, its approvals as "0 of 1 approval", and when it was proposed. A decided proposal's row says who decided instead of its approvals, such as "Rejected by you", and when.
 
 ## Reviewing
 
@@ -55,7 +55,7 @@ Above the decision, a proposal page flags facts about the change itself, never w
 | Revised once | the proposer revised it; approvals of earlier revisions don't count |
 | First proposal from an agent | the first proposal from that agent in this vault |
 
-Files under four lines, blank lines and added lines don't raise a line flag. A new file is marked **New file**, not flagged.
+Files under four lines, blank lines and added lines don't raise a line flag. A new file is marked **New file** on its proposal’s page, and its row in a list says **Create**; it isn’t flagged.
 
 Only people approve, request changes or reject, in the web app. An agent can't, over any tool. See [Agents and the ceiling](agents.md).
 

@@ -103,7 +103,7 @@ test("thread page: the thread, then its messages oldest first, each with who wro
   assert.match(msgs[1].html, /edda@example\.test · <time/);
   assert.match(msgs[1].html, /<p>Nearly\.\nOne more pass\.<\/p>/, "line breaks are kept in the text");
   assert.ok(Number(msgs[0].id) < Number(msgs[1].id) && Number(msgs[1].id) < Number(msgs[2].id));
-  assert.match(h, new RegExp(`<a href="/v/${V.main}/threads" aria-current="page">Threads</a>`), "the vault's Threads entry is current");
+  assert.match(h, new RegExp(`<a href="/v/${V.main}/threads" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Threads</span></a>`), "the vault's Threads entry is current");
   assert.deepEqual([...h.matchAll(/<h([1-6])[ >]/g)].map((m) => m[1]), ["1", "2", "2"], "headings in order: title, Messages, Reply");
   assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1);
 });

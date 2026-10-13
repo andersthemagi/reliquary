@@ -177,9 +177,10 @@ own, still conventional:
   enough to be noticed and serves the "people and agents read this"
   promise. SIL OFL, self-hosted, one variable latin `woff2` per style
   (about 34 KB upright, 38 KB italic, against Inter's 73 KB and 52 KB).
-- **Geist Mono** for code and metadata: times, the meta line under a
-  title and numbers in tables, so they line up and read as an index
-  beside the text. SIL OFL, about 23 KB. Chosen over IBM Plex, Instrument
+- **Geist Mono** for code and metadata: times and numbers in tables, so
+  they line up and read as an index beside the text. Not the meta line
+  under a title (2026-10-13: a sentence in mono read as a typo, not an
+  index), and with word gaps tightened, since a mono space is letter-wide. SIL OFL, about 23 KB. Chosen over IBM Plex, Instrument
   Sans and Hanken Grotesk in a side-by-side specimen of the real
   components.
 - **Square corners** on every box (`--radius-sm`, `-md`, `-lg` are 0);

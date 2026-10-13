@@ -142,7 +142,7 @@ test("members: Settings links to Members, which lists each member by email and r
   const h = await page("olga", members(V.team));
   assert.match(h, /<h1>Settings<\/h1>/);
   assert.match(h, new RegExp(`<a href="/v/${V.team}/config/members" aria-current="page">Members</a>`));
-  assert.match(h, new RegExp(`href="/v/${V.team}/config" aria-current="page">Settings`));
+  assert.match(h, new RegExp(`href="/v/${V.team}/config" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Settings</span>`));
   assert.match(h, /<td>olga@example\.test <span class="badge">You<\/span><\/td>/);
   assert.match(h, /<td>paul@example\.test<\/td>/);
   assert.match(h, /Owner<span class="muted token-client">The only owner<\/span>/);

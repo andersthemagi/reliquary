@@ -386,6 +386,9 @@ strong { font-weight: 600; }
 .app-top .app-nav {
   order: 3; width: calc(100% + 2 * var(--space-6)); margin: 0 calc(-1 * var(--space-6));
   padding: 0 var(--space-4); border-top: 1px solid var(--border); min-height: 44px;
+  /* The rule spans the window like the bar's bottom border, not just the
+     capped content width (outset is ink overflow: it adds no scroll). */
+  border-image: linear-gradient(var(--border), var(--border)) 1 0 0 / 1px 0 0 / 0 100vw;
 }
 @media (max-width: 1080px) {
   .app-top .top-inner { gap: var(--space-4); }
@@ -465,10 +468,11 @@ main#main:not([class]) h2:not(.prose *)::before {
   content: ""; display: inline-block; width: 12px; height: 3px; margin-right: var(--space-3);
   vertical-align: 0.3em; background: var(--brand);
 }
-/* Metadata in the mono face: times, the meta line under a title, numbers in
-   tables. A catalogue's index next to the body text, and figures that line
-   up without depending on the text face's tabular digits. */
-time, .meta, td.num { font-family: var(--font-mono); font-size: 0.92em; letter-spacing: -0.01em; }
+/* Metadata in the mono face: times and numbers in tables. A catalogue's
+   index next to the body text, and figures that line up. Not whole
+   sentences (a .meta line reads as prose, so it keeps the body face), and
+   word gaps tightened, since a mono space is as wide as a letter. */
+time, td.num { font-family: var(--font-mono); font-size: 0.92em; letter-spacing: -0.01em; word-spacing: -0.3em; }
 .meta time, td.num time { font-size: 1em; }
 p { margin: 0 0 var(--space-4); max-width: var(--measure); }
 .lede { color: var(--fg-muted); max-width: var(--measure); margin-bottom: var(--space-6); }
@@ -822,7 +826,7 @@ a.dir { font-weight: 600; }
 .mark { width: 7px; height: 7px; flex: none; transform: rotate(45deg); }
 .mark.canon { background: var(--fg); }
 .mark.open { box-shadow: inset 0 0 0 1.25px var(--fg-muted); }
-.tree-mobile { display: none; }
+.vault-menu { display: none; }
 
 /* Rule line on file and folder headers */
 .rule { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin: 0; }
@@ -1110,25 +1114,26 @@ textarea.secret-input { font-family: var(--font-mono); font-size: var(--text-sm)
 @media (max-width: 767px) {
   .vault { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
   .side { display: none; }
-  .tree-mobile { display: block; }
-  .tree-mobile > summary {
-    display: inline-flex; align-items: center; gap: var(--space-3); list-style: none; cursor: pointer;
-    min-height: var(--control-md); padding: 0 14px; font-size: var(--text-sm); font-weight: 500;
+  /* One menu names the section you're in; open, it is the sidebar. */
+  .vault-menu { display: block; }
+  .vault-menu > summary {
+    display: flex; align-items: center; gap: var(--space-3); list-style: none; cursor: pointer;
+    min-height: var(--control-md); padding: 0 14px; font-size: var(--text-sm); font-weight: 600;
     border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg);
   }
-  .tree-mobile > summary::-webkit-details-marker { display: none; }
-  .tree-mobile > summary::after {
+  .vault-menu > summary::-webkit-details-marker { display: none; }
+  .vault-menu > summary .side-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vault-menu > summary::after {
     content: ""; width: 6px; height: 6px; margin-top: -3px;
     border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg);
   }
-  .tree-mobile[open] > summary { margin-bottom: var(--space-3); }
-  .tree-mobile .tree summary, .tree-mobile .tree .leaf { min-height: 44px; padding-top: 0; padding-bottom: 0; }
-  .tree-mobile .tree a { align-self: stretch; display: flex; align-items: center; }
-  .tree-mobile .side-links, .tree-mobile .tree {
-    background: var(--bg-subtle); border: 1px solid var(--border); padding: var(--space-3);
+  .vault-menu[open] > summary::after { margin-top: 3px; transform: rotate(-135deg); }
+  .vault-menu .side-links, .vault-menu .tree {
+    background: var(--bg-subtle); border: 1px solid var(--border); border-top: 0; padding: var(--space-3);
   }
-  .tree-mobile .side-links { border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-bottom: 0; }
-  .tree-mobile .tree { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+  .vault-menu .side-links a, .vault-menu .tree summary, .vault-menu .tree .leaf { min-height: 44px; }
+  .vault-menu .tree summary, .vault-menu .tree .leaf { padding-top: 0; padding-bottom: 0; }
+  .vault-menu .tree a { align-self: stretch; display: flex; align-items: center; }
 }
 
 @media (max-width: 640px) {
@@ -1311,8 +1316,14 @@ form.confirm .actions:first-child { margin-top: 0; }
 .task-line .badge { white-space: normal; padding-block: 2px; }
 .task-title { font-weight: 500; overflow-wrap: anywhere; }
 .task-line > :is(.action-menu, .button) { margin-left: auto; }
-.task-holder.chip { min-height: 0; padding: 0 var(--space-3); font-size: var(--text-xs); }
-.task-meta { margin: var(--space-2) 0 0; color: var(--fg-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.task-holder { color: var(--fg); }
+/* Only the two top priorities and a passed due date take colour, so a
+   colour on the line always means look here. */
+.task-prio { font-weight: 600; }
+.task-prio.p1 { color: var(--danger); }
+.task-prio.p2 { color: var(--attention); }
+.task-due.overdue { color: var(--danger); font-weight: 500; }
+.task-meta { margin: var(--space-2) 0 0; max-width: none; color: var(--fg-muted); font-size: var(--text-sm); overflow-wrap: break-word; }
 .task-done > summary { cursor: pointer; }
 .task-done > summary h2 { display: inline; }
 .plan-cards { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
@@ -1619,18 +1630,11 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .failure-details[open] > summary { margin-bottom: var(--space-3); }
 
 /* Package B: files and folders */
-/* A vault's sections as tabs on phones (files.ts vaultShell): the sidebar
-   holds them on wide screens, so the row shows only below 768px. The folder
-   tree stays behind "Browse files". */
-.vault-tabs { display: none; min-width: 0; }
-.vault-tabs > .tabs { margin: 0; }
 /* The root's Search button stands in for the sidebar's search box, which is
    hidden on phones. */
 .vault-search-link { display: none; }
 @media (max-width: 767px) {
-  .vault-tabs { display: block; }
   .vault-search-link { display: inline-flex; }
-  .tree-mobile > summary { width: 100%; justify-content: space-between; }
 }
 /* The root's rule line: the default, the rules, what canon means. */
 .root-rule .badge { margin: 0 calc(-1 * var(--space-1)); }
@@ -1886,19 +1890,32 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 .card-stats dt { color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); }
 .card-stats dd { margin: 0; overflow-wrap: anywhere; }
 .card-stats .usage-meter { margin-bottom: 0; }
-.card-counts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.card-counts a {
-  display: inline-flex; align-items: center; min-height: 26px; padding: 0 var(--space-3); border-radius: 999px;
-  background: var(--bg-muted); color: var(--fg); font-weight: 500; text-decoration: none;
-}
-.card-counts a:hover { background: var(--border); }
+/* What waits in a vault, as plain links in a row: on a grid of cards, a
+   pill per count was the loudest thing on each card. */
+.card-counts { display: flex; flex-wrap: wrap; gap: 0 var(--space-4); font-size: var(--text-sm); font-weight: 500; }
+.card-foot .badge { background: none; border: 0; padding: 0; font-weight: 400; color: inherit; }
 .card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--text-xs); line-height: var(--lh-xs); }
-/* A vault's Overview (overview.ts): its cards hold several links rather
-   than being one, so hovering a card darkens nothing. */
-.overview-card:hover, .overview-card:active { border-color: var(--border); }
-.overview-card .see-all { flex: none; font-size: var(--text-xs); line-height: var(--lh-xs); }
-.card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-.card-list li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); min-width: 0; overflow-wrap: anywhere; }
+/* A vault's Overview (overview.ts): a line of facts under the title, then
+   short ruled lists, two side by side when there is room. A row is the
+   thing on the left, who and when on the right; a long title wraps between
+   words, the right side never wraps. */
+.overview-glance { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); margin: 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.overview-glance a { color: inherit; text-decoration-color: var(--border-strong); }
+.overview-glance a:hover { color: var(--fg); }
+.overview-glance .sep { color: var(--border-strong); }
+.overview-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 0 var(--space-6); }
+.overview-section { margin: 0 0 var(--space-6); min-width: 0; }
+.overview-section .section-head { margin: 0; padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); }
+.overview-section .see-all { font-size: var(--text-sm); }
+.overview-section > p { margin: var(--space-3) 0 0; }
+.overview-list { list-style: none; margin: 0; padding: 0; }
+.overview-list li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.overview-list li > :first-child { min-width: 0; overflow-wrap: break-word; }
+/* A path wraps as a whole, onto its own line, never at its hyphens. */
+.overview-list li > :first-child a { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+#connect-nudge p { max-width: none; }
+.overview-list li > :last-child:not(:first-child) { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-muted); font-size: var(--text-sm); }
+.callout.info p strong { display: inline; }
 /* The first-vault checklist: three numbered steps, read left-aligned. */
 .first-steps { max-width: var(--measure); margin: 0 auto var(--space-5); padding-left: 1.5em; text-align: left; color: var(--fg); }
 .first-steps li + li { margin-top: var(--space-3); }

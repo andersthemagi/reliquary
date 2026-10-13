@@ -135,7 +135,7 @@ test("diagnostics: Settings has a Diagnostics tab, and its page says what it is 
   assert.match(h, /<h1>Settings<\/h1>/);
   assert.match(h, /<p class="page-desc">For working out why something happened; most people never need it\.<\/p>/);
   assert.match(h, new RegExp(`<a href="/v/${V.main}/diagnostics" aria-current="page">Diagnostics</a>`), "the Settings tab is current");
-  assert.match(h, new RegExp(`href="/v/${V.main}/config" aria-current="page">Settings`), "the sidebar's Settings is current");
+  assert.match(h, new RegExp(`href="/v/${V.main}/config" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Settings</span>`), "the sidebar's Settings is current");
   const inner = /<nav class="tabs" aria-label="Diagnostics">([\s\S]*?)<\/nav>/.exec(h)?.[1];
   assert.ok(inner, "the inner tabs");
   assert.deepEqual([...inner.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)</g)].map((m) => [m[1], m[2]]), [

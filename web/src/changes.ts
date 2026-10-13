@@ -247,7 +247,7 @@ export async function recentChanges(c: pg.PoolClient, ctx: Ctx, id: string, n: n
   const lines = (await readPage(c, ctx.userId, id)).lines.slice(0, n);
   if (!lines.length) return null;
   const live = await livePaths(c, id, lines);
-  return html`<ul class="card-list">${lines.map((l) => changeLine(ctx, id, l, live))}</ul>`;
+  return html`<ul class="overview-list">${lines.map((l) => changeLine(ctx, id, l, live))}</ul>`;
 }
 
 export async function changes(ctx: Ctx, id: string): Promise<Reply> {

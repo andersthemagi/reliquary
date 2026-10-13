@@ -93,7 +93,9 @@ export const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false
   const r = done ? [] : risks(p);
   const end = done
     ? html`<span class="muted outcome">${outcome(ctx, p.status, p.deciders ?? [], null)}</span> ${stateBadge(p.status)}`
-    : html`${stateBadge(p.status)} ${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${
+    : // A list of live proposals is open by default and the title already
+      // says Create: only a state other than Open earns a badge here.
+      html`${p.status === "open" ? "" : html`${stateBadge(p.status)} `}${
         r.length
           ? html`<span class="badge attention risk-count" title="${r.map((x) => x.long).join(" ")}">${r[0].short}${
               r.length > 1 ? ` +${r.length - 1} more` : ""
@@ -103,7 +105,8 @@ export const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false
   return reviewItem({
     href: proposalPath(p.vault_id, p.id),
     title: `${verb} ${fileName(p.path)}`,
-    path: p.path,
+    // A file at the root is all in the title; a deeper one shows its folder.
+    path: p.path === fileName(p.path) ? null : p.path,
     who: who(ctx, p.proposed_by, p.agent),
     meta: showVault ? p.vault : "",
     end,

@@ -181,7 +181,7 @@ test("vault settings: the sidebar links to Settings, whose sub-nav holds General
   assert.equal(sideLinks.length, 2);
   for (const nav of sideLinks) assert.doesNotMatch(nav, /\/rules"/, "Rules moved under Settings");
   const h = await page(`/v/${V.own}/config`);
-  assert.match(h, new RegExp(`href="/v/${V.own}/config" aria-current="page">Settings`));
+  assert.match(h, new RegExp(`href="/v/${V.own}/config" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Settings</span>`));
   assert.match(h, /<h1>Settings<\/h1>/);
   assert.match(h, new RegExp(`<form method="post" action="/v/${V.own}/config" class="panel choice-form" id="general">`));
   assert.match(h, /<input id="vn" type="text" name="name" value="Admin Own" required maxlength="100">/);
@@ -195,7 +195,7 @@ test("vault settings: the sidebar links to Settings, whose sub-nav holds General
 });
 
 test("vault settings: the Rules page marks Settings as current", async () => {
-  assert.match(await page(`/v/${V.own}/rules`), new RegExp(`href="/v/${V.own}/config" aria-current="page">Settings`));
+  assert.match(await page(`/v/${V.own}/rules`), new RegExp(`href="/v/${V.own}/config" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Settings</span>`));
 });
 
 test("vault settings: an editor sees the default, and no rename form, Export tab or Delete", async () => {
@@ -212,7 +212,7 @@ test("settings tabs: every Settings page is titled Settings, with a breadcrumb v
     assert.doesNotMatch(h, /aria-label="Settings"><a /, `${path}: no tab row`);
     if (path !== "/config") assert.match(h, new RegExp(`<li><a href="/v/${V.own}/config">Settings</a></li><li aria-current="page">${label}</li>`), path);
     assert.ok(h.includes(`<div class="settings-layout">${settingsNav(V.own, path)}<div class="settings-main">`), `${path}: the sub-nav, then the section`);
-    assert.match(h, new RegExp(`href="/v/${V.own}/config" aria-current="page">Settings`), `${path}: the sidebar's Settings is current`);
+    assert.match(h, new RegExp(`href="/v/${V.own}/config" aria-current="page"><svg[\\s\\S]*?<span class="side-label">Settings</span>`), `${path}: the sidebar's Settings is current`);
   }
   assert.equal((await get(`/v/${V.own}/config/usage`)).status, 200);
   assert.equal((await post(`/v/${V.own}/config/usage`, {})).status, 404);

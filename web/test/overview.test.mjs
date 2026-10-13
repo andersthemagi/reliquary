@@ -89,11 +89,12 @@ const page = async (s, path) => (await get(s, path)).text();
 const re = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // One card by its title, up to the next card or the end of the grid.
-function card(h, title) {
-  const start = h.indexOf(`<h2 class="card-title">${title}</h2>`);
-  assert.ok(start >= 0, `a card titled ${title}`);
-  return h.slice(start, h.indexOf("</li>\n", start) > 0 ? h.indexOf("</li>\n", start) : undefined);
+function section(h, title) {
+  const start = h.indexOf(`<section class="overview-section" aria-label="${title}">`);
+  assert.ok(start >= 0, `a section titled ${title}`);
+  return h.slice(start, h.indexOf("</section>", start));
 }
+const glance = (h) => /<p class="overview-glance">([\s\S]*?)<\/p>/.exec(h)?.[1] ?? "";
 const unread = async (user, vault) => (await as(user, "select jsonb_array_length(public.list_flags($1, 200) -> 'flags') as n", [vault]))[0].n;
 
 before(async () => {
@@ -132,21 +133,21 @@ after(() => {
 // ---------------------------------------------------------------------------
 // The page
 
-test("overview: the vault opens on its name with Connect an agent and New file, then four cards each with See all, then the README", async () => {
+test("overview: the vault opens on its name with Connect an agent and New file, a line of facts, In progress and Recent changes each with See all, then the README", async () => {
   const h = await page(ola, `/v/${V.main}`);
   assert.match(h, /<h1>Overview main<\/h1>/);
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>/.exec(h)[1];
   assert.match(actions, new RegExp(`<a class="button" href="/connect">Connect an agent</a>\\s*<a class="button primary" href="/v/${V.main}/new">New file</a>`));
-  const cards = [...h.matchAll(/<h2 class="card-title">([^<]+)<\/h2><a class="see-all" href="([^"]+)"/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(cards, [
+  assert.ok(h.indexOf('class="overview-glance"') < h.indexOf("overview-section"), "the facts come first, under the title");
+  const sections = [...h.matchAll(/<h2>([^<]+)<\/h2><a class="see-all" href="([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(sections, [
     ["Waiting on you", `/v/${V.main}/proposals`],
-    ["Tasks in progress", `/v/${V.main}/tasks`],
+    ["In progress", `/v/${V.main}/tasks`],
     ["Recent changes", `/v/${V.main}/changes`],
-    ["People", `/v/${V.main}/config/members`],
   ]);
-  assert.match(h, /<ul class="card-grid overview-grid">/);
+  assert.match(h, /<div class="overview-cols">/);
   assert.match(h, new RegExp(`<section class="readme" aria-label="README\\.md"><p class="readme-head"><a href="${re(`/v/${V.main}/file?path=README.md`)}">README\\.md</a></p><div class="prose entry"><h1>Start here</h1>`));
-  assert.ok(h.indexOf("overview-grid") < h.indexOf('class="readme"'), "the README comes after the cards");
+  assert.ok(h.indexOf("overview-cols") < h.indexOf('class="readme"'), "the README comes after the lists");
   assert.doesNotMatch(h, /<table class="folder-list">/, "the file list is on Files");
 });
 
@@ -176,45 +177,47 @@ test("files item: a file's breadcrumb starts at the vault's Overview, and a file
 // ---------------------------------------------------------------------------
 // The cards
 
-test("cards: Waiting on you lists the proposal waiting for this person's review and counts unread flags, without marking them seen", async () => {
+test("lists: Waiting on you lists the proposal waiting for this person's review, and the facts link the unread flags without marking them seen", async () => {
   const before = await unread(OLA, V.main);
   assert.ok(before > 0, "a proposal waiting on Ola is a flag for her");
-  const c = card(await page(ola, `/v/${V.main}`), "Waiting on you");
-  assert.match(c, new RegExp(`<a href="/v/${V.main}/proposals/${V.proposal}">Create canon/terms\\.md</a> <span class="muted">· enzo@example\\.test · `));
-  assert.match(c, new RegExp(`<a href="/v/${V.main}/changes">${before} unread flags?</a>`));
+  const h = await page(ola, `/v/${V.main}`);
+  assert.match(section(h, "Waiting on you"), new RegExp(`<a href="/v/${V.main}/proposals/${V.proposal}">Create canon/terms\\.md</a> <span class="muted">enzo@example\\.test · `));
+  assert.match(glance(h), new RegExp(`<a href="/v/${V.main}/changes">${before} unread flags?</a>`));
+  assert.doesNotMatch(glance(h), /Nothing waiting on you/);
   assert.equal(await unread(OLA, V.main), before, "opening the Overview leaves the flags unread");
 });
 
-test("cards: Tasks in progress names who holds each task, a person via their agent, and how many are ready", async () => {
-  const c = card(await page(ola, `/v/${V.main}`), "Tasks in progress");
-  assert.match(c, new RegExp(`<a href="/v/${V.main}/tasks/plan\\?path=plans%2Fwork\\.md">Draft the brief</a> <span class="chip task-holder">enzo@example\\.test via Claude Code</span>`));
-  assert.match(c, /1 task ready to pick up/);
+test("lists: In progress names who holds each task, a person via their agent, and the facts say how many are ready", async () => {
+  const h = await page(ola, `/v/${V.main}`);
+  assert.match(section(h, "In progress"), new RegExp(`<a href="/v/${V.main}/tasks/plan\\?path=plans%2Fwork\\.md">Draft the brief</a> <span class="muted">enzo@example\\.test via Claude Code</span>`));
+  assert.match(glance(h), new RegExp(`<a href="/v/${V.main}/tasks">1 task ready to pick up</a>`));
 });
 
-test("cards: Recent changes says the latest changes in plain words, newest first", async () => {
-  const c = card(await page(ola, `/v/${V.main}`), "Recent changes");
+test("lists: Recent changes says the latest changes in plain words, newest first", async () => {
+  const c = section(await page(ola, `/v/${V.main}`), "Recent changes");
   const lines = [...c.matchAll(/<span class="change-what">([\s\S]*?)<\/span><span class="change-when">/g)].map((m) => m[1].replace(/<[^>]+>/g, ""));
   assert.equal(lines.length, 5, "the latest five");
   assert.equal(lines[0], "enzo@example.test wrote plans/work.md");
   assert.ok(lines.includes("enzo@example.test opened a proposal on canon/terms.md"));
 });
 
-test("cards: People counts the members by role and, for an owner, the vault's agent connections", async () => {
-  const c = card(await page(ola, `/v/${V.main}`), "People");
-  assert.match(c, /<p>3 members: 1 owner, 1 editor, 1 viewer<\/p>/);
-  assert.match(c, /<p class="muted">0 agent connections to this vault<\/p>/);
+test("lists: the facts count the members, by role on hover, and, for an owner, the vault's agent connections", async () => {
+  const g = glance(await page(ola, `/v/${V.main}`));
+  assert.match(g, new RegExp(`<a href="/v/${V.main}/config/members" title="1 owner, 1 editor, 1 viewer">3 members</a>`));
+  assert.match(g, /<a href="\/connect">0 agent connections<\/a>/);
 });
 
 // ---------------------------------------------------------------------------
 // Nothing to show, and viewers
 
-test("quiet: in a vault with nothing in it and no agent connected, each card says so in one quiet line", async () => {
+test("quiet: in a vault with nothing in it and no agent connected, the facts say nothing is waiting and each list says so in one quiet line", async () => {
   const h = await page(ola, `/v/${V.blank}`);
-  assert.match(card(h, "Waiting on you"), /<p class="muted">Nothing is waiting on you\.<\/p>/);
-  assert.match(card(h, "Tasks in progress"), /<p class="muted">Nobody is working on a task\.<\/p>/);
-  assert.doesNotMatch(card(h, "Tasks in progress"), /ready to pick up/);
-  assert.match(card(h, "Recent changes"), /<p class="muted">Nothing has changed yet\.<\/p>/);
-  assert.match(card(h, "People"), /<p>1 member: 1 owner<\/p>/);
+  assert.doesNotMatch(h, /aria-label="Waiting on you"/, "no list when nothing is waiting");
+  assert.match(glance(h), /<span>Nothing waiting on you<\/span>/);
+  assert.doesNotMatch(glance(h), /ready to pick up/);
+  assert.match(section(h, "In progress"), /<p class="muted">Nobody is working on a task\.<\/p>/);
+  assert.match(section(h, "Recent changes"), /<p class="muted">Nothing has changed yet\.<\/p>/);
+  assert.match(glance(h), />1 member<\/a>/);
   assert.doesNotMatch(h, /class="readme"/, "no README, no box");
 });
 
@@ -225,7 +228,7 @@ test("quiet: a viewer gets the Overview with Connect an agent but no New file, a
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>/.exec(h)[1];
   assert.match(actions, /<a class="button" href="\/connect">Connect an agent<\/a>/);
   assert.doesNotMatch(actions, /New file/);
-  assert.match(card(h, "Waiting on you"), /Nothing is waiting on you\./);
-  assert.match(card(h, "People"), /<p class="muted">Your agents: 0 connections to this vault<\/p>/);
-  assert.match(card(h, "Tasks in progress"), /enzo@example\.test via Claude Code/);
+  assert.match(glance(h), /Nothing waiting on you/);
+  assert.match(glance(h), /<a href="\/connect">Your agents: 0 connections<\/a>/);
+  assert.match(section(h, "In progress"), /enzo@example\.test via Claude Code/);
 });

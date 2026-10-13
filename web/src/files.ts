@@ -1,5 +1,5 @@
 // Files and folders: the vault shell (sidebar, search box and folder tree,
-// and the section tabs on phones), folder and file pages, the editor, New
+// and the section menu on phones), folder and file pages, the editor, New
 // file, deleting a file behind a confirm page, and the file form's actions.
 // Each handler runs its queries as the signed-in person through asPerson();
 // the database decides what they may see and do.
@@ -120,11 +120,13 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
       (f) => html`<li class="leaf"><a href="${filePath(v.id, f.path)}"${here === f.path ? raw(' aria-current="page"') : ""}>${f.name}</a></li>`,
     )}</ul>`;
 
-  // The vault's sections: the sidebar's links on wide screens, a row of tabs
-  // on phones (always visible, with the open proposals' count), so no
-  // section hides behind the folder tree. The sidebar splits them into the
-  // work people do every day and the setup they visit once, so a newcomer
-  // reads the first group and can ignore the second.
+  // The vault's sections: the sidebar's links on wide screens; on phones one
+  // menu above the page that names the section you're in (owner,
+  // 2026-10-13: three rows of tabs pushed the page down a screen), with the
+  // sections first and the folder tree under them, and the counts on the
+  // closed menu so nothing waiting hides in it. The sidebar splits them into
+  // the work people do every day and the setup they visit once, so a
+  // newcomer reads the first group and can ignore the second.
   const sections: { section: Section; href: string; label: string; count?: number | string; group: "Work" | "Setup" }[] = [
     { section: "overview", href: vaultPath(v.id), label: "Overview", group: "Work" },
     { section: "files", href: treePath(v.id, ""), label: "Files", group: "Work" },
@@ -141,6 +143,11 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
   const isCurrent = (s: Section) => current.section === s || (s === "settings" && (current.section === "rules" || current.section === "diagnostics"));
   const link = (s: (typeof sections)[number]) =>
     html`<a href="${s.href}"${isCurrent(s.section) ? raw(' aria-current="page"') : ""}>${SECTION_ICONS[s.section]}<span class="side-label">${s.label}</span>${s.count ? html`<span class="count">${s.count}</span>` : ""}</a>`;
+  const groups = (["Work", "Setup"] as const).map(
+    (g) => html`<span class="side-group">${g}</span>${sections.filter((s) => s.group === g).map(link)}`,
+  );
+  const at = sections.find((s) => isCurrent(s.section));
+  const waiting = (open || 0) + Math.min(shell.flags || 0, 20);
   const tree = files.length ? renderNode(root, "") : html`<p class="muted small tree-empty">No files yet.</p>`;
   return html`<div class="vault">
     <aside class="side">
@@ -149,17 +156,13 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
         <input type="search" name="q" placeholder="Search this vault" aria-label="Search this vault" value="${current.section === "search" ? ctx.url.searchParams.get("q") ?? "" : ""}">
         <button type="submit" aria-label="Search">${ICON_SEARCH}</button>
       </form>
-      <nav class="side-links" aria-label="Vault">${(["Work", "Setup"] as const).map(
-        (g) => html`<span class="side-group">${g}</span>${sections.filter((s) => s.group === g).map(link)}`,
-      )}</nav>
+      <nav class="side-links" aria-label="Vault">${groups}</nav>
       <nav class="tree" aria-label="Files"><span class="side-group side-tree-label">Files</span>${tree}</nav>
     </aside>
-    <div class="vault-tabs">${tabs(
-      sections.map((s) => ({ href: s.href, label: s.label, count: s.count, current: isCurrent(s.section) })),
-      "Vault (phone)",
-    )}</div>
-    <details class="tree-mobile"><summary>Browse files</summary>
-      <nav class="tree" aria-label="Files (phone)">${tree}</nav></details>
+    <details class="vault-menu"><summary>${at ? html`${SECTION_ICONS[at.section]}<span class="side-label">${at.label}</span>` : html`<span class="side-label">${v.name}</span>`}${
+      waiting ? html`<span class="count" aria-label="${waiting} waiting">${waiting}</span>` : ""}</summary>
+      <nav class="side-links" aria-label="Vault (phone)">${groups}</nav>
+      <nav class="tree" aria-label="Files (phone)"><span class="side-group side-tree-label">Files</span>${tree}</nav></details>
     <div class="content">${body}</div>
   </div>`;
 }
