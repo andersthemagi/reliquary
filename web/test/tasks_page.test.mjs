@@ -48,13 +48,13 @@ async function sql(q, params = []) {
   }
 }
 
-async function as(user, q, params = []) {
+async function as(user, q, params = [], act = null) {
   const db = new pg.Client({ connectionString: SUPER });
   await db.connect();
   try {
     await db.query("begin");
     await db.query("set local role authenticated");
-    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: user, role: "authenticated" })]);
+    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: user, role: "authenticated", ...(act ? { act } : {}) })]);
     const { rows } = await db.query(q, params);
     await db.query("commit");
     return rows;
@@ -89,20 +89,24 @@ const tasksUrl = (v) => `/v/${v}/tasks`;
 const planUrl = (v, path) => `/v/${v}/tasks/plan?path=${encodeURIComponent(path)}`;
 
 // A plan file and its registration, as `user`.
-async function register(user, vault, path, steps) {
-  await as(user, "select public.write_file($1, $2, 'The plan')", [vault, path]);
+async function register(user, vault, path, steps, body = "The plan") {
+  await as(user, "select public.write_file($1, $2, $3)", [vault, path, body]);
   const [{ v }] = await sql("select current_version_id as v from public.files where vault_id = $1 and path = $2", [vault, path]);
   await as(user, "select public.register_work_plan($1, $2, $3, $4::jsonb)", [vault, path, v, JSON.stringify(steps)]);
 }
 const claim = async (user, vault, path, key, label) =>
   (await as(user, "select o_secret, o_fence from public.claim_step($1, $2, $3, $4)", [vault, path, key, label]))[0];
 
-// The row of one task (matched by its key under the title), as HTML.
+// The row of one task on a plan's page (its id carries the key), as HTML:
+// up to the next row, or the next group's heading.
 function taskRow(h, key) {
-  const row = h.split("<tr>").find((r) => new RegExp(`^<td><strong>[^<]*</strong><span class="token-client"><code>${key}</code>`).test(r));
-  assert.ok(row, `a row for the task ${key}`);
-  return row.slice(0, row.indexOf("</tr>"));
+  const start = h.indexOf(`<li class="task-row" id="task-${key}">`);
+  assert.ok(start >= 0, `a row for the task ${key}`);
+  const ends = ['<li class="task-row"', "<h2", '<p class="hint">'].map((m) => h.indexOf(m, start + 1)).filter((i) => i > 0);
+  return h.slice(start, Math.min(...ends));
 }
+// One plan's card on the Tasks page.
+const planCard = (h, path) => h.split('<li class="plan-card">').slice(1).find((c) => c.includes(`>${path}<`));
 
 before(async () => {
   await sql(
@@ -174,20 +178,50 @@ test("tasks page: a vault with no plan says how one comes to exist, in two sente
   assert.match(h, /<strong>No plans yet<\/strong>/);
   assert.match(
     h,
-    /<p>A plan comes to exist when an agent registers a plan file that holds a <code>work_plan<\/code> block\. Registered plans, and the tasks in them, show up here\.<\/p>/,
+    /<p>A plan comes to exist when an agent registers a plan file, a file in the vault that lists tasks\. Registered plans, and the tasks in them, show up here\.<\/p>/,
   );
   assert.match(h, /<a href="\/docs\/concepts\/tasks">About tasks<\/a>/);
 });
 
 test("tasks page: lists each plan with its tasks counted in words, and links to the plan", async () => {
   const h = await page(noa, tasksUrl(V.main));
-  const launch = h.split("<tr>").find((r) => r.includes("plans/launch.md"));
+  const launch = planCard(h, "plans/launch.md");
   assert.match(launch, new RegExp(`<a href="${tasksUrl(V.main)}/plan\\?path=plans%2Flaunch\\.md">plans/launch\\.md</a>`));
-  assert.match(launch, /<strong>1 of 6 done<\/strong><span class="token-client">1 in progress · 1 ready · 2 blocked · 1 cancelled<\/span>/);
+  assert.match(launch, /<strong>1 of 6 done<\/strong> <span class="muted">· 1 in progress · 1 ready · 2 blocked · 1 cancelled<\/span>/);
   assert.match(launch, /edda@example\.test/, "who registered it");
-  const second = h.split("<tr>").find((r) => r.includes("plans/second.md"));
-  assert.match(second, /<strong>0 of 1 done<\/strong><span class="token-client">1 ready<\/span>/);
-  assert.ok(h.indexOf("plans/launch.md") < h.indexOf("plans/second.md"), "in path order");
+  assert.match(planCard(h, "plans/second.md"), /<strong>0 of 1 done<\/strong> <span class="muted">· 1 ready<\/span>/);
+  const cards = h.slice(h.indexOf('<ul class="plan-cards">'));
+  assert.ok(cards.indexOf("plans/launch.md") < cards.indexOf("plans/second.md"), "in path order");
+});
+
+test("tasks page: opens on what is open across every plan, in progress, ready to pick up and blocked, each row naming its plan", async () => {
+  const h = await page(noa, tasksUrl(V.main));
+  const at = ["open-in-progress", "open-ready", "open-blocked", "plans"].map((g) => h.indexOf(`<h2 id="${g}">`));
+  assert.ok(at.every((i) => i > 0), "a heading for each section in use, and the plans");
+  assert.deepEqual([...at].sort((a, b) => a - b), at, "in progress, ready to pick up, blocked, then the plans");
+  assert.match(h, /<h2 id="open-ready">Ready to pick up <span class="muted">4<\/span><\/h2>/, "check, only, Draft and Outline");
+  const section = (g) => h.slice(h.indexOf(`<h2 id="${g}">`), h.indexOf("</section>", h.indexOf(`<h2 id="${g}">`)));
+  const row = (g, title) => section(g).split('<li class="task-row">').find((r) => r.includes(`<strong class="task-title">${title}</strong>`));
+  const launch = new RegExp(`<p class="task-meta"><a href="${tasksUrl(V.main)}/plan\\?path=plans%2Flaunch\\.md">plans/launch\\.md</a>`);
+  assert.match(row("open-in-progress", "Clean it"), launch);
+  assert.match(row("open-in-progress", "Clean it"), /<span class="chip task-holder">edda@example\.test<\/span>/);
+  assert.match(row("open-in-progress", "Held task"), /plans\/work\.md<\/a>/);
+  assert.match(row("open-ready", "The only task"), /plans\/second\.md<\/a>/);
+  assert.match(row("open-blocked", "After the side job"), /<span class="badge danger">Blocked by a cancelled task<\/span>/);
+  assert.match(row("open-blocked", "Ship it"), /<span class="badge warning">Blocked<\/span>/);
+  assert.ok(section("open-blocked").indexOf("After the side job") < section("open-blocked").indexOf("Ship it"), "blocked by a cancelled task first");
+  for (const title of ["Fetch the data", "Side job", "Done thing"]) assert.doesNotMatch(h, new RegExp(`<strong class="task-title">${title}</strong>`), `${title} is finished`);
+  assert.doesNotMatch(h, /id="task-/, "keys repeat across plans, so no row ids here");
+});
+
+test("tasks page: a plan's card has a progress bar, and the plan file's first heading as its title", async () => {
+  assert.match(planCard(await page(noa, tasksUrl(V.main)), "plans/launch.md"), /<progress class="task-progress" max="6" value="1" aria-label="1 of 6 done">1 of 6 done<\/progress>/);
+  const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks titled', 'open') as id");
+  await register(NOA, v, "plans/site.md", [{ key: "one", title: "One" }], "Some notes first.\n\n# Launch the site\n\n## Steps\n");
+  const card = planCard(await page(noa, tasksUrl(v)), "plans/site.md");
+  assert.match(card, new RegExp(`<h3><a href="${tasksUrl(v)}/plan\\?path=plans%2Fsite\\.md">Launch the site</a></h3>`));
+  assert.match(card, /<p class="path small muted">plans\/site\.md<\/p>/, "the path stays, quieter");
+  assert.match(await page(noa, planUrl(v, "plans/site.md")), /<h1>Launch the site<\/h1>/);
 });
 
 test("tasks page: has its own section in the vault's nav, current on both of its pages", async () => {
@@ -205,14 +239,14 @@ test("tasks page: a viewer sees the same list", async () => {
 
 test("tasks page: a plan whose file has changed since it was registered carries a marker with words, and a deleted one says so", async () => {
   let h = await page(noa, tasksUrl(V.main));
-  assert.match(h.split("<tr>").find((r) => r.includes("plans/second.md")), /<span class="muted">Unchanged<\/span>/);
+  assert.match(planCard(h, "plans/second.md"), /<span class="muted">Unchanged<\/span>/);
   await as(EDDA, "select public.write_file($1, 'plans/second.md', 'The plan, edited')", [V.main]);
   h = await page(noa, tasksUrl(V.main));
-  assert.match(h.split("<tr>").find((r) => r.includes("plans/second.md")), /<span class="badge warning">Changed since registered<\/span>/);
-  assert.match(h.split("<tr>").find((r) => r.includes("plans/launch.md")), /<span class="muted">Unchanged<\/span>/, "another plan's file is untouched");
+  assert.match(planCard(h, "plans/second.md"), /<span class="badge warning">Changed since registered<\/span>/);
+  assert.match(planCard(h, "plans/launch.md"), /<span class="muted">Unchanged<\/span>/, "another plan's file is untouched");
   await as(EDDA, "select public.delete_file($1, 'plans/second.md')", [V.main]);
   h = await page(noa, tasksUrl(V.main));
-  assert.match(h.split("<tr>").find((r) => r.includes("plans/second.md")), /<span class="badge warning">File deleted<\/span>/);
+  assert.match(planCard(h, "plans/second.md"), /<span class="badge warning">File deleted<\/span>/);
 });
 
 // ---------------------------------------------------------------------------
@@ -227,39 +261,60 @@ test("plan page: groups what is in progress and ready first, then blocked, cance
   assert.deepEqual([...order].sort((a, b) => a - b), order, "in progress, ready, blocked, cancelled, done, in that order");
   assert.match(h, /<h2 id="g-in-progress">In progress <span class="muted">1<\/span><\/h2>/);
   assert.match(h, /<h2 id="g-blocked">Blocked <span class="muted">2<\/span><\/h2>/);
-  const keys = [...h.matchAll(/<tr><td><strong>[^<]*<\/strong><span class="token-client"><code>([a-z-]+)<\/code>/g)].map((m) => m[1]);
+  const keys = [...h.matchAll(/<li class="task-row" id="task-([a-z-]+)">/g)].map((m) => m[1]);
   assert.deepEqual(keys, ["clean", "check", "after", "ship", "side", "fetch"], "a task blocked by a cancelled one comes first among the blocked");
+});
+
+test("plan page: done tasks are folded into a closed Done section at the bottom, and no task's key is shown", async () => {
+  const h = await page(noa, planUrl(V.main, "plans/launch.md"));
+  const done = h.indexOf('<details class="task-done"><summary><h2 id="g-done">Done <span class="muted">1</span></h2></summary>');
+  assert.ok(done > 0, "a closed <details>, with no open attribute");
+  assert.ok(h.indexOf('id="task-fetch"') > done, "the done task is inside it");
+  assert.ok(h.indexOf('id="task-side"') < done, "a cancelled task is not");
+  assert.doesNotMatch(h, /<code>(fetch|clean|check|ship|side|after)<\/code>|work_plan/, "keys and work_plan are for agents");
+});
+
+test("plan page: a task an agent holds shows a chip naming the person and their agent", async () => {
+  const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks agent', 'open') as id");
+  await register(NOA, v, "plans/agent.md", [{ key: "one", title: "Agent work" }, { key: "two", title: "My own work" }]);
+  // Both claims come from one connection as claim_step counts them, so the rule allows two (as in before()).
+  await as(NOA, "select public.set_claim_rule($1, '', 2880, 10080, null, 2, 5, 360, 60, 900, 1, 2880)", [v]);
+  await as(NOA, "select public.claim_step($1, 'plans/agent.md', 'one', null)", [v], { sub: "tok-1", name: "Claude Code" });
+  await claim(NOA, v, "plans/agent.md", "two", null);
+  const h = await page(noa, planUrl(v, "plans/agent.md"));
+  assert.match(taskRow(h, "one"), /<span class="chip task-holder">you via Claude Code<\/span>/);
+  assert.match(taskRow(h, "two"), /<span class="chip task-holder">you<\/span>/);
+  assert.match(await page(noa, tasksUrl(v)), /<span class="chip task-holder">you via Claude Code<\/span>/, "and on the Tasks page");
 });
 
 test("plan page: every task's state is a word in its row, not only a colour", async () => {
   const h = await page(noa, planUrl(V.main, "plans/launch.md"));
   const states = { clean: "In progress", check: "Ready", ship: "Blocked", after: "Blocked by a cancelled task", side: "Cancelled", fetch: "Done" };
   for (const [key, label] of Object.entries(states)) {
-    assert.match(taskRow(h, key), new RegExp(`<td class="small" data-label="State"><span class="badge[^"]*">${label}</span></td>`), key);
+    assert.match(taskRow(h, key), new RegExp(`<div class="task-line">\\s*<span class="task-dot [a-z_]+" aria-hidden="true"></span><span class="badge[^"]*">${label}</span>`), key);
   }
-  assert.equal(h.match(/<td class="small" data-label="State">/g).length, 6, "a state for every task");
+  assert.equal(h.match(/<div class="task-line">\s*<span class="task-dot [a-z_]+" aria-hidden="true"><\/span><span class="badge/g).length, 6, "a state for every task, its shape hidden from screen readers");
 });
 
 test("plan page: a task in progress names who holds it, quotes the label as data, and shows the time left", async () => {
   const row = taskRow(await page(noa, planUrl(V.main, "plans/launch.md")), "clean");
-  assert.match(row, /Held by edda@example\.test/);
-  assert.match(row, /<span class="token-client">“&lt;b&gt;cleaning&lt;\/b&gt; the rows”<\/span>/, "the label is text, in quotes");
-  assert.match(row, /Time left: <time [^>]*>in 2 days<\/time>/);
+  assert.match(row, /<span class="chip task-holder">edda@example\.test<\/span>/);
+  assert.match(row, /<p class="task-meta">“&lt;b&gt;cleaning&lt;\/b&gt; the rows” · Time left: <time [^>]*>in 2 days<\/time><\/p>/, "the label is text, in quotes");
 });
 
 test("plan page: a blocked task names what it waits on", async () => {
   const row = taskRow(await page(noa, planUrl(V.main, "plans/launch.md")), "ship");
-  assert.match(row, /Waiting on Clean it <code>clean<\/code>, Check it <code>check<\/code>\./);
+  assert.match(row, /<p class="task-meta">Blocked by Clean it, Check it\.<\/p>/);
 });
 
 test("plan page: a task blocked by a cancelled one says so plainly, and what it takes to move it", async () => {
   const row = taskRow(await page(noa, planUrl(V.main, "plans/launch.md")), "after");
-  assert.match(row, /Blocked by a cancelled task: Side job <code>side<\/code>\. A cancelled task never counts as done, so this one stays blocked until a person reopens that task, or cancels or skips this one\./);
+  assert.match(row, /Blocked by a cancelled task: Side job\. A cancelled task never counts as done, so this one stays blocked until a person reopens that task, or cancels or skips this one\./);
 });
 
 test("plan page: a ready task, a done one and a cancelled one each say what they are", async () => {
   const h = await page(noa, planUrl(V.main, "plans/launch.md"));
-  assert.match(taskRow(h, "check"), /Nobody has taken it yet\./);
+  assert.doesNotMatch(taskRow(h, "check"), /task-meta/, "a ready task needs no second line");
   assert.match(taskRow(h, "fetch"), /Done <time [^>]*>[^<]*<\/time>\./);
   assert.match(taskRow(h, "side"), /Doesn’t count as done\./);
 });
@@ -273,7 +328,7 @@ test("plan page: a lapsed claim reads as ready again, and says why", async () =>
   const h = await page(noa, planUrl(V.main, "plans/launch.md"));
   assert.match(taskRow(h, "clean"), /<span class="badge success">Ready<\/span>/);
   assert.match(taskRow(h, "clean"), /Its last claim ran out, so it can be taken again\./);
-  assert.match(await page(noa, tasksUrl(V.main)), /<strong>1 of 6 done<\/strong><span class="token-client">2 ready · 2 blocked · 1 cancelled<\/span>/);
+  assert.match(await page(noa, tasksUrl(V.main)), /<strong>1 of 6 done<\/strong> <span class="muted">· 2 ready · 2 blocked · 1 cancelled<\/span>/);
 });
 
 test("plan page: a changed plan file is said at the top, with a link to the file's history", async () => {
@@ -336,20 +391,20 @@ const stepOf = async (key) =>
 const logged = async (event) =>
   (await sql("select path, actor, detail->>'step' as step from public.log where vault_id = $1 and path = $2 and event = $3 order by seq", [V.main, WORK, event]));
 
-test("actions: an owner is offered Skip and Cancel on every task that isn't finished, and none on a done one", async () => {
+test("actions: an owner is offered Skip and Cancel in a row's ⋯ menu on every task that isn't finished, and none on a done one", async () => {
   const h = await page(noa, planUrl(V.main, WORK));
   for (const [key, title] of [["a", "Draft"], ["b", "Review the draft"], ["c", "Outline"], ["d", "Write the intro"], ["e", "Held task"]]) {
     const row = taskRow(h, key);
-    assert.match(row, new RegExp(`<a class="button quiet" href="${planUrl(V.main, WORK).replace("?", "\\?")}&amp;cancel=${key}" aria-label="Cancel the task ${title}">Cancel</a>`), `Cancel on ${key}`);
-    assert.match(row, new RegExp(`&amp;skip=${key}" aria-label="Skip the task ${title}">Skip</a>`), `Skip on ${key}`);
+    assert.match(row, new RegExp(`<summary class="button quiet icon-button" aria-label="Actions for the task ${title}"`), `a ⋯ menu on ${key}`);
+    assert.match(row, new RegExp(`<a class="menu-item danger" href="${planUrl(V.main, WORK).replace("?", "\\?")}&amp;cancel=${key}"><span class="menu-item-title">Cancel</span>`), `Cancel on ${key}`);
+    assert.match(row, new RegExp(`<a class="menu-item" href="[^"]*&amp;skip=${key}"><span class="menu-item-title">Skip</span>`), `Skip on ${key}`);
   }
-  assert.doesNotMatch(taskRow(h, "f"), /Skip|Cancel/, "nothing to do on a finished task");
-  assert.match(h, /<span class="sr-only">Actions<\/span>/);
+  assert.doesNotMatch(taskRow(h, "f"), /Skip|Cancel|action-menu/, "nothing to do on a finished task");
 });
 
 test("actions: a viewer is offered nothing, is sent back from a confirm page, and the database refuses a crafted form", async () => {
   const h = await page(rex, planUrl(V.main, WORK));
-  assert.doesNotMatch(h, /Skip<\/a>|Cancel<\/a>|row-actions/, "no buttons, no actions column");
+  assert.doesNotMatch(h, /action-menu|&amp;cancel=|&amp;skip=/, "no ⋯ menus, no Cancel or Skip");
   assert.match(h, /Draft/, "the tasks are still there to read");
   const back = await landed(rex, await get(rex, confirmUrl(V.main, "cancel", "a")));
   assert.deepEqual(flashOf(back), ["warning", "status", "Only someone who can write this plan’s file cancels or skips its tasks."]);
@@ -396,7 +451,7 @@ test("cancel: confirming cancels it, says so as a success, logs it, and what wai
   assert.equal((await stepOf("a")).status, "cancelled");
   assert.deepEqual(await logged("step.cancel"), [{ path: WORK, actor: NOA, step: "a" }]);
   assert.match(taskRow(h, "a"), /<span class="badge">Cancelled<\/span>/);
-  assert.match(taskRow(h, "b"), /Blocked by a cancelled task: Draft <code>a<\/code>/);
+  assert.match(taskRow(h, "b"), /Blocked by a cancelled task: Draft\./);
   assert.doesNotMatch(taskRow(h, "a"), /Cancel<\/a>|Skip<\/a>/, "no more actions on it");
 });
 
@@ -522,7 +577,7 @@ test("reopen: confirming reopens it, says so as a success, logs it, and what wai
   );
   assert.match(taskRow(h, "drop"), /<span class="badge warning">Blocked<\/span>/);
   assert.match(taskRow(h, "next"), /<span class="badge warning">Blocked<\/span>/);
-  assert.match(taskRow(h, "next"), /Waiting on Dropped work <code>drop<\/code>\./);
+  assert.match(taskRow(h, "next"), /Blocked by Dropped work\./);
 });
 
 test("reopen: a cancelled task with nothing unfinished to wait on says it will be ready, and is ready once reopened", async () => {
@@ -548,17 +603,17 @@ test("reopen: a task that isn't cancelled goes back with a warning, and a crafte
 // ---------------------------------------------------------------------------
 // Context moved (CL-3.6): a file a task cites has a newer version.
 
-test("context moved: a task citing a file with a newer version says context moved and links the file, and the registrant's flag names the plan", async () => {
+test("context moved: a task citing a file with a newer version says a file it cites changed and links the file, and the registrant's flag names the plan", async () => {
   await as(EDDA, "select public.write_file($1, 'notes/moved.md', 'first')", [V.main]);
   const [{ v }] = await sql("select current_version_id as v from public.files where vault_id = $1 and path = 'notes/moved.md'", [V.main]);
   await register(NOA, V.main, "plans/moved.md", [{ key: "uses", title: "Uses the note", cites: [{ path: "notes/moved.md", version: v }] }]);
-  assert.doesNotMatch(taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses"), /Context moved/);
+  assert.doesNotMatch(taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses"), /A file it cites changed/);
   await page(noa, `/v/${V.main}/flags`);
 
   await as(EDDA, "select public.write_file($1, 'notes/moved.md', 'second')", [V.main]);
   const row = taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses");
-  assert.match(row, /<span class="badge success">Ready<\/span> <span class="badge warning">Context moved<\/span>/);
-  assert.match(row, new RegExp(`Context moved: <a href="/v/${V.main}/file\\?path=notes%2Fmoved\\.md">notes/moved\\.md</a> has a newer version than the one this task cites\\.`));
+  assert.match(row, /<span class="badge success">Ready<\/span>[\s\S]*<span class="badge warning">A file it cites changed<\/span>/);
+  assert.match(row, new RegExp(`A file it cites changed: <a href="/v/${V.main}/file\\?path=notes%2Fmoved\\.md">notes/moved\\.md</a> has a newer version than the one this task cites\\.`));
 
   const flags = await page(noa, `/v/${V.main}/flags`);
   assert.match(flags, /<span class="badge warning">Context moved<\/span>/);
@@ -582,7 +637,7 @@ test("plan gains tasks: registering the changed file again clears the marker, ad
 
   await register(NOA, v, path, [{ key: "first", title: "First task" }, { key: "second", title: "Second task", blocked_by: ["first"] }]);
   const list = await page(noa, tasksUrl(v));
-  assert.match(list.split("<tr>").find((r) => r.includes(path)), /<span class="muted">Unchanged<\/span>/);
+  assert.match(planCard(list, path), /<span class="muted">Unchanged<\/span>/);
   assert.match(list, /1 of 2 done/);
   const h = await page(noa, planUrl(v, path));
   assert.match(taskRow(h, "first"), /<span class="badge">Done<\/span>/);
@@ -701,19 +756,21 @@ const gateStatus = async (v, key) =>
 test("review gate: the list counts a task awaiting review, and the plan shows it first, who finished it, who approves it and what waits on it", async () => {
   const { v } = await seedGate();
   const list = await page(noa, tasksUrl(v));
-  assert.match(list, /<strong>0 of 4 done<\/strong><span class="token-client">2 awaiting review · 1 ready · 1 blocked<\/span>/);
+  assert.match(list, /<strong>0 of 4 done<\/strong> <span class="muted">· 2 awaiting review · 1 ready · 1 blocked<\/span>/);
+  assert.ok(list.indexOf('<h2 id="open-awaiting-review">Awaiting review <span class="muted">2</span></h2>') >= 0, "the open list has awaiting review");
+  assert.ok(list.indexOf('<h2 id="open-awaiting-review">') < list.indexOf('<h2 id="open-ready">'), "and it comes first");
   const h = await page(noa, planUrl(v, GATE));
   assert.ok(h.indexOf('<h2 id="g-awaiting-review">Awaiting review <span class="muted">2</span></h2>') < h.indexOf('<h2 id="g-ready">'), "awaiting review comes first");
   const row = taskRow(h, "brief");
   assert.match(row, /<span class="badge warning">Awaiting review<\/span>/);
-  assert.match(row, /Finished by you, and waiting for a person who can write the plan’s file to approve it\. The tasks waiting on it start only then\.<span class="token-client">You can approve it\.<\/span>/);
-  assert.match(taskRow(h, "build"), /Waiting on Write the brief <code>brief<\/code> \(awaiting review\)\./);
+  assert.match(row, /Finished by you, and waiting for a person who can write the plan’s file to approve it\. The tasks waiting on it start only then\. You can approve it\./);
+  assert.match(taskRow(h, "build"), /Blocked by Write the brief \(awaiting review\)\./);
 });
 
 test("review gate: an owner is offered Approve on a task awaiting review and on no other; a viewer is offered nothing, is sent back, and a crafted form is refused", async () => {
   const { v } = await seedGate();
   const h = await page(noa, planUrl(v, GATE));
-  assert.match(taskRow(h, "brief"), new RegExp(`<a class="button" href="${planUrl(v, GATE).replace("?", "\\?")}&amp;approve=brief" aria-label="Approve the task Write the brief">Approve</a> <a class="button quiet"[^>]*>Cancel</a>`));
+  assert.match(taskRow(h, "brief"), new RegExp(`<a class="button" href="${planUrl(v, GATE).replace("?", "\\?")}&amp;approve=brief" aria-label="Approve the task Write the brief">Approve</a><details class="menu-wrap action-menu[\\s\\S]*&amp;cancel=brief"><span class="menu-item-title">Cancel</span>`));
   for (const key of ["build", "open"]) assert.doesNotMatch(taskRow(h, key), /Approve/, `no Approve on ${key}`);
   assert.match(h, /Approve passes a finished task’s review, so the tasks waiting on it can start\./);
 

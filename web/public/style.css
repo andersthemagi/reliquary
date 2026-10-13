@@ -1241,19 +1241,57 @@ form.confirm .actions:first-child { margin-top: 0; }
   .table-stack tr:hover > td { background: transparent; }
 }
 
-/* Tasks (tasks.ts): every group's table has the same columns, and a badge
-   keeps its own width in a stacked row. */
-.task-table { table-layout: fixed; }
-.task-table th:nth-child(1) { width: 30%; }
-.task-table th:nth-child(2) { width: 20%; }
-.task-table td .badge, .plan-table td .badge { justify-self: start; white-space: normal; padding-block: 2px; }
-@media (max-width: 640px) { .task-table { table-layout: auto; } }
-/* Cancel and Skip stack in a narrow column beside the details. */
-@media (min-width: 641px) {
-  .task-table th:nth-child(4) { width: 6.5rem; }
-  .task-table td.row-actions .button { display: flex; justify-content: center; }
-  .task-table td.row-actions .button + .button { margin-top: var(--space-2); }
+/* Tasks (tasks.ts): compact rows, Todoist-style. The state word, the title
+   and who holds it on one line, the row's ⋯ menu pushed to the end, then a
+   quiet line under it. Plans are cards with a bar (a <progress>, since the
+   CSP allows no inline width). */
+.task-list { list-style: none; margin: 0 0 var(--space-6); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden; }
+.task-row { padding: var(--space-3) var(--space-4); transition: background-color 120ms ease-out; }
+.task-row + .task-row { border-top: 1px solid var(--border); }
+.task-row:hover { background: var(--bg-subtle); }
+/* The state as a shape, Todoist's circle: a ring when it can be picked up,
+   half filled while someone has it, a ring with a dot while it waits for
+   a person's review, dashed while it waits, filled with a
+   tick when done, struck through when cancelled. The word beside it is
+   the state; the shape only lets the eye scan a long list. */
+.task-dot {
+  flex: none; position: relative; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border-strong); box-sizing: border-box;
 }
+.task-dot.ready { border-color: var(--success); }
+.task-dot.claimed { border-color: var(--info); background: linear-gradient(90deg, var(--info) 50%, transparent 50%); }
+.task-dot.awaiting_review { border-color: var(--attention); }
+.task-dot.awaiting_review::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--attention); }
+.task-dot.blocked { border-style: dashed; border-color: var(--attention); }
+.task-dot.blocked_by_cancelled { border-style: dashed; border-color: var(--danger); }
+.task-dot.done { border-color: var(--success); background: var(--success); }
+.task-dot.done::after {
+  content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
+  border: solid var(--bg); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.task-dot.cancelled::after { content: ""; position: absolute; left: -2px; right: -2px; top: 5px; height: 2px; background: var(--border-strong); transform: rotate(-45deg); }
+.task-row:has(.task-dot.done) .task-title, .task-row:has(.task-dot.cancelled) .task-title { color: var(--fg-muted); }
+.task-row:has(.task-dot.cancelled) .task-title { text-decoration: line-through; }
+.task-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.task-line .badge { white-space: normal; padding-block: 2px; }
+.task-title { font-weight: 500; overflow-wrap: anywhere; }
+.task-line > :is(.action-menu, .button) { margin-left: auto; }
+.task-holder.chip { min-height: 0; padding: 0 var(--space-3); font-size: var(--text-xs); }
+.task-meta { margin: var(--space-2) 0 0; color: var(--fg-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.task-done > summary { cursor: pointer; }
+.task-done > summary h2 { display: inline; }
+.plan-cards { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+.plan-card { position: relative; padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); transition: border-color 120ms ease-out; }
+.plan-card:hover { border-color: var(--border-strong); }
+.plan-card h3 { margin: 0; overflow-wrap: anywhere; }
+.plan-card p { margin: var(--space-2) 0 0; overflow-wrap: anywhere; }
+.task-progress {
+  display: block; width: 100%; height: 6px; margin: var(--space-4) 0 0;
+  -webkit-appearance: none; appearance: none; border: 0; border-radius: var(--radius-full); background: var(--bg-muted); overflow: hidden;
+}
+.task-progress::-webkit-progress-bar { background: var(--bg-muted); border-radius: var(--radius-full); }
+.task-progress::-webkit-progress-value { background: var(--success); border-radius: var(--radius-full); }
+.task-progress::-moz-progress-bar { background: var(--success); border-radius: var(--radius-full); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }

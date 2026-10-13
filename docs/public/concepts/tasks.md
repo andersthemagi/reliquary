@@ -70,21 +70,23 @@ The lease, the hold limit and how many tasks an agent may hold come from the vau
 
 ## The Tasks page
 
-Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). Each row is one plan:
+Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). It opens on what is open across every plan in the vault, in up to four sections: **Awaiting review**, **In progress**, **Ready to pick up** and **Blocked**. Each task names its plan, linked. Done and cancelled tasks stay on their plan's page.
 
-- the path of its file, which opens the plan;
-- how many of its tasks are done, and how the rest are split: in progress, awaiting review, ready, blocked, cancelled;
+Under **Plans**, each plan is a card:
+
+- its title, the plan file's first `#` heading (or its path if it has none), which opens the plan;
+- a bar and "6 of 10 done", and how the rest are split: in progress, awaiting review, ready, blocked, cancelled;
 - whether the plan file has changed since it was registered;
 - who registered it, and when.
 
-If the plan file is edited after it was registered, its row says **Changed since registered**. The tasks you see, and the ones agents work from, are still the ones from the version last registered. Open the file's **History** tab to see what changed. If the file is deleted, the row says **File deleted**, and its tasks stay.
+If the plan file is edited after it was registered, its card says **Changed since registered**. The tasks you see, and the ones agents work from, are still the ones from the version last registered. Open the file's **History** tab to see what changed. If the file is deleted, the card says **File deleted**, and its tasks stay.
 
 ### One plan
 
-Select a plan to see every task in it, grouped so what needs attention comes first: Awaiting review, In progress, Ready, Blocked, Cancelled, Done. Each task shows its state in words, so no state depends on colour alone.
+Select a plan to see every task in it, grouped so what needs attention comes first: Awaiting review, In progress, Ready, Blocked, Cancelled. Done tasks are folded away at the bottom under **Done**; select it to see them. Each task is one row: a circle whose shape shows its state at a glance, the state in words (so no state depends on colour or shape alone), and its title. Keys are for agents and the plan file, so rows show titles only.
 
-- An in-progress task says who holds it, the label they gave it, and how long is left. The label is whatever the holder wrote, such as "cleaning the rows". It is a note, never proof of who is working on the task, and the page shows it in quotes for that reason.
-- A blocked task names the tasks it waits on.
+- An in-progress task has a chip saying who holds it: **you**, a person, or a person's agent ("Ana via Claude Code"). The line under it gives the label they gave it and how long is left. The label is whatever the holder wrote, such as "cleaning the rows". It is a note, never proof of who is working on the task, and the page shows it in quotes for that reason.
+- A blocked task says **Blocked by** and names the tasks it waits on, marking any awaiting review.
 - A task awaiting review says who finished it, and links its proposal if its agent linked one.
 
 The page shows the plan as it is when you open it. Reload to see changes.
@@ -175,7 +177,7 @@ Some work needs a person to check it before anything that depends on it starts: 
 - Who can approve it: whoever can write the plan file (an owner or editor, or a named owner of its path), signed in, in the web app. No agent can approve a task, not even its own person's (see [the ceiling](agents.md#the-ceiling)).
 - The Activity log records **Approved a step**, by the person who approved it.
 
-If you can write the plan file, a task awaiting review has **Approve** beside **Cancel** and **Skip**, and the page says **You can approve it.** Approve opens a confirm page that asks you to check the work first, says which tasks become ready, and changes nothing until you confirm; its way out is **Not yet**. Approving can't be undone from the page.
+If you can write the plan file, a task awaiting review has an **Approve** button, with **Skip** and **Cancel** in the **⋯** menu beside it, and the page says **You can approve it.** Approve opens a confirm page that asks you to check the work first, says which tasks become ready, and changes nothing until you confirm; its way out is **Not yet**. Approving can't be undone from the page.
 
 ### Approving through a proposal
 
@@ -185,7 +187,7 @@ The proposal has to be one the agent's own person made in this vault after the t
 
 ## Context moved
 
-A task can cite files the work depends on, each at the version it was written against. When one of those files has a newer version, because someone wrote it or a proposal to change it was approved, the task shows **Context moved** beside its state, and its row names each file that moved, linked. Open the file's **History** tab to see what changed. `work_plan_status` says `context moved` on the step's state line and names the moved files with its cites.
+A task can cite files the work depends on, each at the version it was written against. When one of those files has a newer version, because someone wrote it or a proposal to change it was approved, the task shows **A file it cites changed** beside its state, and its row names each file that moved, linked. Open the file's **History** tab to see what changed. `work_plan_status` says `context moved` on the step's state line and names the moved files with its cites.
 
 The task's state doesn't change: it can still be ready, blocked or in progress. It means whoever works the task should read the file again first.
 
@@ -206,7 +208,7 @@ A plan can gain tasks, never lose or change them. Add the new steps to the plan 
 
 ## Cancelling, skipping and reopening a task
 
-If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has **Cancel** and **Skip**, and each cancelled task has **Reopen**. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it; on the reopen page it is **Keep it cancelled**. Only a person can do any of them: an agent is refused (see [the ceiling](agents.md#the-ceiling)).
+If you can write the plan's file (an owner or editor, or a named owner of its path), each task that isn't done or cancelled has **Skip** and **Cancel** in the **⋯** menu at the end of its row, and each cancelled task has a **Reopen** button. Each opens a confirm page that says what will happen, and nothing changes until you confirm there. On the cancel page the way out is **Keep the task**, so the only **Cancel** there is the one that cancels it; on the reopen page it is **Keep it cancelled**. Only a person can do any of them: an agent is refused (see [the ceiling](agents.md#the-ceiling)).
 
 - **Cancel** drops the task. A cancelled task never counts as done, so every task waiting on it stays blocked, shown as blocked by a cancelled task, until a person reopens it, or cancels or skips each of them.
 - **Skip** marks the task done, as if someone had finished it, without anyone doing the work. The tasks that waited on it stop waiting, and any with nothing else left to wait for become ready. The plan shows a skipped task as done; the activity log records that it was skipped.
