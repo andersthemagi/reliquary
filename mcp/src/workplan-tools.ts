@@ -300,7 +300,7 @@ export function registerWorkPlanTools(
       inputSchema: {
         vault: VAULT,
         path: PLAN_PATH,
-        label: z.string().max(200).optional().describe("Shown to people with your place or step, e.g. what you're doing. Self-reported, never trusted for identity"),
+        label: z.string().max(200).optional().describe("Shown to people with the step you're granted, e.g. what you're doing. Self-reported, never trusted for identity"),
         ttl_minutes: TTL_MINUTES.optional(),
       },
       annotations: ADDITIVE,
