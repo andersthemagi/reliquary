@@ -197,6 +197,43 @@ const audiences: Array<[string, string]> = [
 ];
 
 
+// Real screens of a fictional vault, photographed from the running app by
+// scripts/demo-shots.sh, so they can't drift from the UI; the drawn frames
+// in How it works stay, since their captions say they are drawings. With an
+// explicit theme (the cookie) the page knows which set to show; on auto it
+// leaves the choice to the visitor's system through <picture>, so only one
+// file loads. `still`: the reel's poster, shown only under reduced motion.
+const shot = (theme: Theme, name: string, alt: string, caption: string, still = false): Raw => {
+  const file = (t: "light" | "dark") => `/img/${name}-${t}${still ? "-poster" : ""}.webp`;
+  const img = (t: "light" | "dark") => html`<img src="${file(t)}" width="1440" height="900" alt="${alt}" loading="lazy">`;
+  const picture = theme === "auto" ? html`<picture><source srcset="${file("dark")}" media="(prefers-color-scheme: dark)">${img("light")}</picture>` : img(theme);
+  return still
+    ? html`<span class="reel-still">${picture}</span><figcaption>${caption}</figcaption>`
+    : html`<figure class="p-frame p-shot">${picture}<figcaption>${caption}</figcaption></figure>`;
+};
+
+const screens: Array<[string, string, string]> = [
+  ["proposal", "A proposal page: the diff of a runbook change from Claude Code, a note field, and the Approve, Request changes and Reject buttons.", "A change to canon: who proposed it, the diff, and the decision."],
+  ["variables", "The Variables page: four variable names across development, preview and production, with who set each and when, and never a value.", "Secrets per environment. Names and who set them; the value never shows."],
+];
+
+// Fifteen seconds of the core loop, in both themes. A muted, looping video
+// with no controls needs no script. A video can't pick its file by media
+// query the way <picture> does, so on auto both are sent and the stylesheet
+// shows one; a visitor who asked for less motion gets the still instead.
+const reel = (theme: Theme) => {
+  const video = (t: "light" | "dark", pick: boolean) =>
+    html`<video${pick ? raw(` class="reel-${t}"`) : ""} autoplay muted loop playsinline poster="/img/reel-${t}-poster.webp" width="1440" height="900" aria-hidden="true"><source src="/img/reel-${t}.webm" type="video/webm"></video>`;
+  return html`<section class="p-sec" id="see" aria-labelledby="see-title">
+  <h2 id="see-title">What it looks like</h2>
+  <figure class="p-frame p-reel">
+    ${theme === "auto" ? html`${video("light", true)}${video("dark", true)}` : video(theme, false)}
+    ${shot(theme, "reel", "A proposal page: the diff of a runbook change from Claude Code, with the Approve button.", "A proposal waits in the Inbox. You open the diff and approve it. The file is canon, and the log says who did what.", true)}
+  </figure>
+  <div class="p-shots">${screens.map(([name, alt, caption]) => shot(theme, name, alt, caption))}</div>
+</section>`;
+};
+
 const faq: Array<[string, Raw]> = [
   ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no model, doesn't search your Drive or Slack, and is not a memory that writes itself. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
   ["What will it cost after the alpha?", html`Free stays free during the alpha. The plan is paid vaults for teams that need more room, ways to support the project, and enough to keep the lights on. Nothing is billed today, you'll hear from us well before anything is, and self-hosting stays free.`],
@@ -315,6 +352,8 @@ export function landing(theme: Theme, stars: number | null = null): string {
     </div>
   </div>
 </section>
+
+${reel(theme)}
 
 ${PRICING.show
     ? html`<section class="p-sec" id="pricing" aria-labelledby="pricing-title">

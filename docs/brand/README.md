@@ -5,6 +5,12 @@
 - `logo-border.svg`: the mark in its rounded square. Copied to
   `web/public/favicon.svg`; `web/public/apple-touch-icon.png` is it at 180x180
   on white (`rsvg-convert -w 180 -h 180 -b white logo-border.svg`).
+- `web/public/img/`: the product pictures on the landing page and in the
+  README (eight screens, light and dark; the reel as `reel-<theme>.webm`
+  with its `-poster.webp`, and `reel.gif` for the README). Photographed from the running app, of
+  a fictional vault, by `scripts/demo-shots.sh` (needs `./mcp/dev.sh up`,
+  and chromium, node and ffmpeg on the host); never edited by hand, and
+  regenerated whenever the UI they show changes.
 - `og.svg`: source of `web/public/og.png` (1200x630 link preview). Regenerate:
 
   ```bash

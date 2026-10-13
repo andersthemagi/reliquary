@@ -155,12 +155,15 @@ const TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
   svg: "image/svg+xml",
   png: "image/png",
+  webp: "image/webp",
+  webm: "video/webm",
+  gif: "image/gif",
   woff2: "font/woff2",
   txt: "text/plain; charset=utf-8",
 };
 const STATIC = new Map<string, { type: string; body: Buffer }>();
-const fonts = existsSync(join(PUBLIC, "fonts")) ? readdirSync(join(PUBLIC, "fonts")).map((f) => `fonts/${f}`) : [];
-for (const rel of ["style.css", "favicon.svg", "logo.svg", "apple-touch-icon.png", "og.png", ...fonts]) {
+const dir = (name: string) => (existsSync(join(PUBLIC, name)) ? readdirSync(join(PUBLIC, name)).map((f) => `${name}/${f}`) : []);
+for (const rel of ["style.css", "favicon.svg", "logo.svg", "apple-touch-icon.png", "og.png", ...dir("fonts"), ...dir("img")]) {
   const type = TYPES[rel.split(".").pop() ?? ""];
   if (type && existsSync(join(PUBLIC, rel))) STATIC.set(`/${rel}`, { type, body: readFileSync(join(PUBLIC, rel)) });
 }
@@ -268,7 +271,7 @@ function formPage(req: http.IncomingMessage): string {
 
 const SECURITY_HEADERS = {
   "content-security-policy":
-    "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   "x-content-type-options": "nosniff",
   // Not "no-referrer": under that policy browsers send `Origin: null` on
   // form posts, which the same-origin check below (rightly) refuses.

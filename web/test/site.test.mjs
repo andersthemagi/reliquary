@@ -78,9 +78,9 @@ test("site landing: a signed-out visitor at / gets the landing page, not a redir
   for (const section of ["Why Reliquary", "What your agent can't do", "The problem, and what Reliquary does about it", "Who it's for", "Pricing", "Questions"]) {
     assert.match(h, new RegExp(`<h2 id="[a-z]+-title">${section}</h2>`), section);
   }
-  // Order: the band, why Reliquary, the ceiling with its proof, the ledger, who, how, pricing, questions, the closing band.
+  // Order: the band, why Reliquary, the ceiling with its proof, the ledger, who, how, what it looks like, pricing, questions, the closing band.
   const ids = [...h.matchAll(/<h2 [^>]*id="([a-z]+)-title"/g)].map((m) => m[1]);
-  assert.deepEqual(ids, ["why", "ceiling", "problem", "who", "how", "pricing", "faq", "closing"]);
+  assert.deepEqual(ids, ["why", "ceiling", "problem", "who", "how", "see", "pricing", "faq", "closing"]);
   assert.match(h, /href="\/security"/);
   assert.doesNotMatch(h, /<script/i);
   assert.doesNotMatch(h, /<p class="eyebrow">/, "no label above the heading");
@@ -191,6 +191,38 @@ test("site landing: the two frames say they are drawings, without claiming to be
   assert.doesNotMatch(shown, /postgres|:\/\/|=/, "names only, never a value");
 });
 
+test("site landing: the reel and the screens are real files from this origin, each with a text alternative", async () => {
+  const r = await fetchAs(A, "/");
+  assert.match(r.headers.get("content-security-policy"), /media-src 'self'/, "the video is allowed to load");
+  const see = /<section class="p-sec" id="see"[\s\S]*?<\/section>/.exec(await r.text())?.[0];
+  assert.ok(see, "the What it looks like section");
+  const videos = [...see.matchAll(/<video\b[^>]*>/g)].map((m) => m[0]);
+  assert.equal(videos.length, 2, "a light and a dark reel, for the stylesheet to pick from");
+  for (const v of videos) for (const a of ["autoplay", "muted", "loop", "playsinline", 'poster="/img/reel-(?:light|dark)-poster.webp"']) assert.match(v, new RegExp(`\\s${a}(\\s|>)`), a);
+  const imgs = [...see.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+  assert.equal(imgs.length, 3, "the reel's still and two screens");
+  for (const i of imgs) assert.match(i, /\balt="[^"]{40,}"/, i);
+  const files = new Set([...see.matchAll(/\b(?:src|srcset|poster)="([^"]+)"/g)].map((m) => m[1]));
+  assert.equal(files.size, 8, "a light and a dark file for the reel, its poster and each screen");
+  for (const f of files) {
+    assert.match(f, /^\/img\/[a-z-]+\.(?:webp|webm)$/, f);
+    const file = await fetchAs(A, f);
+    assert.equal(file.status, 200, f);
+    assert.match(file.headers.get("content-type"), f.endsWith(".webm") ? /^video\/webm/ : /^image\/webp/, f);
+  }
+});
+
+test("site landing: with the theme chosen, the screens are that theme's files alone; on auto, the system decides", async () => {
+  const dark = await text(A, "/", "__Host-rlq_theme=dark; rlq_theme=dark"); // whichever name this instance's cookies carry
+  const see = /<section class="p-sec" id="see"[\s\S]*?<\/section>/.exec(dark)[0];
+  assert.doesNotMatch(see, /<picture|-light[-.]|class="reel-dark"/);
+  assert.equal((see.match(/<video\b/g) ?? []).length, 1);
+  assert.equal((see.match(/-dark(?:-poster)?\.webp/g) ?? []).length, 4, "the poster, the still and two screens");
+  const auto = /<section class="p-sec" id="see"[\s\S]*?<\/section>/.exec(await text(A, "/"))[0];
+  assert.equal((auto.match(/<picture><source srcset="\/img\/[a-z]+-dark(?:-poster)?\.webp" media="\(prefers-color-scheme: dark\)"><img src="\/img\/[a-z]+-light(?:-poster)?\.webp"/g) ?? []).length, 3);
+  assert.match(auto, /<video class="reel-light"[\s\S]*<video class="reel-dark"/);
+});
+
 test("site landing: the log is an example and says so, eight lines, nothing moving", async () => {
   const h = await text(A, "/");
   const log = /<div class="p-log" aria-label="An example of the append-only activity log">([\s\S]*?)<\/div>\s*<\/div>/.exec(h)?.[1] ?? "";
@@ -218,7 +250,7 @@ test("site landing: each AI tool is named once, in the hub, and the band says wh
   // The badge's title attribute carries the sentence; the visible text doesn't repeat it.
   assert.doesNotMatch(band.replace(/<[^>]+>/g, ""), /letting people in steadily|things change and may break/, "the first band says unfinished once, in the badge; the note moved to the closing");
   assert.match(h, /<footer class="p-inv p-fold p-close">[\s\S]*<p class="alpha-note"><strong>Alpha:<\/strong>/);
-  assert.doesNotMatch(h, /<img/);
+  assert.doesNotMatch(h.replace(/<section class="p-sec" id="see"[\s\S]*?<\/section>/, ""), /<img/, "the screens in What it looks like are the only images");
 });
 
 test("site landing: each problem is paired with what Reliquary does about it, one ledger of four rows that ends on no vendor lock-in", async () => {
