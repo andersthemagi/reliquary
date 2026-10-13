@@ -60,7 +60,20 @@ On **Account settings**, you can give yourself a display name. People who share 
 - Leave it empty and save to go back to your email alone.
 - A name that is refused stays in the field, with the reason and a reference above it, and nothing is saved.
 
-Only you can set your name, signed in to the web app. An agent can't set or read it, over any tool: it's your profile, like your memberships. See [Agents and the ceiling](agents.md).
+Only you can set your name, signed in to the web app. An agent can't set it, over any tool: it's your profile, like your memberships. See [Agents and the ceiling](agents.md).
+
+### Show me to others as
+
+Under the display name on **Account settings**, **Show me to others as** chooses what people who share a vault with you see:
+
+- **Display name and email** (the default): "Ana Ruiz (ana@example.com)", or your email alone if you have no name.
+- **Display name alone**: your name and a tag, the first 8 characters of your account id, like "Ana Ruiz · 3f2a1b9c". The tag tells two people with the same name apart. With no display name, you are shown by the tag alone.
+
+Choose one and select **Save**. You always see your own email. Agents, yours and everyone else's, never see an email, whatever you choose: a tool that names people (for example `changes_since` or `list_flags`) shows them by display name and tag alone. Your display name is text, never code: a name like `Robert'); DROP TABLE students;--` or `<script>` is shown exactly as written and does nothing.
+
+Your email stays hidden everywhere: on Members, in Activity, in an invite you send and in the notice when you delete a vault. The one exception is a vault that requires members' emails, and only once you agree: see [Vaults that require emails](members.md#vaults-that-require-emails).
+
+Only you can change this, signed in to the web app.
 
 ## Your email address
 

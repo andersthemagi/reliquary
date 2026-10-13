@@ -33,8 +33,9 @@ type Owner = { user_id: string; added_by: string | null; added_at: Date; email: 
 
 // A path typed into a URL, said back only when it's plain (as rules.ts does).
 const shown = (path: string) => (/^[^\u0000-\u001f\u007f]{1,200}$/.test(path) ? path : "that path");
-// By email where the reader may see it (people.ts fills it in), as members.ts does.
-const label = (m: { user_id: string; email: string | null }) => (m.email ? personRef(m.user_id) : `Account ${m.user_id.slice(0, 8)}`);
+// As the reader may see them (people.ts fills it in), as members.ts does;
+// a former member by a short id.
+const label = (m: { user_id: string; role: string | null }) => (m.role ? personRef(m.user_id) : `Account ${m.user_id.slice(0, 8)}`);
 // The same, for a flash: a flash outlives this process, so no marker.
 const plainName = (m: { user_id: string; email: string | null } | undefined, user: string) => m?.email ?? `Account ${user.slice(0, 8)}`;
 const aRole = (role: string) => `${/^[aeiou]/.test(role) ? "an" : "a"} ${role}`;
