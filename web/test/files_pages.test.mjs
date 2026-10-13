@@ -165,10 +165,11 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   }
 });
 
-test("vault sidebar: the sections are grouped, Work (Files, Proposals, Threads, Tasks, Changes) before Setup (Variables, Links, Settings)", async () => {
+test("vault sidebar: the sections are grouped, each with an icon, Work (Files, Proposals, Threads, Tasks, Changes) before Setup (Variables, Links, Settings)", async () => {
   const side = /<nav class="side-links" aria-label="Vault">([\s\S]*?)<\/nav>/.exec(await page(`/v/${V.main}`))?.[1];
   assert.ok(side, "a sidebar in the vault shell");
-  const order = [...side.matchAll(/<span class="side-group">(\w+)<\/span>|<a [^>]*>(\w+)/g)].map((m) => m[1] ? `[${m[1]}]` : m[2]);
+  const order = [...side.matchAll(/<span class="side-group">(\w+)<\/span>|<span class="side-label">(\w+)<\/span>/g)].map((m) => m[1] ? `[${m[1]}]` : m[2]);
+  assert.equal((side.match(/<a [^>]*><svg class="icon"[^>]*aria-hidden="true"/g) ?? []).length, 8, "every section has an icon, hidden from screen readers");
   assert.deepEqual(order, ["[Work]", "Files", "Proposals", "Threads", "Tasks", "Changes", "[Setup]", "Variables", "Links", "Settings"]);
 });
 

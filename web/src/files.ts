@@ -54,6 +54,22 @@ import {
 type TreeNode = { dirs: Map<string, TreeNode>; files: { name: string; path: string; policy: string }[] };
 export type Section = "files" | "proposals" | "threads" | "tasks" | "changes" | "diagnostics" | "rules" | "search" | "variables" | "links" | "settings";
 
+// One small stroked icon per section, so the eye finds a section by shape
+// before reading it. Inline SVG because the CSP allows no other script or
+// font; aria-hidden because the label beside it is the name.
+const sectionIcon = (d: string) =>
+  raw(`<svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`);
+const SECTION_ICONS: Record<string, Raw> = {
+  files: sectionIcon('<path d="M4 1.75h5l3 3v9.5H4z"/><path d="M9 1.75v3h3"/>'),
+  proposals: sectionIcon('<circle cx="4" cy="4" r="1.75"/><circle cx="12" cy="12" r="1.75"/><path d="M4 5.75v8.5M12 10.25V6a2 2 0 0 0-2-2H7.5"/><path d="M9 2.5 7.5 4 9 5.5"/>'),
+  threads: sectionIcon('<path d="M2 3h12v8H7l-3 2.5V11H2z"/>'),
+  tasks: sectionIcon('<rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="m5 8.25 2 2 4-4.5"/>'),
+  changes: sectionIcon('<circle cx="8" cy="8" r="6.25"/><path d="M8 4.5V8l2.5 1.5"/>'),
+  variables: sectionIcon('<circle cx="5.5" cy="10.5" r="3"/><path d="m7.6 8.4 6-6M11.5 4.5l1.75 1.75"/>'),
+  links: sectionIcon('<path d="M6.75 9.25a2.75 2.75 0 0 0 3.9 0l2.1-2.1a2.75 2.75 0 0 0-3.9-3.9l-.6.6"/><path d="M9.25 6.75a2.75 2.75 0 0 0-3.9 0l-2.1 2.1a2.75 2.75 0 0 0 3.9 3.9l.6-.6"/>'),
+  settings: sectionIcon('<path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/>'),
+};
+
 export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: { path?: string; section?: Section }, body: Raw): Promise<Raw> {
   // A GET has the top bar's summary already. A POST that answers with a page
   // (a refused save is the form again) doesn't, and without it the bar loses
@@ -119,7 +135,7 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
   // Settings holds Rules and Diagnostics, so their pages mark Settings as current.
   const isCurrent = (s: Section) => current.section === s || (s === "settings" && (current.section === "rules" || current.section === "diagnostics"));
   const link = (s: (typeof sections)[number]) =>
-    html`<a href="${s.href}"${isCurrent(s.section) ? raw(' aria-current="page"') : ""}>${s.label}${s.count ? html`<span class="count">${s.count}</span>` : ""}</a>`;
+    html`<a href="${s.href}"${isCurrent(s.section) ? raw(' aria-current="page"') : ""}>${SECTION_ICONS[s.section]}<span class="side-label">${s.label}</span>${s.count ? html`<span class="count">${s.count}</span>` : ""}</a>`;
   const tree = files.length ? renderNode(root, "") : html`<p class="muted small tree-empty">No files yet.</p>`;
   return html`<div class="vault">
     <aside class="side">
