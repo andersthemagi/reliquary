@@ -58,4 +58,4 @@ Claims are state, not content: deleting a vault clears its claims along with eve
 
 ## Work plans
 
-An agent holds a step of a [work plan](tasks.md) the same way it holds a claim on a path: a lease, a secret returned once and a fence, with checking in, giving it back and a hold limit, all set by the same claim rules. Unlike a path claim, a step is handed out in order: an agent gets one only when every step it waits on is done, and when it is its turn in line. See [Tasks](tasks.md).
+An agent holds a step of a [work plan](tasks.md) the same way it holds a claim on a path: a lease, a secret returned once and a fence, with checking in, giving it back and a hold limit, all set by the same claim rules. Unlike a path claim, a step is handed out in order: an agent gets one only when every step it waits on is done, and when it is its turn in line. A step's `for`, `due` and `priority` lines are hints for planning and change none of this. See [Tasks](tasks.md).

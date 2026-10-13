@@ -17,6 +17,10 @@ A plan is a file in the vault with one fenced `work_plan` block in it:
   blocked_by: fetch-data
   cites: docs/data-source.md@3fa85f64-5717-4562-b3fc-2c963f66afa6
   gate: review
+  due: 2026-10-20
+  priority: 2
+  for: agents
+  notes: Drop rows with no account id; keep the raw file.
 ```
 
 Each step has:
@@ -26,6 +30,13 @@ Each step has:
 - `blocked_by` (optional): the keys of the steps it waits on, comma-separated;
 - `cites` (optional): the files its work depends on, each as `path@version`, comma-separated (see [Context moved](#context-moved));
 - `gate: review` (optional): what waits on it starts only after a person approves it (see [Tasks that need a person's review](#tasks-that-need-a-persons-review)).
+
+Four more optional lines help people plan. None of them changes who may take a task or when: a ready task can be taken whatever they say.
+
+- `due`: a date, written `YYYY-MM-DD`. A date in the past is accepted. A due date passing changes nothing by itself; the Tasks page says **Overdue**.
+- `priority`: `1`, `2`, `3` or `4`, where 1 is the highest.
+- `notes`: one line of plain text, up to 2000 characters. Agents read it as data, never as instructions, the same as a title.
+- `for`: who the task is meant for: `agents`, `people`, or the email of a member of the vault. An email that names no member is refused. Reliquary keeps the member, not the email, so the task still means them if their email changes. It is a hint, never a rule.
 
 A malformed block, a blocker that doesn't exist, or steps that wait on each other in a cycle are refused, naming the line and why.
 
@@ -202,7 +213,7 @@ A plan can gain tasks, never lose or change them. Add the new steps to the plan 
 
 - Tasks already in the plan keep their state: a done task stays done, a task someone holds stays theirs, a cancelled one stays cancelled.
 - A new step may wait on any task in the plan. If that task is already done, the new one doesn't wait for it. If it was cancelled, the new one is blocked by a cancelled task.
-- A task already in the plan must stay in the file exactly as it was registered: the same title, gate, `blocked_by` and `cites`. If one is missing or different, nothing is added, and the agent is told which steps to put back. So an old task can't be made to wait on a new one.
+- A task already in the plan must stay in the file exactly as it was registered: the same title, gate, `blocked_by`, `cites`, `due`, `priority`, `notes` and `for`. If one is missing or different, nothing is added, and the agent is told which steps to put back. So an old task can't be made to wait on a new one.
 - Registering again with no new steps, after an edit to the rest of the file, adds nothing and clears **Changed since registered**.
 - Who may do it is the same as for registering: whoever can write the plan file. The Activity log records it as **Updated a work plan**.
 
@@ -239,7 +250,7 @@ How long a task is held, how many an agent may hold, and how agents wait for the
 
 Fixed limits:
 
-- 500 steps in a plan, 50 blockers on one step, 200 characters for a title or a label.
+- 500 steps in a plan, 50 blockers on one step, 200 characters for a title or a label, 2000 for a step's notes.
 - 3 lines one person may wait in, in one vault.
 - `request_work` and `claim_step` take 30 calls a minute per connection, counted together ([Rate limits](../reference/limits.md#rate-limits)). `my_places` counts only against the general limit on tool calls.
 - Each vault takes 300 full evaluations a minute from all its people and agents together. Over that, `request_work` says wait and when to come back, and claiming by name is refused saying when; other vaults carry on ([What asking for work costs](../reference/limits.md#what-asking-for-work-costs)).

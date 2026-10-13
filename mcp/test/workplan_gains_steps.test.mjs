@@ -72,7 +72,7 @@ test("gains steps: a step removed from the file or changed in it is refused by n
   await putPlan(path, [FIRST[0], { ...FIRST[1], title: "Scrub it" }, { key: "new", title: "New" }]);
   const changed = await register(path);
   assert.equal(changed.isError, true);
-  assert.match(changed.text, /^steps already registered can't change, and these differ from the plan as registered \(title, gate, blocked_by or cites\): clean\. Put them back as registered; only new steps can be added/);
+  assert.match(changed.text, /^steps already registered can't change, and these differ from the plan as registered \(title, gate, blocked_by, cites, due, priority, notes or for\): clean\. Put them back as registered; only new steps can be added/);
   assert.match((await status(path)).text, new RegExp(`^${path}: 2 steps `));
 });
 
