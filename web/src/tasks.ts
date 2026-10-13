@@ -56,6 +56,7 @@ type Task = {
   expires_at: Date | null;
   done_at: Date | null;
   blockers: Blocker[];
+  moved: string[];
 };
 
 async function loadPlans(c: pg.PoolClient, id: string): Promise<Plan[]> {
@@ -75,7 +76,7 @@ async function loadTasks(c: pg.PoolClient, id: string, path: string): Promise<Ta
   return (
     await c.query(
       `select st.o_key as key, st.o_title as title, st.o_state as state, s.status, s.holder,
-              st.o_holder_label as holder_label, st.o_expires_at as expires_at, s.done_at,
+              st.o_holder_label as holder_label, st.o_expires_at as expires_at, s.done_at, st.o_moved as moved,
               coalesce((select json_agg(json_build_object('key', b.key, 'title', b.title, 'status', b.status) order by b.id)
                           from public.work_plan_step_blockers d join public.work_plan_steps b on b.id = d.blocker_id
                          where d.step_id = s.id), '[]') as blockers
@@ -218,6 +219,14 @@ function detail(ctx: Ctx, t: Task): Raw {
   }
 }
 
+// A file the task cites has a newer version than the one it cites
+// (work_plan_status's o_moved, only ever set on a task not yet finished).
+function moved(id: string, t: Task): Raw | "" {
+  if (!t.moved.length) return "";
+  return html`<span class="token-client">Context moved: ${t.moved.map((p, i) => html`${i ? ", " : ""}<a href="${filePath(id, p)}">${p}</a>`)} ${
+    t.moved.length === 1 ? "has" : "have"} a newer version than the one this task cites.</span>`;
+}
+
 // Cancel and skip are offered on a task that isn't finished either way.
 const unfinished = (t: Task) => t.state !== "done" && t.state !== "cancelled";
 
@@ -229,8 +238,9 @@ function taskTable(ctx: Ctx, id: string, path: string, rows: Task[], canAct: boo
     }</tr></thead>
     <tbody>${rows.map(
       (t) => html`<tr><td><strong>${t.title}</strong><span class="token-client"><code>${t.key}</code></span></td>
-        <td class="small" data-label="State"><span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span></td>
-        <td class="small" data-label="Details"><div>${detail(ctx, t)}</div></td>
+        <td class="small" data-label="State"><span class="badge${STATE_TONE[t.state] ? ` ${STATE_TONE[t.state]}` : ""}">${STATE_LABEL[t.state]}</span>${
+          t.moved.length ? html` <span class="badge warning">Context moved</span>` : ""}</td>
+        <td class="small" data-label="Details"><div>${detail(ctx, t)}${moved(id, t)}</div></td>
         ${canAct
           ? unfinished(t)
             ? html`<td class="row-actions"><a class="button quiet" href="${href("cancel", t)}" aria-label="Cancel the task ${t.title}">Cancel</a> <a class="button quiet" href="${href("skip", t)}" aria-label="Skip the task ${t.title}">Skip</a></td>`

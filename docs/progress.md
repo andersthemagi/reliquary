@@ -572,11 +572,21 @@ start the next one.
     tool or web page reaches any of it yet; `docs/public/roadmap.yml`.
   - **Phase 3, not yet built:** every other CL-3.x issue -- MCP tools
     (CL-3.4, blocked on this entry and CL-3.9), the web page (CL-3.5),
-    the "canon moved" signal (CL-3.6), review-gated steps (CL-3.7),
+    review-gated steps (CL-3.7),
     waiting and places in line (CL-3.9), a capacity model (CL-3.13),
     one call for every place in line (CL-3.12), the adversary suite and
     load test (CL-3.10/3.11), and CL-3.2's own deferred race/lock-order
     tests (CL-3.3).
+  - the "canon moved" signal (CL-3.6, #73, `supabase/migrations/
+    20261013100000_canon_moved.sql`): `work_plan_status` gains `o_moved`,
+    the cited files whose current version is newer than the one a step
+    cites, for open and claimed steps only, computed on read (no trigger,
+    no stored flag, nothing to keep in step); `list_flags` gains reason
+    `cite_moved`, to the plan's registrant and a citing step's holder, and
+    a `plan` key on every flag. Shown by `work_plan_status` over MCP, the
+    Tasks plan page and the Flags page. Registry: `tests/features.md`
+    F803-F805. Docs: `docs/public/concepts/tasks.md` ("Context moved"),
+    `flags.md`, `claims.md`.
 
 Design for phases 2 and 3 was settled in docs/design.md ("Claims and work
 plans", CL-0.2); phase 2 is built as of this entry, phase 3 has started.

@@ -223,7 +223,7 @@ select t.expect('flags: each flag carries its seq, category, reason, event, path
   || ' / ' || (select string_agg(k, ',' order by k) from jsonb_object_keys(t.flag_json('ben', 'team')::jsonb) k)
   || ' / ' || ((t.flag_json('ben', 'team')::jsonb -> 'flags' -> 0 ->> 'proposal_id') = t.id('p1')::text)::text
   || ' ' || ((t.flag_json('ben', 'team')::jsonb -> 'flags' -> 0 ->> 'actor') = t.id('ana')::text)::text,
-  'actor,agent,at,category,event,message_id,path,proposal_id,reason,seq,thread_id,watching / flags,more,through,watermark / true true');
+  'actor,agent,at,category,event,message_id,path,plan,proposal_id,reason,seq,thread_id,watching / flags,more,through,watermark / true true');
 select t.catch_up('ben', 'team'), t.catch_up('ana', 'team'), t.catch_up('ana', 'team', 'ana-agent'), t.catch_up('cal', 'team');
 select t.expect('flags: once advanced, what was shown isn''t shown again',
   t.flags('ben', 'team') || ' ' || t.flags('ana', 'team', 'ana-agent'), 'none none');
