@@ -90,10 +90,11 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
                  from p left join r on r.path = p.path) as files,
               (select coalesce(json_object_agg(d.path, coalesce(r.policy, 'open')), '{}')
                  from d left join r on r.path = d.path) as dirs,
-              (select count(*)::int from public.proposals where vault_id = $1 and status = 'open') as open`,
+              (select count(*)::int from public.proposals where vault_id = $1 and status = 'open') as open,
+              public.flags_waiting($1) as flags`,
       [v.id],
     )
-  ).rows[0] as { files: [string, string][]; dirs: Record<string, string>; open: number };
+  ).rows[0] as { files: [string, string][]; dirs: Record<string, string>; open: number; flags: number };
   const files = shell.files.map(([path, policy]) => ({ path, policy }));
   const dirPolicy = new Map<string, string>(Object.entries(shell.dirs));
   const open = shell.open;
@@ -123,12 +124,13 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
   // section hides behind the folder tree. The sidebar splits them into the
   // work people do every day and the setup they visit once, so a newcomer
   // reads the first group and can ignore the second.
-  const sections: { section: Section; href: string; label: string; count?: number; group: "Work" | "Setup" }[] = [
+  const sections: { section: Section; href: string; label: string; count?: number | string; group: "Work" | "Setup" }[] = [
     { section: "files", href: vaultPath(v.id), label: "Files", group: "Work" },
     { section: "proposals", href: vaultPath(v.id, "/proposals"), label: "Proposals", count: open || undefined, group: "Work" },
     { section: "threads", href: vaultPath(v.id, "/threads"), label: "Threads", group: "Work" },
     { section: "tasks", href: vaultPath(v.id, "/tasks"), label: "Tasks", group: "Work" },
-    { section: "changes", href: vaultPath(v.id, "/changes"), label: "Changes", group: "Work" },
+    // flags_waiting stops at 21, its way of saying "more than 20".
+    { section: "changes", href: vaultPath(v.id, "/changes"), label: "Updates", count: shell.flags > 20 ? "20+" : shell.flags || undefined, group: "Work" },
     { section: "variables", href: vaultPath(v.id, "/variables"), label: "Variables", group: "Setup" },
     { section: "links", href: vaultPath(v.id, "/links"), label: "Links", group: "Setup" },
     { section: "settings", href: vaultPath(v.id, "/config"), label: "Settings", group: "Setup" },
