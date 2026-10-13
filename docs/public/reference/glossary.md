@@ -14,7 +14,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Ceiling.** The actions no agent can do, however its person connected it: the ones that are irreversible, grant trust or reveal a secret. The list is on [Agents and the ceiling](../concepts/agents.md#the-ceiling).
 
-**Changes.** A vault's plain-language list of what people and their agents changed: files written, deleted and erased, and proposals opened and decided. Newest first, by day. See [Changes and the log](../concepts/activity.md#changes).
+**Changes.** A vault's plain-language list of what people and their agents changed: files written, deleted and erased, and proposals opened and decided. Newest first, by day, on the vault's **Updates** page. See [Changes and the log](../concepts/activity.md#updates).
 
 **Claim.** A lease saying who is working on a path right now and for how long. A courtesy signal, never a lock: claiming a path doesn't stop anyone writing it. See [Claims](../concepts/claims.md).
 
@@ -24,7 +24,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Default policy.** What a vault's paths are, canon or open, where no rule says otherwise. Set on **Settings**.
 
-**Diagnostics.** The part of a vault's **Settings** for working out why something happened: its Flags, its Claims and the full Log. Most people never need it. See [Vaults, files and folders](../concepts/vaults-and-files.md#diagnostics).
+**Diagnostics.** The part of a vault's **Settings** for working out why something happened: its Claims and the full Log. Most people never need it. See [Vaults, files and folders](../concepts/vaults-and-files.md#diagnostics).
 
 **Display name.** An optional name you set on **Account settings**, shown to people who share a vault with you next to your email. Only you set it, in the web app. See [The top bar, inbox and account](../concepts/inbox-and-account.md#display-name).
 
@@ -34,7 +34,7 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Erase.** Blanking every version of a file's text, while the log keeps its entries. Owners only, in person. See [Export, delete and erase](../concepts/export-delete-erase.md#erase-a-file).
 
-**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a new message in a thread for you, a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. You see yours under **Settings**, **Diagnostics**, **Flags**. See [Flags](../concepts/flags.md).
+**Flag.** Something in a vault that changed since you, or one of your connections, was last told: a new message in a thread for you, a proposal waiting on your review, a change to your own proposal, or a change on a path you watch. You see yours in a vault's **Updates**, under **New for you**. See [Flags](../concepts/flags.md).
 
 **Import.** A whole `.env` brought in at once, pasted in the web app or sent from the CLI, waiting for a person to apply it. See [Imports](../concepts/imports.md).
 

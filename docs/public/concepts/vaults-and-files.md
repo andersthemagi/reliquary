@@ -45,7 +45,7 @@ A card with nothing to show says so in one line. Under the cards is the vault's 
 
 In the web app, **Files** in a vault's sidebar is its folder list: each folder and file shows whether it is canon or open, the top says what files without a rule are, and a folder's `README.md` is shown under its list. The vault's name at the start of a breadcrumb goes to its **Overview**; deleting or erasing a file takes you back to **Files**. **Search** finds files by their words and paths. **New file** in a folder follows that folder's rule: in a canon folder it asks why and becomes a proposal. In an open folder it never writes over a file that is already there: it says so and keeps what you typed, so open that file and choose **Edit**, or pick another path.
 
-On a wide screen, a vault's sidebar lists its sections in two groups: **Work** (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Changes**), the ones you use every day, then **Setup** (**Variables**, **Links**, **Settings**). Under them, **Files** heads the folder tree, and the search box has its own search button. On a phone, a vault's sections (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Changes**, **Variables**, **Links**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
+On a wide screen, a vault's sidebar lists its sections in two groups: **Work** (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Updates**), the ones you use every day, then **Setup** (**Variables**, **Links**, **Settings**). **Proposals** counts the open proposals, and **Updates** counts the [flags](flags.md) waiting for you. Under them, **Files** heads the folder tree, and the search box has its own search button. On a phone, a vault's sections (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Updates**, **Variables**, **Links**, **Settings**) are tabs at the top, and the folder tree is under **Browse files**. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
 
@@ -59,7 +59,7 @@ A vault's **Settings** has a menu beside the page (above it on a phone), in thre
 
 ## Diagnostics
 
-**Settings**, then **Diagnostics**, is for working out why something happened. It has a tab for [Flags](flags.md) (what changed since you were last told), one for [Claims](claims.md) (who is working on which path) and one for the **Log**, every event the vault recorded (see [Changes and the log](activity.md)). Most people never need it, so none of them is in the vault's main navigation. What people changed, in plain words, is under **Changes**. The **Diagnostics** page itself only lists its tabs; it changes nothing.
+**Settings**, then **Diagnostics**, is for working out why something happened. It has a tab for [Claims](claims.md) (who is working on which path) and one for the **Log**, every event the vault recorded (see [Changes and the log](activity.md)). Most people never need it, so neither is in the vault's main navigation. What is new for you, and what people changed in plain words, is under **Updates**. The **Diagnostics** page itself only lists its tabs; it changes nothing.
 
 ## Roles
 

@@ -243,7 +243,7 @@ test("watching tab: every member has Settings, Watching, listing only their own 
   assert.match(h, /<h1>Settings<\/h1>/);
   assert.match(h, new RegExp(`<li><a href="/v/${V.main}/config">Settings</a></li><li aria-current="page">Watching</li>`));
   assert.match(h, new RegExp(`<a href="/v/${V.main}/config/watching" aria-current="page">Watching</a>`));
-  assert.match(h, new RegExp(`Changes there are flagged to you and to your agents\\. You see them in <a href="/v/${V.main}/flags">Flags</a> \\(under Diagnostics\\) and in <a href="/v/${V.main}/changes\\?show=watching">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>\\. Only you see this list\\.`));
+  assert.match(h, new RegExp(`Changes there are flagged to you and to your agents\\. You see them in <a href="/v/${V.main}/changes">Updates</a>, under New for you, and in <a href="/v/${V.main}/changes\\?show=watching">Updates, Watching</a>; your agents ask for theirs with <code>list_flags</code>\\. Only you see this list\\.`));
   assert.match(h, new RegExp(`<a href="${re(tree(V.main, "notes/"))}"><code>notes/</code></a><span class="token-client">Folder, and everything in it</span>`));
   assert.doesNotMatch(h, /<code>notes\/a\.md<\/code>/, "Ola's watch isn't Wren's");
   const { action, fields } = formFields(h, "Unwatch");

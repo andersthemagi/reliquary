@@ -1,17 +1,14 @@
 // Diagnostics: the part of a vault's Settings for working out why something
-// happened. Flags and Claims live here, so the vault's own navigation leads
+// happened. Claims and the Log live here, so the vault's own navigation leads
 // with what a person reads or acts on (docs/parity.md says an agent's
 // capabilities should exist in the web UI too; it doesn't say they belong in
-// the first row). Nothing is removed: each page is the one it was, behind
-// this frame, at the URL it always had.
+// the first row). Each page is the one it was, behind this frame, at the URL
+// it always had. Flags moved out to Updates' "New for you" (changes.ts):
+// people never found them here.
 //
 //   GET /v/:id/diagnostics   what each tab is for; reads nothing that changes
-//   GET /v/:id/flags         the Flags tab (flagspage.ts)
 //   GET /v/:id/claims        the Claims tab (claimspage.ts)
 //   GET /v/:id/activity      the Log tab: the full log (pages.ts, activity.ts)
-//
-// The landing page is not the Flags tab on purpose: opening Flags marks the
-// person's flags shown, and finding Diagnostics in Settings shouldn't.
 
 import { html, tabs, type Raw } from "./html.js";
 import { asPerson } from "./db.js";
@@ -19,11 +16,10 @@ import { vaultShell } from "./files.js";
 import { notFound, render, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { settingsPage } from "./vaultadmin.js";
 
-export type DiagTab = "flags" | "claims" | "log";
+export type DiagTab = "claims" | "log";
 
 // The tabs, in order, and one line each for the landing page.
 const DIAG_TABS: { tab: DiagTab; label: string; what: string }[] = [
-  { tab: "flags", label: "Flags", what: "What changed in this vault since you were last told. Opening it marks what it lists as shown for you, not for your agents." },
   { tab: "claims", label: "Claims", what: "Who is working on which path right now, and for how long. Owners and editors can break a claim." },
   { tab: "log", label: "Log", what: "Every event the vault recorded, including members, rules, variables and claims. It can only be added to." },
 ];

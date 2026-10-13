@@ -27,8 +27,7 @@ import { linkGrantsRoutes } from "./linkgrants.js";
 import { claimAction, claims } from "./claimspage.js";
 import { plan, taskAction, tasks } from "./tasks.js";
 import { claimRules, setClaimRuleAction } from "./claimrulespage.js";
-import { flags } from "./flagspage.js";
-import { changes } from "./changes.js";
+import { changes, changesPath } from "./changes.js";
 import { diagnostics, diagnosticsFrame, diagSection } from "./diagnostics.js";
 import { adminRoutes } from "./vaultadmin.js";
 import { deletionNotices, inboxInviteRoutes, inviteRoutes } from "./members.js";
@@ -696,7 +695,8 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (rest === "/links") return linksRoutes(ctx, id);
   if (get && rest === "/changes") return changes(ctx, id);
   if (get && rest === "/diagnostics") return diagnostics(ctx, id);
-  if (get && rest === "/flags") return flags(ctx, id);
+  // Flags became Updates' "New for you"; old links and bookmarks still land.
+  if (get && rest === "/flags") return { redirect: changesPath(id) };
   if (get && rest === "/claims") return claims(ctx, id);
   if (!get && rest === "/claims") return claimAction(ctx, id);
   if (get && rest === "/tasks") return tasks(ctx, id);

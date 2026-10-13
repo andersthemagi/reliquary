@@ -2164,6 +2164,10 @@ table.env-log td[data-label="Environment"] { white-space: nowrap; }
 .change-what { min-width: 0; overflow-wrap: anywhere; }
 .change-agent { margin-left: var(--space-1); color: var(--fg-muted); font-size: var(--text-sm); }
 .change-when { flex: none; color: var(--fg-muted); font-size: var(--text-sm); white-space: nowrap; }
+/* Updates' New for you (flagspage.ts): above the chips, which only filter the feed. */
+.new-for-you { margin-bottom: var(--space-6); }
+.new-for-you h2 { margin: 0 0 var(--space-3); font-size: var(--text-md); line-height: var(--lh-md); }
+.feed .flag { align-items: baseline; flex-wrap: wrap; }
 
 /* Changes: Everyone, Mine, Watching, as links with one marked (changes.ts). */
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; margin: var(--space-4) 0 0; padding: 0; }

@@ -11,7 +11,6 @@ import { asPerson } from "./db.js";
 import { callout, html, pageHeader, plural, raw, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { recentChanges } from "./changes.js";
-import { flagsPath } from "./flagspage.js";
 import { planPath, tasksPath } from "./tasks.js";
 import { renderMarkdown } from "./markdown.js";
 import { filePath, notFound, proposalPath, render, vault, vaultPath, WAITING_SQL, who, writablePath, type Ctx, type Reply, type Vault } from "./pages.js";
@@ -123,7 +122,7 @@ export async function overview(ctx: Ctx, id: string): Promise<Reply> {
       ? html`<ul class="card-list">${f.waiting.map(
           (p) => html`<li><a href="${proposalPath(id, p.id)}">${verb(p)} ${p.path}</a> <span class="muted">· ${who(ctx, p.proposed_by, p.agent)} · ${time(p.created_at)}</span></li>`,
         )}</ul>${f.waiting_n > f.waiting.length ? html`<p class="small muted">and ${f.waiting_n - f.waiting.length} more</p>` : ""}`
-      : f.flags ? "" : quiet("Nothing is waiting on you.")}${f.flags ? html`<p class="small"><a href="${flagsPath(id)}">${f.flags_more ? "More than " : ""}${plural(f.flags, "unread flag")}</a></p>` : ""}`;
+      : f.flags ? "" : quiet("Nothing is waiting on you.")}${f.flags ? html`<p class="small"><a href="${vaultPath(id, "/changes")}">${f.flags_more ? "More than " : ""}${plural(f.flags, "unread flag")}</a></p>` : ""}`;
     const progress = html`${tasks.length
       ? html`<ul class="card-list">${tasks.slice(0, ROWS).map(
           (t) => html`<li><a href="${planPath(id, t.plan)}">${t.title}</a> <span class="chip task-holder">${who(ctx, t.holder, t.agent)}</span></li>`,

@@ -608,14 +608,14 @@ test("context moved: a task citing a file with a newer version says a file it ci
   const [{ v }] = await sql("select current_version_id as v from public.files where vault_id = $1 and path = 'notes/moved.md'", [V.main]);
   await register(NOA, V.main, "plans/moved.md", [{ key: "uses", title: "Uses the note", cites: [{ path: "notes/moved.md", version: v }] }]);
   assert.doesNotMatch(taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses"), /A file it cites changed/);
-  await page(noa, `/v/${V.main}/flags`);
+  await page(noa, `/v/${V.main}/changes`);
 
   await as(EDDA, "select public.write_file($1, 'notes/moved.md', 'second')", [V.main]);
   const row = taskRow(await page(noa, planUrl(V.main, "plans/moved.md")), "uses");
   assert.match(row, /<span class="badge success">Ready<\/span>[\s\S]*<span class="badge warning">A file it cites changed<\/span>/);
   assert.match(row, new RegExp(`A file it cites changed: <a href="/v/${V.main}/file\\?path=notes%2Fmoved\\.md">notes/moved\\.md</a> has a newer version than the one this task cites\\.`));
 
-  const flags = await page(noa, `/v/${V.main}/flags`);
+  const flags = await page(noa, `/v/${V.main}/changes`);
   assert.match(flags, /<span class="badge warning">Context moved<\/span>/);
   assert.match(flags, new RegExp(`cited in <a href="${tasksUrl(V.main)}/plan\\?path=plans%2Fmoved\\.md">plans/moved\\.md</a>`));
 });

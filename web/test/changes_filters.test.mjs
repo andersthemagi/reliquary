@@ -3,7 +3,7 @@
 // log's actor; Watching is public.subscriptions under its own RLS joined to
 // the log by the rule in src/watchrule.ts. This file proves the rule agrees
 // with public.list_flags's own on the same paths, that only the reader's own
-// watches count, and that no view moves anyone's flag watermark.
+// watches count, and that neither view moves anyone's flag watermark.
 //
 // This file starts its own servers from dist/, signed in as Kai (an owner)
 // and Max (a viewer), people no other test file uses. Kai owns "Filters
@@ -87,6 +87,9 @@ async function start(user, name) {
 const get = (s, path) => fetch(s.origin + path, { headers: { cookie: s.cookie }, redirect: "manual" });
 const page = async (s, path) => (await get(s, path)).text();
 const url = (v, show) => `/v/${v}/changes${show ? `?show=${show}` : ""}`;
+// Everyone's first page shows New for you and marks flags shown; a cursor past
+// the end is the same lines without that, so the flags tests below still have flags.
+const keepFlags = (u) => `${u}${u.includes("?") ? "&" : "?"}before=999999999999`;
 const text = (h) => h.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 const lines = (h) => [...h.matchAll(/<li class="change"><span class="change-what">([\s\S]*?)<\/span><span class="change-when">/g)].map((m) => text(m[1]));
 const wrote = (h) => lines(h).map((l) => /wrote (\S+)$/.exec(l)?.[1]).filter(Boolean);
@@ -156,11 +159,11 @@ test("changes views: Everyone, Mine and Watching are links, the current one mark
       .map(([k, label, href]) => `<li><a class="chip" href="${href}"${k === show ? ' aria-current="true"' : ""}>${label}</a></li>`)
       .join("") +
     `</ul>`;
-  assert.ok((await page(kai, url(V.main))).includes(chips(V.main, "everyone")));
+  assert.ok((await page(kai, keepFlags(url(V.main)))).includes(chips(V.main, "everyone")));
   assert.ok((await page(kai, url(V.main, "mine"))).includes(chips(V.main, "mine")));
   assert.ok((await page(kai, url(V.main, "watching"))).includes(chips(V.main, "watching")));
   for (const odd of ["bogus", "MINE", "", "mine,watching"]) {
-    assert.ok((await page(kai, url(V.main, encodeURIComponent(odd)))).includes(chips(V.main, "everyone")), odd);
+    assert.ok((await page(kai, keepFlags(url(V.main, encodeURIComponent(odd))))).includes(chips(V.main, "everyone")), odd);
   }
 });
 
@@ -176,7 +179,7 @@ test("changes views: Mine is what you did and what your agents did for you, not 
     "You wrote canon/rules.md",
   ]);
   // Everyone has Lia's lines as well, and the write that applied her proposal (hers, not Kai's).
-  const everyone = lines(await page(kai, url(V.main)));
+  const everyone = lines(await page(kai, keepFlags(url(V.main))));
   assert.ok(everyone.includes("lia@example.test wrote canon/rules.md, from an approved proposal"));
   assert.ok(everyone.includes("lia@example.test’s agent Cursor wrote mine/l1.md"));
   assert.ok(!mine.some((l) => l.includes("lia@example.test")));
@@ -247,12 +250,16 @@ test("changes views: Older and Newest keep the view", async () => {
   assert.match(past, new RegExp(`<a class="button" href="/v/${V.long}/changes\\?show=mine">Back to the newest</a>`));
 });
 
-test("changes views: opening any view marks no flag shown, for the reader or anyone", async () => {
+test("changes views: Mine, Watching and an older page show no New for you and mark no flag shown, for the reader or anyone", async () => {
   const waiting = async (user, v) => (await as(user, "select public.list_flags($1, 200) as r", [v]))[0].r.flags.length;
   const before = [await waiting(KAI, V.main), await waiting(MAX, V.main), await waiting(LIA, V.main)];
   assert.ok(before[0] > 0 && before[1] > 0, "Kai and Max have flags waiting");
-  for (const show of [undefined, "mine", "watching", "bogus"]) {
-    for (const s of [kai, max]) assert.equal((await get(s, url(V.main, show))).status, 200);
+  for (const path of [url(V.main, "mine"), url(V.main, "watching"), `${url(V.main)}?before=999999`]) {
+    for (const s of [kai, max]) {
+      const r = await get(s, path);
+      assert.equal(r.status, 200, path);
+      assert.doesNotMatch(await r.text(), /New for you/, path);
+    }
   }
   assert.deepEqual([await waiting(KAI, V.main), await waiting(MAX, V.main), await waiting(LIA, V.main)], before);
 });

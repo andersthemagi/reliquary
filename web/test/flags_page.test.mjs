@@ -1,9 +1,10 @@
-// The Flags page in the web app (src/flagspage.ts): what public.list_flags
-// returns for the signed-in person, in a vault, and that viewing it marks
-// those flags shown (public.advance_flags) the same way an MCP client is
-// told to (F412, F413). The database's own predicates are hostile-tested in
-// supabase/tests/flags_test.sql; this file is about what the page shows and
-// that it advances the person's own watermark, not a connection's.
+// Flags in the web app, as Updates' "New for you" (src/flagspage.ts): what
+// public.list_flags returns for the signed-in person, in a vault, and that
+// viewing it marks those flags shown (public.advance_flags) the same way an
+// MCP client is told to (F412, F413). The database's own predicates are
+// hostile-tested in supabase/tests/flags_test.sql; this file is about what
+// the page shows and that it advances the person's own watermark, not a
+// connection's.
 //
 // This file starts its own server from dist/, signed in as Fran, a person no
 // other test file uses. Fran owns "Flags main" with Gil as editor.
@@ -65,7 +66,9 @@ async function as(user, q, params = []) {
 
 const get = (path) => fetch(s.origin + path, { headers: { cookie: s.cookie }, redirect: "manual" });
 const page = async (path) => (await get(path)).text();
-const flagsUrl = (v) => `/v/${v}/flags`;
+const flagsUrl = (v) => `/v/${v}/changes`;
+// Each flag's row in New for you; the feed's own rows are class="change".
+const flagRows = (h) => [...h.matchAll(/<li class="flag">([\s\S]*?)<\/li>/g)].map((m) => m[1]);
 
 before(async () => {
   const port = await freePort();
@@ -126,7 +129,7 @@ test("flags page: a vault you're not in is 404", async () => {
 // something happened. This file's seed has flags waiting, which is what the
 // landing page must leave alone.
 
-test("diagnostics: Settings has a Diagnostics tab, and its page says what it is for and offers Flags, Claims and the Log, none of them current", async () => {
+test("diagnostics: Settings has a Diagnostics tab, and its page says what it is for and offers Claims and the Log, neither of them current", async () => {
   assert.match(await page(`/v/${V.main}/config`), new RegExp(`<a href="/v/${V.main}/diagnostics">Diagnostics</a>`));
   const h = await page(`/v/${V.main}/diagnostics`);
   assert.match(h, /<h1>Settings<\/h1>/);
@@ -136,7 +139,6 @@ test("diagnostics: Settings has a Diagnostics tab, and its page says what it is 
   const inner = /<nav class="tabs" aria-label="Diagnostics">([\s\S]*?)<\/nav>/.exec(h)?.[1];
   assert.ok(inner, "the inner tabs");
   assert.deepEqual([...inner.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)</g)].map((m) => [m[1], m[2]]), [
-    [`/v/${V.main}/flags`, "Flags"],
     [`/v/${V.main}/claims`, "Claims"],
     [`/v/${V.main}/activity`, "Log"],
   ]);
@@ -155,68 +157,71 @@ test("diagnostics: a vault you're not in is 404", async () => {
   assert.equal((await get(`/v/${V.ola}/diagnostics`)).status, 404);
 });
 
-test("diagnostics: /flags is the same page inside Diagnostics, with Flags and Diagnostics current and the headings in order", async () => {
+test("flags redirect: /v/:id/flags answers 303 to the vault's Updates, so old links still land", async () => {
+  const r = await get(`/v/${V.empty}/flags`);
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), `/v/${V.empty}/changes`);
+});
+
+test("new for you: Updates has one h1, then New for you, then the chips that filter the changes below it", async () => {
   // A vault with nothing waiting, so this opens nothing of the seed's.
   const h = await page(flagsUrl(V.empty));
-  assert.match(h, new RegExp(`<a href="/v/${V.empty}/diagnostics" aria-current="page">Diagnostics</a>`), "the Settings tab");
-  assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.empty}/flags" aria-current="page">Flags</a><a href="/v/${V.empty}/claims">Claims</a><a href="/v/${V.empty}/activity">Log</a></nav>`));
-  assert.match(h, new RegExp(`href="/v/${V.empty}/config" aria-current="page">Settings`), "the sidebar's Settings");
-  assert.match(h, /For working out why something happened; most people never need it\./);
   assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, "one h1");
-  assert.ok(h.indexOf("<h1>Settings</h1>") < h.indexOf("<h2>Flags</h2>"), "Settings, then Flags");
+  const at = (s) => h.indexOf(s);
+  assert.ok(at("<h1>Updates</h1>") > -1, "titled Updates");
+  assert.ok(at("<h1>Updates</h1>") < at('<h2 id="new-for-you">New for you</h2>'), "Updates, then New for you");
+  assert.ok(at('<h2 id="new-for-you">New for you</h2>') < at('<ul class="chips"'), "New for you, then the chips");
 });
 
 test("flags page: a vault with nothing waiting says so", async () => {
   const h = await page(flagsUrl(V.empty));
-  assert.match(h, /<h2>Flags<\/h2>/);
-  assert.match(h, /<strong>Nothing new<\/strong>/);
+  assert.match(h, /<h2 id="new-for-you">New for you<\/h2>\s*<p class="muted">Nothing new since you last looked\./, "one quiet line");
+  assert.doesNotMatch(h, /<strong>Nothing new/, "not an empty state");
 });
 
 test("flags page: with nothing new it says so and points to Proposals for what is still waiting, not that nothing waits", async () => {
   const h = await page(flagsUrl(V.empty));
   assert.doesNotMatch(h, /Nothing is waiting on you/);
-  assert.match(h, new RegExp(`Nothing has changed since you last looked\\. Proposals still waiting on you are in <a href="/v/${V.empty}/proposals">Proposals</a>\\.`));
+  assert.match(h, new RegExp(`Nothing new since you last looked\\. Proposals still waiting on you are in <a href="/v/${V.empty}/proposals">Proposals</a>\\.`));
 });
 
 test("flags page: shows what waits on Fran, oldest first, none of it Fran's own actions", async () => {
   const h = await page(flagsUrl(V.main));
-  const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
+  const rows = flagRows(h);
   assert.equal(rows.length, 5, h);
 
   assert.match(rows[0], /<span class="badge warning">Waiting on you<\/span>/);
   assert.match(rows[0], new RegExp(`<a href="/v/${V.main}/proposals/${P.review}">Proposed</a>`));
-  assert.match(rows[0], /<td class="path-cell">notes\/a\.md<\/td>/);
+  assert.match(rows[0], /<span class="meta"><span>notes\/a\.md<\/span><span>gil@example\.test<\/span><span><time /, "where, who, when");
 
   assert.match(rows[1], /<span class="badge info">Your proposal<\/span>/);
   assert.match(rows[1], new RegExp(`<a href="/v/${V.main}/proposals/${P.own}">Commented on a proposal</a>`));
 
   assert.match(rows[2], /<span class="badge info">File changed<\/span>/);
   assert.match(rows[2], new RegExp(`<a href="/v/${V.main}/proposals/${P.base}">Wrote</a>`));
-  assert.match(rows[2], new RegExp(`<td class="path-cell"><a href="/v/${V.main}/file\\?path=notes%2Fb\\.md">notes/b\\.md</a></td>`));
+  assert.match(rows[2], new RegExp(`<span class="meta"><span><a href="/v/${V.main}/file\\?path=notes%2Fb\\.md">notes/b\\.md</a></span>`));
 
   assert.match(rows[3], /<span class="badge info">Watching<\/span>/);
-  assert.match(rows[3], />Wrote<\/td>/, "not linked to any proposal");
-  assert.match(rows[3], new RegExp(`<td class="path-cell"><a href="/v/${V.main}/file\\?path=top\\.md">top\\.md</a></td>`));
-  assert.doesNotMatch(rows[3], /token-client">via/, "watched exactly, no folder to name");
+  assert.match(rows[3], /<\/span> Wrote<\/span>/, "not linked to any proposal");
+  assert.match(rows[3], new RegExp(`<span class="meta"><span><a href="/v/${V.main}/file\\?path=top\\.md">top\\.md</a></span>`));
+  assert.doesNotMatch(rows[3], / via /, "watched exactly, no folder to name");
 
   assert.match(rows[4], /<span class="badge info">Watching<\/span>/);
-  assert.match(rows[4], new RegExp(`<td class="path-cell"><a href="/v/${V.main}/file\\?path=sub%2Fx\\.md">sub/x\\.md</a><span class="token-client">via sub/</span></td>`));
-
-  assert.match(h, /Your agents see the same flags over MCP/);
+  assert.match(rows[4], new RegExp(`<span class="meta"><span><a href="/v/${V.main}/file\\?path=sub%2Fx\\.md">sub/x\\.md</a> via sub/</span>`));
 });
 
 test("flags page: viewing it marks these shown; a second visit has nothing new until something else happens", async () => {
-  assert.match(await page(flagsUrl(V.main)), /<strong>Nothing new<\/strong>/);
+  assert.match(await page(flagsUrl(V.main)), /Nothing new since you last looked/);
   await as(GIL, "select public.comment_on_proposal($1, 'one more thing')", [P.own]);
   const h = await page(flagsUrl(V.main));
-  const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)];
+  const rows = flagRows(h);
   assert.equal(rows.length, 1);
-  assert.match(rows[0][1], new RegExp(`<a href="/v/${V.main}/proposals/${P.own}">Commented on a proposal</a>`));
+  assert.match(rows[0], new RegExp(`<a href="/v/${V.main}/proposals/${P.own}">Commented on a proposal</a>`));
 });
 
 test("flags page: a thread flag is badged Thread and links to its thread, not left as a bare Watching row", async () => {
   const h = await page(flagsUrl(V.thread));
-  const rows = [...h.matchAll(/<tr class="ev">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
+  const rows = flagRows(h);
   assert.equal(rows.length, 2, h);
   for (const r of rows) {
     assert.match(r, /<span class="badge info">Thread<\/span>/);
@@ -232,10 +237,27 @@ test("flags page: past 200 flags it says to reload for the next batch, and the r
   await as(FRAN, "select public.create_subscription($1, 'path', 'bulk/')", [V.many]);
   await as(GIL, "select public.write_file($1, 'bulk/' || g || '.md', 'Text') from generate_series(1, 201) g", [V.many]);
   const first = await page(flagsUrl(V.many));
-  assert.equal((first.match(/<tr class="ev">/g) ?? []).length, 200);
+  assert.equal(flagRows(first).length, 200);
   assert.match(first, /More than 200 flags were waiting; the oldest are shown first\. Reload for the next batch\./);
   assert.doesNotMatch(first, /Check back/);
   const second = await page(flagsUrl(V.many));
-  assert.equal((second.match(/<tr class="ev">/g) ?? []).length, 1);
+  assert.equal(flagRows(second).length, 1);
   assert.doesNotMatch(second, /More than 200 flags/);
+});
+
+test("updates count: the sidebar's Updates shows how many flags wait, up to 20+, and none once Updates has shown them", async () => {
+  const [{ id: v }] = await as(FRAN, "select public.create_vault('Flags count', 'open') as id");
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, GIL, FRAN]);
+  await as(FRAN, "select public.create_subscription($1, 'path', 'w/')", [v]);
+  const side = async (path) => /<nav class="side-links" aria-label="Vault">[\s\S]*?<\/nav>/.exec(await page(path))[0];
+  const updates = (count) =>
+    new RegExp(`<a href="/v/${v}/changes"(?: aria-current="page")?><svg[\\s\\S]*?</svg><span class="side-label">Updates</span>${count === null ? "</a>" : `<span class="count">${count}</span>`}`);
+
+  assert.match(await side(`/v/${v}`), updates(null), "nothing waits yet");
+  await as(GIL, "select public.write_file($1, 'w/' || g || '.md', 'Text') from generate_series(1, 2) g", [v]);
+  assert.match(await side(`/v/${v}`), updates(2));
+  assert.match(await side(`/v/${v}/changes`), updates(null), "Updates shows them, so its own sidebar has no count");
+  assert.match(await side(`/v/${v}`), updates(null), "and nor does any page after it");
+  await as(GIL, "select public.write_file($1, 'w/more-' || g || '.md', 'Text') from generate_series(1, 21) g", [v]);
+  assert.match(await side(`/v/${v}`), updates("20\\+"));
 });

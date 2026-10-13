@@ -181,7 +181,7 @@ test("cards: Waiting on you lists the proposal waiting for this person's review 
   assert.ok(before > 0, "a proposal waiting on Ola is a flag for her");
   const c = card(await page(ola, `/v/${V.main}`), "Waiting on you");
   assert.match(c, new RegExp(`<a href="/v/${V.main}/proposals/${V.proposal}">Create canon/terms\\.md</a> <span class="muted">· enzo@example\\.test · `));
-  assert.match(c, new RegExp(`<a href="/v/${V.main}/flags">${before} unread flags?</a>`));
+  assert.match(c, new RegExp(`<a href="/v/${V.main}/changes">${before} unread flags?</a>`));
   assert.equal(await unread(OLA, V.main), before, "opening the Overview leaves the flags unread");
 });
 

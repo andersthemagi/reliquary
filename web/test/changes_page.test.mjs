@@ -3,7 +3,7 @@
 // and who may read it are the database's (RLS, tested in supabase/tests and
 // diff_activity.test.mjs); this file is about which events show, how they
 // read, how repeat writes fold, how pages are cut, and that opening the page
-// changes nothing.
+// marks only the reader's own flags shown.
 //
 // This file starts its own servers from dist/, signed in as Hana (an owner)
 // and Jun (a viewer), people no other test file uses. Hana owns "Changes
@@ -169,7 +169,7 @@ after(async () => {
 
 test("changes: content events only, newest first, grouped by day, each in plain words from the reader's side", async () => {
   const h = await page(hana, changesUrl(V.main));
-  assert.match(h, /<h1>Changes<\/h1>/);
+  assert.match(h, /<h1>Updates<\/h1>/);
   assert.deepEqual(lines(h), [
     ["Today", "ivo@example.test wrote canon/rules.md, from an approved proposal"],
     ["Today", "You approved the proposal on canon/rules.md"],
@@ -275,7 +275,7 @@ test("changes: days read Today, Yesterday, then the weekday and date, each a hea
   const h = await page(hana, changesUrl(V.main));
   assert.deepEqual([...h.matchAll(/<h2 id="d-\d{4}-\d{2}-\d{2}">([^<]+)<\/h2>/g)].map((m) => m[1]), ["Today", "Yesterday", daysAgo(3)]);
   assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, "one h1");
-  assert.ok(h.indexOf("<h1>Changes</h1>") < h.indexOf('<h2 id="d-'), "Changes, then its days");
+  assert.ok(h.indexOf("<h1>Updates</h1>") < h.indexOf('<h2 id="d-'), "Updates, then its days");
   assert.equal(dayLabel("2026-10-02", new Date("2026-10-02T09:00:00Z")), "Today");
   assert.equal(dayLabel("2026-10-01", new Date("2026-10-02T00:00:01Z")), "Yesterday");
   assert.equal(dayLabel("2026-09-28", new Date("2026-10-02T09:00:00Z")), "Monday 28 September");
@@ -291,14 +291,15 @@ test("changes: a viewer reads it; a vault you're not in is 404", async () => {
   assert.equal((await get(jun, changesUrl(V.empty))).status, 404);
 });
 
-test("changes: opening it marks no flag shown for anyone", async () => {
+test("changes: opening it marks the reader's own flags shown, and nobody else's", async () => {
   const waiting = async (user) => (await as(user, "select public.list_flags($1, 200) as r", [V.main]))[0].r.flags.length;
   await as(HANA, "select public.create_subscription($1, 'path', 'notes/')", [V.main]);
   await as(IVO, "select public.write_file($1, 'notes/flagged.md', 'x')", [V.main]);
-  const before = [await waiting(HANA), await waiting(IVO)];
-  assert.ok(before[0] > 0, "Hana has flags waiting");
-  for (const s of [hana, jun]) assert.equal((await get(s, changesUrl(V.main))).status, 200);
-  assert.deepEqual([await waiting(HANA), await waiting(IVO)], before);
+  const before = await waiting(IVO);
+  assert.ok((await waiting(HANA)) > 0, "Hana has flags waiting");
+  assert.equal((await get(hana, changesUrl(V.main))).status, 200);
+  assert.equal(await waiting(HANA), 0, "Hana's are shown");
+  assert.equal(await waiting(IVO), before, "Ivo's are not");
 });
 
 // ---------------------------------------------------------------------------
@@ -311,7 +312,7 @@ test("diagnostics: /activity and /log are the full log inside Diagnostics, as it
     assert.match(h, /<h2>Log<\/h2>/, path);
     assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, `${path}: one h1`);
     assert.match(h, new RegExp(`<a href="/v/${V.main}/diagnostics" aria-current="page">Diagnostics</a>`), `${path}: the Settings tab`);
-    assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.main}/flags">Flags</a><a href="/v/${V.main}/claims">Claims</a><a href="/v/${V.main}/activity" aria-current="page">Log</a></nav>`), path);
+    assert.match(h, new RegExp(`<nav class="tabs" aria-label="Diagnostics"><a href="/v/${V.main}/claims">Claims</a><a href="/v/${V.main}/activity" aria-current="page">Log</a></nav>`), path);
     assert.match(h, new RegExp(`<form method="get" action="/v/${V.main}/activity" class="panel filters"`), `${path}: the filter form`);
     assert.match(h, /Every change to this vault, newest first\. This log can only be added to/, path);
     // Everything the Changes feed leaves out is here.
@@ -331,12 +332,12 @@ test("diagnostics: the Log links a write to its file only while the file is ther
   }
 });
 
-test("diagnostics: the vault's own navigation has Changes where Activity was, and no entry for the log", async () => {
+test("diagnostics: the vault's own navigation has Updates where Activity was, and no entry for the log", async () => {
   const h = await page(hana, changesUrl(V.main));
   const navs = h.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
   assert.equal(navs.length, 2, "the wide sidebar and the phone tabs");
   for (const nav of navs) {
-    assert.match(nav, new RegExp(`<a href="/v/${V.main}/changes" aria-current="page">(?:<svg[\\s\\S]*?</svg><span class="side-label">)?Changes<`));
+    assert.match(nav, new RegExp(`<a href="/v/${V.main}/changes" aria-current="page">(?:<svg[\\s\\S]*?</svg><span class="side-label">)?Updates<`));
     assert.doesNotMatch(nav, /Activity|\/activity|Log/);
   }
   assert.match(await page(hana, `/v/${V.main}/diagnostics`), /<dt><a href="[^"]+\/activity">Log<\/a><\/dt><dd>Every event the vault recorded/);
