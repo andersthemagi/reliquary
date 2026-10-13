@@ -1695,6 +1695,10 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
 .rules-table .rule-actions .action-list { min-width: 240px; }
 .rule-form { scroll-margin-top: var(--space-10); }
 .rule-form .hint + .hint { margin-top: var(--space-1); }
+/* "What applies to a path?" is folded under the list until asked for. */
+.rule-check { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-5); margin: var(--space-6) 0 0; max-width: 80ch; }
+.rule-check > summary { cursor: pointer; font-weight: 600; padding: var(--space-2) 0; }
+.rule-check[open] > summary { margin-bottom: var(--space-3); }
 .rule-check .result { margin: var(--space-3) 0 0; }
 .rules-help { margin-top: var(--space-5); }
 @media (max-width: 640px) {
@@ -1759,9 +1763,27 @@ label.choice-card input:focus-visible { outline: none; }
   .table-stack td.vault-name::before { content: none; }
 }
 /* Package G: vault admin and members */
-/* Settings tabs (vaultadmin.ts settingsHeader): the first h2 under the tabs
-   sits close, the rest keep the page rhythm. */
+/* A page's tabs: the first h2 under them sits close, the rest keep the page rhythm. */
 .page-head.has-tabs + h2, .page-head.has-tabs + .section-head > h2 { margin-top: var(--space-2); }
+/* Settings (vaultadmin.ts settingsPage): a grouped sub-nav beside the
+   section on wide screens; on narrow ones it stacks above, each group's
+   links in a wrapping row so the section is still near the top. */
+.settings-layout { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: var(--space-7); align-items: start; margin-top: var(--space-5); }
+.settings-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.settings-nav-group + .settings-nav-group { margin-top: var(--space-5); }
+.settings-nav-label { margin: 0 0 var(--space-2); padding: 0 var(--space-3); color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); font-weight: 600; }
+.settings-nav a { display: flex; align-items: center; min-height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); position: relative; color: var(--fg-muted); text-decoration: none; font-weight: 500; }
+.settings-nav a:hover { background: var(--bg-muted); color: var(--fg); }
+.settings-nav a[aria-current="page"] { background: var(--bg-muted); color: var(--fg); font-weight: 600; }
+.settings-nav a[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--brand); }
+.settings-main > :first-child, .settings-main > .section-head:first-child > h2 { margin-top: 0; }
+@media (max-width: 900px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .settings-nav { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); }
+  .settings-nav-group + .settings-nav-group { margin-top: 0; }
+  .settings-nav ul { flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 640px) { .settings-nav a { min-height: var(--control-md); } }
 /* Diagnostics (diagnostics.ts): Flags, Claims and the log are a second row
    under the Settings tabs, lighter than them so the two read as two levels. */
 .diag-tabs > .tabs { box-shadow: none; gap: var(--space-1); margin: var(--space-2) 0 var(--space-5); }
@@ -1792,12 +1814,13 @@ td.row-actions { width: 1%; white-space: nowrap; }
 .invite-list td:first-child { overflow-wrap: anywhere; }
 .invite-form input[type="text"] { max-width: 28rem; }
 .reveal .callout-title strong { display: inline; }
-/* Danger zone: one bordered box, a row per action, the button at the end. */
-.danger-rows { border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); border-radius: var(--radius-lg); background: var(--bg); max-width: 80ch; }
+/* Danger zone, at the foot of General: a red-outlined box, a row per action, the button at the end. */
+.settings-danger { margin-top: var(--space-9); }
+.danger-rows { border: 1px solid var(--danger); border-radius: var(--radius-lg); background: var(--bg); max-width: 80ch; }
 .danger-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); padding: var(--space-5); border-top: 1px solid var(--border); }
 .danger-row:first-child { border-top: 0; }
 .danger-row > div { flex: 1 1 22rem; min-width: 0; }
-.danger-row h2 { font-size: var(--text-md); line-height: var(--lh-md); margin: 0 0 var(--space-1); }
+.danger-row h3 { font-size: var(--text-md); line-height: var(--lh-md); margin: 0 0 var(--space-1); }
 .danger-row p { margin: 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
 .danger-rows + .hint { margin-top: var(--space-4); }
 .export-facts { max-width: var(--measure); padding-left: 1.25em; margin: 0; }

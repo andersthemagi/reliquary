@@ -60,15 +60,15 @@ What people and their agents can each do, where, and who may: every rule here is
 | See members (by email) | **Settings**, **Members** | none | person, any member |
 | Invite, change roles, remove members | **Members** | none | person, owners |
 | Accept an invite | the invite link | none | person, the invited address |
-| Leave a vault | **Settings**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains |
-| See and cut members' connections | **Members** | none | person, owners |
+| Leave a vault | **Settings**, **General**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains |
+| See and cut members' connections | **Members**, **Agents** | none | person, owners |
 | Create or revoke a token | **Connections** (the account menu) | none | person |
 | Set your display name | **Account settings** | none | person, for themself only |
 | Change your email address, sign out everywhere or delete your account | **Account settings** | none | person, for themself only |
 | Allow an OAuth client or the CLI | the consent page | none | person |
 | Erase a file | the file's **More**, **Erase file** | none | person, owners |
 | Export a vault | **Settings**, **Export** | none | person, owners |
-| Delete a vault | **Settings**, **Danger zone** | none | person, owners |
+| Delete a vault | **Settings**, **General**, **Danger zone** | none | person, owners |
 
 ## Feedback
 
