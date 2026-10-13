@@ -102,7 +102,7 @@ select t.expect('thread flags: a flag names its thread and message, and carries 
           || ' ' || (f ->> 'path' is null)::text || ' ' || (f ->> 'proposal_id' is null)::text
           || ' ' || (select string_agg(k, ',' order by k) from jsonb_object_keys(f) k)
      from jsonb_array_elements(t.flag_json('ben', 'team')::jsonb -> 'flags') f),
-  'true true true true actor,agent,at,category,event,message_id,path,proposal_id,reason,seq,thread_id,watching');
+  'true true true true actor,agent,at,category,event,message_id,path,plan,proposal_id,reason,seq,thread_id,watching');
 select t.expect('thread flags: a flag holds neither the thread''s title nor the message''s text',
   (position('Launch plan' in t.flag_json('ben', 'team')) = 0 and position('Who takes the copy' in t.flag_json('ben', 'team')) = 0)::text,
   'true');
