@@ -81,7 +81,8 @@ export type Download = { filename: string; type: string; write: (out: Writable) 
 export type Reply = { status?: number; html?: string; redirect?: string; formAction?: string; download?: Download; retryAfter?: number };
 
 export { UUID };
-export type Vault = { id: string; name: string; role: string };
+// orphaned: the vault has members but no owner (vaultShell offers Become owner).
+export type Vault = { id: string; name: string; role: string; orphaned?: boolean };
 
 // A refusal from the database, as the reason and a reference to show on the
 // page (errorpage.ts); anything else is thrown on to the error page.
@@ -167,7 +168,7 @@ export const notFound = (ctx: Ctx): Reply => {
 export async function vault(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Vault | undefined> {
   if (!UUID.test(id)) return undefined;
   const { rows } = await c.query(
-    `select v.id, v.name, m.role from public.vaults v
+    `select v.id, v.name, m.role, public.vault_orphaned(v.id) as orphaned from public.vaults v
        join public.vault_members m on m.vault_id = v.id and m.user_id = $2
       where v.id = $1`,
     [id, ctx.userId],

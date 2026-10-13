@@ -126,6 +126,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
     if (get) return say(`Opening what you watch in ${vault}`);
     return form.get("action") === "unwatch" ? say(`Stopping a watch in ${vault}`) : say(`Watching ${path || "a path"} in ${vault}`);
   }
+  if (rest === "/config/take") return say(`Becoming the owner of ${vault}`);
   if (rest === "/search") return say(`Searching ${vault}`);
   if (rest === "/erase") return say(`Erasing ${path || "a file"} in ${vault}`);
   if (rest === "/variables" || rest.startsWith("/variables/")) {

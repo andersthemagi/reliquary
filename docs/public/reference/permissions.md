@@ -64,7 +64,8 @@ What people and their agents can each do, where, and who may: every rule here is
 | See members (by email) | **Settings**, **Members** | none | person, any member |
 | Invite, change roles, remove members | **Members** | none | person, owners |
 | Accept an invite | the invite link | none | person, the invited address |
-| Leave a vault | **Settings**, **General**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains |
+| Leave a vault | **Settings**, **General**, **Danger zone**, **Leave this vault** | none | person, any member while another owner remains; in a [vault with no owner](../concepts/members.md#a-vault-with-no-owner), any member but the last |
+| Become the owner of a vault with no owner | **Become owner**, in the notice on the vault's pages | none | person, any member, within their plan's vault limit |
 | See and cut members' connections | **Members**, **Agents** | none | person, owners |
 | Create or revoke a token | **Connections** (the account menu) | none | person |
 | Set your display name | **Account settings** | none | person, for themself only |

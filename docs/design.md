@@ -1498,12 +1498,15 @@ before, even for the table owner.
 
 **Deleting an account.** Immediate, by one database function,
 `delete_account`: the person, in person (no agent or token of any kind),
-with their email address typed (checked by the database too). It is
-refused while they are the only owner of a vault, naming those vaults: a
-vault always keeps an owner, so they make someone else an owner or delete
-the vault first. Then, in one transaction: they leave every vault (a
-`member.leave` log entry each, marked `account_deleted`); vaults they
-created count against the longest-standing remaining owner; every
+with their email address typed (checked by the database too). Owning
+vaults never refuses it (owner's call, 2026-10-13; #381). In one
+transaction: a vault nobody else is in is erased with the account, by the
+same `private.erase_vault` as `delete_vault`, leaving its
+`vault_deletions` row; they leave every other vault (a `member.leave` log
+entry each, marked `account_deleted`); a vault left with members but no
+owner is **orphaned** (the entry is marked `orphaned`) and its waiting
+invites are withdrawn; vaults they created count against the
+longest-standing remaining owner; every
 connection is deleted; invites they made that are waiting are withdrawn,
 and invites they accepted are deleted (the only rows of Reliquary's own
 that tied the account to an address); their display name, plan, admission,
@@ -1512,6 +1515,20 @@ and the `auth.users` row itself, so Supabase Auth forgets the address and
 every session. A row in `private.deleted_accounts` keeps the id and when;
 `check_session` refuses that id from then on and `co_member_people` names
 it "a deleted account" (`20260926140200_delete_account.sql`).
+
+An orphaned vault keeps working for its members as their roles allow;
+what only an owner may do is refused because nobody holds the role. Any
+member may take it (`take_vault`): the first becomes its owner, nobody
+is made one without choosing it, and an agent or token can't (it charges
+a plan, so it is on the ceiling). Taking it counts against the taker's
+plan and is refused at their vault limit; `vaults.created_by` becomes the
+taker, since it already means "counts against" everywhere (`create_vault`,
+`my_plan`, `vault_limits`), so the vault takes its limits from their plan
+from then on. Until taken it counts against the deleted account, whose
+plan is gone, so it has the Free plan's limits: orphaning never holds a
+vault outside a plan once it has an owner again. The last member of an
+orphaned vault can't leave it, so no vault is left that nobody can reach
+or delete (`20261014170000_orphaned_vaults.sql`).
 
 What they wrote stays: versions, proposals, approvals, comments, notes and
 both logs belong to the vaults (the owner is the controller), and hold only

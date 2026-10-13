@@ -247,6 +247,22 @@ test("races, limits hold: 12 new vaults at once with one left on the plan, exact
   assert.equal((await sql("select count(*)::int as n from public.vaults where created_by = $1", [who]))[0].n, 3);
 });
 
+test("races, one wins: 12 members taking a vault with no owner at once leave exactly one owner", async () => {
+  const v = await newVault(OWNER, "Races orphaned");
+  const crowd = people.slice(0, 12);
+  for (const p of crowd) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  // As delete_account leaves it (20261014170000_orphaned_vaults.sql): members, no owner.
+  await sql("delete from public.vault_members where vault_id = $1 and user_id = $2", [v, OWNER]);
+  const conns = await Promise.all(crowd.map(() => connect()));
+  const results = await Promise.all(crowd.map((p, i) => as(conns[i], p, "select public.take_vault($1) as n", [v])));
+  await close(conns);
+  log("take crowd", codes(results));
+  assert.deepEqual(codes(results), { ok: 1, 55000: 11 });
+  const owners = await sql("select user_id from public.vault_members where vault_id = $1 and role = 'owner'", [v]);
+  assert.equal(owners.length, 1);
+  assert.equal((await sql("select created_by from public.vaults where id = $1", [v]))[0].created_by, owners[0].user_id);
+});
+
 test("races, limits hold: 16 writes at once racing the storage limit never pass it, and the counter equals a scan", async () => {
   const v = await newVault(OWNER, "Races storage");
   await sql("select private.set_vault_tier($1, 'races_tiny')", [v]); // 1000 bytes

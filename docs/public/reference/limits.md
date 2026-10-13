@@ -10,7 +10,7 @@ What your plan and a vault's tier allow. How they count, and what happens at a l
 
 | What | Free | Alpha tester | A Pro vault |
 |---|---|---|---|
-| Vaults you own | 5 | 25 | |
+| Vaults you own, created or [taken on with no owner](../concepts/members.md#a-vault-with-no-owner) | 5 | 25 | |
 | People per vault, counting invites waiting | 10 | 25 | 50 |
 | Storage per vault: every file version, variable values and waiting imports | 100 MB | 1 GB | 5 GB |
 

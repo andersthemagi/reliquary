@@ -37,9 +37,10 @@
 //
 // Delete account (GET /settings/delete, a confirm page; POST deletes) is
 // public.delete_account, in person, with the address typed, which the
-// database checks too (20260926140200_delete_account.sql). While the
-// person is a vault's only owner the page lists those vaults and offers no
-// form. Afterwards this browser's session ends here; the database refuses
+// database checks too (20260926140200_delete_account.sql). The page says
+// what happens to each vault: left, deleted with the account (nobody else
+// in it) or left without an owner (20261014170000_orphaned_vaults.sql).
+// Afterwards this browser's session ends here; the database refuses
 // any other (private.check_session), and Supabase Auth has no account left
 // to renew one for.
 
@@ -259,8 +260,8 @@ export async function changeEmail(ctx: Ctx): Promise<Reply> {
 
 type DeletionSummary = {
   email: string | null;
-  sole_owner: { id: string; name: string }[];
-  vaults: { id: string; name: string; role: string }[];
+  // What deleting the account does to each vault (private.account_vault_fates).
+  vaults: { id: string; name: string; role: string; fate: "leave" | "orphan" | "delete" }[];
   connections: number;
   invites: number;
 };
@@ -269,30 +270,18 @@ const crumb = [{ label: "Account settings", href: "/settings" }, { label: "Delet
 
 export async function deleteAccountPage(ctx: Ctx, error?: string): Promise<Reply> {
   const s = await asPerson(ctx.userId, async (c) => (await c.query(`select public.account_deletion_summary() as s`)).rows[0].s as DeletionSummary);
-  if (s.sole_owner.length) {
-    return render(
-      ctx,
-      "Delete account",
-      html`${pageHeader({ crumb, title: "Delete account" })}
-      ${error ? callout("danger", error) : ""}
-      ${callout(
-        "warning",
-        html`<p>You’re the only owner of ${s.sole_owner.length === 1 ? "this vault" : `these ${s.sole_owner.length} vaults`}, and a vault always keeps an owner. Before you can delete your account, for each one make someone else an owner on its Members page, or delete the vault.</p>`,
-        { title: "Your account can’t be deleted yet" },
-      )}
-      <ul class="rows">
-        ${s.sole_owner.map(
-          (v) => html`<li><span><strong>${v.name}</strong></span><span class="actions"><a href="/v/${v.id}/config/members">Members</a> <a href="/v/${v.id}/config#danger">Delete vault</a></span></li>`,
-        )}
-      </ul>
-      <p><a class="button quiet" href="/settings">Back to Account settings</a></p>`,
-      "settings",
-    );
-  }
+  const leaving = s.vaults.filter((v) => v.fate !== "delete");
+  const fates = s.vaults.flatMap((v) =>
+    v.fate === "delete"
+      ? [html`Nobody else is in <strong>${v.name}</strong>, so it is deleted with your account, with everything in it. <a href="/v/${v.id}/config/export">Export it</a> first to keep a copy.`]
+      : v.fate === "orphan"
+        ? [html`<strong>${v.name}</strong> has no other owner, so it is left without one. Its members keep working in it, and any of them can choose to become its owner.`]
+        : [],
+  );
   const typed = s.email ?? NO_EMAIL_PHRASE;
-  const left = s.vaults.length
-    ? html`You leave ${s.vaults.length === 1 ? "one vault" : `${s.vaults.length} vaults`}: ${s.vaults.map((v, i) => html`${i ? ", " : ""}<strong>${v.name}</strong> (${v.role})`)}.`
-    : html`You’re in no vault.`;
+  const left = leaving.length
+    ? html`You leave ${leaving.length === 1 ? "one vault" : `${leaving.length} vaults`}: ${leaving.map((v, i) => html`${i ? ", " : ""}<strong>${v.name}</strong> (${v.role})`)}.`
+    : s.vaults.length ? "" : html`You’re in no vault.`;
   return render(
     ctx,
     "Delete account",
@@ -301,6 +290,7 @@ export async function deleteAccountPage(ctx: Ctx, error?: string): Promise<Reply
       crumb,
       lede: html`This deletes your account now. ${left} ${s.connections ? `${plural(s.connections, "connection")} (tokens, apps and the Reliquary CLI) ${s.connections === 1 ? "is" : "are"} deleted and stop${s.connections === 1 ? "s" : ""} working.` : "You have no connections to delete."} This can’t be undone.`,
       consequences: [
+        ...fates,
         "Reliquary forgets your email address, your display name and your plan, and signs you out everywhere.",
         ...(s.invites ? [`${plural(s.invites, "invite")} you made that ${s.invites === 1 ? "is" : "are"} still waiting ${s.invites === 1 ? "is" : "are"} withdrawn.`] : []),
         "What you wrote in vaults stays there: files, proposals, comments and the activity log belong to each vault and its owners. It shows as written by a deleted account. To remove something you wrote, erase it or ask an owner to, before you delete your account.",
@@ -324,7 +314,7 @@ export async function deleteAccountPage(ctx: Ctx, error?: string): Promise<Reply
 
 export async function deleteAccount(ctx: Ctx): Promise<Reply> {
   const typed = ctx.form.get("confirm_email") ?? "";
-  let n: { vaults: number; connections: number; invites: number };
+  let n: { vaults: number; orphaned: number; deleted: number; connections: number; invites: number };
   try {
     n = await asPerson(ctx.userId, async (c) => (await c.query(`select public.delete_account($1) as n`, [typed])).rows[0].n);
   } catch (err) {
@@ -332,12 +322,6 @@ export async function deleteAccount(ctx: Ctx): Promise<Reply> {
     if (e.code === "22023") {
       const r = await deleteAccountPage(ctx, "That isn’t your email address as it is on this account. Nothing was deleted.");
       return { ...r, status: 400 };
-    }
-    // Only owner of a vault now (a role changed since the page was drawn):
-    // the page again, listing them, with the database's reason.
-    if (e.code === "55000") {
-      const r = await deleteAccountPage(ctx, refusalText(err));
-      return { ...r, status: 409 };
     }
     throw err;
   }
@@ -348,7 +332,9 @@ export async function deleteAccount(ctx: Ctx): Promise<Reply> {
   return {
     html: notice(
       "Account deleted",
-      html`Your account is deleted. You left ${plural(n.vaults, "vault")}, ${plural(n.connections, "connection")} ${n.connections === 1 ? "was" : "were"} deleted${n.invites ? `, and ${plural(n.invites, "waiting invite")} ${n.invites === 1 ? "was" : "were"} withdrawn` : ""}. What you wrote in vaults stays there, shown as written by a deleted account.`,
+      html`Your account is deleted. You left ${plural(n.vaults, "vault")}, ${plural(n.connections, "connection")} ${n.connections === 1 ? "was" : "were"} deleted${n.invites ? `, and ${plural(n.invites, "waiting invite")} ${n.invites === 1 ? "was" : "were"} withdrawn` : ""}.${
+        n.orphaned ? ` ${n.orphaned === 1 ? "One of them has" : `${n.orphaned} of them have`} no owner now, until a member chooses to become one.` : ""}${
+        n.deleted ? ` ${plural(n.deleted, "vault")} nobody else was in ${n.deleted === 1 ? "was" : "were"} deleted with your account.` : ""} What you wrote in vaults stays there, shown as written by a deleted account.`,
       ctx.theme,
     ),
   };

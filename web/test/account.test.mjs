@@ -369,7 +369,6 @@ test("change email: needs the form token and this site's origin", async () => {
 // Solo" alone; he wrote a file in Acct Shared and has a token.
 
 const W = {};
-const main = (h) => /<main id="main">[\s\S]*<\/main>/.exec(h)[0];
 const exists = async (id) => (await sql("select count(*)::int as n from auth.users where id = $1", [id]))[0].n === 1;
 
 test("delete account: Account settings links to it, saying what goes and what stays", async () => {
@@ -385,16 +384,6 @@ test("delete account: Account settings links to it, saying what goes and what st
   assert.match(h, /<h3 id="delete-account">Delete account<\/h3>/);
   assert.match(h, /Deletes your account now: you leave every vault, your connections are deleted, and Reliquary forgets your email address and name\. What you wrote in vaults stays there, shown as written by a deleted account\. This can’t be undone\./);
   assert.match(h, /<a class="button danger" href="\/settings\/delete">Delete account<\/a>/);
-});
-
-test("delete account: while I'm the only owner of a vault, the page lists it with Members and Delete vault, and offers no form", async () => {
-  const jar = await signIn("acct-wes@example.test");
-  const h = main(await (await get("/settings/delete", jar)).text());
-  assert.match(h, /Your account can’t be deleted yet/);
-  assert.match(h, /You’re the only owner of this vault, and a vault always keeps an owner\. Before you can delete your account, for each one make someone else an owner on its Members page, or delete the vault\./);
-  assert.match(h, new RegExp(`<li><span><strong>Acct Wes Solo</strong></span><span class="actions"><a href="/v/${W.solo}/config/members">Members</a> <a href="/v/${W.solo}/config#danger">Delete vault</a></span></li>`));
-  assert.doesNotMatch(h, /Acct Shared/);
-  assert.doesNotMatch(h, /action="\/settings\/delete"/);
 });
 
 test("delete account: the confirm page says which vaults I leave, what goes and what stays, and asks for my address", async () => {

@@ -1,6 +1,6 @@
 -- Hostile tests for 20260926140200_delete_account: deleting your own
--- account, in person, with your address typed; refused while you are a
--- vault's only owner; what goes (memberships, connections, invites you made
+-- account, in person, with your address typed; what the summary says
+-- happens to each vault (orphaned_vaults_test.sql tests each way); what goes (memberships, connections, invites you made
 -- or accepted, name, plan, admission, the sign-in account) and what stays
 -- (the log and what you wrote, under your id only); and how a deleted
 -- account is named afterwards.
@@ -46,18 +46,6 @@ insert into private.session_cutoffs (user_id, not_before) values (t.id('dee'), n
 insert into public.env_imports (vault_id, environments, names, source, created_by, expires_at)
 values (t.id('team'), '{development}', '{DEE_KEY}', 'web', t.id('dee'), now() + interval '1 day');
 
--- The message of what p_sql raised as p_user, or 'no error'.
-create function t.err(p_user text, p_sql text) returns text language plpgsql as $$
-begin
-  perform set_config('request.jwt.claims', jsonb_build_object('sub', t.id(p_user), 'role', 'authenticated')::text, true);
-  perform set_config('role', 'authenticated', true);
-  execute p_sql;
-  perform set_config('role', 'none', true);
-  return 'no error';
-exception when others then
-  perform set_config('role', 'none', true);
-  return sqlerrm;
-end $$;
 -- Everything the account has, as one line.
 create function t.has(p_user text) returns text language sql as $$
   select concat_ws(' ',
@@ -93,21 +81,16 @@ select t.expect('delete account: nobody reads the deleted accounts, the web app'
   'ERR 42501 ERR 42501');
 
 -- ---------------------------------------------------------------------------
--- The only owner of a vault
+-- What it would do
 
-select t.expect('delete account: the summary names the vaults that block it, what would be left and what goes',
-  t.run('dee', $q$select concat_ws(' | ', s ->> 'email', s -> 'sole_owner' -> 0 ->> 'name',
-       (select string_agg(v ->> 'name' || ':' || (v ->> 'role'), ',') from jsonb_array_elements(s -> 'vaults') v),
+select t.expect('delete account: the summary says what happens to each vault, and what goes',
+  t.run('dee', $q$select concat_ws(' | ', s ->> 'email',
+       (select string_agg(v ->> 'name' || ':' || (v ->> 'role') || ':' || (v ->> 'fate'), ',') from jsonb_array_elements(s -> 'vaults') v),
        s ->> 'connections', s ->> 'invites') from public.account_deletion_summary() s$q$),
-  'dee@example.test | DeeSolo | DeeSolo:owner,DeeV:owner,Team:editor | 2 | 1');
-select t.expect('delete account: refused while the person is the only owner of a vault, naming it, and nothing goes',
-  t.run('dee', $q$select public.delete_account('dee@example.test')::text$q$) || ' '
-  || t.err('dee', $q$select public.delete_account('dee@example.test')$q$) || ' / ' || t.has('dee'),
-  'ERR 55000 you are the only owner of “DeeSolo”: in each, make someone else an owner on Members, or delete the vault; then delete your account / users=1 members=3 tokens=2 name=1 plan=1 admitted=1');
-select t.expect('delete account: once that vault is deleted, nothing blocks it',
-  t.run('dee', format($q$select (public.delete_vault(%L, 'DeeSolo') is not null)::text$q$, t.id('deesolo'))) || ' '
-  || t.run('dee', $q$select jsonb_array_length(account_deletion_summary -> 'sole_owner')::text from public.account_deletion_summary()$q$),
-  'true 0');
+  'dee@example.test | DeeSolo:owner:delete,DeeV:owner:leave,Team:editor:leave | 2 | 1');
+-- DeeSolo goes before the account here, so what follows counts as before
+-- (deleting it with the account: orphaned_vaults_test.sql).
+select t.run('dee', format($q$select public.delete_vault(%L, 'DeeSolo')::text$q$, t.id('deesolo')));
 
 -- ---------------------------------------------------------------------------
 -- Deleting
@@ -120,7 +103,7 @@ insert into t.before values
 
 select t.expect('delete account: in person, with the address typed in any case and spacing, it deletes the account and counts what went',
   t.run('dee', $q$select public.delete_account('  DEE@example.TEST ')::text$q$),
-  '{"vaults": 2, "invites": 1, "connections": 2}');
+  '{"vaults": 2, "deleted": 0, "invites": 1, "orphaned": 0, "connections": 2}');
 select t.expect('delete account: the sign-in account, memberships, connections, display name, plan and admission are gone',
   t.has('dee'), 'users=0 members=0 tokens=0 name=0 plan=0 admitted=0');
 select t.expect('delete account: snoozes, deletion notices, the sign-out cutoff and unapplied pasted imports are gone',
