@@ -3,7 +3,7 @@
   "name": "cc.redmage/reliquary",
   "title": "Reliquary",
   "description": "Shared vault of context and environment variables for people and the AI agents they use.",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "websiteUrl": "https://reliquary.redmage.cc/docs",
   "repository": {
     "url": "https://github.com/andersthemagi/reliquary",
@@ -14,7 +14,9 @@
     {
       "src": "https://reliquary.redmage.cc/apple-touch-icon.png",
       "mimeType": "image/png",
-      "sizes": ["180x180"]
+      "sizes": [
+        "180x180"
+      ]
     }
   ],
   "remotes": [
