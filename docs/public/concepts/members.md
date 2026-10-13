@@ -46,4 +46,6 @@ When a vault requires emails, a member who hid theirs sees a notice on the vault
 - **Show my email in this vault**: the people who share this vault with them see their email from then on. People who share only other vaults with them still don't, and agents never do.
 - **Leave this vault**.
 
-Until they choose, their email stays hidden, in that vault too. Nobody's email is shown without their agreement. Leaving takes the agreement with it, and so does an owner turning the requirement off: if it is turned on again, members who hid their email are asked again.
+Until they choose, their email stays hidden, in that vault too. Nobody's email is shown without their agreement.
+
+The agreement is the member's own choice for that vault, and only they can change it: not an owner, another member or an agent. It is kept when they leave or are removed, and when an owner turns the requirement off, but it shows nothing meanwhile: a former member's email stays hidden, even from people who share another vault with them, and so does everyone's while the vault doesn't require emails. If they rejoin, or the requirement is turned back on, their choice applies again and they aren't asked again. Only deleting the vault (or the member's account) removes it.

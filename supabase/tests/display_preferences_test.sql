@@ -134,21 +134,20 @@ select t.expect('require: an agent never gets the email, even after consent, and
                                          from public.co_member_people(array[%L]::uuid[])$q$, t.id('ben'))) || ' | '
   || t.run_tok('ana', 'ana-other', format($q$select count(*)::text from public.co_member_people(array[%L]::uuid[])$q$, t.id('ben'))),
   'Ben · 00000000 / no email | Ben · 00000000 / no email | 0');
-select t.expect('require: turning it off forgets the consent, so turning it on again asks again',
+select t.expect('require: turning it off hides the email meanwhile and keeps the choice, so turning it on again applies it with no new prompt',
   (t.run('ana', format($q$select public.set_require_emails(%L, false)$q$, t.id('team'))) || 'ok') || ' '
   || t.seen('ana', 'ben') || ' | '
   || (t.run('ana', format($q$select public.set_require_emails(%L, true)$q$, t.id('team'))) || 'ok') || ' '
   || t.run('ben', format($q$select public.email_consent_needed(%L)::text$q$, t.id('team'))) || ' '
   || t.seen('ana', 'ben'),
-  'ok Ben · 00000000 / no email | ok true Ben · 00000000 / no email');
-select t.run('ben', format($q$select public.consent_to_show_email(%L)$q$, t.id('team')));
+  'ok Ben · 00000000 / no email | ok false Ben (ben@example.test) / ben@example.test');
 select t.run('ben', format($q$select public.leave_vault(%L)$q$, t.id('team')));
-select t.expect('require: leaving takes the consent along',
-  (select count(*)::text from public.email_consents where user_id = t.id('ben')), '0');
+select t.expect('require: leaving keeps the choice',
+  (select count(*)::text from public.member_preferences where user_id = t.id('ben') and vault_id = t.id('team') and value), '1');
 select test_support.add_member(t.id('team'), t.id('ben'), 'editor', t.id('ana'));
-select t.expect('require: coming back asks again, and the email stays hidden until they agree',
+select t.expect('require: coming back applies the stored choice again, with no new prompt',
   t.run('ben', format($q$select public.email_consent_needed(%L)::text$q$, t.id('team'))) || ' ' || t.seen('ana', 'ben'),
-  'true Ben · 00000000 / no email');
+  'false Ben (ben@example.test) / ben@example.test');
 
 -- ---------------------------------------------------------------------------
 -- Invites and deletion notices name a hidden inviter without the email
