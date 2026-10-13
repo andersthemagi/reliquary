@@ -46,6 +46,17 @@ added. Changing `PUBLIC_URL` changes the
 OAuth issuer: every connector and the CLI signs in again once. Changing only
 `SITE_URL` signs nobody out. After changing any of them, redeploy (below).
 
+The Netlify team is **Reliquary**, on the Pro plan, held and billed by the
+owner (decided 2026-10-11, #219): 3,000 credits a month. A release deploys
+both sites at 15 credits each, so 30 a release; every page and MCP call is a
+function request (2 credits per 10,000), function compute is 10 per GB-hour
+and bandwidth 20 per GB, all from the same pool. Deploy previews are not
+metered. Functions run in Netlify's default US East region: the app makes no
+EU-hosting claim, and moving them to Frankfurt (`region: "fra"`, which Pro
+allows) changes the legal pages' sentences with it. Watch usage in the team's
+Billing page; a month heading past 3,000 is the signal to look at request
+volume before buying more.
+
 ## Rules that came from incidents
 
 - **Secrets never pass through a model.** Scripts that handle secrets write
