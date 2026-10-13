@@ -109,7 +109,7 @@ export function registerFlagsTools(
     {
       title: "List flags",
       description:
-        "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, a change on a path they watch, a newer version of a file cited by their work plan or step, or a new message in a thread for the whole vault or one they take part in. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
+        "What's changed in a vault since your connection's watermark: a proposal waiting on your person, a change to one of their own proposals, a change on a path they watch, a task awaiting their review, a newer version of a file cited by their work plan or step, or a new message in a thread for the whole vault or one they take part in. Oldest first. Doesn't mark anything shown; call advance_flags with the through value once you've shown these.",
       inputSchema: {
         vault: VAULT,
         limit: z.number().int().min(1).max(200).optional().describe("Flags, default 50"),
@@ -137,6 +137,8 @@ export function registerFlagsTools(
             thread_id: string | null;
             message_id: number | null;
             plan: string | null;
+            step: string | null;
+            step_title: string | null;
           }[];
         };
         if (r.flags.length === 0) {
@@ -157,6 +159,7 @@ export function registerFlagsTools(
           // a flag line isn't fenced as data (20261005100000_thread_flags.sql).
           if (f.thread_id) bits.push(`thread ${f.thread_id}  message ${f.message_id}`);
           if (f.plan) bits.push(`plan ${f.plan}`);
+          if (f.step) bits.push(`task ${oneLine(f.step)}: ${oneLine(f.step_title ?? "")}`);
           return `  ${bits.join("  ")}`;
         });
         const out = [
@@ -165,7 +168,10 @@ export function registerFlagsTools(
           summary(),
           ...fenced("Flag lines", lines),
           ...(r.flags.some((f) => f.thread_id) ? ["read_thread shows a thread's messages, quoted as data."] : []),
-          ...(r.flags.some((f) => f.plan) ? ["work_plan_status shows which steps of a plan cite a file that moved."] : []),
+          ...(r.flags.some((f) => f.reason === "step_review")
+            ? ["A task awaiting review waits for your person: they approve it on the plan's page in Tasks (no agent can), and work_plan_status shows it."]
+            : []),
+          ...(r.flags.some((f) => f.reason === "cite_moved") ? ["work_plan_status shows which steps of a plan cite a file that moved."] : []),
           `through: ${r.through}`,
           "Call advance_flags(vault, through) once these are shown to your person.",
         ];

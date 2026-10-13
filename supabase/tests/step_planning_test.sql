@@ -1,4 +1,4 @@
--- A step's planning fields (20261014100000_step_planning_fields, issue
+-- A step's planning fields (20261014130000_step_planning_fields, issue
 -- #334): due, priority, notes and for, checked and stored at registration
 -- from the registered version, refused naming the step and line, and never
 -- a claim rule. The rest of registration is work_plans_test.sql's and

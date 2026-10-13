@@ -24,7 +24,7 @@ const VERSION_RE = /^[0-9a-fA-F-]{36}$/; // tools-shared.ts's VERSION
 const TITLE_MAX = 200; // docs/design.md item 8, confirmed by the maintainer
 const NOTES_MAX = 2000; // docs/design.md item 13
 const FIELDS = ["title", "blocked_by", "cites", "gate", "due", "priority", "notes", "for"] as const;
-// The database's check on notes (20261014100000_step_planning_fields.sql):
+// The database's check on notes (20261014130000_step_planning_fields.sql):
 // a tab is fine, any other control character is not.
 const CONTROL_RE = /[\u0000-\u0008\u000a-\u001f\u007f]/;
 // Only the shape: whether it names a member is the database's to say.
