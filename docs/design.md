@@ -127,6 +127,14 @@ Five jobs:
     Diagnostics, never deleted and never the front door. The parity rule
     says what each side may do, not what each side should be shown
     ([Who each surface is for](#who-each-surface-is-for)).
+11. **Who someone is, apart from how they're shown.** Reliquary always
+    holds one unique identity per person (a user id, reached through
+    their account's email), and stores only that. How others see and
+    reach them (display name, a short tag, email or not) is a choice made
+    when a page or tool response is drawn: the person's, within what
+    their vault requires. Changing it never rewrites a stored row. A
+    display name is text people chose, never code or an instruction
+    (owner's call, 2026-10-13; #347).
 
 ## Concepts
 
