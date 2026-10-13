@@ -293,3 +293,34 @@ select t.expect_true('hold limit: a check-in is capped at the original claim plu
 update public.work_plan_steps set claimed_at = now() - interval '8 days' where id = (t.step('plans/checkin.md', 'x')).id;
 select t.expect('hold limit: past it, a check-in is refused outright',
   t.run('ben', t.checkin_sql('plans/checkin.md', 'x', (t.step('plans/checkin.md', 'x')).fence, t.val('x'), 120)), 'ERR RLW04');
+
+-- ---------------------------------------------------------------------------
+-- A lapsed claim on a blocker (CL-3.3): only finishing a blocker unblocks,
+-- never its lease running out, and the holder who let it lapse can't finish
+-- it afterwards, whether or not someone else has claimed it since
+
+select t.run('ben', t.seed_sql('plans/lapse.md'));
+select t.save('lapse-version', (select current_version_id::text from public.files where vault_id = t.id('wp') and path = 'plans/lapse.md'));
+select t.run('ben', t.register_sql('plans/lapse.md', t.val('lapse-version'),
+  '[{"key":"x","title":"X"},{"key":"y","title":"Y","blocked_by":["x"]}]'::jsonb));
+select t.save('x1', t.run('ben', t.claim_sql('plans/lapse.md', 'x')));
+select t.save('x1-fence', (t.step('plans/lapse.md', 'x')).fence::text);
+update public.work_plan_steps set expires_at = now() - interval '1 second' where id = (t.step('plans/lapse.md', 'x')).id;
+
+select t.expect_true('lapse: a blocker whose claim lapsed still counts as unfinished',
+  (t.step('plans/lapse.md', 'y')).open_blockers = 1);
+select t.expect('lapse: its dependent still cannot be claimed',
+  t.run('ana', t.claim_sql('plans/lapse.md', 'y')), 'ERR RLW02');
+select t.expect('lapse: its dependent still reads blocked', t.status('plans/lapse.md', 'y'), 'blocked');
+select t.expect('stale: the holder whose lease lapsed cannot complete it',
+  t.run('ben', t.complete_sql('plans/lapse.md', 'x', t.val('x1-fence')::int, t.val('x1'))), 'ERR RLW03');
+
+select t.save('x2', t.run('ana', t.claim_sql('plans/lapse.md', 'x')));
+select t.expect('stale: nor once someone else has claimed it again',
+  t.run('ben', t.complete_sql('plans/lapse.md', 'x', t.val('x1-fence')::int, t.val('x1'))), 'ERR RLW03');
+select t.expect_true('stale: the refused completion finished nothing',
+  (t.step('plans/lapse.md', 'x')).status = 'claimed' and (t.step('plans/lapse.md', 'y')).open_blockers = 1);
+select t.expect('stale: the new holder completes it',
+  t.run('ana', t.complete_sql('plans/lapse.md', 'x', (t.step('plans/lapse.md', 'x')).fence, t.val('x2'))), '');
+select t.expect_true('stale: only then is its dependent unblocked',
+  (t.step('plans/lapse.md', 'y')).open_blockers = 0);
