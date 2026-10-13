@@ -821,9 +821,13 @@ editing the file later changes none of them, consistent with item 6.
   file is where long text belongs. Shown to agents between markers as
   data, never as instructions, the same as `title` and a claim's label
   (item 12).
-- `for: agents`, `for: people`, or a member's email, resolved to the
-  member at registration and refused, with the line, if it names no
-  member. A hint for who should pick the task up, and only a hint.
+- `for: agents`, `for: people`, or a member's email. An email is
+  resolved to the member's user id at registration and refused, with
+  the line, if it names no member; the step stores the id, never the
+  email, so a member who changes address stays the one it means. A
+  page shows that member however people are shown everywhere else
+  (their display name and email today). A hint for who should pick the
+  task up, and only a hint.
 
 None of the four is an access rule or a claim rule. A step is claimable
 exactly as items 3, 4 and 12(c) say, whatever its `for`, `due` or
@@ -834,10 +838,11 @@ routine. When waiting in line (item 11) is built, whether `priority`
 orders which ready step a waiting agent is offered is its own decision,
 not settled here.
 
-Open for the owner: `for` with an email puts a member's address into
-file text, which every reader of the vault and every export already
-sees for members, but a viewer may not otherwise have a reason to. The
-alternative is a display name, which is not unique.
+Settled 2026-10-13 (owner's call): `for` names a member by email,
+because an email is unique and a display name is not. What identifies a
+person (their id, reached through their email) stays separate from how
+they are shown, so letting a person choose how co-members see them is
+its own change and never touches a stored plan.
 
 ### What this doesn't show
 
