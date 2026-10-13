@@ -177,9 +177,9 @@ test("threads list: the vault's Threads entry is in its navigation, marked on th
   const h = await page(noa, threads(V.main));
   const navs = h.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
   assert.equal(navs.length, 2, "the sidebar and the phone tabs");
-  for (const nav of navs) assert.match(nav, new RegExp(`<a href="/v/${V.main}/threads" aria-current="page">Threads</a>`));
+  for (const nav of navs) assert.match(nav, new RegExp(`<a href="/v/${V.main}/threads" aria-current="page">(?:<svg[\\s\\S]*?</svg><span class="side-label">)?Threads<`));
   const files = await page(noa, `/v/${V.main}`);
-  assert.match(files, new RegExp(`<a href="/v/${V.main}/threads">Threads</a>`));
+  assert.match(files, new RegExp(`<a href="/v/${V.main}/threads">(?:<svg[\\s\\S]*?</svg><span class="side-label">)?Threads<`));
   assert.doesNotMatch(files, new RegExp(`/v/${V.main}/threads" aria-current`));
   assert.equal((h.match(/<h1[ >]/g) ?? []).length, 1, "one h1");
 });

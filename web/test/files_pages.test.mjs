@@ -165,6 +165,14 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   }
 });
 
+test("vault sidebar: the sections are grouped, each with an icon, Work (Files, Proposals, Threads, Tasks, Changes) before Setup (Variables, Links, Settings)", async () => {
+  const side = /<nav class="side-links" aria-label="Vault">([\s\S]*?)<\/nav>/.exec(await page(`/v/${V.main}`))?.[1];
+  assert.ok(side, "a sidebar in the vault shell");
+  const order = [...side.matchAll(/<span class="side-group">(\w+)<\/span>|<span class="side-label">(\w+)<\/span>/g)].map((m) => m[1] ? `[${m[1]}]` : m[2]);
+  assert.equal((side.match(/<a [^>]*><svg class="icon"[^>]*aria-hidden="true"/g) ?? []).length, 8, "every section has an icon, hidden from screen readers");
+  assert.deepEqual(order, ["[Work]", "Files", "Proposals", "Threads", "Tasks", "Changes", "[Setup]", "Variables", "Links", "Settings"]);
+});
+
 test("vault tabs: the phone's Browse files holds only the folder tree, not the sections", async () => {
   const h = await page(file(V.main, "notes/a.md"));
   const mobile = /<details class="tree-mobile">([\s\S]*?)<\/details>\s*<div class="content">/.exec(h)?.[1];
@@ -198,11 +206,10 @@ test("folder: the README is boxed under the list with its name as the header bar
   assert.ok(h.indexOf("</table>") < h.indexOf('class="readme"'), "after the list");
 });
 
-test("folder: the root's header offers Search and New file, and no second Connect an agent while the first-run step shows its own; times are relative with the UTC time in the title", async () => {
+test("folder: the root's header offers Search, Connect an agent and New file, even while the first-run step shows its own; times are relative with the UTC time in the title", async () => {
   const h = await page(`/v/${V.main}`);
   const actions = /<div class="page-actions">([\s\S]*?)<\/div>/.exec(h)[1];
-  assert.match(actions, new RegExp(`<a class="button vault-search-link" href="/v/${V.main}/search">Search</a>\\s*<a class="button primary" href="/v/${V.main}/new">New file</a>`));
-  assert.doesNotMatch(actions, /Connect an agent/);
+  assert.match(actions, new RegExp(`<a class="button vault-search-link" href="/v/${V.main}/search">Search</a>\\s*<a class="button" href="/connect">Connect an agent</a>\\s*<a class="button primary" href="/v/${V.main}/new">New file</a>`));
   assert.match(h, /<td class="num small muted hide-sm"><time datetime="[^"]+" title="\d{4}-\d\d-\d\d \d\d:\d\d UTC">just now<\/time><\/td>/);
 });
 
@@ -225,11 +232,11 @@ test("folder: an empty vault with a proposal waiting says so and links to it", a
   assert.match(h, new RegExp(`<div class="empty"><strong>No files yet</strong><p>1 proposal waits to add the first file\\.</p><p class="empty-action"><a class="button" href="/v/${V.waiting}/proposals">Review it</a></p></div>`));
 });
 
-test("folder: an empty vault with nothing waiting offers New file to a writer, and Connect an agent once, in the first-run step", async () => {
+test("folder: an empty vault with nothing waiting offers New file to a writer, and Connect an agent in the header and the first-run step", async () => {
   const h = await page(`/v/${V.blank}`);
   assert.match(h, /<strong>No files yet<\/strong><p>Create the first file, or connect an agent and ask it to write one\.<\/p>/);
   assert.match(h, new RegExp(`<p class="empty-action"><a class="button" href="/v/${V.blank}/new">New file</a></p>`));
-  assert.equal(h.match(/>Connect an agent</g).length, 1);
+  assert.equal(h.match(/>Connect an agent</g).length, 2);
 });
 
 // ---------------------------------------------------------------------------

@@ -336,7 +336,7 @@ test("diagnostics: the vault's own navigation has Changes where Activity was, an
   const navs = h.match(/<nav class="(?:side-links|tabs)" aria-label="Vault(?: \(phone\))?">[\s\S]*?<\/nav>/g);
   assert.equal(navs.length, 2, "the wide sidebar and the phone tabs");
   for (const nav of navs) {
-    assert.match(nav, new RegExp(`<a href="/v/${V.main}/changes" aria-current="page">Changes</a>`));
+    assert.match(nav, new RegExp(`<a href="/v/${V.main}/changes" aria-current="page">(?:<svg[\\s\\S]*?</svg><span class="side-label">)?Changes<`));
     assert.doesNotMatch(nav, /Activity|\/activity|Log/);
   }
   assert.match(await page(hana, `/v/${V.main}/diagnostics`), /<dt><a href="[^"]+\/activity">Log<\/a><\/dt><dd>Every event the vault recorded/);

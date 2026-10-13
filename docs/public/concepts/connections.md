@@ -40,7 +40,7 @@ The **Connect** page says **Connected** and names a connection used in the last 
 
 A vault's page shows a **Connect an agent** step to its writers, for the first 14 days after the vault is made, until you have any connection at all (a token, an app or the CLI).
 
-Every vault's front page also has a **Connect an agent** button next to **New file**, so you can connect another agent from any vault at any time. Viewers see it too. While the step above is showing, its own button is the one to use, and the header doesn't repeat it.
+Every vault's front page also has a **Connect an agent** button next to **New file**, so you can connect another agent from any vault at any time. Viewers see it too. It stays there while the step above is showing, too.
 
 If **Create token** is refused (no name, **Only the vaults I tick** with none ticked, an expiry past a year), the form comes back with the reason and a reference, and everything you chose is still there to correct. Nothing was created.
 
