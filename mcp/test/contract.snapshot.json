@@ -1100,7 +1100,7 @@
           "description": "The plan file's path"
         },
         "label": {
-          "description": "Shown to people with your place or step, e.g. what you're doing. Self-reported, never trusted for identity",
+          "description": "Shown to people with the step you're granted, e.g. what you're doing. Self-reported, never trusted for identity",
           "type": "string",
           "maxLength": 200
         },
