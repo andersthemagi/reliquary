@@ -125,9 +125,9 @@ Asking again and again before its time costs nothing: the agent gets its last an
 
 | Setting | With no claim rule | With a claim rule set on the Rules page |
 |---|---|---|
-| Place in line lasts | 6 hours | the rule's lease |
-| Longest hint | 1 hour | the rule's lease |
-| Minimum gap | 15 minutes | 10 seconds |
+| Place in line lasts | 6 hours | the rule's place in line |
+| Longest hint | 1 hour | the rule's longest check-again hint |
+| Minimum gap | 15 minutes | the rule's minimum gap, never under 10 seconds |
 | Free times a task runs out | 1 | 1 |
 | Cooldown cap | 48 hours | the rule's lease |
 | Tasks per agent and per person | 1 and 5 | the rule's |

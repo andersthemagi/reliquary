@@ -245,3 +245,23 @@ select t.expect_true('whole vault: the folder rule it sat under is untouched', a
 select t.expect_true('whole vault: a leading slash is still refused', t.set_rule('/x', 30, 120) like '22023%', t.set_rule('/x', 30, 120));
 select t.expect_true('whole vault: so is a ..', t.set_rule('../x', 30, 120) like '22023%', t.set_rule('../x', 30, 120));
 select t.expect_true('whole vault: and a null path', t.cr_err('ana', format($q$select public.set_claim_rule(%L, null, 30, 120)$q$, t.id('cr'))) like '22023%');
+
+-- ---------------------------------------------------------------------------
+-- the waiting settings (issue #346): stored as given, a gap below the 10
+-- second floor or a place or hint under a minute refused in words
+
+create function t.set_waiting(p_path text, p_place int, p_hint int, p_gap int) returns text language sql as $$
+  select t.cr_err('ana', format('select public.set_claim_rule(%L, %L, 30, 120, null, 1, 5, %L, %L, %L)',
+    t.id('cr'), p_path, p_place, p_hint, p_gap))
+$$;
+select t.expect('waiting: an owner sets a place in line, a hint and a gap', t.set_waiting('q/', 15, 1, 15), null);
+select t.expect_true('waiting: stored as given, the cooldown cap the lease',
+  (t.rule_row('q/')).place_in_line_minutes = 15 and (t.rule_row('q/')).check_again_minutes = 1
+  and (t.rule_row('q/')).min_gap_seconds = 15 and (t.rule_row('q/')).cooldown_cap_minutes = 30);
+select t.expect_true('waiting: a gap below 10 seconds is refused in words',
+  t.set_waiting('q2/', 15, 1, 9) like '22023 The minimum gap between checks has to be at least 10 seconds%', t.set_waiting('q2/', 15, 1, 9));
+select t.expect_true('waiting: a place in line under a minute is refused',
+  t.set_waiting('q2/', 0, 1, 15) like '22023 A place in line has to last at least 1 minute%', t.set_waiting('q2/', 0, 1, 15));
+select t.expect_true('waiting: a hint under a minute is refused',
+  t.set_waiting('q2/', 15, 0, 15) like '22023 The longest check-again hint has to be at least 1 minute%', t.set_waiting('q2/', 15, 0, 15));
+select t.expect_true('waiting: none of them was stored', (t.rule_row('q2/')) is null);
