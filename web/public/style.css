@@ -1717,14 +1717,40 @@ table.activity tr.ev:target > td { background: var(--attention-bg); }
 }
 
 /* Package H: home and new vault */
-/* Home (pages.ts home()): the plan line under the title, the badge beside
+/* Home (pages.ts home()): the plan line under Your vaults, the badge beside
    the count when the plan is full. */
 .plan-line .badge { margin-left: var(--space-2); }
-/* The vault table: the name leads (and heads each block on a phone); the
-   counts line up on the right; role and time never wrap. */
-.vault-list td.vault-name { font-weight: 500; min-width: 10rem; overflow-wrap: anywhere; }
-.vault-list td.num, .vault-list th.num { width: 1%; white-space: nowrap; }
-.vault-list td[data-label="Your role"], .vault-list td[data-label="Updated"] { white-space: nowrap; }
+h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
+/* Cards: a grid of link cards, one column on a phone. A card's title link
+   is stretched over it with ::after, so the whole card is one click target
+   without nesting links; the other links in it sit above that layer. */
+.card-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: var(--space-4); }
+.card {
+  position: relative; display: grid; gap: var(--space-3); align-content: start; min-width: 0;
+  padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+}
+.card:hover { border-color: var(--border-strong); background: var(--bg-subtle); }
+.card:has(.card-link:focus-visible) { outline: 2px solid var(--link); outline-offset: 2px; }
+.card p { margin: 0; }
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.card-title { margin: 0; font-size: var(--text-md); line-height: var(--lh-md); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.card-link { color: var(--fg); text-decoration: none; }
+.card-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.card-link:focus-visible { outline: none; }
+.card a:not(.card-link) { position: relative; z-index: 1; }
+.card-role, .card-foot { color: var(--fg-muted); }
+.card-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
+.card-stats dt { color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); }
+.card-stats dd { margin: 0; white-space: nowrap; }
+.card-stats .usage-meter { margin-bottom: 0; }
+.card-counts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+/* The first-vault checklist: three numbered steps, read left-aligned. */
+.first-steps { max-width: var(--measure); margin: 0 auto var(--space-5); padding-left: 1.5em; text-align: left; color: var(--fg); }
+.first-steps li + li { margin-top: var(--space-3); }
+.first-steps strong { display: inline; font-size: inherit; margin: 0; }
+.first-steps .button { margin-left: var(--space-2); }
 /* New vault (pages.ts newVault(), templates.ts templateChoices()): the
    template and the default policy as cards. The radio sits inside the
    label, so the whole card picks it; the checked card is outlined in the
@@ -1752,11 +1778,7 @@ label.choice-card input:focus-visible { outline: none; }
 .callout-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0 0; }
 .refused-ref { color: var(--fg-muted); }
 @media (max-width: 640px) {
-  .choice-card-grid { grid-template-columns: minmax(0, 1fr); }
-  .vault-list td.num, .vault-list th.num { width: auto; }
-  /* On a phone the name heads its block, without a label. */
-  .table-stack td.vault-name { grid-template-columns: minmax(0, 1fr); font-size: var(--text-md); line-height: var(--lh-md); }
-  .table-stack td.vault-name::before { content: none; }
+  .choice-card-grid, .card-grid { grid-template-columns: minmax(0, 1fr); }
 }
 /* Package G: vault admin and members */
 /* Settings tabs (vaultadmin.ts settingsHeader): the first h2 under the tabs
