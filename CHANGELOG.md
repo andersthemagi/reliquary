@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.23.0](https://github.com/andersthemagi/reliquary/compare/v0.22.0...v0.23.0) (2026-10-13)
+
+
+### Features
+
+* **web:** the legal pages name the Colorado LLC and add US state privacy rights ([#316](https://github.com/andersthemagi/reliquary/issues/316)) ([34f254f](https://github.com/andersthemagi/reliquary/commit/34f254fb888a6796bd7e72e3be2ca91f6e87b121))
+
 ## [0.22.0](https://github.com/andersthemagi/reliquary/compare/v0.21.0...v0.22.0) (2026-10-12)
 
 Reliquary's alpha is closed, and the site now says so. The landing page's button is Request access: a short form (email, country, a note on your team and AI tools) that goes to the operator, who replies with an invite. Sign in stays for people who already have an account or an invite. No database changes.
