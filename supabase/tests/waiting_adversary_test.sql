@@ -76,6 +76,14 @@ create function t.lapse_step(p_path text, p_key text) returns void language sql 
   update public.work_plan_steps set expires_at = clock_timestamp() - interval '1 second'
    where plan_id = t.plan_id(p_path) and key = p_key
 $$;
+-- Someone outside the line is working p_key: Ana's claim, written as the
+-- table owner, since claim_step keeps the caps (20261013180000) and the
+-- g/ rule lets her hold only two.
+create function t.occupy(p_path text, p_key text) returns void language sql as $$
+  update public.work_plan_steps set status = 'claimed', fence = fence + 1, holder = t.id('ana'),
+         claimed_at = clock_timestamp(), expires_at = clock_timestamp() + interval '10 minutes'
+   where plan_id = t.plan_id(p_path) and key = p_key
+$$;
 -- p_user asks p_n times, each a full evaluation (its gap passed), and
 -- gives the distinct answers, as "state place ready".
 create function t.ask_again(p_user text, p_path text, p_n int) returns text language plpgsql as $$
@@ -248,8 +256,7 @@ select t.step_call('complete_step', 'ben', 'ben-1', 'g/hoard.md', 'ben1-hoard');
 select t.step_call('complete_step', 'ben', 'ben-2', 'g/hoard.md', 'ben2-hoard');
 
 select t.plan(p, '[{"key":"a","title":"A"}]') from unnest(array['g/t1.md', 'g/t2.md', 'g/t3.md', 'g/t4.md']) p;
-select t.run('ana', format($q$select o_fence::text from public.claim_step(%L, %L, 'a')$q$, t.id('adv'), p))
-  from unnest(array['g/t1.md', 'g/t2.md', 'g/t3.md', 'g/t4.md']) p;
+select t.occupy(p, 'a') from unnest(array['g/t1.md', 'g/t2.md', 'g/t3.md', 'g/t4.md']) p;
 select t.expect('adversary: a person takes three places in line, each from a different connection',
   (select string_agg(t.rw_tok('ben', tok, p)->>'o_state', ' ' order by tok)
      from (values ('ben-1', 'g/t1.md'), ('ben-2', 'g/t2.md'), ('ben-3', 'g/t3.md')) x(tok, p)), 'wait wait wait');

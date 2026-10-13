@@ -116,8 +116,9 @@ before(async () => {
   await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.main, EDDA, NOA]);
   await sql("select test_support.add_member($1, $2, 'viewer', $3)", [V.main, REX, NOA]);
   // claim_step keeps to the claim rule's caps (20261013180000): Edda holds
-  // a task in two plans from one connection, so the rule allows two.
-  await as(NOA, "select public.set_claim_rule($1, '', 2880, 10080, null, 2, 5)", [V.main]);
+  // a task in two plans from one connection, so the rule allows two. The
+  // rest is the Org preset, the settings with no rule.
+  await as(NOA, "select public.set_claim_rule($1, '', 2880, 10080, null, 2, 5, 360, 60, 900, 1, 2880)", [V.main]);
 
   // fetch: done. clean: held by Edda. check: ready. ship: blocked on clean and
   // check. side: cancelled. after: blocked by the cancelled side job.
