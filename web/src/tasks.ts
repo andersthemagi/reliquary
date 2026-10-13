@@ -400,7 +400,7 @@ async function confirmTask(ctx: Ctx, id: string, path: string, verb: Verb, key: 
         : verb === "cancel"
         ? [
             waiting.length
-              ? html`These tasks wait on it and stay blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them: ${nameList(waiting)}.`
+              ? html`These tasks wait on it and stay blocked, shown as blocked by a cancelled task, until a person reopens it, or cancels or skips each of them: ${nameList(waiting)}.`
               : "No other task is waiting on it.",
             holder,
             "A person can reopen it later from this page.",
@@ -469,7 +469,7 @@ export async function taskAction(ctx: Ctx, id: string): Promise<Reply> {
         : action === "reopen"
         ? `“${done}” is reopened. Tasks that waited on it now wait for it to be done.`
         : action === "cancel"
-        ? `“${done}” is cancelled. Tasks waiting on it stay blocked until a person cancels or skips them.`
+        ? `“${done}” is cancelled. Tasks waiting on it stay blocked until a person reopens it, or cancels or skips them.`
         : `“${done}” is skipped and counts as done. Tasks that were waiting only on it are ready now.`,
       "success",
     );

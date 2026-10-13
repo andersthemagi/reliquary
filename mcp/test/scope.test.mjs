@@ -114,6 +114,10 @@ test("scoped: a read-write token writes in its own vault", async () => {
 });
 
 test("client name and last use are recorded for the Tokens page", async () => {
+  // Resolving a token writes last_used_at at most once a minute (hardening
+  // migration), and other files use this token too: the guarantee is a time
+  // no more than a minute before this request, not before the assertion.
+  const before = Date.now();
   const c = await connect(env.ANA_WS_RW, "Scope Test Client");
   await call(c, "list_vaults");
   await c.close();
@@ -121,7 +125,7 @@ test("client name and last use are recorded for the Tokens page", async () => {
     "select client_name, last_used_at from public.access_tokens where name = 'Workshop writer'",
   );
   assert.equal(row.client_name, "Scope Test Client");
-  assert.ok(Date.now() - row.last_used_at.getTime() < 60_000);
+  assert.ok(row.last_used_at.getTime() >= before - 60_000, `last use ${row.last_used_at.toISOString()} is within a minute of the request`);
 });
 
 test("revoked mid-session: the next request is refused", async () => {

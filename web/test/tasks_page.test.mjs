@@ -366,7 +366,7 @@ test("cancel: the confirm page says what happens and what stays blocked, and ope
   assert.match(h, /Cancelling <strong>Draft<\/strong> <code>a<\/code> drops it from the plan\. A cancelled task never counts as done\./);
   assert.match(
     h,
-    /<li>These tasks wait on it and stay blocked, shown as blocked by a cancelled task, until a person cancels or skips each of them: Review the draft <code>b<\/code>\.<\/li>/,
+    /<li>These tasks wait on it and stay blocked, shown as blocked by a cancelled task, until a person reopens it, or cancels or skips each of them: Review the draft <code>b<\/code>\.<\/li>/,
   );
   assert.match(h, /<li>A person can reopen it later from this page\.<\/li>/);
   const { action, fields } = formFields(h, "Cancel “Draft”");
@@ -392,7 +392,7 @@ test("cancel: a form without the confirm page's field is sent to that page and c
 test("cancel: confirming cancels it, says so as a success, logs it, and what waited on it reads as blocked by a cancelled task", async () => {
   const { action, fields } = formFields(await page(noa, confirmUrl(V.main, "cancel", "a")), "Cancel “Draft”");
   const h = await landed(noa, await post(noa, action, fields));
-  assert.deepEqual(flashOf(h), ["success", "status", "“Draft” is cancelled. Tasks waiting on it stay blocked until a person cancels or skips them."]);
+  assert.deepEqual(flashOf(h), ["success", "status", "“Draft” is cancelled. Tasks waiting on it stay blocked until a person reopens it, or cancels or skips them."]);
   assert.equal((await stepOf("a")).status, "cancelled");
   assert.deepEqual(await logged("step.cancel"), [{ path: WORK, actor: NOA, step: "a" }]);
   assert.match(taskRow(h, "a"), /<span class="badge">Cancelled<\/span>/);

@@ -72,9 +72,9 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Snooze.** Hiding a proposal from your own Inbox for a day, a week, or until it changes. Private to you. See [Proposals and review](../concepts/proposals-and-review.md#snooze).
 
-**Step.** One entry in a work plan: a piece of work and the steps it waits on. People see steps as tasks. See [Work plans](../concepts/claims.md#work-plans).
+**Step.** One entry in a work plan: a piece of work and the steps it waits on. People see steps as tasks. See [Tasks](../concepts/tasks.md).
 
-**Task.** A work plan's step as a person sees it on a vault's **Tasks** page: in progress, ready, blocked, done or cancelled. See [Tasks](../concepts/tasks.md).
+**Task.** A work plan's step as a person sees it on a vault's **Tasks** page: in progress, ready, awaiting review, blocked, done or cancelled. See [Tasks](../concepts/tasks.md).
 
 **Thread.** A conversation inside one vault between its members and their agents: a title and messages in order, never private. Not the same as the discussion on a proposal. See [Threads](../concepts/threads.md).
 
@@ -84,4 +84,4 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Watch.** Asking to be flagged about changes on a folder or file in a vault. Yours only, set in person, and private to you. See [Flags](../concepts/flags.md#watching-a-path).
 
-**Work plan.** A plan file in a vault with a `work_plan` block, registered by an agent (and registered again to gain new steps), so its steps are taken in order and nobody gets a step before the steps it waits on are done. See [Work plans](../concepts/claims.md#work-plans).
+**Work plan.** A plan file in a vault with a `work_plan` block, registered by an agent (and registered again to gain new steps), so its steps are taken in order and nobody gets a step before the steps it waits on are done. See [Tasks](../concepts/tasks.md).
