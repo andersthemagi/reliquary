@@ -148,6 +148,44 @@ test("claim rules: manual fields are honoured over a preset's defaults when no p
   assert.equal(row.person_cap, 7);
 });
 
+test("claim rules: each preset sets its place in line, longest check-again hint, a gap of a quarter of the hint and a cooldown cap of the lease", async () => {
+  const want = {
+    hackathon: { lease: 30, place: 15, hint: 1, gap: 15 },
+    team: { lease: 480, place: 120, hint: 15, gap: 225 },
+    org: { lease: 2880, place: 360, hint: 60, gap: 900 },
+  };
+  for (const [preset, w] of Object.entries(want)) {
+    const token = csrfOf(await page(noa, rulesUrl(V.main)));
+    await landed(noa, await post(noa, `/v/${V.main}/rules/claims`, { csrf: token, path: `wait-${preset}/`, preset }));
+    const row = await claimRule(V.main, `wait-${preset}/`);
+    assert.deepEqual(
+      { lease: row.lease_minutes, place: row.place_in_line_minutes, hint: row.check_again_minutes, gap: row.min_gap_seconds, cooldown: row.cooldown_cap_minutes },
+      { ...w, cooldown: w.lease },
+      preset,
+    );
+  }
+  const h = await page(noa, rulesUrl(V.main));
+  assert.match(h, /rule-path">wait-hackathon\/<[\s\S]*?<td data-label="Waiting in line" class="small">15 min place, checks within 1 min, 15 s gap<\/td>/);
+});
+
+test("claim rules: the waiting settings can be typed, Change shows them, and a gap below 10 seconds is refused in the form", async () => {
+  const token = csrfOf(await page(noa, rulesUrl(V.main)));
+  await landed(
+    noa,
+    await post(noa, `/v/${V.main}/rules/claims`, { csrf: token, path: "typed/", lease: "60", hold: "60", place: "3", place_unit: "hours", hint: "10", hint_unit: "minutes", gap: "120" }),
+  );
+  const row = await claimRule(V.main, "typed/");
+  assert.deepEqual([row.place_in_line_minutes, row.check_again_minutes, row.min_gap_seconds], [180, 10, 120]);
+  const change = await page(noa, `${rulesUrl(V.main)}?claim=typed%2F`);
+  assert.match(change, /name="place"[^>]*value="3"/);
+  assert.match(change, /name="hint"[^>]*value="10"/);
+  assert.match(change, /name="gap"[^>]*value="120"/);
+  const { h, text } = await refused(noa, { path: "slow/", lease: "60", hold: "60", place: "1", hint: "1", gap: "9" });
+  assert.match(text, /^The minimum gap is a whole number of seconds: at least 10 and at most 365 days\. Nothing was saved\./);
+  assert.match(h, /name="gap"[^>]*value="9"[^>]*aria-invalid="true"/);
+  assert.equal(await claimRule(V.main, "slow/"), undefined);
+});
+
 // A refused save is the page again (400), the refusal and its reference in the
 // form, what was typed kept, the refused field marked, and nothing stored.
 const refused = async (s, fields) => {
