@@ -777,6 +777,12 @@ lapse, a 48 hour cooldown cap). Where it differs from the spike:
   place and the ready count it was granted at.
 - **Not here:** the per-token and per-vault `request_work` rate limits of
   item 8 are the MCP server's, with the tools (#75).
+- **One read for every line** (#79, `20261013230000_my_places.sql`):
+  `my_places()` gives the caller's person, across the vaults the caller
+  reads, each place's state as `request_work` would answer it (with
+  `lapsed` for a place that ran out) and each step held, writing nothing
+  (item 12d's cheap read, for every plan at once). Over MCP it counts only
+  against the general tool call limit, not item 8's `request_work` one.
 ### 12. The agent is not trusted
 
 No rule may depend on an agent behaving, and none needs a model: every

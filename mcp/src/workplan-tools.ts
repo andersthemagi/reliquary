@@ -1,7 +1,8 @@
 // Work plan MCP tools: register_work_plan, work_plan_status, request_work,
-// leave_queue, claim_step, checkin_step, complete_step, release_step
+// leave_queue, my_places, claim_step, checkin_step, complete_step, release_step
 // (20261002200000_work_plans.sql, 20261002210000_work_plan_checkin.sql,
 // 20261013170100_request_work.sql, 20261013220000_claim_step_follows_the_line.sql,
+// 20261013230000_my_places.sql,
 // docs/design.md "Claims and work plans", CL-3.4).
 //
 // Not here, on purpose: cancel_step, skip_step and reopen_step need a person
@@ -28,7 +29,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
-import { ADDITIVE, at, FENCE, freshNonce, makeRun, ok, PATH, peopleLabeler, READ, refuse, SECRET, ToolError, TTL_MINUTES, VAULT, VAULT_REF } from "./tools-shared.js";
+import { ADDITIVE, at, FENCE, fenced, freshNonce, makeRun, ok, PATH, peopleLabeler, READ, refuse, SECRET, ToolError, TTL_MINUTES, VAULT, VAULT_REF } from "./tools-shared.js";
 import { parseWorkPlanBlock } from "./workplan-format.js";
 
 // The same pattern the database enforces on a step's key (and the plan
@@ -375,6 +376,45 @@ export function registerWorkPlanTools(
       run(async (c) => {
         const { rows } = await c.query("select public.leave_queue(private.vault_ref($1), $2) as left", [vault, path]);
         return ok(rows[0].left ? `Left the line for ${path}.` : `You had no place in line for ${path}, so nothing changed.`);
+      }),
+  );
+
+  server.registerTool(
+    "my_places",
+    {
+      title: "Where you stand in every line",
+      description:
+        "One call for every plan your person waits on or works, across the vaults this connection reaches, instead of request_work once per plan. Each place in line: waiting (your number, steps ready, when to call request_work), at capacity, cooling down, lapsed or plan complete; each step held, with when its lease ends. Changes nothing. Then call request_work only where it says to.",
+      annotations: READ,
+    },
+    async () =>
+      run(async (c) => {
+        const { rows } = await c.query(
+          `select v.name, m.* from public.my_places() m join public.vaults v on v.id = m.o_vault
+            order by v.name, m.o_vault, m.o_path nulls first, m.o_state, m.o_step`,
+        );
+        const now = new Date();
+        const head = `Server time (UTC): ${at(now)}`;
+        if (rows.length === 0) return ok(`${head}\nYour person has no place in any line and holds no step this connection can see.`);
+        const when = (t: Date) => (t <= now ? "now" : `at ${at(t)}`);
+        const lines = rows.map((r) => {
+          const where = r.o_path === null ? r.name : `${r.name} ${r.o_path}`;
+          switch (r.o_state) {
+            case "waiting":
+              return `${where}: waiting, number ${r.o_place} in line, ${r.o_ready} step${r.o_ready === 1 ? "" : "s"} ready for you; call request_work ${when(r.o_at)}`;
+            case "holding":
+              return `${where}: holding step ${r.o_step} until ${at(r.o_at)}`;
+            case "at_capacity":
+              return `${where}: at capacity; finish or release a step you hold before asking`;
+            case "cooling_down":
+              return `${where}: cooling down until ${at(r.o_at)}; no step in this vault before then`;
+            case "lapsed":
+              return `${where}: your place lapsed at ${at(r.o_at)}; asking again starts at the back`;
+            default:
+              return `${where}: plan complete; stop asking here`;
+          }
+        });
+        return ok([head, ...fenced("Vault names and plan paths, with where you stand", lines)].join("\n"));
       }),
   );
 
