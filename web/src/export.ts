@@ -18,6 +18,15 @@
 // download is cut (server.ts), so a truncated file fails to gunzip and
 // holds no manifest.
 //
+// Threads (20261013150000_export_threads.sql): export_vault's snapshot lists
+// them in the header, and each becomes threads/<n>-<title>.md, numbered in
+// the order they opened, with its messages from export_messages a page at a
+// time. A message is people's and agents' words, so it is written quoted
+// ("> " on every line) under a heading this module writes: nothing in a
+// message can pass for another message, an author or a time. A redacted
+// message keeps its place, author, agent and time, and says who redacted
+// it, with no text. People are written as pages write them (people.ts).
+//
 // The tar writer is the minimum POSIX ustar needs: regular files, 0644,
 // owner 0, and a pax header for any path over 100 bytes. No dependency.
 //
@@ -37,12 +46,35 @@ import type { Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 import { asPerson } from "./db.js";
+import { peopleLabels } from "./people.js";
 
 export const MANIFEST = "reliquary-export.json";
 // The database refuses to start an export over its cap (100 MiB of text);
 // this guards the stream too, in case files grow while it runs.
 const STREAM_CAP = 110 * 1024 * 1024;
 const PAGE = 200;
+const MESSAGE_PAGE = 500;
+
+export type ThreadAnchor =
+  | { kind: "path"; path: string }
+  | { kind: "proposal"; proposal: string }
+  | { kind: "task"; plan_path: string; step_key: string }
+  | null;
+
+export type ExportThread = {
+  id: string;
+  title: string;
+  scope: "vault" | "side";
+  addressees: string[];
+  anchor: ThreadAnchor;
+  opened_by: string;
+  agent: string | null;
+  opened_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolved_agent: string | null;
+  messages: number;
+};
 
 export type ExportHeader = {
   export: string; // the snapshot's id: export_files serves this export's files
@@ -53,6 +85,8 @@ export type ExportHeader = {
   bytes: number;
   rules: { path: string; policy: string; quorum: number }[];
   variables: { name: string; environments: string[] }[];
+  threads?: ExportThread[];
+  people?: string[]; // everyone the threads name
 };
 
 // Starts an export as the signed-in person: the database checks and logs it.
@@ -61,7 +95,7 @@ export async function startExport(userId: string, vaultId: string): Promise<Expo
 }
 
 // A name safe for a file and a folder: lower-case letters, digits, dashes.
-export function slug(name: string): string {
+export function slug(name: string, fallback = "vault"): string {
   const s = name
     .normalize("NFKD")
     .toLowerCase()
@@ -69,7 +103,7 @@ export function slug(name: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 50)
     .replace(/-+$/, "");
-  return s || "vault";
+  return s || fallback;
 }
 
 export function archiveName(h: ExportHeader): string {
@@ -188,7 +222,89 @@ const dbPages = (userId: string, h: ExportHeader): FilePages => (after, limit) =
     ).rows,
   );
 
-export async function writeExport(userId: string, h: ExportHeader, out: Writable, pages: FilePages = dbPages(userId, h)): Promise<void> {
+// ---------------------------------------------------------------------------
+// Threads
+
+export type MessageRow = {
+  id: string;
+  author: string;
+  agent: string | null;
+  at: Date;
+  body: string | null;
+  redacted_at: Date | null;
+  redacted_by: string | null;
+};
+export type ThreadSource = {
+  // One page of a thread's messages after message `after`, oldest first.
+  messages: (thread: string, after: string, limit: number) => Promise<MessageRow[]>;
+  // How the exporter may see each person; anyone missing is written as their id.
+  people: (ids: string[]) => Promise<Map<string, string>>;
+};
+
+const dbThreads = (userId: string, h: ExportHeader): ThreadSource => ({
+  messages: (thread, after, limit) =>
+    asPerson(userId, async (c) =>
+      (
+        await c.query(`select id, author, agent, at, body, redacted_at, redacted_by from public.export_messages($1, $2, $3, $4, $5)`, [
+          h.vault.id,
+          h.export,
+          thread,
+          after,
+          limit,
+        ])
+      ).rows,
+    ),
+  people: (ids) => peopleLabels(userId, ids),
+});
+
+const iso = (t: string | Date) => new Date(t).toISOString();
+const quoted = (text: string) =>
+  text
+    .split(/\r\n|\r|\n/)
+    .map((l) => (l ? `> ${l}` : ">"))
+    .join("\n");
+
+function aboutLine(a: ThreadAnchor): string | null {
+  if (!a) return null;
+  if (a.kind === "path") return `About: file:${a.path}`;
+  if (a.kind === "proposal") return `About: proposal:${a.proposal} (proposals are not in this export)`;
+  return `About: task:${a.plan_path}#${a.step_key} (tasks are not in this export; the plan is under files/)`;
+}
+
+export function threadMarkdown(t: ExportThread, messages: MessageRow[], people: Map<string, string>): string {
+  // One line whatever a name holds, so no name can start a heading of its own.
+  const who = (id: string | null, agent: string | null) =>
+    // eslint-disable-next-line no-control-regex
+    `${(id && people.get(id)) || id || "unknown"}${agent ? ` via ${agent}` : ""}`.replace(/[\u0000-\u001f\u007f]+/g, " ");
+  const about = aboutLine(t.anchor);
+  const head = [
+    `# ${t.title}`,
+    "",
+    `- Opened by ${who(t.opened_by, t.agent)}, ${iso(t.opened_at)}`,
+    ...(about ? [`- ${about}`] : []),
+    t.scope === "side"
+      ? `- Side thread, addressed to ${t.addressees.map((u) => who(u, null)).join(", ")}. Everyone in the vault could read it.`
+      : "- Addressed to the whole vault",
+    t.resolved_at ? `- Resolved by ${who(t.resolved_by, t.resolved_agent)}, ${iso(t.resolved_at)}` : "- Open",
+    `- ${messages.length} ${messages.length === 1 ? "message" : "messages"}`,
+  ];
+  const body = messages.map((m, i) =>
+    [
+      `## ${i + 1}. ${who(m.author, m.agent)}, ${iso(m.at)}`,
+      "",
+      m.body !== null ? quoted(m.body) : `_Redacted by ${who(m.redacted_by, null)}, ${iso(m.redacted_at!)}. The text was removed._`,
+    ].join("\n"),
+  );
+  return [head.join("\n"), ...body].join("\n\n") + "\n";
+}
+
+export async function writeExport(
+  userId: string,
+  h: ExportHeader,
+  out: Writable,
+  pages: FilePages = dbPages(userId, h),
+  source: ThreadSource = dbThreads(userId, h),
+): Promise<void> {
   const root = `${slug(h.vault.name)}-${h.exported_at.slice(0, 10)}`;
   const gz = createGzip();
   const piped = pipeline(gz, out);
@@ -218,6 +334,7 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
   };
   const files: { path: string; archived_as?: string; sha256: string; bytes: number; updated_at: string; version_id: string }[] = [];
   const renamed: { path: string; archived_as: string; why: string }[] = [];
+  const threads: (ExportThread & { archived_as: string; sha256: string; bytes: number })[] = [];
   let total = 0;
   try {
     let after = "";
@@ -243,6 +360,22 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
       if (rows.length < PAGE) break;
       after = rows[rows.length - 1].path;
     }
+    const listed = h.threads ?? [];
+    const people = listed.length ? await source.people(h.people ?? []) : new Map<string, string>();
+    for (const [i, t] of listed.entries()) {
+      const messages: MessageRow[] = [];
+      for (let after = "0"; ; ) {
+        const rows = await source.messages(t.id, after, MESSAGE_PAGE);
+        messages.push(...rows);
+        if (rows.length < MESSAGE_PAGE) break;
+        after = rows[rows.length - 1].id;
+      }
+      const body = Buffer.from(threadMarkdown(t, messages, people), "utf8");
+      const entry = `threads/${String(i + 1).padStart(4, "0")}-${slug(t.title, "thread")}.md`;
+      const last = messages.length ? messages[messages.length - 1].at : t.opened_at;
+      await put(tarEntry(`${root}/${entry}`, body, Date.parse(iso(last)) / 1000));
+      threads.push({ ...t, messages: messages.length, archived_as: entry, sha256: createHash("sha256").update(body).digest("hex"), bytes: body.length });
+    }
     const manifest = Buffer.from(
       JSON.stringify(
         {
@@ -253,14 +386,18 @@ export async function writeExport(userId: string, h: ExportHeader, out: Writable
           layout:
             "Each file's current text is under files/, at its path in the vault. " +
             "A path that another system could read as something else (a backslash, a colon, a name ending in a dot " +
-            "or a space, a device name like CON) is under renamed/ instead: renamed lists each one's path in the vault.",
+            "or a space, a device name like CON) is under renamed/ instead: renamed lists each one's path in the vault. " +
+            "Each thread is a Markdown file under threads/, numbered in the order the threads opened: its title, who opened it, " +
+            "what it is about, who it is addressed to and whether it is resolved, then every message in order with its author, " +
+            "agent and time, its text quoted. A redacted message keeps its place with no text. threads lists each one.",
           not_included:
-            "Deleted and erased files, earlier versions, proposals, comments and the activity log. " +
+            "Deleted and erased files, earlier versions, proposals and their comments, tasks and the activity log. " +
             "Environment variable values are never exported: only their names and the environments that have a value.",
           default_policy: h.vault.default_policy,
           rules: h.rules,
           files,
           renamed,
+          threads,
           variables: { values_included: false, names: h.variables },
         },
         null,

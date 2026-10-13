@@ -224,14 +224,15 @@ async function exportPage(ctx: Ctx, id: string): Promise<Reply> {
     const n = (await c.query(`select count(*)::int as n from public.files where vault_id = $1 and deleted_at is null`, [id])).rows[0].n as number;
     return html`
       ${settingsHeader(id, v, "export", {
-        description: html`A <code>.tar.gz</code> of ${plural(n, "file")}, each at its path under <code>files/</code>, and a <code>${MANIFEST}</code> manifest.`,
+        description: html`A <code>.tar.gz</code> of ${plural(n, "file")}, each at its path under <code>files/</code>, the vault’s threads under <code>threads/</code>, and a <code>${MANIFEST}</code> manifest.`,
         primary: html`<button class="primary" form="export">Download export</button>`,
       })}
       <form method="post" action="${settingsPath(id, "/export")}" id="export">${csrfField(ctx.csrf)}</form>
       <ul class="export-facts">
         <li>The manifest lists the vault’s name and default policy, its rules, and every file with its SHA-256, size and when it was last written.</li>
         <li><strong>Variable values are not exported.</strong> The manifest names each environment variable and the environments that have a value, nothing more.</li>
-        <li>Deleted and erased files, earlier versions, proposals, comments and the activity log are not included.</li>
+        <li>Each thread is a Markdown file with every message in order, its author, agent and time. A redacted message keeps its place, without its text.</li>
+        <li>Deleted and erased files, earlier versions, proposals and their comments, tasks and the activity log are not included.</li>
         <li>The export is recorded in the vault’s activity. A vault can be exported 10 times an hour.</li>
       </ul>`;
   });
