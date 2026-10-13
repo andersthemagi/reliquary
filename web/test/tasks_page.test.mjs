@@ -587,3 +587,79 @@ test("plan gains tasks: registering the changed file again clears the marker, ad
   assert.match(taskRow(h, "first"), /<span class="badge">Done<\/span>/);
   assert.match(taskRow(h, "second"), /<span class="badge success">Ready<\/span>/);
 });
+
+// ---------------------------------------------------------------------------
+// Who waits in a plan's line (issue #76). plans/line.md has one task, held
+// by Edda, so whoever asks for work waits. Noa asks first, Ula second (her
+// place then lapses), Ivo's agent third. The line's rules are SQL's
+// (waiting_test.sql); this is what the plan page shows of it.
+
+const IVO = "00000000-0000-0000-0000-0000000055a4";
+const ULA = "00000000-0000-0000-0000-0000000055a5";
+const LINE = "plans/line.md";
+
+async function requestWork(user, label, agent) {
+  const db = new pg.Client({ connectionString: SUPER });
+  await db.connect();
+  try {
+    await db.query("begin");
+    await db.query("set local role authenticated");
+    const claims = { sub: user, role: "authenticated", ...(agent ? { act: { sub: agent, name: agent } } : {}) };
+    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
+    const { rows } = await db.query("select o_state, o_place from public.request_work($1, $2, $3)", [V.main, LINE, label]);
+    await db.query("commit");
+    return rows[0];
+  } finally {
+    await db.end();
+  }
+}
+
+// The waiting section's rows, as [place, who, lapses].
+function lineRows(h) {
+  const s = /<section aria-labelledby="g-waiting">([\s\S]*?)<\/section>/.exec(h);
+  assert.ok(s, "a Waiting for work section");
+  return [...s[1].matchAll(/<tr><td><strong>(\d+)<\/strong><\/td><td [^>]*>([^<]*)<\/td><td [^>]*>([\s\S]*?)<\/td><\/tr>/g)].map((m) => m.slice(1));
+}
+
+// Set up once, by the first test that needs it: a second top-level before()
+// would not wait for the first one to create the vault.
+let seeded;
+const seedLine = () => (seeded ??= (async () => {
+  await sql(`insert into auth.users (id, email) values ($1, 'ivo@example.test'), ($2, 'ula@example.test') on conflict (id) do nothing`, [IVO, ULA]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.main, IVO, NOA]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.main, ULA, NOA]);
+  await register(EDDA, V.main, LINE, [{ key: "only", title: "The only task" }]);
+  await claim(EDDA, V.main, LINE, "only", null);
+  assert.deepEqual(await requestWork(NOA, "<b>secret-ish label</b>", null), { o_state: "wait", o_place: 1 });
+  assert.deepEqual(await requestWork(ULA, null, null), { o_state: "wait", o_place: 2 });
+  assert.deepEqual(await requestWork(IVO, null, "Ivo bot"), { o_state: "wait", o_place: 3 });
+  await sql("update public.work_plan_places set expires_at = now() - interval '1 minute' where holder = $1", [ULA]);
+})());
+
+test("waiting: the plan page lists who is waiting in line order, each with their place and when it lapses, and an agent as its person's agent", async () => {
+  await seedLine();
+  const rows = lineRows(await page(noa, planUrl(V.main, LINE)));
+  assert.equal(rows.length, 2, "a lapsed place is not listed");
+  assert.deepEqual(rows.map(([n, w]) => [n, w]), [["1", "you"], ["2", "ivo@example.test’s agent"]]);
+  for (const [, , lapses] of rows) assert.match(lapses, /^<time datetime="[^"]+"[^>]*>in 6 h<\/time>, unless it asks again$/, "the default place-in-line time");
+});
+
+test("waiting: a viewer sees the same list", async () => {
+  await seedLine();
+  const rows = lineRows(await page(rex, planUrl(V.main, LINE)));
+  assert.deepEqual(rows.map(([n, w]) => [n, w]), [["1", "noa@example.test"], ["2", "ivo@example.test’s agent"]]);
+});
+
+test("waiting: the page shows no place's label, and the list no agent name, secret or fence", async () => {
+  await seedLine();
+  const h = await page(rex, planUrl(V.main, LINE));
+  const section = /<section aria-labelledby="g-waiting">[\s\S]*?<\/section>/.exec(h)[0];
+  assert.doesNotMatch(h, /secret-ish label/);
+  assert.doesNotMatch(section, /Ivo bot|secret|fence/i);
+});
+
+test("waiting: a plan with no one in line says so plainly", async () => {
+  const h = await page(noa, planUrl(V.main, "plans/second.md"));
+  assert.deepEqual(lineRows(h), []);
+  assert.match(h, /<h2 id="g-waiting">Waiting for work <span class="muted">0<\/span><\/h2><p class="muted">No one is waiting for work in this plan\.<\/p>/);
+});
