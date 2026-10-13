@@ -627,7 +627,7 @@
   {
     "name": "list_vaults",
     "title": "List vaults",
-    "description": "Vaults this token reaches, with your role in each (viewer if the token is read-only). Other tools take a vault by name or id.",
+    "description": "Vaults this token reaches, with your role in each (viewer if the token is read-only), and the server's time in UTC: use it, not your own clock, for times you write. Other tools take a vault by name or id.",
     "inputSchema": {
       "type": "object",
       "properties": {}

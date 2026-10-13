@@ -118,7 +118,8 @@ export function registerVaultFileTools(
     "list_vaults",
     {
       title: "List vaults",
-      description: "Vaults this token reaches, with your role in each (viewer if the token is read-only). Other tools take a vault by name or id.",
+      description:
+        "Vaults this token reaches, with your role in each (viewer if the token is read-only), and the server's time in UTC: use it, not your own clock, for times you write. Other tools take a vault by name or id.",
       annotations: READ,
     },
     async () =>
@@ -135,8 +136,11 @@ export function registerVaultFileTools(
             where m.user_id = private.uid()
             order by v.name`,
         );
-        if (rows.length === 0) return ok("This token can't reach any vaults.");
-        return ok(fenced("Vault names", rows.map((r) => `${r.name} (${r.role}) id=${r.id}${limitNote(r)}`)).join("\n"));
+        // Agents' own clocks drift (a hackathon's logs were off by 1h20, #263);
+        // first, so it is never mistaken for the flags hint on the last line.
+        const now = `Server time (UTC): ${at(new Date())}`;
+        if (rows.length === 0) return ok(`${now}\nThis token can't reach any vaults.`);
+        return ok([now, ...fenced("Vault names", rows.map((r) => `${r.name} (${r.role}) id=${r.id}${limitNote(r)}`))].join("\n"));
       }),
   );
 
