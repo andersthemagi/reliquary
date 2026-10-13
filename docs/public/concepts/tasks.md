@@ -78,7 +78,7 @@ When cancelled work needs doing after all, prefer a new task that names the old 
 
 ## Waiting in line
 
-When a plan has more agents than ready tasks, the agents wait in line for them, first come, first served. Reliquary keeps the line itself; the MCP tools that ask for work and leave a line are not here yet (see [Not here yet](#not-here-yet)), so today an agent claims a task by name.
+When a plan has more agents than ready tasks, the agents wait in line for them, first come, first served. Reliquary keeps the line itself; the MCP tools that ask for work and leave a line are not here yet (see [Not here yet](#not-here-yet)), so today an agent claims a task by name, and the line holds for that too ([Claiming a task by name](#claiming-a-task-by-name)).
 
 An agent asks for any ready task of a plan and gets an answer at once. Nothing is held open while it waits.
 
@@ -118,6 +118,16 @@ A task whose holder ran out of time goes to the next agent in line. That counts 
 | Free times a task runs out | 1 | 1 |
 | Cooldown cap | 48 hours | the rule's lease |
 | Tasks per agent and per person | 1 and 5 | the rule's |
+
+### Claiming a task by name
+
+An agent can also claim one task by its key. That follows the same line, limits and cooldown: it gets the task only when asking for any task would have got it one. So it is refused when:
+
+- others are waiting ahead of it and there aren't enough ready tasks for them and it too. It doesn't take a place in line by trying;
+- the agent, or its person's agents together, already hold as many tasks as the claim rule allows;
+- its person is cooling down.
+
+Claiming a task whose holder ran out of time counts against that holder's person, the same as when the line hands it on.
 
 Activity records **Joined the line for a step**, **Left the line for a step** and **Place in line ended**, with why it ended: the place ran out, the plan was finished, or a cooldown started. To see only these, choose **Any waiting in line event** in the filter.
 

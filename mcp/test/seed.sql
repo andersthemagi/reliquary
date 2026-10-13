@@ -30,6 +30,10 @@ select pg_temp.reset();
 select test_support.add_member(:'v1', :'cal', 'viewer', :'ana');
 select pg_temp.as_person(:'ana');
 select public.set_policy(:'v1', 'canon/', 'canon', 1);
+-- Work plan steps under plans/ (test/workplan_steps.test.mjs) are claimed by
+-- name across many tests and some are left held, so the rule there allows
+-- more than the default of one per connection (claim_step keeps the caps).
+select public.set_claim_rule(:'v1', 'plans/', 2880, 10080, null, 20, 20);
 select public.write_file(:'v1', 'notes/standup.md', 'Standup is at 10:00 in room B.');
 select public.propose(:'v1', 'canon/pricing.md', 'Day rate is 800 EUR.', 'initial rate') as p1 \gset
 select public.decide(:'p1', 'approve');

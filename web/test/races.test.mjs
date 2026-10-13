@@ -354,6 +354,11 @@ test("races, work plan gate: 30 people working a 120-step plan at once, abandoni
              on conflict (id) do nothing`, [crowd]);
   const v = await newVault(OWNER, "Races work plan crowd");
   for (const p of crowd) await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, p, OWNER]);
+  // claim_step strikes whoever let a claim lapse (20261013180000), and this
+  // crowd walks away on purpose: no lapse earns a cooldown here, so the
+  // gate, not the cooldown, is what gets tested.
+  const rule = await as(db, OWNER, "select public.set_claim_rule($1, '', 2880, 10080, null, 1, 5, null, null, null, 1000000)", [v]);
+  assert.ok(rule.ok, rule.message);
   const seededFile = await as(db, OWNER, "select public.write_file($1, 'plan.md', 'plan') as v", [v]);
   assert.ok(seededFile.ok, seededFile.message);
   const steps = layeredPlan(seeded(72));
