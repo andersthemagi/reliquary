@@ -259,6 +259,13 @@ test("search: no query shows the form; no match says so", async () => {
   assert.match(await page("dora", "/search?q=nothing-matches-this"), /Nothing in your vaults matches “nothing-matches-this”/);
 });
 
+test("search empty: no match is the shared empty state, a title and what to try", async () => {
+  assert.match(
+    await page("dora", "/search?q=nothing-matches-this"),
+    /<div class="empty"><strong>Nothing in your vaults matches “nothing-matches-this”<\/strong><p>Try fewer words, or part of a file name\.<\/p><\/div>/,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Account settings
 
