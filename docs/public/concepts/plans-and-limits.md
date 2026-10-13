@@ -35,7 +35,8 @@ Sizes are decimal: 1 MB is 1,000,000 bytes, 1 GB is 1,000 MB.
 
 ## Where you see them
 
-- **Account**, **Plan and usage** (`/account`): your plan, how many vaults you own of how many, and each of your vaults' people and storage, each with a bar and a status: **People full**, **Storage full**, or storage from 80% ("Storage 85%"). Home shows the plan and the count under **Your vaults**. Home shows the count under its title, like "You own 2 of 5 vaults on the Free plan", marked **At the limit** when you're there.
+- **Account**, **Plan and usage** (`/account`): your plan, how many vaults you own of how many, and each of your vaults' people and storage, each with a bar and a status: **People full**, **Storage full**, or storage from 80% ("Storage 85%").
+- **Home**: under **Your vaults**, a line like "You own 2 of 5 vaults on the Free plan", marked **At the limit** when you're there. Each vault's card shows its tier, its people ("4 of 10") and its storage ("12 MB of 100 MB"), each with a bar. A vault with no limit shows the number alone, without a bar.
 - A vault's **Settings**, **Usage**: its tier, people and storage, for every member, with a warning from 80% of storage and when every place is filled. Owners also see the invites waiting.
 - A vault's **Settings**, **Members**: how many places are filled. When none is left, **Invite someone** is off and the page says how to make room, before anyone fills in an invite.
 - Agents: `list_vaults` notes a vault that is near or over a limit.

@@ -156,7 +156,7 @@ export function inboxItem(i: ShellItem): { href: string; title: string; meta: st
 const ICON_INBOX = raw(
   '<svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2.8 2h10.4c.5 0 .9.3 1.1.7l1.6 5.1c.1.2.1.4.1.6V13c0 .6-.4 1-1 1H1c-.6 0-1-.4-1-1V8.4c0-.2 0-.4.1-.6l1.6-5.1C1.9 2.3 2.3 2 2.8 2Zm.2 1.5L1.7 7.5h3.1c.4 0 .7.3.7.7a2.5 2.5 0 0 0 5 0c0-.4.3-.7.7-.7h3.1L13 3.5H3ZM1.5 9v3.5h13V9h-2.5a4 4 0 0 1-8 0H1.5Z"/></svg>',
 );
-const ICON_SEARCH = raw(
+export const ICON_SEARCH = raw(
   '<svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10.7 11.8a6 6 0 1 1 1.1-1.1l3.5 3.5a.8.8 0 1 1-1.1 1.1l-3.5-3.5ZM11.5 7a4.5 4.5 0 1 0-9 0 4.5 4.5 0 0 0 9 0Z"/></svg>',
 );
 

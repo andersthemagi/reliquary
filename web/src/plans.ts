@@ -159,6 +159,15 @@ function storageNote(u: VaultUsage, vaultName: string): Raw {
   return html``;
 }
 
+// "4 of 10" and "12 MB of 100 MB", each with its bar; with no limit, the
+// number alone. Plan and usage and Home's vault cards say it the same way.
+export const peopleUsage = (u: VaultUsage): Raw =>
+  html`${peopleLimited(u) ? `${filled(u)} of ${u.maxMembers}` : `${u.members}`}${meter(filled(u), u.maxMembers, `${filled(u)} of ${u.maxMembers} places filled`)}`;
+export const storageUsage = (u: VaultUsage): Raw =>
+  storageLimited(u)
+    ? html`${formatBytes(u.bytes)} of ${formatBytes(u.maxBytes)}${meter(u.bytes, u.maxBytes, `${formatBytes(u.bytes)} of ${formatBytes(u.maxBytes)} used`, NO_LIMIT_BYTES)}`
+    : html`${formatBytes(u.bytes)}`;
+
 const percent = (used: number, max: number) => Math.floor((used / max) * 100);
 
 // The Usage tab of a vault's Settings. Every member sees it; owners also
@@ -244,11 +253,8 @@ export async function accountPage(ctx: Ctx): Promise<Reply> {
           <thead><tr><th>Vault</th><th>People</th><th>Storage</th><th>Status</th></tr></thead>
           <tbody>${vaults.map(({ id, name, usage: u }) => html`<tr>
             <td><a class="name" href="${vaultPath(id)}">${name}</a><span class="muted token-client">${tierLabel(u)}</span></td>
-            <td data-label="People">${peopleLimited(u) ? `${filled(u)} of ${u.maxMembers}` : `${u.members}`}${meter(
-              filled(u), u.maxMembers, `${filled(u)} of ${u.maxMembers} places filled`)}</td>
-            <td data-label="Storage">${storageLimited(u)
-              ? html`${formatBytes(u.bytes)} of ${formatBytes(u.maxBytes)}${meter(u.bytes, u.maxBytes, `${formatBytes(u.bytes)} of ${formatBytes(u.maxBytes)} used`, NO_LIMIT_BYTES)}`
-              : formatBytes(u.bytes)}</td>
+            <td data-label="People">${peopleUsage(u)}</td>
+            <td data-label="Storage">${storageUsage(u)}</td>
             <td data-label="Status">${status(u)}</td></tr>`)}</tbody></table></div>`
       : html`<div class="empty">You haven’t created a vault yet. <a href="/vaults/new">New vault</a></div>`}
     ${planNote(plan, selfHosted())}`,

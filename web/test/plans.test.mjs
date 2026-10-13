@@ -152,6 +152,43 @@ test("plans: Home shows the plan and the vaults owned, linking to Plan and usage
   assert.match(await page("pia", "/"), /<p class="meta plan-line"><span>You own 1 of 2 vaults on the Web small plan<\/span><span><a href="\/account">Plan and usage<\/a><\/span><\/p>/);
 });
 
+// Home's vault cards: Your vaults and Shared with you -----------------------
+
+const cardOf = (h, name) => [...h.matchAll(/<li class="card vault-card">[\s\S]*?<\/li>/g)].map((m) => m[0]).find((c) => c.includes(`>${name}</a></h3>`)) ?? "";
+const section = (h, title) => new RegExp(`<h2>${title}</h2>([\\s\\S]*?)(?:<h2>|</main>)`).exec(h)?.[1] ?? "";
+
+test("home cards: a vault I created is under Your vaults with its tier, people and storage, each with a bar", async () => {
+  const h = await page("pia", "/");
+  const c = cardOf(section(h, "Your vaults"), "Plans One");
+  assert.match(c, /<span class="badge">Standard \(Web small\)<\/span>/);
+  assert.match(c, /<dt>People<\/dt><dd>2 of 2<meter class="usage-meter" min="0" max="2" low="1" high="2" optimum="0" value="2" aria-label="2 of 2 places filled">/);
+  assert.match(c, /<dt>Storage<\/dt><dd>0 bytes of 400 bytes<meter class="usage-meter"[^>]* aria-label="0 bytes of 400 bytes used">/);
+  assert.doesNotMatch(h, /<h2>Shared with you<\/h2>/, "nothing shared with Pia: no section");
+});
+
+test("home cards: a vault someone else created is under Shared with you, with my role", async () => {
+  const h = await page("quinn", "/");
+  assert.equal(cardOf(section(h, "Your vaults"), "Plans One"), "");
+  assert.match(section(h, "Your vaults"), /You haven’t created a vault yet\. The ones below were shared with you\./);
+  const c = cardOf(section(h, "Shared with you"), "Plans One");
+  assert.match(c, /<p class="card-role">Your role: Editor<\/p>/);
+  assert.match(c, /<span class="badge">Standard \(Web small\)<\/span>/);
+  assert.match(c, /<dt>People<\/dt><dd>2 of 2<meter /);
+});
+
+test("home cards: open proposals and ready tasks are counted, linked to their pages; with no limits, people and storage have no bar", async () => {
+  await as({ user: REX }, "select public.propose($1, 'canon/p.md', 'P.', 'p')", [V.rex]);
+  await as({ user: REX }, "select public.write_file($1, 'plan.md', 'The plan')", [V.rex]);
+  const [{ v }] = await sql("select current_version_id as v from public.files where vault_id = $1 and path = 'plan.md'", [V.rex]);
+  const steps = [{ key: "a", title: "A" }, { key: "b", title: "B" }, { key: "c", title: "C", blocked_by: ["a"] }];
+  await as({ user: REX }, "select public.register_work_plan($1, 'plan.md', $2, $3::jsonb)", [V.rex, v, JSON.stringify(steps)]);
+  const c = cardOf(await page("rex", "/"), "Plans Boundless");
+  assert.match(c, new RegExp(`<p class="card-counts"><a href="/v/${V.rex}/proposals" aria-label="1 open proposal in Plans Boundless">1 open proposal</a><a href="/v/${V.rex}/tasks" aria-label="2 ready tasks in Plans Boundless">2 ready tasks</a></p>`));
+  assert.match(c, /<dt>People<\/dt><dd>1<\/dd>/);
+  assert.match(c, /<dt>Storage<\/dt><dd>\d+ bytes<\/dd>/);
+  assert.doesNotMatch(c, /<meter/);
+});
+
 test("plans: the Account menu links Plan and usage", async () => {
   assert.match(await page("quinn", "/"), /<li><a href="\/account">Plan and usage<\/a><\/li>/);
 });
@@ -401,4 +438,21 @@ test("vault limit: Home says the plan is full, and New vault is no longer the pr
   const head = /<div class="page-head">[\s\S]*?<\/div>\s*<\/div>/.exec(h)[0];
   assert.match(head, /<a class="button" href="\/vaults\/new">New vault<\/a>/);
   assert.doesNotMatch(head, /class="button primary"/);
+});
+
+test("home filter: past six vaults, Home offers a filter by name and sorts by recent, name or what needs attention", async () => {
+  assert.doesNotMatch(await page("pia", "/"), /class="home-filter"/, "one vault: no filter");
+  for (const n of ["Zeta", "Alpha", "Kappa", "Delta", "Omega", "Sigma"]) await as({ user: REX }, "select public.create_vault($1, 'open')", [`Home filter ${n}`]);
+  const all = await page("rex", "/");
+  assert.match(all, /<form class="home-search" method="get" action="\/" role="search">/);
+  assert.match(all, /<button type="submit" aria-label="Filter">/, "a button, not only Enter");
+  assert.match(all, /<a class="chip" href="\/\?sort=recent" aria-current="true">Recent<\/a>/);
+  const names = (h) => [...h.matchAll(/class="card-link" href="[^"]+">(Home filter \w+)</g)].map((m) => m[1]);
+  assert.deepEqual(names(await page("rex", "/?sort=name")), ["Home filter Alpha", "Home filter Delta", "Home filter Kappa", "Home filter Omega", "Home filter Sigma", "Home filter Zeta"]);
+  const one = await page("rex", "/?q=kap");
+  assert.deepEqual(names(one), ["Home filter Kappa"]);
+  assert.match(one, /1 of \d+ vaults match “kap” · <a href="\/">Clear filter<\/a>/);
+  assert.match(await page("rex", "/?q=nothing-like-this"), /<strong>No vault matches “nothing-like-this”<\/strong>/);
+  const first = /class="card-link" href="[^"]+">([^<]+)</.exec(await page("rex", "/?sort=attention"))[1];
+  assert.equal(first, "Plans Boundless", "the vault with a proposal open and tasks ready comes first");
 });
