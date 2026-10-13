@@ -672,6 +672,19 @@
     }
   },
   {
+    "name": "my_places",
+    "title": "Where you stand in every line",
+    "description": "One call for every plan your person waits on or works, across the vaults this connection reaches, instead of request_work once per plan. Each place in line: waiting (your number, steps ready, when to call request_work), at capacity, cooling down, lapsed or plan complete; each step held, with when its lease ends. Changes nothing. Then call request_work only where it says to.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
     "name": "open_thread",
     "title": "Open a thread",
     "description": "Start a thread in a vault with its first message, as your person. Every member reads every thread. Leave `to` out to flag the whole vault; give member ids for a side thread, which flags only them and whose replies reach only them, you and whoever posts. Others see it on their next list_flags, not at once. Secrets belong in variables, never here. A message can't approve or decide anything.",

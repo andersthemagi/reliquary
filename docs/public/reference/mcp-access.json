@@ -19,6 +19,7 @@
   "list_threads": "Any member's agent, within its connection's vaults (read-only is enough). Every member reads every thread, side threads included",
   "list_variables": "Any member's agent, within its connection's vaults; pushes waiting for a person are shown to owners' and editors' read-write agents. Never values",
   "list_vaults": "Any connection or token; a read-only one shows you as viewer",
+  "my_places": "Any member's agent, within its connection's vaults (read-only is enough); only its own person's places and steps",
   "open_thread": "An owner's or editor's agent with read-write access; viewers and read-only connections can't open one",
   "post_message": "An owner's or editor's agent with read-write access, also to resolve or reopen a thread; viewers and read-only connections can't post",
   "propose": "An owner's or editor's agent with read-write access",

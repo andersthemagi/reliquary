@@ -10,7 +10,7 @@
 //                        list_claims (break_claim needs a person present,
 //                        so no tool here offers it)
 //   workplan-tools.ts    register_work_plan, work_plan_status, request_work,
-//                        leave_queue, claim_step, checkin_step, complete_step,
+//                        leave_queue, my_places, claim_step, checkin_step, complete_step,
 //                        release_step
 //                        (cancel_step, skip_step and reopen_step need a person present,
 //                        so no tool here offers them)

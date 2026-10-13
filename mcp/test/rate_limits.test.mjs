@@ -136,6 +136,15 @@ test("rate limits: asking for work per token: past its own limit request_work an
   assert.equal((await call(tok)).status, 200, "the refused requests counted nothing against the tool call limit");
 });
 
+test("rate limits: my_places counts only against the tool call limit, so it still answers once asking for work is spent", async () => {
+  const tok = await token();
+  await nextWindow();
+  const ask = rpc({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name: "request_work", arguments: { vault: "Nowhere", path: "plan.md" } } }, { tok });
+  assert.equal((await ask).status, 200);
+  const r = await rpc({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name: "my_places", arguments: {} } }, { tok });
+  assert.equal(r.status, 200);
+});
+
 test("rate limits: 401s per address: the 4th request without a live token from one address is a 429; other addresses still get 401", async () => {
   const from = addr();
   const bogus = `rlq_${"0".repeat(64)}`;

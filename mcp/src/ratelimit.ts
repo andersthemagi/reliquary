@@ -60,7 +60,9 @@ export const DEFAULT_LIMITS = {
 
 // The tools whose calls also count as thread writes.
 export const THREAD_WRITES: ReadonlySet<string> = new Set(["open_thread", "post_message"]);
-// The tools whose calls also count as asking for work.
+// The tools whose calls also count as asking for work. Not my_places: it
+// writes nothing and is one indexed read, the call an agent makes instead of
+// request_work per plan, so it counts only against the general limit.
 export const WORK_REQUESTS: ReadonlySet<string> = new Set(["request_work", "claim_step"]);
 
 export type LimitName = keyof typeof DEFAULT_LIMITS;
