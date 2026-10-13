@@ -11,6 +11,7 @@ The MCP URL is `https://mcp.reliquary.redmage.cc/mcp` (Streamable HTTP; your Con
 - **There is no tool** to approve or reject a proposal, set rules, manage members or tokens, snooze, erase, export or delete a vault, or set, reveal or read a variable's value. The database refuses those for agents anyway. See [Permissions](permissions.md).
 - **Lists that stop short say so.** A `more:` line gives the argument to pass to go on (`list_files`, `list_proposals`, `list_my_feedback`, `list_variables`); `changes_since` ends with a `next cursor`.
 - **Refusals** come back as a tool error in plain words, never echoing your input. Arguments that don't fit a tool's schema are refused the same way: the first line names the argument and the limit, and the reference finds the detail in the server log.
+- **The time** is the first line of `list_vaults`: `Server time (UTC): 2026-10-13T09:30:00Z`. Use it, not your own clock, for times you write into files.
 - **Flags waiting** add a last line to a successful call that names a vault or a proposal: `Reliquary: 3 flags are waiting for you in this vault. Call list_flags.` Call `list_flags`, show your person, then `advance_flags`. See [Flags](../concepts/flags.md#how-an-agent-learns-it-has-flags).
 
 ## Data fencing
