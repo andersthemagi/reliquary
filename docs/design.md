@@ -26,7 +26,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 8 | [Path ownership](#path-ownership) | Built |
 | 9 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
 | 10 | [Claims and work plans](#claims-and-work-plans) | Built, except waiting in line |
-| 11 | [Threads](#threads) | Built, except export |
+| 11 | [Threads](#threads) | Built |
 | 12 | [Links](#links) | Built |
 | 13 | [Routines](#routines) | Designed, not built |
 | 14 | [Environment variables](#environment-variables) | Built |
@@ -829,7 +829,7 @@ were confirmed on 2026-10-02.
 
 Written 2026-10-02 (owner's decision), built 2026-10-03: the database (#126),
 flags for messages (#127), the web page (#128) and the MCP tools (#129).
-Not built: threads in a vault's export. A thread is where people and their
+Threads in a vault's export built 2026-10-13 (#197). A thread is where people and their
 agents talk about the work. A vault had no such place: a proposal's comments exist only on that proposal,
 and notes addressed `to:` someone are not built
 ([Notifications](#notifications)). Ten points, each with the reason it was
@@ -1020,14 +1020,17 @@ erasure, so nothing of a vault is left behind or kept out of its export.
 - **Limit numbers.** Every number in item 8 is a starting point, and the
   posting bucket's size has none. Whether message text counts toward a
   vault's storage is open (comments and review notes don't today).
-- **The export format.** Where threads sit in the archive, and how an
-  anchor to a task reads there, since tasks are not exported. Also whether
-  threads reach the export in the same change as the feature. Today's
-  export fixes its contents in one snapshot inside `export_vault` (files
-  and a manifest, capped at 100 MiB of text, no proposals yet),
-  so adding threads means changing that function and its hostile tests,
-  and may be a change of its own. Until the export carries threads, the
-  docs for Threads say that it does not.
+- **The export format.** Settled when it was built (2026-10-13, #197,
+  `20261013150000_export_threads.sql`): each thread is a Markdown file
+  under `threads/`, numbered in the order threads opened, its messages
+  quoted under headings the exporter writes, and the manifest lists each
+  thread. A task anchor reads as `task:<plan path>#<step key>`, the
+  citation item 9 uses, since tasks are not exported and the plan file
+  is. `export_vault`'s one snapshot fixes the thread list and the latest
+  message id; bodies are read as each page is served, so a redaction made
+  mid-export wins, as erasure does for files. Thread text doesn't count
+  toward the 100 MiB cap: item 8's limits bound it. Nothing imports an
+  export yet, so no thread is restored from one.
 - **Redaction of copies.** What becomes of a redacted message's text when
   someone quoted it into another message.
 - **Unread markers.** Whether people get one.
@@ -1295,9 +1298,10 @@ that with a vault per engagement:
 - **Export:** the whole vault's context as markdown files plus a log file,
   from the UI or `reliquary export`. Available on every plan.
   - Built (web): an owner, in person, downloads a `.tar.gz` from the vault's
-    Settings: every live file's current text under `files/`, and
+    Settings: every live file's current text under `files/`, each thread
+    as Markdown under `threads/` ([Threads](#threads), item 10), and
     `reliquary-export.json` with the vault, its default policy and rules,
-    and each file's SHA-256, size and last write. Variable values are never
+    each file's SHA-256, size and last write, and each thread. Variable values are never
     exported, only names and the environments that have one. It streams,
     a page of files per short transaction, is capped at 100 MiB of text,
     is `no-store`, and is logged as `vault.export`. Not yet: the log file,
