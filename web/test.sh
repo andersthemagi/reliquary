@@ -10,6 +10,9 @@
 # The other instances, and those test files start themselves, multiply
 # every limit by 1000 (RATE_LIMIT_SCALE): they count as in production, but
 # the suite never reaches a limit.
+#
+#   WEB_TESTS="test/races.test.mjs" ./web/test.sh   only these test files
+#   WAITING_LOAD_FULL=1                             races.test.mjs's load tests at full length
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -142,15 +145,17 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
   -e WEB_AUTH_PUBLIC_URL="$hosted_url" -e FAKE_AUTH_URL=$fake_url -e AUTH_SECRETS_FILE=/app/.auth-secrets-$slot \
   -e WEB_SPLIT_URL="http://127.0.0.1:$split_port" -e WEB_SPLIT_APP_URL="$split_app_url" -e WEB_SPLIT_SITE_URL="$split_site_url" \
   -e WEB_RL_URL="http://127.0.0.1:$rl_port" -e RATE_LIMIT_SCALE=1000 \
-  -e EXPECT_VERSION="$(tr -d '[:space:]' < ../version.txt)" \
-  "$node" node --test --test-concurrency=1 test/*.test.mjs
+  -e EXPECT_VERSION="$(tr -d '[:space:]' < ../version.txt)" -e WAITING_LOAD_FULL="${WAITING_LOAD_FULL:-}" -e RACES_VERBOSE="${RACES_VERBOSE:-}" \
+  "$node" node --test --test-concurrency=1 ${WEB_TESTS:-test/*.test.mjs}
 
 echo "== server log (must contain no tokens, codes or file text)"
 { "$engine" logs "$srv"; "$engine" logs "$hosted"; } 2>&1 | grep -E 'rl[qei]_|code=|EUR|script|SEKRIT' && { echo "LEAK in server log"; exit 1; } || echo "clean"
 echo "== supabase-mode server logs (must contain no JWTs, refresh tokens, codes, token hashes or emails)"
 # test/auth.test.mjs wrote every code, token hash and refresh token it saw
 # to .auth-secrets-<slot>; none may appear in a log.
-[ -s .auth-secrets-$slot ] || { echo "auth.test.mjs recorded no secrets to look for"; exit 1; }
+# Without auth.test.mjs (WEB_TESTS), there is nothing recorded to look for.
+[ -s .auth-secrets-$slot ] || [[ -n "${WEB_TESTS:-}" && "$WEB_TESTS" != *auth* ]] || { echo "auth.test.mjs recorded no secrets to look for"; exit 1; }
+[ -e .auth-secrets-$slot ] || : > .auth-secrets-$slot  # on CI the container owns it; only make it when WEB_TESTS skipped auth.test.mjs
 { "$engine" logs "$auth_a"; "$engine" logs "$auth_b"; "$engine" logs "$split"; "$engine" logs "$rl"; } > .auth-logs-$slot 2>&1
 leak=0
 grep -E 'eyJ|@|token_hash|rlq_|rli_|EUR|script' .auth-logs-$slot && leak=1
