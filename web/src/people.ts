@@ -32,18 +32,27 @@ const BATCH = 500;
 export const personLabel = (email: string | null, name: string | null): string =>
   name && email ? `${name} (${email})` : (email ?? name ?? "");
 
+// How `userId` may see each of `ids` written: only the ones they may see
+// (anyone else is missing from the map).
+export async function peopleLabels(userId: string, ids: string[]): Promise<Map<string, string>> {
+  const labels = new Map<string, string>();
+  if (!ids.length) return labels;
+  await asPerson(userId, async (c) => {
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const { rows } = await c.query(`select user_id, email, display_name, deleted from public.co_member_people($1::uuid[])`, [ids.slice(i, i + BATCH)]);
+      for (const r of rows) labels.set(r.user_id, r.deleted ? DELETED_ACCOUNT : personLabel(r.email, r.display_name));
+    }
+  });
+  return labels;
+}
+
 // Replaces every marker in `html` as `userId` sees them.
 export async function fillPeople(userId: string, html: string): Promise<string> {
   const ids = [...new Set(Array.from(html.matchAll(PERSON_MARK), (m) => m[1]))];
   if (!ids.length) return html;
-  const emails = new Map<string, string>();
+  let emails = new Map<string, string>();
   try {
-    await asPerson(userId, async (c) => {
-      for (let i = 0; i < ids.length; i += BATCH) {
-        const { rows } = await c.query(`select user_id, email, display_name, deleted from public.co_member_people($1::uuid[])`, [ids.slice(i, i + BATCH)]);
-        for (const r of rows) emails.set(r.user_id, r.deleted ? DELETED_ACCOUNT : personLabel(r.email, r.display_name));
-      }
-    });
+    emails = await peopleLabels(userId, ids);
   } catch {
     // Short ids, as before, rather than no page.
   }
