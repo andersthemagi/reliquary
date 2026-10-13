@@ -6,7 +6,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { diffMode, diffSection } from "./diffview.js";
-import { callout, csrfField, emptyState, html, pageHeader, textareaText, time, type CrumbPart, type Raw, type Tone } from "./html.js";
+import { callout, csrfField, emptyState, html, pageHeader, reviewItem, textareaText, time, type CrumbPart, type Raw, type Tone } from "./html.js";
 import { vaultShell } from "./files.js";
 import {
   canWrite,
@@ -17,6 +17,7 @@ import {
   UUID,
   vault,
   vaultPath,
+  who,
   writablePath,
   type Ctx,
   type Reply,
@@ -79,30 +80,36 @@ function outcome(ctx: Ctx, status: string, by: string[], at: Date | null): Raw {
   return html`${text}${at ? html` · ${time(at)}` : ""}`;
 }
 
-// A proposal in a list (the vault's Proposals, the Inbox, Home): what it
-// does to which file, then the vault (across vaults), who proposed it and
-// when. At the end, while it's live: a New file label, the first risk (all
-// of them in the badge's title) and its approvals so far; once decided, how
-// it ended. Rows the Inbox can snooze carry a Snooze menu.
+// A proposal in a list (the vault's Proposals, the Inbox, Home), in the row
+// threads share: what it does to which file, the file's path, who proposed
+// it and, across vaults, which vault. At the end its state; while it's live,
+// a New file label, the first risk (all of them in the badge's title) and
+// its approvals so far; once decided, who decided. Then when it was proposed
+// or decided. Rows the Inbox can snooze carry a Snooze menu.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const reviewRow = (ctx: Ctx, p: any, showVault = false, snoozable = false) => {
   const verb = verbOf(p);
   const done = decided(p.status);
   const r = done ? [] : risks(p);
   const end = done
-    ? html`<span class="muted outcome">${outcome(ctx, p.status, p.deciders ?? [], p.decided_at ?? null)}</span> ${stateBadge(p.status)}`
-    : html`${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${
+    ? html`<span class="muted outcome">${outcome(ctx, p.status, p.deciders ?? [], null)}</span> ${stateBadge(p.status)}`
+    : html`${stateBadge(p.status)} ${verb === "Create" ? html`<span class="badge">New file</span> ` : ""}${
         r.length
           ? html`<span class="badge attention risk-count" title="${r.map((x) => x.long).join(" ")}">${r[0].short}${
               r.length > 1 ? ` +${r.length - 1} more` : ""
             }</span> `
           : ""
       }<span class="muted">${approvalCount(p.approvals, p.quorum)}</span>`;
-  return html`<li>
-    <span><a class="name" href="${proposalPath(p.vault_id, p.id)}">${verb} ${p.path}</a>
-      <span class="muted small"> · ${showVault ? `${p.vault} · ` : ""}${byWhom(ctx, p.proposed_by, p.agent)} · ${time(p.created_at)}</span></span>
-    <span class="row-end small">${end}${snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : ""}</span>
-  </li>`;
+  return reviewItem({
+    href: proposalPath(p.vault_id, p.id),
+    title: `${verb} ${fileName(p.path)}`,
+    path: p.path,
+    who: who(ctx, p.proposed_by, p.agent),
+    meta: showVault ? p.vault : "",
+    end,
+    at: done ? (p.decided_at ?? p.created_at) : p.created_at,
+    after: snoozable ? rowSnooze(ctx, p.vault_id, p.id, `${verb} ${p.path}`) : "",
+  });
 };
 
 // ---------------------------------------------------------------------------
@@ -279,9 +286,12 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     const feedback = await latestFeedback(c, ctx, p);
     const snooze = await snoozeControl(c, ctx, { vaultId: id, p, waitingOnMe: decidable });
 
-    // The decision sits at the top, under the title, as on a GitHub pull
-    // request: the note, then the verdicts, all visible without opening
-    // anything. The diff follows immediately. (docs/research/ux-patterns.md)
+    // Everything the reviewer should know first is one status strip under
+    // the title. The decision comes next, as on a GitHub pull request: the
+    // note, then the verdicts, all visible without opening anything. On a
+    // wide screen it sits in a column beside the diff; on a narrow one it
+    // stays above it, since controls belong at the top.
+    // (docs/research/ux-patterns.md)
     // A refused decision comes back here with the reason inside the box and
     // the note as typed; a missing note marks the field.
     const noteMissing = (refused?.decision === "reject" || refused?.decision === "request_changes") && !refused.note.trim();
@@ -369,9 +379,12 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
               "The file changed after this was proposed. Approving it would mark it stale instead of applying it, and revising or editing it doesn’t change that. The diff below compares with the file as it is now. To go ahead, reject it and propose the same text again against the current version.",
             )
           : ""}
-        ${status}${controls ?? refusal}
+        ${status}${controls ? "" : refusal}
       </div>
 
+      <div class="review-layout">
+      ${controls ? html`<aside class="review-side" aria-label="Decide">${controls}</aside>` : ""}
+      <div class="review-body">
       ${p.body === null && p.kind === "write"
         ? html`<div class="empty">This proposal’s content was erased.</div>`
         : diffSection({
@@ -392,7 +405,9 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
       }</p>`
         : ""}
 
-      ${thread}`;
+      ${thread}
+      </div>
+      </div>`;
     return { v, p, shell: await vaultShell(c, ctx, v, { path: p.path, section: "proposals" }, body) };
   });
   if (!data) return notFound(ctx);

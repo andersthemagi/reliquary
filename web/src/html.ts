@@ -610,6 +610,32 @@ export function menu(o: {
 const hiddenFields = (fields: Record<string, string> = {}) =>
   Object.entries(fields).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`);
 
+// Review rows -------------------------------------------------------------------
+
+// One row in a list of things to review (Proposals, the Inbox, Home, Threads),
+// so a reader learns the order once: what it is, the file it touches, who;
+// then its badges and count, and when, at the right edge. `who` comes from
+// who() in pages.ts; it can't be called here without a circular import.
+export function reviewItem(o: {
+  href: string;
+  title: string;
+  path?: string | null;
+  who: string;
+  meta?: Raw | string;
+  end: Raw | string;
+  at: Date | null;
+  after?: Raw | string;
+  className?: string;
+}): Raw {
+  return html`<li${o.className ? html` class="${o.className}"` : ""}>
+    <span class="review-main"><a class="name" href="${o.href}">${o.title}</a>
+      <span class="review-meta small">${o.path ? html`<span class="path-chip">${o.path}</span>` : ""}<span class="muted">${o.who}${
+        o.meta ? html` · ${o.meta}` : ""
+      }</span></span></span>
+    <span class="row-end small">${o.end}${o.at ? html`<span class="muted">${time(o.at)}</span>` : ""}${o.after ?? ""}</span>
+  </li>`;
+}
+
 // Empty states ----------------------------------------------------------------
 
 // What's missing, when it will appear, and the action that fills it (a

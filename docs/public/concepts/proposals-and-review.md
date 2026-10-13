@@ -18,15 +18,15 @@ A proposal is one of:
 | Rejected | a reviewer rejected it, with a note |
 | Stale | the file changed after it was proposed, so it can't apply; **Propose again** (or `propose` with the same text) starts a new one on the current file |
 
-A vault's **Proposals** page lists them in tabs, each with its count: **Open**, **Changes requested**, **Applied** and **Closed** (rejected and stale ones, each marked). A decided proposal's row says how it ended, such as "Rejected by you, 2 days ago", instead of its approvals.
+A vault's **Proposals** page lists them in tabs, each with its count: **Open**, **Changes requested**, **Applied** and **Closed** (rejected and stale ones, each marked). Each row reads the same way here, on Home and in the Inbox, and like a row on the Threads page: what it does and to which file, such as "Change rates.md", the file's full path, and who proposed it, such as "sol@example.com via Claude Code". At the end are its state, the first thing worth a closer look, its approvals as "0 of 1 approval", and when it was proposed. A decided proposal's row says who decided instead of its approvals, such as "Rejected by you", and when.
 
 ## Reviewing
 
 The **Inbox** in the top bar counts what waits on you, across all your vaults, and lists it on the Inbox page (see [The top bar, inbox and account](inbox-and-account.md)). A proposal's page puts the decision first:
 
 1. The status, who proposed it (the agent first, then its person) and when. **Snooze**, **Revise** and **Edit, then approve** are at the top right.
-2. The latest request for changes if there is one, and what's worth a closer look (below).
-3. The decision: a note, then **Approve**, **Request changes** or **Reject**.
+2. One status strip: how it ended, the latest request for changes if there is one, what's worth a closer look (below), and any warning. A refused comment shows here too, as an alert.
+3. The decision: a note, then **Approve**, **Request changes** or **Reject**. On a wide screen it sits in a column to the right of the diff; on a narrow one it comes before the diff.
 4. The diff: unified (the default), split, or rendered as it will read. Changed words are highlighted. Once a proposal is applied or rejected, its diff stays what was reviewed: against the version it was made against, not the file as it is now, and the split and rendered views label that side **Before**. A stale proposal's diff is against the file as it is now.
 5. The proposer's reason. From an agent it is marked unverified: read the diff, not the story.
 6. Approvals so far and the discussion.
@@ -37,7 +37,7 @@ Your decision is on the revision you read. If the proposer or their agent revise
 
 Once a proposal is decided, the top of its page says how it ended, who decided and when, in place of the approvals.
 
-If the file changed after an open proposal was made, its page says so in a warning above the decision and offers **Reject** but not **Approve** or **Request changes**: approving could only mark it stale, and neither **Revise** nor **Edit, then approve** moves it onto the new version. Reject it, then propose the same text again against the current version.
+If the file changed after an open proposal was made, its page says so in a warning in the status strip and offers **Reject** but not **Approve** or **Request changes**: approving could only mark it stale, and neither **Revise** nor **Edit, then approve** moves it onto the new version. Reject it, then propose the same text again against the current version.
 
 - **Approve** counts once per person. When approvals reach the quorum, the change applies, credited to whoever proposed it. If another proposal for the same file applied first, it goes stale instead, even when both were approved at the same moment.
 - **Request changes** and **Reject** need a note. Requesting changes keeps the proposal alive; rejecting closes it.
