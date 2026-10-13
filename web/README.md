@@ -17,7 +17,7 @@ sessions are HttpOnly, SameSite=Strict cookies.
 The look follows `docs/research/ui-design-system.md`: tokens for light and
 dark (the OS setting, or the Account menu's Auto / Light / Dark, stored in a
 cookie) at the top of `public/style.css`, Inter self-hosted from
-`public/fonts/` (SIL Open Font License, `OFL-Inter.txt`), sentence case,
+`public/fonts/` (SIL Open Font License, `OFL-AtkinsonHyperlegibleNext.txt`, `OFL-GeistMono.txt`), sentence case,
 neutral surfaces, and vermilion only for the logo diamond, "you are here"
 bars and the Review count. Filled and hollow diamonds mark canon and open.
 `test/contrast.test.mjs` checks every token pair against WCAG AA in both

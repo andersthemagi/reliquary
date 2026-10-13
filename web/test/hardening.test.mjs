@@ -62,7 +62,7 @@ test("assets: the versioned stylesheet is cached for a year; an unversioned one 
   assert.equal((await fetch(BASE + href)).headers.get("cache-control"), "public, max-age=31536000, immutable");
   assert.equal((await fetch(BASE + "/style.css?v=stale")).headers.get("cache-control"), "public, max-age=300");
   assert.equal(
-    (await fetch(BASE + "/fonts/inter-latin-opsz-normal.woff2")).headers.get("cache-control"),
+    (await fetch(BASE + "/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2")).headers.get("cache-control"),
     "public, max-age=31536000, immutable",
   );
 });

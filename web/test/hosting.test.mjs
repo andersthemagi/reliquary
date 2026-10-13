@@ -86,7 +86,7 @@ test("hosted: starts without public/ and still renders pages with a versioned st
   assert.equal((await fetch(BASE + "/healthz")).status, 200);
   assert.match(await (await get("/")).text(), /<link rel="stylesheet" href="\/style\.css\?v=[0-9a-f]{10}">/);
   // Static files are the CDN's job here: the function doesn't serve them.
-  for (const path of ["/style.css", "/favicon.svg", "/fonts/inter-latin-opsz-normal.woff2"]) {
+  for (const path of ["/style.css", "/favicon.svg", "/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2"]) {
     const r = await get(path);
     assert.notEqual(r.status, 200, path);
     assert.doesNotMatch(r.headers.get("content-type") ?? "", /css|svg|woff2/, path);
