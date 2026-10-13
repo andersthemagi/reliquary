@@ -1,6 +1,6 @@
 # Flags
 
-A flag tells you, or your agent, about something in a vault that changed since you were last told: a new message in a thread for you, a proposal waiting on your review, a change to one of your own proposals, or a change on a path you watch.
+A flag tells you, or your agent, about something in a vault that changed since you were last told: a new message in a thread for you, a proposal or a task waiting on your review, a change to one of your own proposals, or a change on a path you watch.
 
 **Partly usable.** You watch and unwatch folders and files, and see your own flags, in the web app (see [Watching a path](#watching-a-path) and [Seeing your flags](#seeing-your-flags)). An agent can list your flags (`list_flags`) and what you watch (`list_subscriptions`) over MCP, and mark flags shown (`advance_flags`). Thread messages are flagged; notes addressed to someone aren't built.
 
@@ -8,6 +8,7 @@ A flag tells you, or your agent, about something in a vault that changed since y
 
 - **Threads for you.** A new [thread](threads.md), or a new message in an open one, when the thread is for the whole vault or addressed to you. A thread for the whole vault is flagged to every member, viewers included, though viewers can't post. A side thread, addressed to some members, is flagged to them when it opens. After that, each message in it is flagged to the people taking part: the members it's addressed to, the person who opened it, and anyone who has posted in it. Everyone else can still read it, but isn't told. Nothing is flagged for a resolved thread, for resolving or reopening one, or for a redaction.
 - **Waiting on you.** An open proposal, in a vault where you're an owner or editor, that you haven't approved, sent back or rejected at its current revision and haven't snoozed. These are the same proposals as **Changes to review** in your [Inbox](inbox-and-account.md#inbox). It is flagged when it opens, and again when it's revised, edited or commented on.
+- **A task waiting on your review.** A task marked `gate: review` that its agent finished, in a plan file you can write (as an owner or editor, or a named owner of its path). The flag names the plan and the task, and links to the plan's page in **Tasks**, where you approve it. Once the task is approved, skipped or cancelled, it isn't flagged any more. See [Tasks that need a person's review](tasks.md#tasks-that-need-a-persons-review).
 - **Your own proposals.** A comment, a decision, an edit, going stale or being applied, on a proposal you made or your agent made for you.
 - **The file under your proposal.** Someone else writes, deletes or erases the file one of your pending proposals would change. Approving that proposal would now make it stale, so you'll want to propose again.
 - **Tasks whose context moved.** Someone writes a new version of a file that a task cites at an older version, or a proposal changing it is approved, while that task isn't done or cancelled. You're flagged if you registered the task's plan or hold the task. The flag names the file and the plan. See [Context moved](tasks.md#context-moved).
@@ -45,7 +46,7 @@ It only reaches an agent that is making calls in that vault. An agent that is id
 
 ## Seeing your flags
 
-In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you, badged apart from threads, events on your own proposals and their files, tasks whose context moved, and changes on paths you watch, oldest first. Each links to its thread, proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
+In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you (a proposal, or a task to review, linked to its plan), badged apart from threads, events on your own proposals and their files, tasks whose context moved, and changes on paths you watch, oldest first. Each links to its thread, proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
 
 Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since, and when there's nothing it says so and points to **Proposals**, where what still waits on you is counted. If more than 200 flags are waiting, the page shows the oldest 200: reload for the next batch. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
 
