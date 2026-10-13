@@ -439,3 +439,20 @@ test("vault limit: Home says the plan is full, and New vault is no longer the pr
   assert.match(head, /<a class="button" href="\/vaults\/new">New vault<\/a>/);
   assert.doesNotMatch(head, /class="button primary"/);
 });
+
+test("home filter: past six vaults, Home offers a filter by name and sorts by recent, name or what needs attention", async () => {
+  assert.doesNotMatch(await page("pia", "/"), /class="home-filter"/, "one vault: no filter");
+  for (const n of ["Zeta", "Alpha", "Kappa", "Delta", "Omega", "Sigma"]) await as({ user: REX }, "select public.create_vault($1, 'open')", [`Home filter ${n}`]);
+  const all = await page("rex", "/");
+  assert.match(all, /<form class="home-search" method="get" action="\/" role="search">/);
+  assert.match(all, /<button type="submit" aria-label="Filter">/, "a button, not only Enter");
+  assert.match(all, /<a class="chip" href="\/\?sort=recent" aria-current="true">Recent<\/a>/);
+  const names = (h) => [...h.matchAll(/class="card-link" href="[^"]+">(Home filter \w+)</g)].map((m) => m[1]);
+  assert.deepEqual(names(await page("rex", "/?sort=name")), ["Home filter Alpha", "Home filter Delta", "Home filter Kappa", "Home filter Omega", "Home filter Sigma", "Home filter Zeta"]);
+  const one = await page("rex", "/?q=kap");
+  assert.deepEqual(names(one), ["Home filter Kappa"]);
+  assert.match(one, /1 of \d+ vaults match “kap” · <a href="\/">Clear filter<\/a>/);
+  assert.match(await page("rex", "/?q=nothing-like-this"), /<strong>No vault matches “nothing-like-this”<\/strong>/);
+  const first = /class="card-link" href="[^"]+">([^<]+)</.exec(await page("rex", "/?sort=attention"))[1];
+  assert.equal(first, "Plans Boundless", "the vault with a proposal open and tasks ready comes first");
+});

@@ -1724,7 +1724,20 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 /* Cards: a grid of link cards, one column on a phone. A card's title link
    is stretched over it with ::after, so the whole card is one click target
    without nesting links; the other links in it sit above that layer. */
-.card-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: var(--space-4); }
+.card-grid { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: var(--space-4); }
+/* Home's filter and sort, shown past six vaults: the box with its own
+   button, the sorts as chips, and how many vaults are shown. */
+.home-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); margin: 0 0 var(--space-5); }
+.home-filter .chips { margin: 0; }
+.home-count { margin: 0; flex-basis: 100%; }
+.home-search { position: relative; flex: 1 1 18rem; max-width: 28rem; margin: 0; }
+.home-search input { width: 100%; padding-right: 40px; }
+.home-search button {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-md);
+  background: transparent; color: var(--fg-muted); cursor: pointer;
+}
+.home-search button:hover { background: var(--bg-muted); color: var(--fg); }
 .card {
   position: relative; display: grid; gap: var(--space-3); align-content: start; min-width: 0;
   padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg);
@@ -1763,7 +1776,7 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 .card-role, .card-foot { color: var(--fg-muted); }
 .card-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
 .card-stats dt { color: var(--fg-muted); font-size: var(--text-xs); line-height: var(--lh-xs); }
-.card-stats dd { margin: 0; white-space: nowrap; }
+.card-stats dd { margin: 0; overflow-wrap: anywhere; }
 .card-stats .usage-meter { margin-bottom: 0; }
 .card-counts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .card-counts a {
@@ -1771,7 +1784,7 @@ h2 + .plan-line { margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
   background: var(--bg-muted); color: var(--fg); font-weight: 500; text-decoration: none;
 }
 .card-counts a:hover { background: var(--border); }
-.card-foot { padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--text-xs); line-height: var(--lh-xs); }
+.card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--text-xs); line-height: var(--lh-xs); }
 /* The first-vault checklist: three numbered steps, read left-aligned. */
 .first-steps { max-width: var(--measure); margin: 0 auto var(--space-5); padding-left: 1.5em; text-align: left; color: var(--fg); }
 .first-steps li + li { margin-top: var(--space-3); }

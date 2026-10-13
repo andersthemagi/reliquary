@@ -8,7 +8,7 @@ import type { Session } from "./auth.js";
 import { asPerson, readOnlyRequest } from "./db.js";
 import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
-import { callout, csrfField, emptyState, html, page, pageHeader, plural, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
+import { callout, csrfField, emptyState, html, ICON_SEARCH, page, pageHeader, plural, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
 import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, signOutEverywhere } from "./settings.js";
@@ -229,6 +229,15 @@ type HomeVault = { id: string; name: string; role: string; mine: boolean; open: 
 // A vault as a card. The name is its one link, stretched over the card
 // (style.css), so the whole card opens the vault and a screen reader hears
 // one link per vault; the proposals and tasks links sit above it.
+const HOME_FILTER_FROM = 6;
+// Recent is the default (the query's own order); Needs attention puts the
+// vaults with proposals open or tasks ready first, most waiting first.
+const HOME_SORTS: { key: string; label: string; compare: (a: HomeVault, b: HomeVault) => number }[] = [
+  { key: "recent", label: "Recent", compare: (a, b) => +b.updated - +a.updated },
+  { key: "name", label: "Name", compare: (a, b) => a.name.localeCompare(b.name) },
+  { key: "attention", label: "Needs attention", compare: (a, b) => b.open + b.ready - (a.open + a.ready) || +b.updated - +a.updated },
+];
+
 function vaultCard(v: HomeVault): Raw {
   const u = v.usage;
   // Named with the vault, so a list of links read out of context still
@@ -241,11 +250,11 @@ function vaultCard(v: HomeVault): Raw {
   // the CSP allows no inline styles. Decoration only: the name says it.
   const tint = parseInt(v.id.replace(/-/g, "").slice(-4), 16) % 6;
   return html`<li class="card vault-card">
-    <div class="card-head"><span class="vault-mark tint-${tint}" aria-hidden="true">${Array.from(v.name.trim())[0]?.toUpperCase() ?? "?"}</span><h3 class="card-title"><a class="card-link" href="${vaultPath(v.id)}">${v.name}</a></h3>${u ? html`<span class="badge">${tierLabel(u)}</span>` : ""}</div>
+    <div class="card-head"><span class="vault-mark tint-${tint}" aria-hidden="true">${Array.from(v.name.trim())[0]?.toUpperCase() ?? "?"}</span><h3 class="card-title"><a class="card-link" href="${vaultPath(v.id)}">${v.name}</a></h3></div>
     ${v.mine ? "" : html`<p class="card-role">Your role: ${ROLE_LABEL[v.role] ?? v.role}</p>`}
     ${u ? html`<dl class="card-stats"><div><dt>People</dt><dd>${peopleUsage(u)}</dd></div><div><dt>Storage</dt><dd>${storageUsage(u)}</dd></div></dl>` : ""}
     ${counts.length ? html`<p class="card-counts">${counts}</p>` : ""}
-    <p class="card-foot">Updated ${time(v.updated)}</p>
+    <p class="card-foot"><span>Updated ${time(v.updated)}</span>${u ? html`<span class="badge">${tierLabel(u)}</span>` : ""}</p>
   </li>`;
 }
 
@@ -284,8 +293,31 @@ async function home(ctx: Ctx): Promise<Reply> {
   });
   const invites = counts?.invites ?? 0;
   const full = planFull(plan);
-  const mine = vaults.filter((v) => v.mine);
-  const shared = vaults.filter((v) => !v.mine);
+  // Past six vaults (an alpha host is in one per tester) the cards get a
+  // filter by name and a sort; both are GET parameters, so a filtered Home
+  // is a link, and the cards and the query stay the same.
+  const filterable = vaults.length > HOME_FILTER_FROM;
+  const words = filterable ? (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 100) : "";
+  const sort = filterable ? (HOME_SORTS.find((x) => x.key === ctx.url.searchParams.get("sort")) ?? HOME_SORTS[0]) : HOME_SORTS[0];
+  const shown = vaults
+    .filter((v) => !words || v.name.toLocaleLowerCase().includes(words.toLocaleLowerCase()))
+    .sort(sort.compare);
+  const mine = shown.filter((v) => v.mine);
+  const shared = shown.filter((v) => !v.mine);
+  const sortHref = (key: string) => `/?${new URLSearchParams({ ...(words ? { q: words } : {}), sort: key })}`;
+  const toolbar = filterable
+    ? html`<div class="home-filter">
+        <form class="home-search" method="get" action="/" role="search">
+          <input type="search" name="q" value="${words}" placeholder="Filter vaults by name" aria-label="Filter vaults by name" maxlength="100">
+          ${sort === HOME_SORTS[0] ? "" : html`<input type="hidden" name="sort" value="${sort.key}">`}
+          <button type="submit" aria-label="Filter">${ICON_SEARCH}</button>
+        </form>
+        <ul class="chips" aria-label="Sort vaults">${HOME_SORTS.map(
+          (x) => html`<li><a class="chip" href="${sortHref(x.key)}"${x === sort ? raw(' aria-current="true"') : ""}>${x.label}</a></li>`,
+        )}</ul>
+        <p class="small muted home-count">${words ? html`${shown.length} of ${vaults.length} vaults match “${words}” · <a href="${sort === HOME_SORTS[0] ? "/" : sortHref(sort.key)}">Clear filter</a>` : html`${vaults.length} vaults`}</p>
+      </div>`
+    : "";
   // One primary per page: New vault. Review, when something waits, sits
   // before it as a secondary button. At the plan's limit New vault is a
   // secondary button: it leads to the page that says why and what to do.
@@ -307,6 +339,8 @@ async function home(ctx: Ctx): Promise<Reply> {
         <ul class="rows">${waiting.map((p) => reviewRow(ctx, p, true))}</ul>
         ${waitingCount > waiting.length ? html`<p class="small"><a href="/inbox">All ${waitingCount} waiting</a></p>` : ""}`
       : ""}
+    ${toolbar}
+    ${words && !shown.length ? emptyState({ title: `No vault matches “${words}”`, body: "Check the spelling, or clear the filter to see every vault.", action: html`<a class="button" href="/">Clear filter</a>` }) : ""}
     <h2>Your vaults</h2>
     <p class="meta plan-line"><span>${ownedLine(plan)}${full ? html` <span class="badge warning">At the limit</span>` : ""}</span><span><a href="/account">Plan and usage</a></span></p>
     ${vaults.length === 0
@@ -320,7 +354,9 @@ async function home(ctx: Ctx): Promise<Reply> {
             invites ? html` You have ${invites === 1 ? "an invite" : `${invites} invites`} waiting: <a href="/inbox#invites">see your inbox</a>. Join or decline ${invites === 1 ? "it" : "them"} there, no link needed.` : ""}</p></div>`
       : mine.length
         ? html`<ul class="card-grid">${mine.map(vaultCard)}</ul>`
-        : html`<p class="muted">You haven’t created a vault yet. The ones below were shared with you.</p>`}
+        : words
+          ? html`<p class="muted">None of yours matches.</p>`
+          : html`<p class="muted">You haven’t created a vault yet. The ones below were shared with you.</p>`}
     ${shared.length ? html`<h2>Shared with you</h2><ul class="card-grid">${shared.map(vaultCard)}</ul>` : ""}`,
     "home",
   );
