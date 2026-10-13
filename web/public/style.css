@@ -582,13 +582,15 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 /* Callouts ------------------------------------------------------------------ */
 
 .callout {
-  display: block; max-width: 62ch; margin: 0 0 var(--space-5);
+  display: block; margin: 0 0 var(--space-5);
   padding: var(--space-4) var(--space-5); border: 1px solid; border-radius: var(--radius-lg);
   font-size: var(--text-sm); line-height: var(--lh-sm);
   background: var(--bg-subtle); border-color: var(--border); color: var(--fg);
 }
 .callout > :last-child { margin-bottom: 0; }
-.callout p { margin: 0 0 var(--space-3); }
+/* A callout spans the content column like the table under it; only its
+   text keeps a reading measure. */
+.callout p { margin: 0 0 var(--space-3); max-width: var(--measure); }
 .callout.info { background: var(--info-bg); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
 .callout.success { background: var(--success-bg); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
 .callout.attention { background: var(--attention-bg); border-color: color-mix(in srgb, var(--attention) 35%, transparent); }
@@ -735,7 +737,17 @@ a.dir { font-weight: 600; }
 }
 .side-title { font-weight: 600; font-size: var(--text-md); color: var(--fg); text-decoration: none; padding: var(--space-2) var(--space-3) 0; overflow-wrap: anywhere; }
 .side-title:hover { color: var(--link); }
-.side-search input { min-height: 32px; font-size: var(--text-sm); padding: 4px 10px; }
+/* The search box carries its own button, so nobody has to know Enter
+   submits it; the button sits inside the field's right edge. */
+.side-search { position: relative; }
+.side-search input { width: 100%; min-height: 32px; font-size: var(--text-sm); padding: 4px 36px 4px 10px; }
+.side-search button {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-sm, 4px);
+  background: transparent; color: var(--fg-muted); cursor: pointer;
+}
+.side-search button:hover { background: var(--bg-muted); color: var(--fg); }
+.side-tree-label { margin: 0 var(--space-3) var(--space-1); }
 /* A group's name is a quiet heading, never a target: small, uppercase,
    no padding box, with a rule above every group after the first, so it
    can't be mistaken for a link. The links are the opposite: an icon, a
@@ -1555,7 +1567,7 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
    bar (not a second heading above the README's own). */
 .readme { margin-top: var(--space-6); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden; }
 .readme-head {
-  margin: 0; padding: var(--space-3) var(--space-5); background: var(--bg-subtle); border-bottom: 1px solid var(--border);
+  margin: 0; max-width: none; padding: var(--space-3) var(--space-5); background: var(--bg-subtle); border-bottom: 1px solid var(--border);
   font: 500 var(--text-sm)/var(--lh-sm) var(--font-mono);
 }
 .readme-head a { color: var(--fg-muted); text-decoration: none; }

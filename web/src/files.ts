@@ -17,6 +17,7 @@ import {
   pageHeader,
   plural,
   policyBadge,
+  ICON_SEARCH,
   raw,
   tabs,
   textareaText,
@@ -142,11 +143,12 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
       <a class="side-title" href="${vaultPath(v.id)}">${v.name}</a>
       <form class="side-search" method="get" action="${vaultPath(v.id, "/search")}" role="search">
         <input type="search" name="q" placeholder="Search this vault" aria-label="Search this vault" value="${current.section === "search" ? ctx.url.searchParams.get("q") ?? "" : ""}">
+        <button type="submit" aria-label="Search">${ICON_SEARCH}</button>
       </form>
       <nav class="side-links" aria-label="Vault">${(["Work", "Setup"] as const).map(
         (g) => html`<span class="side-group">${g}</span>${sections.filter((s) => s.group === g).map(link)}`,
       )}</nav>
-      <nav class="tree" aria-label="Files">${tree}</nav>
+      <nav class="tree" aria-label="Files"><span class="side-group side-tree-label">Files</span>${tree}</nav>
     </aside>
     <div class="vault-tabs">${tabs(
       sections.map((s) => ({ href: s.href, label: s.label, count: s.count, current: isCurrent(s.section) })),
@@ -310,9 +312,10 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
     // The way to connect an agent that doesn't expire. The first-run step
     // below is for a writer of a young vault with nothing connected; an older
     // vault, a vault you were invited to, a viewer, or someone connecting a
-    // second agent had no way in from here. While that step shows, its own
-    // button is right under the header, so this one would be a second.
-    const connect = !dir && !nudge ? html` <a class="button" href="/connect">Connect an agent</a>` : "";
+    // second agent had no way in from here. It stays in the header even
+    // while that step shows (owner, 2026-10-13): the header is where people
+    // look for it, and the step goes once something connects.
+    const connect = !dir ? html` <a class="button" href="/connect">Connect an agent</a>` : "";
     const body = html`
       ${pageHeader({
         crumb: dir ? crumbs(id, v, dir, true) : undefined,
