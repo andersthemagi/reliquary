@@ -2,19 +2,21 @@
 
 What people and their agents changed in a vault, in plain words, and the full log behind it, which nobody can edit or delete.
 
-## Changes
+## Updates
 
-A vault's **Changes** lists what people and their agents did to its content: files written, deleted and erased, and proposals opened, approved, sent back for changes, rejected, revised, edited and commented on. Newest first, under a heading for each day: **Today**, **Yesterday**, then the weekday and date (in UTC, like every time here).
+A vault's **Updates**, in its sidebar, is where you see what happened while you were away. At the top, **New for you** lists your [flags](flags.md#seeing-your-flags): threads for you, proposals waiting on you, events on your own proposals, and changes on paths you watch. The sidebar counts them until you open **Updates**. When nothing is new, it says so in one line.
+
+Below that, the changes feed lists what people and their agents did to the vault's content: files written, deleted and erased, and proposals opened, approved, sent back for changes, rejected, revised, edited and commented on. Newest first, under a heading for each day: **Today**, **Yesterday**, then the weekday and date (in UTC, like every time here).
 
 Each line says who, what and where, and links to the file or the proposal. For example "Ana wrote notes/plan.md", "Ben's agent Hermes on Linux opened a proposal on canon/rules.md" or "You approved the proposal on canon/rules.md". Your own changes say "You" and "Your agent". A file that has been deleted or erased since shows as plain text: there is nothing to open.
 
 When one person, or one agent, writes the same file several times in a row, it is one line: "Ana wrote notes/plan.md 4 times". Another person's change in between, or the day changing, starts a new line. A write that applies an approved proposal is its own line: "Ben wrote canon/rules.md, from an approved proposal".
 
-Three links above the list choose what to show: **Everyone** (the default), **Mine** and **Watching**. **Mine** is what you changed, and what your agents changed for you. **Watching** is what changed on the folders and files you [watch](flags.md#watching-a-path): a folder covers everything under it and a file only itself, the same rule [flags](flags.md) use. It includes changes from before you started watching. Only your own watches count, and nobody else sees which view you chose.
+Three links above the feed choose what to show: **Everyone** (the default), **Mine** and **Watching**. **Mine** is what you changed, and what your agents changed for you. **Watching** is what changed on the folders and files you [watch](flags.md#watching-a-path): a folder covers everything under it and a file only itself, the same rule [flags](flags.md) use. It includes changes from before you started watching. Only your own watches count, and nobody else sees which view you chose.
 
 Pages hold 30 lines. **Older** goes back, and **Newest** returns to the latest, in the view you chose.
 
-Changes leaves out members and invites, rules, variables, links, claims, plan steps and exports: those are in the log below. Opening Changes, in any view, doesn't mark your [flags](flags.md) as shown, or your agents'.
+The feed leaves out members and invites, rules, variables, links, claims, plan steps and exports: those are in the log below. Opening **Updates** marks your flags shown, never your agents'. Only the **Everyone** view's first page shows **New for you**, so **Mine**, **Watching** and older pages leave your flags as they are.
 
 ## What is logged
 

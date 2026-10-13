@@ -1,13 +1,16 @@
-// Changes: what people and their agents did to a vault's content, in plain
-// words, newest first and grouped by day. It is the page a person opens to
-// see what happened while they were away; the full log (members, rules,
-// variables, claims) is the Log tab under Settings, Diagnostics.
+// Updates (at /changes, the address the page always had): what is new for
+// you (flagspage.ts), then what people and their agents did to a vault's
+// content, in plain words, newest first and grouped by day. It is the page a
+// person opens to see what happened while they were away; the full log
+// (members, rules, variables, claims) is the Log tab under Settings,
+// Diagnostics.
 //
-// It reads the same log as Activity (queryActivity), narrowed to the content
-// events (CONTENT_EVENTS, activity.ts), as the signed-in person: the log's
-// RLS policy and the membership join decide what they may see, and nothing
-// here reads `detail`. Opening it changes nothing: it never touches a flag
-// watermark (flags.md), only Flags does.
+// The feed reads the same log as Activity (queryActivity), narrowed to the
+// content events (CONTENT_EVENTS, activity.ts), as the signed-in person: the
+// log's RLS policy and the membership join decide what they may see, and
+// nothing here reads `detail`. Only Everyone's first page shows "New for
+// you", and so only it marks flags shown: a view or an older page is about
+// the feed, and shouldn't use up what the person hasn't seen yet.
 //
 // A run of writes by one actor to one file is one line ("wrote notes/plan.md
 // 4 times"), so an agent saving a file in a loop doesn't bury everything
@@ -18,13 +21,14 @@
 // by them or their agents: the log's actor is the person either way), or the
 // changes on paths the reader watches (watchrule.ts; public.subscriptions
 // under its own RLS, so only their own watches count). Each is the same read
-// with one more condition, and none of them touches a flag watermark.
+// with one more condition.
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { CONTENT_EVENTS, queryActivity, type Row } from "./activity.js";
 import { emptyState, html, pageHeader, raw, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
+import { newForYou } from "./flagspage.js";
 import { filePath, notFound, proposalPath, render, vault, vaultPath, type Ctx, type Reply } from "./pages.js";
 import { personRef } from "./personref.js";
 
@@ -240,7 +244,8 @@ export async function changes(ctx: Ctx, id: string): Promise<Reply> {
         : [],
     );
     const body = html`
-      ${pageHeader({ title: "Changes", description: "What people and their agents changed in this vault, newest first." })}
+      ${pageHeader({ title: "Updates", description: "What’s new for you, then what people and their agents changed in this vault, newest first." })}
+      ${show === "everyone" && !before ? await newForYou(c, ctx, id) : ""}
       ${chips(id, show)}
       ${show === "watching" && lines.length
         ? html`<p class="hint">Changes on the folders and files you watch. <a href="${vaultPath(id, "/config/watching")}">What you watch</a></p>`
@@ -263,5 +268,5 @@ export async function changes(ctx: Ctx, id: string): Promise<Reply> {
     return vaultShell(c, ctx, v, { section: "changes" }, body);
   });
   if (!out) return notFound(ctx);
-  return render(ctx, "Changes", out, "vaults");
+  return render(ctx, "Updates", out, "vaults");
 }

@@ -141,7 +141,7 @@ after(async () => {
 // ---------------------------------------------------------------------------
 // The vault's sections on phones
 
-test("vault tabs: every vault page has the sections as tabs (for phones), the current one marked and the open proposals counted; Flags and Claims are under Settings, not here", async () => {
+test("vault tabs: every vault page has the sections as tabs (for phones), the current one marked and the open proposals counted; Claims and the log are under Settings, not here", async () => {
   const h = await page(`/v/${V.main}`);
   const tabs = /<div class="vault-tabs"><nav class="tabs" aria-label="Vault \(phone\)">([\s\S]*?)<\/nav><\/div>/.exec(h)?.[1];
   assert.ok(tabs, "a tabs row in the vault shell");
@@ -152,12 +152,11 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   assert.match(tabs, new RegExp(`<a href="/v/${V.main}" aria-current="page">Files</a>`));
   assert.match(tabs, /Proposals<span class="count">1<\/span>/);
   const changes = await page(`/v/${V.main}/changes`);
-  assert.match(changes, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/changes" aria-current="page">Changes</a>`), "Changes is marked on its page");
+  assert.match(changes, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/changes" aria-current="page">Updates</a>`), "Updates is marked on its page");
   assert.doesNotMatch(/<nav class="side-links" aria-label="Vault">[\s\S]*?<\/nav>/.exec(changes)[0], /Activity|\/activity/, "the full log is under Diagnostics, not in the sidebar");
   const rules = await page(`/v/${V.main}/rules`);
   assert.match(rules, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/config" aria-current="page">Settings</a>`), "Rules is under Settings");
   // Claims and the log moved under Settings, Diagnostics: they and the landing page mark Settings.
-  // (Flags is not opened here: opening it marks this person's flags shown; flags_page.test.mjs covers it.)
   for (const rest of ["/diagnostics", "/claims", "/activity"]) {
     const d = await page(`/v/${V.main}${rest}`);
     assert.match(d, new RegExp(`aria-label="Vault \\(phone\\)">[\\s\\S]*?<a href="/v/${V.main}/config" aria-current="page">Settings</a>`), `${rest} is under Settings`);
@@ -165,12 +164,12 @@ test("vault tabs: every vault page has the sections as tabs (for phones), the cu
   }
 });
 
-test("vault sidebar: the sections are grouped, each with an icon, Work (Files, Proposals, Threads, Tasks, Changes) before Setup (Variables, Links, Settings)", async () => {
+test("vault sidebar: the sections are grouped, each with an icon, Work (Files, Proposals, Threads, Tasks, Updates) before Setup (Variables, Links, Settings)", async () => {
   const side = /<nav class="side-links" aria-label="Vault">([\s\S]*?)<\/nav>/.exec(await page(`/v/${V.main}`))?.[1];
   assert.ok(side, "a sidebar in the vault shell");
   const order = [...side.matchAll(/<span class="side-group">(\w+)<\/span>|<span class="side-label">(\w+)<\/span>/g)].map((m) => m[1] ? `[${m[1]}]` : m[2]);
   assert.equal((side.match(/<a [^>]*><svg class="icon"[^>]*aria-hidden="true"/g) ?? []).length, 8, "every section has an icon, hidden from screen readers");
-  assert.deepEqual(order, ["[Work]", "Files", "Proposals", "Threads", "Tasks", "Changes", "[Setup]", "Variables", "Links", "Settings"]);
+  assert.deepEqual(order, ["[Work]", "Files", "Proposals", "Threads", "Tasks", "Updates", "[Setup]", "Variables", "Links", "Settings"]);
 });
 
 test("vault tabs: the phone's Browse files holds only the folder tree, not the sections", async () => {

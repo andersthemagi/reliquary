@@ -15,7 +15,6 @@ import type pg from "pg";
 import { asPerson } from "./db.js";
 import { changesPath } from "./changes.js";
 import { csrfField, emptyState, html, time, type Raw } from "./html.js";
-import { flagsPath } from "./flagspage.js";
 import { Refusal } from "./failure.js";
 import { vaultShell } from "./files.js";
 import { filePath, message, notFound, render, treePath, UUID, vault, vaultPath, type Ctx, type Reply } from "./pages.js";
@@ -122,7 +121,7 @@ async function watchingPage(ctx: Ctx, id: string, form?: WatchForm): Promise<Rep
       </form>`;
     // A refused form goes first, so its reason is on the first screen.
     const body = settingsPage(id, v, "watching", {
-        description: html`Folders and files you watch in ${v.name}. Changes there are flagged to you and to your agents. You see them in <a href="${flagsPath(id)}">Flags</a> (under Diagnostics) and in <a href="${changesPath(id, "watching")}">Changes, Watching</a>; your agents ask for theirs with <code>list_flags</code>. Only you see this list.`,
+        description: html`Folders and files you watch in ${v.name}. Changes there are flagged to you and to your agents. You see them in <a href="${changesPath(id)}">Updates</a>, under New for you, and in <a href="${changesPath(id, "watching")}">Updates, Watching</a>; your agents ask for theirs with <code>list_flags</code>. Only you see this list.`,
         primary: form || !list.length ? "" : html`<a class="button primary" href="#watch-path">Watch a path</a>`,
       }, html`
       ${form ? addForm : ""}

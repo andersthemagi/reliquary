@@ -46,9 +46,11 @@ It only reaches an agent that is making calls in that vault. An agent that is id
 
 ## Seeing your flags
 
-In the web app, **Settings**, **Diagnostics**, **Flags** in a vault shows what's waiting on you (a proposal, or a task to review, linked to its plan), badged apart from threads, events on your own proposals and their files, tasks whose context moved, and changes on paths you watch, oldest first. Each links to its thread, proposal or file. Flags are how agents hear about changes, so the page sits under **Diagnostics**: most people never need it.
+In the web app, a vault's sidebar shows **Updates** with a count of the flags waiting for you (up to **20+**). Open it, and **New for you**, at the top, lists them oldest first, one line each: a badge for why (**Thread**, **Waiting on you** (a proposal, or a task to review, linked to its plan), **Your proposal**, **File changed**, **Context moved** or **Watching**), what happened, linked to its thread or proposal, then where, who and when. Below it is the vault's [Changes feed](activity.md#updates).
 
-Opening the page marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`: the next visit shows only what's new since, and when there's nothing it says so and points to **Proposals**, where what still waits on you is counted. If more than 200 flags are waiting, the page shows the oldest 200: reload for the next batch. This is your own place in the vault, separate from any of your agent connections', so looking at this page doesn't clear anything for them, and their calls don't clear anything for you.
+Opening **Updates** marks those flags shown for you, the same as an agent calling `advance_flags` after it shows you `list_flags`, and the count goes. The next visit shows only what's new since, and when there's nothing it says so in one line and points to **Proposals**, where what still waits on you is counted. If more than 200 flags are waiting, it shows the oldest 200: reload for the next batch. Only the **Everyone** view's first page shows **New for you**: **Mine**, **Watching** and older pages leave your flags as they are. This is your own place in the vault, separate from any of your agent connections', so opening **Updates** doesn't clear anything for them, and their calls don't clear anything for you.
+
+The old address of the Flags page, `/v/<vault>/flags`, now opens **Updates**.
 
 ## Watching a path
 
@@ -56,9 +58,9 @@ Any member of a vault, owner, editor or viewer, can watch its folders and files.
 
 To watch a folder or a file, open it and choose **Watch** at the top of its page. The page then says **Watching**, with **Unwatch** to stop. A file inside a folder you watch says **Watching via** that folder, since the folder's watch already covers it. The vault's top folder has no **Watch**: watch the folders in it instead.
 
-Changes on what you watch are flagged to you and to your agents. You see yours in **Settings**, **Diagnostics**, **Flags** (badged **Watching**) and in **Changes**, **Watching**; your agents ask for theirs with `list_flags`.
+Changes on what you watch are flagged to you and to your agents. You see yours in **Updates**, under **New for you** (badged **Watching**), and in its **Watching** view; your agents ask for theirs with `list_flags`.
 
-Everything you watch in a vault is on its **Settings**, **Watching** page (under **You** in the Settings menu), each with **Unwatch**. The vault's [Changes](activity.md#changes) has a **Watching** view of what changed on those paths, including changes from before you started watching; flags only count from the moment you ask. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. Until something is, the list shows that path as plain text, marked "nothing there yet", because there is no page to open. A folder ends in `/` and covers everything in it; a file covers only itself.
+Everything you watch in a vault is on its **Settings**, **Watching** page (under **You** in the Settings menu), each with **Unwatch**. The vault's [Updates](activity.md#updates) has a **Watching** view of what changed on those paths, including changes from before you started watching; flags only count from the moment you ask. You can also type a path there to watch it, like `clients/` or `notes/plan.md`, even before anything is written there. Until something is, the list shows that path as plain text, marked "nothing there yet", because there is no page to open. A folder ends in `/` and covers everything in it; a file covers only itself.
 
 At 100 paths in a vault, watching another is refused, and the page says so: stop watching one first. A path the vault won't take is refused the same way, in the **Watch a folder or file** form with the reason, and what you typed stays in it to correct.
 

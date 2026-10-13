@@ -1,31 +1,26 @@
-// A vault's Flags page (docs/design.md, "Notifications"; docs/public/concepts/flags.md):
-// what changed since you were last told, for the person signed in to the
-// web app. Agents have had this over MCP since 20260928 (list_flags,
-// advance_flags); this is the same data, for the person themselves, who has
-// no other way to see it (the Inbox only ever shows category 3, waiting on
-// you, account-wide; this also shows your own proposals' events and your
-// watched paths, per vault, since list_flags is vault-scoped).
+// "New for you" on a vault's Updates page (docs/design.md, "Notifications";
+// docs/public/concepts/flags.md): what changed since the person signed in to
+// the web app was last told. Agents have had this over MCP since 20260928
+// (list_flags, advance_flags); this is the same data, for the person
+// themselves, who has no other way to see it (the Inbox only ever shows
+// category 3, waiting on you, account-wide; this also shows your own
+// proposals' events and your watched paths, per vault, since list_flags is
+// vault-scoped).
 //
-// Read-only: there is nothing to act on here except open the proposal or
-// file a flag names. Loading the page marks it shown for the person's own
-// watermark (advance_flags, in the same request, only once list_flags has
-// returned), same contract as design.md's "advances the moment a flag is
-// actually shown in a response, not on request": rendering this page is that
-// response. This never touches an agent connection's own watermark, so
-// looking at this page doesn't silence anything for your agents, and their
-// list_flags doesn't silence this page either.
+// Showing it marks it shown for the person's own watermark (advance_flags,
+// in the same request, only once list_flags has returned), same contract as
+// design.md's "advances the moment a flag is actually shown in a response,
+// not on request": rendering the section is that response. This never
+// touches an agent connection's own watermark, so looking at it doesn't
+// silence anything for your agents, and their list_flags doesn't silence
+// this either.
 
 import type pg from "pg";
-import { asPerson } from "./db.js";
 import { describe } from "./activity.js";
-import { emptyState, html, time, type Raw } from "./html.js";
-import { diagnosticsFrame, diagSection } from "./diagnostics.js";
-import { vaultShell } from "./files.js";
+import { html, time, type Raw } from "./html.js";
 import { planPath } from "./tasks.js";
 import { threadPath } from "./threadrefs.js";
-import { filePath, notFound, proposalPath, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
-
-export const flagsPath = (id: string) => vaultPath(id, "/flags");
+import { filePath, proposalPath, vaultPath, who, type Ctx } from "./pages.js";
 
 type Flag = {
   seq: string;
@@ -45,9 +40,9 @@ type Flag = {
   step_title: string | null;
 };
 
-// The widest page list_flags takes, so "loading the page" and "marking it
+// The widest page list_flags takes, so "showing them" and "marking them
 // shown" cover the same flags: a second page would need its own watermark
-// step, which this first pass doesn't offer.
+// step, which this doesn't offer.
 const LIMIT = 200;
 
 function categoryBadge(f: Pick<Flag, "category" | "reason">): Raw {
@@ -59,57 +54,39 @@ function categoryBadge(f: Pick<Flag, "category" | "reason">): Raw {
   return html`<span class="badge info">Watching</span>`;
 }
 
-function flagsTable(ctx: Ctx, id: string, rows: Flag[]): Raw {
-  return html`<div class="table-wrap activity-wrap"><table class="activity">
-    <thead><tr><th>When</th><th>Why</th><th>What</th><th>Where</th><th>By</th></tr></thead>
-    <tbody>${rows.map((f) => {
-      const what = describe(ctx.userId, { event: f.event });
-      const whatCell = f.reason === "step_review" && f.plan
-        ? html`<a href="${planPath(id, f.plan)}">Task “${f.step_title}” awaits your review</a>`
-        : f.proposal_id
-        ? html`<a href="${proposalPath(id, f.proposal_id)}">${what}</a>`
-        : f.thread_id
-          ? html`<a href="${threadPath(id, f.thread_id)}${f.message_id === null ? "" : `#message-${f.message_id}`}">${what}</a>`
-          : what;
-      const whereCell = f.path
-        ? f.event === "file.write"
-          ? html`<a href="${filePath(id, f.path)}">${f.path}</a>`
-          : html`${f.path}`
-        : "";
-      return html`<tr class="ev"><td class="small nowrap ev-when">${time(f.at)}</td>
-        <td class="small">${categoryBadge(f)}</td>
-        <td class="small ev-what">${whatCell}</td>
-        <td class="path-cell">${whereCell}${f.watching && f.watching !== f.path ? html`<span class="token-client">via ${f.watching}</span>` : ""}${
-          f.reason === "cite_moved" && f.plan ? html`<span class="token-client">cited in <a href="${planPath(id, f.plan)}">${f.plan}</a></span>` : ""}</td>
-        <td class="small">${who(ctx, f.actor, f.agent)}</td></tr>`;
-    })}</tbody></table></div>`;
+// One row per flag, in the changes feed's row shape: why and what, then
+// where, who and when as one meta line.
+function flagRows(ctx: Ctx, id: string, rows: Flag[]): Raw {
+  return html`<ul class="rows feed">${rows.map((f) => {
+    const what = describe(ctx.userId, { event: f.event });
+    const whatLink = f.reason === "step_review" && f.plan
+      ? html`<a href="${planPath(id, f.plan)}">Task “${f.step_title}” awaits your review</a>`
+      : f.proposal_id
+      ? html`<a href="${proposalPath(id, f.proposal_id)}">${what}</a>`
+      : f.thread_id
+        ? html`<a href="${threadPath(id, f.thread_id)}${f.message_id === null ? "" : `#message-${f.message_id}`}">${what}</a>`
+        : what;
+    const where = f.path
+      ? html`<span>${f.event === "file.write" ? html`<a href="${filePath(id, f.path)}">${f.path}</a>` : f.path}${
+          f.watching && f.watching !== f.path ? ` via ${f.watching}` : ""
+        }</span>`
+      : "";
+    const cited = f.reason === "cite_moved" && f.plan ? html`<span>cited in <a href="${planPath(id, f.plan)}">${f.plan}</a></span>` : "";
+    return html`<li class="flag"><span class="change-what">${categoryBadge(f)} ${whatLink}</span><span class="meta">${where}${cited}<span>${who(ctx, f.actor, f.agent)}</span><span>${time(f.at)}</span></span></li>`;
+  })}</ul>`;
 }
 
-export async function flags(ctx: Ctx, id: string): Promise<Reply> {
-  const out = await asPerson(ctx.userId, async (c) => {
-    const v = await vault(c, ctx, id);
-    if (!v) return null;
-    const { rows } = await c.query(`select public.list_flags($1, $2) as r`, [id, LIMIT]);
-    const r = rows[0].r as { watermark: number; through: number; more: boolean; flags: Flag[] };
-    // Marks these shown for the person, once list_flags has actually
-    // returned: a failed query above never reaches here, so it loses
-    // nothing (design.md, "A separate watermark").
-    await c.query(`select public.advance_flags($1, $2)`, [id, r.through]);
-    const body = html`
-      ${diagSection("Flags", html`What’s changed in ${v.name} since you were last told: threads for you, a proposal or a task waiting on you, your own proposals, paths you watch, and files cited by tasks of yours.`)}
-      ${r.flags.length
-        ? flagsTable(ctx, id, r.flags)
-        : emptyState({
-            title: "Nothing new",
-            // Opening this page marks what it shows as seen, so an empty list
-            // means nothing new, not nothing waiting: a proposal can still be
-            // waiting on the person, and Proposals is where it is counted.
-            body: html`Nothing has changed since you last looked. Proposals still waiting on you are in <a href="${vaultPath(id, "/proposals")}">Proposals</a>.`,
-          })}
-      ${r.more ? html`<p class="hint">More than ${LIMIT} flags were waiting; the oldest are shown first. Reload for the next batch.</p>` : ""}
-      <p class="hint">Your agents see the same flags over MCP (<code>list_flags</code>), kept separately from yours: opening this page doesn’t mark theirs shown, and their calls don’t mark yours. <a href="/docs/concepts/flags">About flags</a> · <a href="${vaultPath(id, "/config/watching")}">What you watch</a></p>`;
-    return vaultShell(c, ctx, v, { section: "diagnostics" }, diagnosticsFrame(id, v, "flags", body));
-  });
-  if (!out) return notFound(ctx);
-  return render(ctx, "Flags", out, "vaults");
+export async function newForYou(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Raw> {
+  const { rows } = await c.query(`select public.list_flags($1, $2) as r`, [id, LIMIT]);
+  const r = rows[0].r as { watermark: number; through: number; more: boolean; flags: Flag[] };
+  // A failed query above never reaches here, so it loses nothing (design.md,
+  // "A separate watermark").
+  await c.query(`select public.advance_flags($1, $2)`, [id, r.through]);
+  return html`<section class="new-for-you" aria-labelledby="new-for-you"><h2 id="new-for-you">New for you</h2>
+    ${r.flags.length
+      ? flagRows(ctx, id, r.flags)
+      : // Showing marks them seen, so empty means nothing new, not nothing
+        // waiting: a proposal can still wait on the person, counted in Proposals.
+        html`<p class="muted">Nothing new since you last looked. Proposals still waiting on you are in <a href="${vaultPath(id, "/proposals")}">Proposals</a>.</p>`}
+    ${r.more ? html`<p class="hint">More than ${LIMIT} flags were waiting; the oldest are shown first. Reload for the next batch.</p>` : ""}</section>`;
 }

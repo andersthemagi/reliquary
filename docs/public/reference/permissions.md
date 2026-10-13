@@ -23,7 +23,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | Approve, request changes, reject | the proposal's page | none | person, owners and editors |
 | Edit, then approve | the proposal's page | none | person, owners and editors |
 | Snooze or unsnooze in the Inbox | the proposal's page or row | none | person |
-| Follow changes | **Changes**, the **Log** (under **Diagnostics**), **Activity**, a file's **History** | `changes_since` | both |
+| Follow changes | **Updates**, the **Log** (under **Diagnostics**), **Activity**, a file's **History** | `changes_since` | both |
 | Claim a path, renew or release your own [claim](../concepts/claims.md) | none | `claim_path`, `renew_claim`, `release_claim` | agent, owners and editors (whoever could write the path) |
 | See a vault's active claims | **Settings**, **Diagnostics**, **Claims** | `list_claims` | both |
 | Break someone else's claim | **Diagnostics**, **Claims**, **Break** | none | person, owners and editors |
@@ -49,8 +49,8 @@ What people and their agents can each do, where, and who may: every rule here is
 
 | Action | Web app | MCP tool | Who may |
 |---|---|---|---|
-| See what is [flagged](../concepts/flags.md) for you | **Settings**, **Diagnostics**, **Flags** | `list_flags` | both, your own only |
-| Mark flags shown | opening the **Flags** page | `advance_flags` | both, your own only; you and each connection keep separate places |
+| See what is [flagged](../concepts/flags.md) for you | **Updates**, **New for you** | `list_flags` | both, your own only |
+| Mark flags shown | opening a vault's **Updates** | `advance_flags` | both, your own only; you and each connection keep separate places |
 
 ## Vault settings, members and access
 

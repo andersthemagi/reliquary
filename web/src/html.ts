@@ -460,7 +460,7 @@ export function crumb(parts: CrumbPart[]): Raw {
 
 // Links styled as tabs, flush under a page header: the current one marked
 // with aria-current, an optional count in a pill.
-export type Tab = { href: string; label: string; count?: number; current?: boolean };
+export type Tab = { href: string; label: string; count?: number | string; current?: boolean };
 export function tabs(list: Tab[], label = "Sections"): Raw {
   if (!list.length) return raw("");
   return html`<nav class="tabs" aria-label="${label}">${list.map(
