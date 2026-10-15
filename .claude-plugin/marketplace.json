@@ -1,0 +1,13 @@
+{
+  "name": "reliquary",
+  "owner": { "name": "Red Mage", "url": "https://reliquary.redmage.cc" },
+  "metadata": { "description": "The Reliquary plugin for Claude Code." },
+  "plugins": [
+    {
+      "name": "reliquary",
+      "source": "./plugins/reliquary",
+      "description": "Connect Claude Code to Reliquary, the shared vault of context for people and their agents.",
+      "category": "productivity"
+    }
+  ]
+}

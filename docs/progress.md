@@ -95,6 +95,17 @@ only bots fill; no CAPTCHA. The owner switches it on after the release
 deploys, once the email limits cover the pace (`docs/ops/runbook.md`,
 "Plans and testers").
 
+### 2026-10-15: the Claude Code plugin
+
+Owner's decision, 2026-10-15 (#243, part of #235): build the Claude Code
+plugin now, ahead of milestone 3, and ship it in today's release. It is
+the connector plus a skill for working in a vault, and two hooks that act
+only in a project whose `.reliquary.json` names a vault: a brief when a
+session starts (the agent calls `list_flags` and `my_places`) and a
+reminder after `git push` to propose an update. No server code: the hooks
+point the agent at tools that already exist. Codex and Cursor packaging is
+left for a follow-up, since their sign-in paths aren't checked.
+
 ## Milestone 1: core, MCP and UI
 
 Vaults, files with canon/open policies, proposals with quorum, log, gate,
