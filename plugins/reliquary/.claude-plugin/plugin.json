@@ -1,0 +1,8 @@
+{
+  "name": "reliquary",
+  "description": "Connect Claude Code to Reliquary: the MCP connection, a skill for working in a vault, and a brief of what changed when a session starts in a project linked to a vault.",
+  "author": { "name": "Red Mage", "url": "https://reliquary.redmage.cc" },
+  "homepage": "https://reliquary.redmage.cc/docs/how-to/connect-claude-code",
+  "repository": "https://github.com/andersthemagi/reliquary",
+  "license": "SEE LICENSE IN LICENSE.md"
+}
