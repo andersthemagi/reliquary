@@ -13,7 +13,7 @@ Either way it is called an import: one you pasted, or one from the CLI.
 | Waits | for 30 minutes, seen only by you | for 24 hours, on the Variables page's **Imports** tab and in the Inbox |
 | Applied by | you, from its preview | an owner or editor, from the Imports tab or the Inbox |
 
-Either way the values are encrypted on arrival and held on the server. The review page names each variable, says whether it is **New** or **Replaces a value**, and lists the lines that weren't taken and why. It never shows a value. **Apply** and **Reject** (**Discard** for one you pasted) are at the top of the page: **Apply** sets them all, each logged; **Reject** or **Discard** drops them.
+Either way the values are encrypted on arrival and held on the server. The review page names each variable, says whether it is **New** or **Replaces a value**, and lists the lines that weren't taken and why. It never shows a value. **Apply: set N variables** (N is the count) and **Reject** (**Discard** for one you pasted) are at the top of the page. Applying sets them all, each logged; rejecting or discarding drops them.
 
 ## Why an import from the CLI needs a person
 

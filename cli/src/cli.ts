@@ -32,7 +32,7 @@ const HELP = `reliquary: a vault's environment variables on this computer
 Usage:
   reliquary login [--no-browser]        connect the Reliquary CLI to your account
   reliquary logout                      revoke this connection and forget it
-  reliquary vaults                      the vaults and environments you can read
+  reliquary vaults [--json]             the vaults and environments you can read
   reliquary run [--vault V] [--env E] -- <command> [args...]
                                         run a command with the variables in its environment
   reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]
@@ -54,6 +54,7 @@ Options:
   --timeout <t>    env push --wait: how long, like 90s, 15m or 2h (default 15m)
   --outside-repo   env pull: allow a file outside any git repository
   --no-browser     login: print the link without opening a browser
+  --json           vaults: print them as JSON, for scripts
   -h, --help       this help
   -v, --version    the version
 
@@ -88,15 +89,56 @@ function parse(tokens: string[], spec: Spec, stopAtCommand = false): Parsed {
         if (v === undefined || v === "") throw new UsageError(`--${name} needs a value.`);
         opts[name] = v;
       } else {
-        throw new UsageError(`Unknown option ${t.slice(0, eq === -1 ? undefined : eq)}. See \`reliquary --help\`.`);
+        throw unknownOption(t.slice(0, eq === -1 ? undefined : eq), spec);
       }
       continue;
     }
-    if (t.startsWith("-") && t !== "-") throw new UsageError(`Unknown option ${t}. See \`reliquary --help\`.`);
+    if (t.startsWith("-") && t !== "-") throw unknownOption(t, spec);
     if (stopAtCommand) return { opts, positionals, rest: tokens.slice(i) };
     positionals.push(t);
   }
   return { opts, positionals, rest: null };
+}
+
+// Levenshtein distance, for "did you mean" hints on a mistyped command or
+// option.
+function distance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length];
+}
+
+// The candidate nearest to `word`, if it is within two edits.
+function closest(word: string, candidates: string[]): string | undefined {
+  let best: string | undefined;
+  let bestD = 3;
+  for (const c of candidates) {
+    const d = distance(word.toLowerCase(), c);
+    if (d < bestD) [best, bestD] = [c, d];
+  }
+  return best;
+}
+
+// Only this command's options are suggested. `--environment` is the key's
+// name in .reliquary.json, a natural guess that edit distance won't reach.
+function unknownOption(option: string, spec: Spec): UsageError {
+  const name = option.replace(/^-+/, "");
+  const names = [...spec.values, ...spec.flags];
+  const near = name === "environment" && names.includes("env") ? "env" : closest(name, names);
+  return new UsageError(`Unknown option ${option}.${near ? ` Did you mean --${near}?` : ""} See \`reliquary --help\`.`);
+}
+
+const COMMANDS = ["help", "version", "login", "logout", "vaults", "run", "env"];
+
+function unknownCommand(command: string): UsageError {
+  // `pull` and `push` live under `env`; someone who left it out is close.
+  if (command === "pull" || command === "push") return new UsageError(`Unknown command "${command}". Did you mean \`reliquary env ${command}\`?`);
+  const near = closest(command, COMMANDS);
+  return new UsageError(`Unknown command "${command}".${near ? ` Did you mean "${near}"?` : ""} See \`reliquary --help\`.`);
 }
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
@@ -161,11 +203,16 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case "vaults": {
-      const { opts, positionals } = parse(args, { values: ["server"], flags: [] });
+      const { opts, positionals } = parse(args, { values: ["server"], flags: ["json"] });
       if (opts.help) return help();
       if (positionals.length) throw new UsageError("vaults takes no arguments.");
       const server = await discover(serverOrigin(val(opts, "server"), project()));
       const vaults = await listVaults(server);
+      // Ids, names, roles and environment names only: no value is in a Vault.
+      if (opts.json) {
+        process.stdout.write(`${JSON.stringify({ vaults })}\n`);
+        return 0;
+      }
       if (!vaults.length) say("This connection reaches no vaults.");
       for (const v of vaults) process.stdout.write(`${v.id}  ${describe(v)}\n`);
       return 0;
@@ -207,7 +254,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     default:
-      throw new UsageError(`Unknown command "${command}". See \`reliquary --help\`.`);
+      throw unknownCommand(command);
   }
 }
 

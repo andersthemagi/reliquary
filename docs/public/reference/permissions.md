@@ -11,6 +11,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | List vaults | Home | `list_vaults` | both |
 | Create a vault | Home, **New vault** | `create_vault` | both, once the account is [admitted](../concepts/plans-and-limits.md#who-can-create-vaults); an agent needs a read-write connection to all its person's vaults |
 | List, read and search files | a vault's pages, its **Search**, the top bar's search (every vault at once) | `list_files`, `read_file`, `search` | both |
+| See which files refer to a file | the file's page, **References** and **Referenced by** | `related_files` | both |
 | Write or delete an open file | the file's **Edit** page; the file's **More**, **Delete file** | `write_file`, `delete_file` | both, owners and editors |
 | Propose a write or a delete | the file's **Propose a change**, or **More**, **Propose deleting**; **New file** in a canon folder | `propose` | both, owners and editors |
 | Propose a stale proposal again | **Propose again** | `propose` with the same text | both |

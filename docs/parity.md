@@ -61,6 +61,7 @@ and, for the agent, its token's vaults and access.
 | List files | `/v/:v`, `/v/:v/tree?path=` | `list_files` | both | |
 | Read a file | `/v/:v/file?path=` | `read_file` | both | |
 | Search a vault | `/v/:v/search?q=` | `search` | both | |
+| See which files refer to a file | `/v/:v/file?path=` (References and Referenced by) | `related_files` | both | One reader-gated query, `public.related_files` (`20261017100000_file_references.sql`) |
 | Search every vault you're in at once | `/search?q=` (the top bar) | none; `search` takes one vault, and `list_vaults` names them | person | **Gap**, left on purpose: an agent calls `search` per vault; the web page runs the same `public.search` per vault in one query |
 | Write an open file | `/v/:v/new`, `/v/:v/edit`, POST `/v/:v/file` (`write`, `create`) | `write_file` | both | Both can compare-and-swap against `expected_version` (`20260930100000_compare_and_swap.sql`): the web editor sends the version it loaded every time and shows a conflict page on a mismatch (`web/src/files.ts`); an agent must read `read_file`'s `version:` line and pass it back itself, or write with none and risk overwriting |
 | Delete an open file | `/v/:v/edit` (Delete this file), POST `/v/:v/file` (`delete`) | `delete_file` | both | Same `expected_version` guard as the write above, but only over MCP so far: the web app's plain Delete confirm page doesn't carry a version yet |

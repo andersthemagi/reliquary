@@ -674,6 +674,9 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--fg); width: 16
 .results li { display: block; }
 .rows + p { margin-top: var(--space-4); }
 .results .snippet { display: block; color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--lh-sm); margin-top: var(--space-2); max-width: var(--measure); }
+.results .snippet-line { display: block; overflow-wrap: anywhere; }
+.results .line-no { font-family: var(--font-mono); font-size: 0.92em; }
+.results mark { background: none; color: var(--fg); font-weight: 600; }
 .results .badge { margin-left: var(--space-2); }
 
 /* Positioned, so the visually hidden "Actions" header (position: absolute) is
@@ -1642,6 +1645,10 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .folder-list td:nth-child(2) { width: 1%; white-space: nowrap; }
 /* A folder's README, boxed under the list with its file name as the header
    bar (not a second heading above the README's own). */
+.file-references { margin-top: var(--space-6); }
+.references { list-style: none; padding: 0; margin: 0 0 var(--space-4); }
+.references li { padding: var(--space-1) 0; overflow-wrap: anywhere; }
+.references .meta { display: inline; }
 .readme { margin-top: var(--space-6); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden; }
 .readme-head {
   margin: 0; max-width: none; padding: var(--space-3) var(--space-5); background: var(--bg-subtle); border-bottom: 1px solid var(--border);

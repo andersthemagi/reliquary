@@ -533,6 +533,15 @@ test("variables log: the access log pages 50 at a time, newest first", async () 
   assert.match(o, /Newest<\/a>/);
 });
 
+test("variables log: each empty access log says why and what to do: clear the filters, back to the newest, or what will show here", async () => {
+  const f = await page(vp(V.own, "/log?name=NOPE_NONE"));
+  assert.match(f, new RegExp(`<div class="empty"><strong>Nothing matches these filters\\.</strong><p>No entry matches all of them\\. Change a filter above, or clear them all\\.</p><p class="empty-action"><a class="button" href="/v/${V.own}/variables/log">Clear filters</a>`));
+  const o = await page(vp(V.own, "/log?name=API_KEY&before=1"));
+  assert.match(o, /<strong>No older entries\.<\/strong><p>This is where the access log begins for these filters\.<\/p><p class="empty-action"><a class="button" href="[^"]*\/log\?name=API_KEY">Back to the newest<\/a>/);
+  const n = await page(vp(V.empty, "/log"));
+  assert.match(n, /<strong>Nothing has been set, read or revealed yet\.<\/strong><p>Each time someone or their agent sets, reads, reveals or is refused a variable here, it shows with who, when and which names, newest first\. Values never show\.<\/p>/);
+});
+
 // ---------------------------------------------------------------------------
 // Empty vault, no key, Connect
 

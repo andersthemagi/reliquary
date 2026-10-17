@@ -2,7 +2,7 @@
 
 A link is a vault's credential to another remote MCP server, like Stripe, Linear or Supabase, so a team can share a platform account with their agents without sharing the key.
 
-A vault's owner adds, edits and deletes links from its **Links** page in the web app: the page lists the vault's links, **Add link** at the top opens the form, and each row's menu has **Edit**, **Grants** and **Delete**. An agent can list them (name and url, never the credential) with `list_links`. Adding a link also discovers its tools, from the upstream server's own tool list; an owner grants them per role from the link's **Grants** page; and a granted tool is callable, as its own MCP tool.
+A vault's owner adds, edits and deletes links from its **Links** page in the web app: the page lists the vault's links, **Add link** at the top opens the form, and each row's menu has **Edit**, **Grants** and **Delete**. An agent can list them (name and url, never the credential) with `list_links`. Adding a link also discovers its tools, from the upstream server's own tool list; an owner grants them per role from the link's **Grants** page; and a granted tool is callable, as its own MCP tool. Step by step: [Add a link](../how-to/add-a-link.md).
 
 ## What a link holds
 

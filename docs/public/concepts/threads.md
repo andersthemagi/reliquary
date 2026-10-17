@@ -54,7 +54,7 @@ A file's page says how many threads are about it, in a line like **2 threads abo
 
 Select a thread to read it. Its messages come oldest first, each with who wrote it, through which agent if one acted for them, and when. A message is shown as plain text exactly as it was typed. Nothing in it is rendered, so markup or a link in a message is only characters.
 
-Owners and editors post from the box at the bottom, and resolve or reopen the thread with the button at the top. Viewers read, and see a note where the box would be. The box says what to expect: an agent that is idle sees a new message on its next tool call, not instantly, and a secret belongs in a variable, never in a thread.
+Owners and editors write in the box under **Reply** at the end of the thread and choose **Post message**; the **Reply** button at the top jumps there. They close the thread with **Resolve thread** and open it again with **Reopen thread**. Viewers read, and see a note where the box would be. The box says what to expect: an agent that is idle sees a new message on its next tool call, not instantly, and a secret belongs in a variable, never in a thread.
 
 A resolved thread shows who resolved it and when. It takes no new message until someone reopens it.
 
