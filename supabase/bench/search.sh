@@ -12,6 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/engine.sh
 source ../scripts/lib/engine.sh
 slot=${TEST_SLOT:-32}
 name=reliquary-search-bench-$slot

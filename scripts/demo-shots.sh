@@ -31,8 +31,10 @@ up() {
     "select public.delete_vault(id, name) from public.vaults where name = 'Northwind relaunch';" \
     | "$engine" exec -i $pg psql -U postgres -p 54331 -q -v ON_ERROR_STOP=1 -o /dev/null
   "$engine" exec -i $pg psql -U postgres -p 54331 -v ON_ERROR_STOP=1 -f - < scripts/demo-seed.sql
+  set -a
   # shellcheck disable=SC1090
-  set -a; source "$envfile"; set +a
+  source "$envfile"
+  set +a
   # WEB_NODE_MODULES: a checkout without web/node_modules (a worktree) can
   # borrow another's.
   local mods=()

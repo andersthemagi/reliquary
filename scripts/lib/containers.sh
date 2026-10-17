@@ -11,6 +11,7 @@
 # probe still fails after WAIT_TIMEOUT seconds (default 300, enough for a
 # cold `npm ci`), says what was being waited for and why it stopped, prints
 # the container's last log lines, and exits 1.
+# shellcheck disable=SC2154 # $engine: set by engine.sh, sourced first
 wait_until() {
   local c=$1 what=$2 limit=${WAIT_TIMEOUT:-300} why
   local deadline=$((SECONDS + limit))

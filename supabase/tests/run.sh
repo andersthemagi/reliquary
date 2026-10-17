@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/engine.sh
 source ../scripts/lib/engine.sh
 # TEST_SLOT lets parallel runs (e.g. separate worktrees) avoid each other.
 slot=${TEST_SLOT:-0}

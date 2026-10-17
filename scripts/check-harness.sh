@@ -11,7 +11,7 @@
 # engine.sh: with no usable container engine every script must say what is
 # missing, not run its suites into empty logs.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit
 
 source scripts/lib/engine.sh
 name=reliquary-harness-check-${TEST_SLOT:-0}

@@ -3,7 +3,7 @@
 # spikes were built. About two minutes. The stress and load scripts are separate
 # (see the page that links this directory). Needs scratch-server.sh start first.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit
 H="-h 127.0.0.1 -p 54329 -U postgres"
 fresh() { dropdb $H --if-exists spike 2>/dev/null; createdb $H spike; }
 load()  { for f in "$@"; do psql $H -d spike -X -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1 || { echo "FAILED to load $f"; return 1; }; done; }

@@ -9,6 +9,7 @@ api_base=${NETLIFY_API:-https://api.netlify.com/api/v1}
 
 # netlify_api <method> <path> [json body file]: status code on stdout, body in
 # $tmp/out. The token goes to curl on stdin, never as an argument.
+# shellcheck disable=SC2154 # $tmp is the caller's, as above
 netlify_api() {
   local args=(-sS -o "$tmp/out" -w '%{http_code}' --max-time 30 -X "$1" -H @- -H 'content-type: application/json')
   [ -z "${3:-}" ] || args+=(--data "@$3")

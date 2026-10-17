@@ -11,7 +11,7 @@
 # one-line count. Exits non-zero if the registry check, the harness check or any
 # suite fails.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit
 source scripts/lib/engine.sh
 
 base=${TEST_SLOT:-0}
@@ -66,7 +66,7 @@ status=0
 echo
 echo "== summary ($((SECONDS - start))s)"
 for s in "${suites[@]}"; do
-  read -r code secs <"$logs/$s.status" || { code=1; secs=?; }
+  read -r code secs <"$logs/$s.status" || { code=1; secs='?'; }
   if [ "$code" = 0 ]; then
     printf '  PASS  %-4s %s (%ss)\n' "$s" "$(count "$logs/$s.log")" "$secs"
   else

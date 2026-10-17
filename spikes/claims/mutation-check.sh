@@ -3,7 +3,7 @@
 # broken copy. Every mutant must fail a named assertion; one that passes means a
 # guard nothing tests. About four minutes. Needs scratch-server.sh start first.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit
 H="-h 127.0.0.1 -p 54329 -U postgres"
 caught=0; total=0
 for m in no-hoard-cap no-person-cap no-connection-check public-execute table-grant no-fast-path no-max-hold \
