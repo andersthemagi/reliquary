@@ -160,6 +160,24 @@ test("quick token: Create read and write token makes a read and write one, and V
   assert.equal((await tokenRow("Flow vscode")).access, "write");
 });
 
+test("vscode install link: the VS Code tab and the token's answer each hold vscode: and vscode-insiders: install links whose JSON is the mcp.json server entry, the token read from a prompt, never inline", async () => {
+  const mcpUrl = /http:\/\/127\.0\.0\.1:8787\/mcp/;
+  for (const h of [await page("/connect?client=vscode"), await createdBy({ client: "vscode", name: "Flow vscode link", access: "read" })]) {
+    const link = /<a href="vscode:mcp\/install\?([^"]+)">Add Reliquary to VS Code<\/a>/.exec(h)?.[1];
+    const insiders = /<a href="vscode-insiders:mcp\/install\?([^"]+)">Add Reliquary to VS Code Insiders<\/a>/.exec(h)?.[1];
+    assert.ok(link, "the VS Code link");
+    assert.equal(insiders, link, "Insiders carries the same JSON");
+    const config = JSON.parse(decodeURIComponent(link));
+    assert.equal(config.name, "reliquary");
+    assert.equal(config.type, "http");
+    assert.match(config.url, mcpUrl);
+    assert.deepEqual(config.headers, { Authorization: "Bearer ${input:reliquary-token}" });
+    assert.deepEqual(config.inputs, [{ type: "promptString", id: "reliquary-token", description: "Reliquary access token", password: true }]);
+    assert.doesNotMatch(link, /rlq_[0-9a-f]{64}/, "no token in the link");
+    assert.ok(at(h, 'href="vscode:mcp/install?') < at(h, ".vscode/mcp.json"), "the link comes before the file");
+  }
+});
+
 test("other clients: the answer has a tools/list test that reads the token from the environment, never inline", async () => {
   const h = await createdBy({ client: "other", name: "Flow other", access: "read" });
   const token = /<p class="secret">(rlq_[0-9a-f]{64})<\/p>/.exec(h)[1];

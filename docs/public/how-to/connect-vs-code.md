@@ -5,7 +5,7 @@ VS Code connects with an access token that it asks for once and keeps in its sec
 ## Steps
 
 1. In Reliquary, open **Connect** in the top bar and choose the **VS Code** tab. Name the token after the agent and machine, like `VS Code on my laptop`, then choose **Create read-only token**, or **Create read and write token** if the agent should also write files and propose changes. The token reaches all your vaults and expires in 90 days; for some vaults or another expiry, choose **use the full form**. If you belong to more than one vault, the tab shows **Choose vaults and create a token** instead, which opens the full form, where nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md). The page that follows shows the token once, with the steps below.
-2. In your project, create `.vscode/mcp.json`:
+2. Choose **Add Reliquary to VS Code** on that page (or **Add Reliquary to VS Code Insiders**) and confirm the install when VS Code asks. The link carries the server's address and a prompt for the token, never the token itself. If the link doesn't open, create `.vscode/mcp.json` in your project instead:
 
    ```json
    {
@@ -29,9 +29,9 @@ VS Code connects with an access token that it asks for once and keeps in its sec
    }
    ```
 
-3. Start the server from the file (VS Code shows **Start** above it) and paste the token when asked. Then reload the Connect page: once VS Code has used the token, the page says **Connected** and names it.
+3. If you made the file, start the server from it (VS Code shows **Start** above it). Either way, paste the token when VS Code asks. Then reload the Connect page: once VS Code has used the token, the page says **Connected** and names it.
 
-The file holds no secret, so you can commit it; each person enters their own token.
+Neither the link nor the file holds a secret, so you can commit the file; each person enters their own token.
 
 ## Change or remove it
 
