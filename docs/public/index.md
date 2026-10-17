@@ -17,7 +17,7 @@ Reliquary is in alpha: things change and may break; data is backed up daily. See
 | [Tutorials](tutorials/getting-started.md) | learn by doing, start to finish |
 | Concepts | understand how a part works and why, starting with [vaults](concepts/vaults-and-files.md) |
 | How-to guides | get one job done, like [connecting Cursor](how-to/connect-cursor.md) or [moving a .env into a vault](how-to/move-env-into-vault.md) |
-| Reference | look up exact facts: [MCP tools](reference/mcp-tools.md), [CLI](reference/cli.md), [permissions](reference/permissions.md), [limits](reference/limits.md) |
+| Reference | look up exact facts: [MCP tools](reference/mcp-tools.md), [CLI](reference/cli.md), [permissions](reference/permissions.md), [limits](reference/limits.md), [glossary](reference/glossary.md) |
 
 ## Where things are
 
