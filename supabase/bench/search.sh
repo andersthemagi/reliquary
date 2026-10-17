@@ -25,7 +25,7 @@ source ../scripts/lib/containers.sh
 # Data on tmpfs, as supabase/tests/run.sh: nothing needs to survive. Default
 # settings otherwise (shared_buffers 128MB), near a small hosted instance.
 "$engine" run -d --network none --tmpfs /var/lib/postgresql/data --name "$name" -e POSTGRES_PASSWORD=test \
-  docker.io/library/postgres:17 >/dev/null
+  "$PG_IMAGE" >/dev/null
 wait_until "$name" "Postgres to accept connections" "$engine" exec "$name" pg_isready -h 127.0.0.1 -U postgres -q
 sleep 1
 
