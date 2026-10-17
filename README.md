@@ -52,6 +52,42 @@ flowchart LR
 **◆ Canon:** a person approved it, so every tool treats it as true.
 **◆◆◆ Sealed:** a secret your tools can use and never see.
 
+## Get started in 2 minutes
+
+1. **Sign in** at [app.reliquary.redmage.cc](https://app.reliquary.redmage.cc)
+   with your email; the same step makes the account. Free during the alpha,
+   and new accounts are let in steadily, so you may wait a little before you
+   can create a vault. Or [self-host](docs/public/how-to/self-host.md) with
+   Docker Compose and skip the line.
+2. **Create a vault** (Home, **New vault**) and **connect Claude Code**:
+
+   ```bash
+   claude mcp add --transport http --scope user reliquary https://mcp.reliquary.redmage.cc/mcp
+   ```
+
+   In Claude Code run `/mcp`, choose **reliquary**, then **Authenticate**;
+   your browser opens a consent page, no token to copy. Other clients:
+   [Claude.ai](docs/public/how-to/connect-claude-ai.md),
+   [ChatGPT](docs/public/how-to/connect-chatgpt.md),
+   [Cursor](docs/public/how-to/connect-cursor.md),
+   [VS Code](docs/public/how-to/connect-vs-code.md),
+   [anything else over MCP](docs/public/how-to/connect-other-clients.md).
+3. **Make the first call.** Ask Claude Code:
+
+   ```text
+   Using Reliquary, list my vaults. Then propose a new file notes/hello.md in "My project"
+   that says what this project is, with the reason "first note".
+   ```
+
+   It calls `list_vaults`, then `propose`. Nothing is written yet: open the
+   **Inbox** in the web app and approve it, and the file is canon.
+
+The full walk, with your first secret and `reliquary run`, is
+[Getting started](docs/public/tutorials/getting-started.md) (about 15
+minutes). Already have a `.env` and a `CLAUDE.md`?
+[Move the .env into a vault](docs/public/how-to/move-env-into-vault.md), then
+put `CLAUDE.md` in as canon.
+
 ## Why Reliquary
 
 - **Every AI tool, one vault.** Claude, ChatGPT, Cursor, VS Code and any MCP
@@ -80,27 +116,15 @@ An agent acts as its person, minus a ceiling. Whatever it's told, it can't:
 - **Reveal a secret's value**
 - **Export or delete a vault**
 
-Those need the person, signed in. They are enforced as row-level security in
-Postgres, not in a prompt, and each rule has a hostile test that tries to break
-it on every push. [How security works](docs/public/concepts/security.md).
-
-## The problem, and what Reliquary does about it
-
-| Today | With Reliquary |
-| --- | --- |
-| Every person and every tool has its own AI memory, so three people get three versions of the project. | One vault of approved context that every tool and every person reads, kept current by what agents propose and people approve. |
-| Agents write things nobody checked, and the next agent believes them. | Agents propose. Nothing becomes canon until a person, or a quorum, approves it. |
-| API keys travel by Slack and email and sit in `.env` files any agent can read. | Variables live in the vault. `reliquary run` puts them into one process; no AI tool ever gets a value. |
-| Every AI vendor wants to be the one place your context lives, and your team already uses three of them. | Reliquary holds no model and takes any MCP client. Switch tools whenever you like; the context, the approvals and the log stay, and export as plain markdown. |
+Those need the person, signed in. [How security works](docs/public/concepts/security.md).
 
 ## How it works
 
 **1. Connect any AI tool with one URL.** Paste the MCP URL into Claude,
-ChatGPT, Cursor or VS Code and sign in; no token to copy. In Claude Code:
-
-```bash
-claude mcp add --transport http --scope user reliquary https://mcp.reliquary.redmage.cc/mcp
-```
+ChatGPT, Cursor or VS Code and sign in; no token to copy (the command is
+above). Claude Code can also take the
+[plugin](docs/public/how-to/connect-claude-code.md#with-the-plugin), which
+adds the connection and a skill for working in a vault.
 
 **2. Agents read and propose.** Open folders take notes directly. Canon
 folders change only when a person approves, with a quorum if you want one.
@@ -120,11 +144,13 @@ value.
 
 ```console
 $ npx @reliquary-ai/cli login
-$ reliquary run --vault "My project" --env development -- npm start
+$ npx @reliquary-ai/cli run --vault "My project" --env development -- npm start
 ```
 
-Or `reliquary env pull` writes a gitignored `.env`, and `reliquary env push`
-sends an existing one for approval. [Use the CLI](docs/public/how-to/use-the-cli.md).
+`reliquary env pull` writes a gitignored `.env`, and `reliquary env push`
+sends an existing one for approval. Node 20 or later; `npm install -g
+@reliquary-ai/cli` gives you the bare `reliquary` command.
+[Use the CLI](docs/public/how-to/use-the-cli.md).
 
 **Links** let your agents use another team's MCP tools (a project tracker, a
 support inbox) without handing out the credential: Reliquary holds it and
@@ -141,19 +167,6 @@ proxies only the tools you grant.
 - **Solo builders.** Several tools and machines, one source of truth. Stop
   copying `CLAUDE.md` between tools and leaving `.env` files where any coding
   agent can read them.
-
-## Get started
-
-- **Hosted:** sign up at [reliquary.redmage.cc](https://reliquary.redmage.cc)
-  with your email and create a vault. Free during the alpha; people are let
-  in steadily, so a new account may wait a little before it can create one.
-  Start with [Getting started](docs/public/tutorials/getting-started.md).
-- **Self-hosted:** your own server with Docker Compose and no plan limits.
-  [Self-host Reliquary](docs/public/how-to/self-host.md).
-- **Already have a `.env` and a `CLAUDE.md`?**
-  [Move a .env into a vault](docs/public/how-to/move-env-into-vault.md), then
-  put `CLAUDE.md` in as canon and
-  [point Claude Code at the vault](docs/public/how-to/connect-claude-code.md).
 
 ## Questions
 
