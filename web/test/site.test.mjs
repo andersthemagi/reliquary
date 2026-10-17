@@ -148,7 +148,7 @@ test("site landing: what an agent can't do is the first section, five lines with
   assert.deepEqual(items, ["Approve any change", "Change who approves what", "Add or remove people", "Reveal a secret&#39;s value", "Export or delete a vault"]);
   assert.doesNotMatch(list, /✕|<span class="cant-mark"/);
   assert.match(h, /<p class="p-note">Enforced as row-level security in Postgres, not in a prompt\. Each rule has a test that tries to break it, and they run on every push\. <a href="\/security">How security works<\/a><\/p>/);
-  assert.match(h, /<p class="p-note p-note-who">Built in Barcelona by Andrés of <a href="https:\/\/redmage\.cc">Red Mage<\/a>, out of running one vault per client/);
+  assert.doesNotMatch(h, /p-note-who/, "who builds it is said once, in the closing");
 });
 
 test("site landing: the demo card works without a script: a radio group decides on the proposal, and each state is in the markup", async () => {
@@ -259,7 +259,8 @@ test("site landing: each problem is paired with what Reliquary does about it, on
   const rows = [...ledger.matchAll(/<div><dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd><\/div>/g)];
   assert.equal(rows.length, 4);
   assert.match(rows[3][1], /already uses three of them/);
-  assert.match(rows[3][2], /Built for teams on different systems[\s\S]*export it all as plain markdown/);
+  assert.match(rows[3][2], /^Reliquary brings no assistant of its own and takes any MCP client\.[\s\S]*export it all as plain markdown/);
+  assert.doesNotMatch(rows[3][2], /different systems/);
   assert.doesNotMatch(h, /id="trust-title"/, "no separate promise section");
   assert.match(rows[1][1], /nobody checked/);
   assert.match(rows[1][2], /a person, or a quorum, approves/);
@@ -292,7 +293,9 @@ test("site landing: pricing shows the plans and their limits, clearly marked fre
 test("site landing: a title, a description, Open Graph tags and the icon; indexable", async () => {
   const h = await text(A, "/");
   assert.match(h, /<title>Reliquary by Red Mage: A secure second brain for people and their agents\.<\/title>/);
-  assert.match(h, /<meta name="description" content="[^"]{50,}">/);
+  assert.match(h, /<meta name="description" content="Reliquary is a secure second brain for people and their AI agents: one vault that Claude, ChatGPT, Cursor and any MCP client read\. Agents propose, people approve, and secrets never reach a model\. Free during the alpha, and you can self-host\.">/, "the description says what Reliquary is, then what it does");
+  assert.match(h, /<p class="p-lede">One vault that every AI tool reads: Claude, ChatGPT, Cursor and any MCP client\. Agents propose, people approve, and secrets never reach a model\.<\/p>/, "the lede names the mechanism");
+  assert.doesNotMatch(h, /[Dd]ead simple/);
   for (const p of ["og:title", "og:description", "og:type", "og:site_name"]) assert.match(h, new RegExp(`<meta property="${p}" content="[^"]+">`), p);
   assert.match(h, new RegExp(`<meta property="og:url" content="${ORIGIN}/">`));
   assert.match(h, new RegExp(`<link rel="canonical" href="${ORIGIN}/">`));

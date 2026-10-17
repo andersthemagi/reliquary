@@ -175,7 +175,7 @@ const problems: Array<[Raw, Raw]> = [
   [html`Every person and every tool has its own AI memory, so three people get three versions of the project.`, html`One vault of approved context that every tool and every person reads, kept current by what agents propose and people approve.`],
   [html`Agents write things nobody checked, and the next agent believes them.`, html`Agents propose. Nothing becomes canon until a person, or a quorum, approves it.`],
   [html`API keys travel by Slack and email and sit in <code>.env</code> files any agent can read.`, html`Variables live in the vault. <code>reliquary run</code> puts them into one process; no AI tool ever gets a value.`],
-  [html`Every AI vendor wants to be the one place your context lives, and your team already uses three of them.`, html`Built for teams on different systems: Reliquary brings no assistant of its own and takes any MCP client. Use Claude today and something better tomorrow; the context, the approvals and the log stay, and an owner can export it all as plain markdown at any time.`],
+  [html`Every AI vendor wants to be the one place your context lives, and your team already uses three of them.`, html`Reliquary brings no assistant of its own and takes any MCP client. Use Claude today and something better tomorrow: the context, the approvals and the log stay, and an owner can export it all as plain markdown at any time.`],
 ];
 
 // Teams first: the people who say this out loud (2026-10-11 research) run
@@ -275,6 +275,10 @@ export function landing(theme: Theme, stars: number | null = null): string {
   // (#251); the problem is a ledger of pains and fixes (#252); the closing
   // says who builds it (#255). Vendor lock-in stays a pain and a
   // differentiator (2026-09-30, owner's call).
+  // 2026-10-17 (#420): the lede lost its "dead simple" opener and says the
+  // mechanism in the README's words, the description says what Reliquary is
+  // before what it does, the ledger's last row lost "built for teams on
+  // different systems", and who builds it is said once, in the closing.
   const path = "/";
   const body = html`${rail}
 <header class="p-inv p-fold">
@@ -288,7 +292,7 @@ export function landing(theme: Theme, stars: number | null = null): string {
   <section class="p-wrap p-fold-body" aria-labelledby="hero-title">
     <h1 class="p-h1 p-fold-head" id="hero-title"><span class="p-open">A secure second brain</span><span class="p-canon">for people and their agents.</span></h1>
     <div class="p-fold-text">
-      <p class="p-lede">Dead simple context to share across any AI tool. Claude, ChatGPT and Cursor read the same vault, agents propose, people approve, and secrets never reach a model.</p>
+      <p class="p-lede">One vault that every AI tool reads: Claude, ChatGPT, Cursor and any MCP client. Agents propose, people approve, and secrets never reach a model.</p>
       ${cta("Get started")}
       <p class="p-small">Works with any MCP client. The code is public and it's free for everyone during the alpha. Self-host it if you'd rather.</p>
       ${github(stars, "Read the code on GitHub")}
@@ -312,7 +316,6 @@ export function landing(theme: Theme, stars: number | null = null): string {
     ${ceiling.map((c) => html`<li><span class="p-x" aria-hidden="true"></span>${c}</li>`)}
   </ul>
   <p class="p-note">Enforced as row-level security in Postgres, not in a prompt. Each rule has a test that tries to break it, and they run on every push. <a href="/security">How security works</a></p>
-  <p class="p-note p-note-who">Built in Barcelona by ${OPERATOR.person} of <a href="${OPERATOR.site}">Red Mage</a>, out of running one vault per client as a consultant.</p>
 </section>
 
 <section class="p-sec" aria-labelledby="problem-title">
@@ -407,7 +410,7 @@ ${PRICING.show
   return sitePage({
     title: "A secure second brain for people and their agents.",
     description:
-      "Dead simple context to share across any AI tool. Claude, ChatGPT and Cursor read the same vault; agents propose, people approve, and secrets never reach a model. Free during the alpha, and you can self-host.",
+      "Reliquary is a secure second brain for people and their AI agents: one vault that Claude, ChatGPT, Cursor and any MCP client read. Agents propose, people approve, and secrets never reach a model. Free during the alpha, and you can self-host.",
     path,
     body,
     theme,

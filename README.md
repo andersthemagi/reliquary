@@ -5,8 +5,8 @@
 <p align="center"><strong>A secure second brain for people and their agents.</strong></p>
 
 <p align="center">
-Dead simple context to share across any AI tool. Claude, ChatGPT and Cursor read the same vault,<br>
-agents propose, people approve, and secrets never reach a model.
+One vault that every AI tool reads: Claude, ChatGPT, Cursor and any MCP client.<br>
+Agents propose, people approve, and secrets never reach a model.
 </p>
 
 <p align="center">
