@@ -12,17 +12,18 @@
 # suite fails.
 set -uo pipefail
 cd "$(dirname "$0")" || exit
-source scripts/lib/engine.sh
 
+# A plain array and a case, not declare -A: macOS still ships bash 3.2.
+cmds=(./supabase/tests/run.sh ./mcp/test.sh ./web/test.sh ./cli/test.sh)
+index() { case $1 in sql) echo 0 ;; mcp) echo 1 ;; web) echo 2 ;; cli) echo 3 ;; *) return 1 ;; esac; }
 base=${TEST_SLOT:-0}
 suites=("$@")
 [ ${#suites[@]} -eq 0 ] && suites=(sql mcp web cli)
-
-declare -A cmd=([sql]=./supabase/tests/run.sh [mcp]=./mcp/test.sh [web]=./web/test.sh [cli]=./cli/test.sh)
-declare -A slot=([sql]=$base [mcp]=$((base + 1)) [web]=$((base + 2)) [cli]=$((base + 3)))
 for s in "${suites[@]}"; do
-  [ -n "${cmd[$s]:-}" ] || { echo "unknown suite: $s (sql, mcp, web, cli)"; exit 2; }
+  index "$s" >/dev/null || { echo "unknown suite: $s (sql, mcp, web, cli)"; exit 2; }
 done
+
+source scripts/lib/engine.sh
 
 logs=$(mktemp -d)
 trap 'rm -rf "$logs"' EXIT
@@ -40,15 +41,14 @@ echo "== harness"
 ./scripts/check-harness.sh || { echo "harness check failed"; exit 1; }
 
 start=$SECONDS
-declare -A pid
 for s in "${suites[@]}"; do
-  echo "== $s: ${cmd[$s]} (TEST_SLOT=${slot[$s]})"
+  i=$(index "$s")
+  echo "== $s: ${cmds[i]} (TEST_SLOT=$((base + i)))"
   ( t0=$SECONDS
-    TEST_SLOT=${slot[$s]} "${cmd[$s]}" >"$logs/$s.log" 2>&1
+    TEST_SLOT=$((base + i)) "${cmds[i]}" >"$logs/$s.log" 2>&1
     echo "$? $((SECONDS - t0))" >"$logs/$s.status" ) &
-  pid[$s]=$!
 done
-for s in "${suites[@]}"; do wait "${pid[$s]}"; done
+wait
 
 # Counts: SQL prints PASS/FAIL rows; node:test (TAP, no TTY) prints # pass/# fail.
 count() {

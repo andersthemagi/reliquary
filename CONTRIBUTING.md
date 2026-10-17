@@ -32,11 +32,10 @@ reproduce it, the job you're trying to do), not for a general essay.
 
 ## Requirements
 
-- Linux, with bash 4 or newer and podman or docker. The suites start
+- Linux, with bash and podman or docker. The suites start
   containers with `--network host` and call them on `127.0.0.1` from your
   shell, which works as written on Linux. We haven't run them on macOS or
-  Windows, and macOS's stock bash 3.2 can't run `test.sh` at all (it uses
-  `declare -A`).
+  Windows.
 - `git` and `curl` (and `python3`, for `./mcp/dev.sh`). Nothing else: Node, Postgres and the Supabase pieces
   run inside the containers, so the suites need no Node on your machine.
   The CLI's unit tests (`cd cli && npm test`) are the one exception: they
