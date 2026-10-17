@@ -73,6 +73,8 @@ An agent holds a task the way it holds a [claim](claims.md#how-a-claim-works) on
 
 A holder that goes quiet loses the task when its time runs out, and the task is ready for someone else. Running out of time never counts as done: the tasks waiting on it stay blocked, and the holder that went quiet can't finish it afterwards. A wrong or old secret or fence, another connection, a blocked task, one someone else holds, and a done or cancelled one are each refused, with the reason.
 
+A holder that leaves the vault, is removed by an owner, or deletes their account gives every task they hold back unfinished, the same as `release_step`: the task is ready for someone else, the tasks waiting on it stay blocked, and Activity records the release with the reason. The plan keeps every one of its tasks.
+
 The lease, the hold limit and how many tasks an agent may hold come from the vault's [claim rule](claims.md#claim-rules) for the plan's path.
 
 ### What an agent reads
