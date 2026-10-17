@@ -1642,6 +1642,10 @@ mark.placeholder { background: none; color: var(--attention); font-weight: 500; 
 .folder-list td:nth-child(2) { width: 1%; white-space: nowrap; }
 /* A folder's README, boxed under the list with its file name as the header
    bar (not a second heading above the README's own). */
+.file-references { margin-top: var(--space-6); }
+.references { list-style: none; padding: 0; margin: 0 0 var(--space-4); }
+.references li { padding: var(--space-1) 0; overflow-wrap: anywhere; }
+.references .meta { display: inline; }
 .readme { margin-top: var(--space-6); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden; }
 .readme-head {
   margin: 0; max-width: none; padding: var(--space-3) var(--space-5); background: var(--bg-subtle); border-bottom: 1px solid var(--border);

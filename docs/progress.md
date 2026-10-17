@@ -106,6 +106,23 @@ reminder after `git push` to propose an update. No server code: the hooks
 point the agent at tools that already exist. Codex and Cursor packaging is
 left for a follow-up, since their sign-in paths aren't checked.
 
+### 2026-10-17: references between files and semantic search
+
+Owner's decision, 2026-10-17: build lookup work ahead of milestone 3, as
+another logged exception: references between files (#393) and semantic
+search (#207). The "knowledge graph" the owner asked for means
+deterministic references: `[[path]]` and Markdown links to `.md` files,
+read from each file's current text when it is saved, kept in
+`public.file_references` and read through `related_files` and the file
+page. No model and no outbound call. They are called references, since
+"links" already means external MCP servers. Embeddings for semantic
+search use Supabase's built-in gte-small model with pgvector (#207, its
+own PR). Out of scope: entities a model extracts, and a graph view.
+
+Status 2026-10-17: references are built (#393:
+`20261017100000_file_references.sql`, `related_files`, the file page's
+References and Referenced by). Semantic search (#207) is in progress.
+
 ## Milestone 1: core, MCP and UI
 
 Vaults, files with canon/open policies, proposals with quorum, log, gate,

@@ -378,6 +378,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const claim = await claimBanner(c, ctx, v, path, "view", filePath(id, path, tab === "preview" ? undefined : tab));
     const tab_ = (name: string, label: string) => ({ href: filePath(id, path, name === "preview" ? undefined : name), label, current: tab === name });
     const threads = (await c.query(`select count(*)::int as n from public.threads where vault_id = $1 and anchor_path = $2`, [id, path])).rows[0].n as number;
+    const related = (await c.query(`select direction, path, policy, missing from public.related_files($1, $2)`, [id, path])).rows as Related[];
     const body = html`
       ${pageHeader({
         crumb: crumbs(id, v, path, false),
@@ -411,11 +412,33 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
           ? html`<div class="prose entry">${raw(renderMarkdown(f.body ?? ""))}</div>`
           : tab === "source"
             ? html`<div class="file">${f.body}</div>`
-            : history}`;
+            : history}
+      ${references(id, related)}`;
     return { v, shell: await vaultShell(c, ctx, v, { path, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
   return render(ctx, path, data.shell, "vaults");
+}
+
+// A file's References and Referenced by (public.related_files), each a list
+// of links; nothing when it has neither.
+type Related = { direction: "references" | "referenced_by"; path: string; policy: string; missing: boolean };
+function references(id: string, rows: Related[]): Raw | "" {
+  if (!rows.length) return "";
+  const list = (direction: Related["direction"], label: string, hid: string) => {
+    const these = rows.filter((r) => r.direction === direction);
+    return these.length
+      ? html`<h2 class="pane-label" id="${hid}">${label}</h2>
+          <ul class="references" aria-labelledby="${hid}">${these.map((r) =>
+            r.missing
+              ? html`<li><span>${r.path}</span> <span class="meta">No file yet</span></li>`
+              : html`<li><a href="${filePath(id, r.path)}">${r.path}</a> ${policyBadge(r.policy)}</li>`,
+          )}</ul>`
+      : "";
+  };
+  return html`<section class="file-references" aria-label="References">
+    ${list("references", "References", "refs-out")}${list("referenced_by", "Referenced by", "refs-in")}
+  </section>`;
 }
 
 // The file page's "More" menu: the rare and destructive actions, each through

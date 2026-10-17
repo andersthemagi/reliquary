@@ -48,6 +48,24 @@ On a wide screen, a vault's sidebar lists its sections in two groups: **Work** (
 
 Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
 
+## References between files
+
+A file refers to another when its text points at it. Reliquary reads these references each time a file is saved, so you can go from a file to the files it points at, and to the files that point at it, without searching. Nothing is guessed: no model reads your files for this, and nothing leaves Reliquary. (They are called references because [links](links.md) are something else: other MCP servers a vault connects to.)
+
+What counts as a reference:
+
+- `[[path]]` or `[[path|label]]`, from the vault's top folder. Without an extension it means the `.md` file: `[[decisions/pricing]]` is `decisions/pricing.md`.
+- A Markdown link to a `.md` file, like `[pricing](pricing.md)` or `[pricing](../decisions/pricing.md)`, from the file's own folder. One that starts with `/`, like `[pricing](/decisions/pricing.md)`, is from the top folder.
+- A heading after `#` is ignored: `[[pricing#tiers]]` refers to `pricing.md`.
+
+Web addresses, links to a heading alone (`#tiers`), images (`![...](...)` and `![[...]]`), links to other kinds of file and a file's links to itself are not references.
+
+Editing a file replaces its references with the ones in its new text. Deleting a file removes the references it made; references other files make to it stay, shown as missing. A reference to a path with no file yet is kept and shown as missing until someone writes that file.
+
+In the web app, a file's page lists **References** and **Referenced by** under its text, each file with its policy; a missing one says **No file yet**. A file with neither shows nothing. Agents call `related_files` with a vault and a path: `->` lines are what it refers to, `<-` lines what refers to it, each with its policy and `missing` where there is no file.
+
+You see a reference only if you can read the vault it is in, and a reference never reaches outside its vault: `[[secret]]` in one vault says nothing about a `secret.md` in another.
+
 ## Settings
 
 A vault's **Settings** has a menu beside the page (above it on a phone), in three groups:

@@ -27,6 +27,7 @@
   "read_proposal": "Any member's agent, within its connection's vaults (read-only is enough)",
   "read_thread": "Any member's agent, within its connection's vaults (read-only is enough)",
   "register_work_plan": "Whoever could write the plan file's path: an owner's or editor's agent with read-write access, or a path's named owner. A read-only connection or a viewer can't register",
+  "related_files": "Any member's agent, within its connection's vaults (read-only is enough); only references within that vault",
   "request_work": "Whoever could write the plan's path: an owner's or editor's agent with read-write access, or a path's named owner. A read-only connection or a viewer can't ask. One place in line per person, shared by their agents",
   "release_claim": "The claim's own holder, from the same connection, with its secret and fence; nobody else",
   "release_step": "The step's own holder, from the same connection, with its secret and fence; nobody else",
