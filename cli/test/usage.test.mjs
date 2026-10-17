@@ -37,6 +37,22 @@ test("usage: --environment suggests --env, exit 2", () => {
   assert.match(r.stderr, /Unknown option --environment\. Did you mean --env\?/);
 });
 
+test("usage: an option before the command says options go after it, exit 2", () => {
+  const r = cli("--vault", "acme", "run", "--", "x");
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /Options go after the command: reliquary run --vault/);
+  assert.match(cli("--json", "vaults").stderr, /reliquary vaults --json/);
+});
+
+test("usage: --help has an example for every command", () => {
+  const r = cli("--help");
+  assert.equal(r.status, 0);
+  const examples = r.stdout.split("\nExamples:\n")[1] ?? "";
+  for (const c of ["login", "vaults", "run --", "env pull", "env push"]) assert.match(examples, new RegExp(`^  reliquary ${c}`, "m"), c);
+  // No arguments prints the same help, to stdout, for someone who just installed it.
+  assert.equal(cli().stdout, r.stdout);
+});
+
 test("usage: a mistyped option suggests the closest one that command accepts", () => {
   assert.match(cli("run", "--vualt", "a", "--", "x").stderr, /Did you mean --vault\?/);
   // `vaults` takes no --vault, so nothing is suggested.

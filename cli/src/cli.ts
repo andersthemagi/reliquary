@@ -58,6 +58,14 @@ Options:
   -h, --help       this help
   -v, --version    the version
 
+Examples:
+  reliquary login                    connect, then choose the vaults it may read
+  reliquary vaults                   see what it can read, and each vault's id
+  reliquary run -- npm start         start a dev server with the development variables
+  reliquary run --vault acme --env production -- ./deploy.sh
+  reliquary env pull                 write .env, which git must ignore
+  reliquary env push --wait          send .env for approval and wait for the answer
+
 Values are never printed. The connection is kept in the OS keychain when
 there is one (macOS Keychain, Secret Service, Windows DPAPI), else in
 ${credentialsFile()} (mode 600); RELIQUARY_CREDENTIALS=file or keychain
@@ -134,7 +142,12 @@ function unknownOption(option: string, spec: Spec): UsageError {
 
 const COMMANDS = ["help", "version", "login", "logout", "vaults", "run", "env"];
 
-function unknownCommand(command: string): UsageError {
+function unknownCommand(command: string, args: string[]): UsageError {
+  // `reliquary --vault x run ...`: the option is real, only its place is wrong.
+  if (command.startsWith("-")) {
+    const meant = args.find((a) => COMMANDS.includes(a)) ?? "run";
+    return new UsageError(`Options go after the command: reliquary ${meant} ${command} ... See \`reliquary --help\`.`);
+  }
   // `pull` and `push` live under `env`; someone who left it out is close.
   if (command === "pull" || command === "push") return new UsageError(`Unknown command "${command}". Did you mean \`reliquary env ${command}\`?`);
   const near = closest(command, COMMANDS);
@@ -254,7 +267,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     default:
-      throw unknownCommand(command);
+      throw unknownCommand(command, args);
   }
 }
 
