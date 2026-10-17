@@ -29,6 +29,10 @@ Revokes this computer's connection on the server, then forgets it. Takes `--serv
 
 Prints each vault the connection reaches, one per line: its id, name, your role, and the environments you may read. Takes `--server <url>`.
 
+| Option | Does |
+|---|---|
+| `--json` | print them as one line of JSON for scripts, `{"vaults":[...]}`, each with `id`, `name`, `role` and `environments`; no vaults prints `{"vaults":[]}`. Nothing goes to stderr |
+
 ### reliquary run
 
 ```text
@@ -101,7 +105,7 @@ Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected o
 | Vault | `--vault`, `vault` in `.reliquary.json`, the only vault the connection reaches |
 | Environment | `--env`, `environment` in `.reliquary.json`, `development` |
 
-A vault name that two of your vaults share is an error listing their ids.
+A vault name that two of your vaults share is an error listing their ids. A `--vault` that matches none of your vaults is an error listing the ones you can reach, by name and id. Names match whatever their case.
 
 ## .reliquary.json
 
@@ -149,5 +153,7 @@ A connection made before the keychain, in `credentials.json`, keeps working. The
 | 2 | a usage error (an unknown command or option, a missing value, an argument `run` can't pass to a `.cmd` on Windows) |
 | 3 | `env push --wait` ran out of time, or couldn't check the push three times in a row |
 | other | `run` passes on its command's exit code |
+
+A mistyped command or option gets a hint: `reliquary pull` says to run `reliquary env pull`, `reliquary vault` asks whether you meant `vaults`, and `--environment` or `--vualt` asks whether you meant `--env` or `--vault`. Only options the command takes are suggested.
 
 Common errors: the connection was revoked or expired (run `reliquary login`); the keychain is locked or doesn't answer (unlock it, or set `RELIQUARY_CREDENTIALS=file`); your role can't read that environment; no such vault or environment for this connection; the server has no key for variables; a file or folder the system won't let the CLI use (the message names the path and the reason, such as no permission, a full disk or a read-only folder; for the config directory, `RELIQUARY_CONFIG_DIR` moves it). No error prints a value, a token or a server response.

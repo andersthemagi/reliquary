@@ -269,6 +269,7 @@ under 6 ms at 200k rows.
 |---|---|
 | `search` | Words and meaning together: full text, plus gte-small embeddings from an Edge Function in pgvector, blended by rank ([Search](#search)); words alone when the function is down, and the response says so |
 | `read_file`, `list_files` | Text returned as quoted data with its policy, author and approvals |
+| `related_files` | The files a path refers to and the files that refer to it, with each one's policy; kept from `[[path]]` and Markdown links when a file is saved, no model |
 | `changes_since` | The feed: events after a cursor, oldest first |
 | `write_file` | Open files only; refused on canon files with a pointer to `propose` |
 | `propose` | New file, edit, move or retraction of a canon file, with a reason |

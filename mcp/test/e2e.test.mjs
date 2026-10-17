@@ -52,7 +52,7 @@ test("tools: the expected set, and no way to approve", async () => {
     "advance_flags", "changes_since", "checkin_step", "claim_path", "claim_step", "comment_on_proposal", "complete_step",
     "create_vault", "delete_file", "leave_queue", "list_claims", "list_files", "list_flags", "list_links", "list_my_feedback",
     "list_proposals", "list_subscriptions", "list_threads", "list_variables", "list_vaults", "my_places", "open_thread", "post_message",
-    "propose", "read_file", "read_proposal", "read_thread", "register_work_plan", "release_claim", "release_step",
+    "propose", "read_file", "read_proposal", "read_thread", "register_work_plan", "related_files", "release_claim", "release_step",
     "renew_claim", "request_work", "revise_proposal", "search", "send_feedback", "work_plan_status", "write_file",
   ]);
   await c.close();

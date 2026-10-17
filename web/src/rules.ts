@@ -10,6 +10,7 @@ import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
 import { filePath, message, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 import { settingsPage } from "./vaultadmin.js";
+import { LINES_SQL, queryTerms, snippetLines } from "./searchlines.js";
 
 // ---------------------------------------------------------------------------
 // Rules
@@ -346,8 +347,8 @@ export async function search(ctx: Ctx, id: string): Promise<Reply> {
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
-    // Only the start of each text, for its snippet: 30 whole files could be 30 MB.
-    const rows = query ? (await c.query(`select path, policy, left(body, 4000) as body from public.search($1, $2, 30)`, [id, query])).rows : [];
+    const terms = queryTerms(query);
+    const rows = query ? (await c.query(`select s.path, s.policy, ${LINES_SQL} from public.search($1, $2, 30) s`, [id, query, terms])).rows : [];
     const everywhere = `/search${query ? `?q=${q(query)}` : ""}`;
     const body = html`
       ${pageHeader({
@@ -369,7 +370,7 @@ export async function search(ctx: Ctx, id: string): Promise<Reply> {
           ? html`<p class="muted small">${rows.length}${rows.length === 30 ? "+" : ""} result${rows.length > 1 ? "s" : ""} for “${query}” in ${v.name}</p>
             <ul class="rows results">${rows.map(
               (r) => html`<li><span><a class="name" href="${filePath(id, r.path)}">${r.path}</a> ${policyBadge(r.policy)}
-                <span class="snippet">${(r.body as string).replace(/\s+/g, " ").slice(0, 200)}</span></span></li>`,
+                ${snippetLines(r.lines, terms)}</span></li>`,
             )}</ul>`
           : emptyState({
               title: `Nothing matches “${query}” in ${v.name}`,

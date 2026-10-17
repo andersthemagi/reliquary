@@ -114,6 +114,8 @@ before(async () => {
   await as(BREE, "select public.write_file($1, 'notes/a.md', 'Alpha')", [V.main]);
   await as(BREE, "select public.write_file($1, 'notes/gone.md', 'Going')", [V.main]);
   await as(BREE, "select public.write_file($1, 'notes/solo.md', 'Once')", [V.main]);
+  await as(BREE, "select public.write_file($1, 'refs/target.md', 'Target')", [V.main]);
+  await as(BREE, "select public.write_file($1, 'refs/source.md', $2)", [V.main, "See [[refs/target]], [terms](../canon/terms.md) and [[refs/<b>later</b>]]."]);
   const [{ id: first }] = await as(BREE, "select public.propose($1, 'canon/terms.md', 'Net 30.', 'first') as id", [V.main]);
   await as(BREE, "select public.decide($1, 'approve')", [first]);
   await as(BREE, "select public.propose($1, 'canon/terms.md', 'Net 60.', 'longer terms')", [V.main]);
@@ -498,4 +500,29 @@ test("erase: the confirm page sits under the file (vault / folder / file / Erase
   assert.match(h, new RegExp(`<a href="${re(file(V.main, "notes/solo.md", "&amp;confirm=delete"))}">delete it</a> instead`));
   assert.match(h, new RegExp(`<button class="danger solid">Erase solo\\.md</button><a class="button quiet" href="${re(file(V.main, "notes/solo.md"))}">Cancel</a>`));
   assert.match(h, new RegExp(`<li class="leaf"><a href="${re(file(V.main, "notes/solo.md"))}" aria-current="page">solo\\.md</a>`), "the tree marks the file");
+});
+
+// ---------------------------------------------------------------------------
+// References (F917)
+
+test("references: a file's page lists References, each linked with its policy badge, a missing one as text marked No file yet", async () => {
+  const h = await page(file(V.main, "refs/source.md"));
+  const out = /<h2 class="pane-label" id="refs-out">References<\/h2>\s*<ul class="references" aria-labelledby="refs-out">([\s\S]*?)<\/ul>/.exec(h)?.[1];
+  assert.ok(out, "a References list");
+  assert.deepEqual([...out.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1]), [
+    `<a href="${file(V.main, "canon/terms.md").replace(/&/g, "&amp;")}">canon/terms.md</a> <span class="badge policy canon" title="Canon: changes are proposals that people approve">Canon</span>`,
+    `<span>refs/&lt;b&gt;later&lt;/b&gt;.md</span> <span class="meta">No file yet</span>`,
+    `<a href="${file(V.main, "refs/target.md").replace(/&/g, "&amp;")}">refs/target.md</a> <span class="badge policy open" title="Open: members and agents write directly">Open</span>`,
+  ]);
+  assert.doesNotMatch(h, /id="refs-in"/, "nothing refers to it, so no Referenced by");
+});
+
+test("references: the target's page lists Referenced by, linking back", async () => {
+  const h = await page(file(V.main, "refs/target.md"));
+  assert.match(h, new RegExp(`<h2 class="pane-label" id="refs-in">Referenced by</h2>\\s*<ul class="references" aria-labelledby="refs-in"><li><a href="${re(file(V.main, "refs/source.md"))}">refs/source\\.md</a> <span class="badge policy open"`));
+  assert.doesNotMatch(h, /id="refs-out"/);
+});
+
+test("references: a file with neither has no references section", async () => {
+  assert.doesNotMatch(await page(file(V.main, "notes/a.md")), /class="file-references"/);
 });

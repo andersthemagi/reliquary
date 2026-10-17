@@ -98,21 +98,23 @@ export async function listVaults(server: Server): Promise<Vault[]> {
 
 // A vault by id or name, among those this sign-in reaches.
 export function pickVault(vaults: Vault[], wanted: string | undefined): Vault {
+  const list = (vs: Vault[]) => vs.map((v) => `  ${v.name}  ${v.id}`).join("\n");
+  const reachable = vaults.length ? ` It reaches:\n${list(vaults)}` : " It reaches no vaults.";
   if (!wanted) {
     if (vaults.length === 1) return vaults[0];
     if (vaults.length === 0) throw new CliError("This connection reaches no vaults.");
-    throw new UsageError(`Choose a vault with --vault (or "vault" in .reliquary.json):\n${vaults.map((v) => `  ${v.name}  ${v.id}`).join("\n")}`);
+    throw new UsageError(`Choose a vault with --vault (or "vault" in .reliquary.json):\n${list(vaults)}`);
   }
   if (UUID.test(wanted.toLowerCase())) {
     const v = vaults.find((x) => x.id === wanted.toLowerCase());
-    if (!v) throw new CliError(`No vault ${wanted} for this connection. \`reliquary vaults\` lists what you can reach.`);
+    if (!v) throw new CliError(`No vault ${wanted} for this connection.${reachable}`);
     return v;
   }
   let hits = vaults.filter((v) => v.name === wanted);
   if (hits.length === 0) hits = vaults.filter((v) => v.name.toLowerCase() === wanted.toLowerCase());
   if (hits.length === 1) return hits[0];
-  if (hits.length === 0) throw new CliError(`No vault named "${wanted}" for this connection. \`reliquary vaults\` lists what you can reach.`);
-  throw new UsageError(`More than one vault is named "${wanted}"; pass its id with --vault:\n${hits.map((v) => `  ${v.name}  ${v.id}`).join("\n")}`);
+  if (hits.length === 0) throw new CliError(`No vault named "${wanted}" for this connection.${reachable}`);
+  throw new UsageError(`More than one vault is named "${wanted}"; pass its id with --vault:\n${list(hits)}`);
 }
 
 // An environment's values. Held in memory only; the caller hands them to one

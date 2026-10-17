@@ -1,5 +1,5 @@
 // Vault and file MCP tools: list_vaults, create_vault, list_files,
-// read_file, search, write_file, delete_file.
+// read_file, search, related_files, write_file, delete_file.
 //
 // Responses are compact on purpose: an agent pays for every byte it reads
 // (docs/research/token-load.md, mcp/test/token_load.test.mjs). Lists page
@@ -10,6 +10,7 @@ import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
 import { minSimilarity, queryVector } from "./embeddings.js";
+import { Refusal } from "./failure.js";
 import { ADDITIVE, at, DESTRUCTIVE, fenced, fileBlock, freshNonce, makeRun, ok, PATH, READ, refuse, TEXT, type FileRow, VAULT, VAULT_REF, VERSION, via } from "./tools-shared.js";
 
 // Sizes as the database words them (private.size_text): decimal units.
@@ -284,6 +285,41 @@ export function registerVaultFileTools(
           );
         }
         return ok(out.join("\n"));
+      }),
+  );
+
+  server.registerTool(
+    "related_files",
+    {
+      title: "Files referring to each other",
+      description:
+        "The files a path refers to (->) and the files that refer to it (<-), with each one's policy; missing: no file there yet. References are [[path]] and Markdown links to .md files.",
+      inputSchema: { vault: VAULT, path: PATH },
+      annotations: READ,
+    },
+    async ({ vault, path }) =>
+      run(async (c) => {
+        // public.related_files (20261017100000_file_references.sql) decides
+        // what the caller may see; `here` tells "no references" from "no file".
+        const { rows } = await c.query(
+          `select h.here, x.direction, x.path, x.policy, x.missing
+             from ${VAULT_REF}
+             cross join lateral (select exists (select 1 from public.files f
+                                                 where f.vault_id = v.id and f.path = $2 and f.deleted_at is null) as here offset 0) h
+             left join lateral public.related_files(v.id, $2) x on true`,
+          [vault, path],
+        );
+        const rel = rows.filter((r) => r.path !== null);
+        if (rel.length === 0) {
+          if (rows[0]?.here) return ok("No references to or from this file.");
+          throw new Refusal({
+            status: 404,
+            where: "MCP tool related_files: file lookup",
+            why: "No file at that path, and no file refers to it. Use list_files to see the vault's.",
+          });
+        }
+        const lines = rel.map((r) => `${r.direction === "references" ? "->" : "<-"} ${r.path}  ${r.policy}${r.missing ? "  missing" : ""}`);
+        return ok(fenced("Paths", lines).join("\n"));
       }),
   );
 
