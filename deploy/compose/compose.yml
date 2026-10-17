@@ -15,6 +15,7 @@
 #   migrate   one-shot: Reliquary's migrations, the self-hosting overlay (no
 #             plan limits), the app roles' passwords
 #   web, mcp  the two apps, built from this checkout, read-only, unprivileged
+#   embed     optional (profile embed): search by meaning's model
 #   caddy     optional (profile caddy): HTTPS for the three hostnames
 #   owner     a tool (profile tools): makes an account, see above
 #
@@ -223,6 +224,9 @@ services:
       AUTH_ISSUER: ${PUBLIC_URL}
       LINK_PROXY_SECRET: ${LINK_PROXY_SECRET:?run deploy/setup.sh first}
       TRUST_PROXY_IP: ${TRUST_PROXY_IP:-0}
+      # Optional: search by meaning, with the embed service below.
+      EMBED_URL: ${EMBED_URL:-}
+      EMBED_SECRET: ${EMBED_SECRET:-}
     ports:
       - ${MCP_BIND:-127.0.0.1:8787}:8787
     depends_on:
@@ -233,6 +237,19 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+
+  # Optional (profile embed): the search embedding function
+  # (supabase/functions/embed) in Supabase's open-source edge runtime, on
+  # this network only. It downloads the gte-small model on first use.
+  embed:
+    image: docker.io/supabase/edge-runtime:v1.77.4
+    profiles: [embed]
+    restart: unless-stopped
+    command: ["start", "--main-service", "/functions/embed", "-p", "9000"]
+    environment:
+      EMBED_SECRET: ${EMBED_SECRET:-}
+    volumes:
+      - ../../supabase/functions:/functions:ro,z
 
   caddy:
     image: docker.io/library/caddy:2.11.4-alpine

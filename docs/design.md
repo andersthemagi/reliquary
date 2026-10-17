@@ -23,7 +23,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 5 | [Identity and permissions](#identity-and-permissions) | Built |
 | 6 | [Access surfaces](#access-surfaces) | Built, except service agent tokens |
 | 7 | [Context](#context) | Built |
-| 8 | [Search](#search) | Designed 2026-10-17, being built (#207) |
+| 8 | [Search](#search) | Built: words and meaning (#207); the web app searches by words |
 | 9 | [Path ownership](#path-ownership) | Built |
 | 10 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
 | 11 | [Claims and work plans](#claims-and-work-plans) | Built, apart from the hosted load test (#82) |

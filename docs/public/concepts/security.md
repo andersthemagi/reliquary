@@ -21,7 +21,7 @@ One test reads the database's own schema rather than its data: a column whose na
 
 - The [ceiling](agents.md) keeps approving, rules, members, grants, secret values, export and deletion with people.
 - Text people and agents wrote reaches an agent fenced as data, with a random marker no text can forge.
-- Reliquary runs no model and sends your content to no model provider. Your AI tools get what their agent reads, under your agreement with them.
+- Reliquary sends your content to no model provider. The one model it runs is gte-small, inside Supabase, which turns file text into numbers so search can match by meaning (see [Vaults and files](vaults-and-files.md#reading-and-searching)); it writes nothing. Those numbers are stored beside the text, readable by the same people, and removed with it. Your AI tools get what their agent reads, under your agreement with them.
 
 ## Connections and sign-in
 

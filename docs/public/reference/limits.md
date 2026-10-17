@@ -62,7 +62,7 @@ Threads and messages are never deleted, so a vault at a limit stays at it. The r
 | A request body | 3 MiB + 64 KiB, so 1 MiB of file text fits once it is written as JSON. A larger one is refused with a 400 that names the limit, before any tool runs |
 | `read_file` | 100000 bytes by default, up to 1048576 with `max_bytes`; `from_line` and `to_line` pick lines |
 | `list_files` | 200 files by default, up to 1000; continue with `after` |
-| `search` | 10 files by default, up to 50; a query up to 500 characters; up to 3 matching lines per file |
+| `search` | 10 files by default, up to 50; a query up to 500 characters; up to 3 matching lines per file; by meaning, the first 8 parts of about 1,200 characters of each file, and up to 8 newly written files embedded per search |
 | `changes_since` | 100 events by default, up to 500 |
 
 Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
