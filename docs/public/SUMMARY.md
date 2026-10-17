@@ -46,6 +46,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Invite someone](how-to/invite-someone.md)
 - [Set rules](how-to/set-rules.md)
 - [Keep call and meeting notes](how-to/keep-meeting-notes.md)
+- [Add a link](how-to/add-a-link.md)
 - [Work through a plan with agents](how-to/work-through-a-plan.md)
 - [Rotate a leaked token](how-to/rotate-a-leaked-token.md)
 - [Delete your account](how-to/delete-your-account.md)

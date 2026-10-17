@@ -270,6 +270,16 @@ test("environments page: a refused rename target stays in the New name field to 
   assert.doesNotMatch(await envs(), /wip/);
 });
 
+test("environments page: Add and Rename show the same rule for a valid name, and each name field points at it", async () => {
+  const rule = 'Lowercase letters, digits, <code>-</code> and <code>_</code>, starting with a letter.</p>';
+  const add = await page(vp("/environments"));
+  assert.match(add, /<input id="en" [^>]*aria-describedby="en-hint">/);
+  assert.ok(add.includes(`<p class="hint" id="en-hint">${rule}`));
+  const rename = await page(vp("/environments/rename?name=development"));
+  assert.match(rename, /<input id="et" [^>]*aria-describedby="et-hint">/);
+  assert.ok(rename.includes(`<p class="hint" id="et-hint">${rule}`));
+});
+
 test("environments page: a Rename or Delete link for an environment that is gone goes back to the list, saying so, not to a page that says nothing exists", async () => {
   const warned = async (r) => {
     assert.equal(r.status, 303, "back to Environments");

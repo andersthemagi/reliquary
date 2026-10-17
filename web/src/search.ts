@@ -7,6 +7,7 @@
 import { asPerson } from "./db.js";
 import { emptyState, html, pageHeader } from "./html.js";
 import { render, type Ctx, type Reply } from "./pages.js";
+import { LINES_SQL, queryTerms, snippetLines } from "./searchlines.js";
 
 // Matches per vault, and in all.
 const PER_VAULT = 10;
@@ -17,23 +18,23 @@ const VAULTS = 100;
 const badge = (policy: string) =>
   html`<span class="badge policy ${policy}">${policy === "canon" ? "Canon" : policy === "open" ? "Open" : policy}</span>`;
 
-type Hit = { vault_id: string; vault: string; path: string; policy: string; body: string };
+type Hit = { vault_id: string; vault: string; path: string; policy: string; lines: [number, string][] };
 
 export async function searchAll(ctx: Ctx): Promise<Reply> {
   const query = (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 200);
+  const terms = queryTerms(query);
   const rows: Hit[] = query
     ? await asPerson(ctx.userId, async (c) =>
         (
           await c.query(
-            // Only the start of each text, for its snippet.
-            `select v.id as vault_id, v.name as vault, s.path, s.policy, left(s.body, 4000) as body
+            `select v.id as vault_id, v.name as vault, s.path, s.policy, ${LINES_SQL}
                from (select v.id, v.name from public.vaults v
                        join public.vault_members m on m.vault_id = v.id and m.user_id = $1
                       order by v.name, v.id limit ${VAULTS}) v
               cross join lateral public.search(v.id, $2, ${PER_VAULT}) s
               order by s.rank desc, s.updated_at desc
               limit ${TOTAL}`,
-            [ctx.userId, query],
+            [ctx.userId, query, terms],
           )
         ).rows,
       )
@@ -55,7 +56,7 @@ export async function searchAll(ctx: Ctx): Promise<Reply> {
           <ul class="rows results">${rows.map(
             (r) => html`<li><span><a class="name" href="/v/${r.vault_id}/file?path=${encodeURIComponent(r.path)}">${r.path}</a> ${badge(r.policy)}
               <span class="muted small"> · ${r.vault}</span>
-              <span class="snippet">${r.body.replace(/\s+/g, " ").slice(0, 200)}</span></span></li>`,
+              ${snippetLines(r.lines, terms)}</span></li>`,
           )}</ul>`
         : emptyState({ title: `Nothing in your vaults matches “${query}”`, body: "Try fewer words, or part of a file name." })
       : ""}`;

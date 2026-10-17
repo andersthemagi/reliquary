@@ -386,6 +386,14 @@ test("search: a vault's search says it covers only that vault, has its own box, 
   assert.match(h, /notes\/n\.md<\/a> <span class="badge policy open"/);
 });
 
+test("search lines: a vault's search shows the numbered lines that hold the words", async () => {
+  await as(JO, "select public.write_file($1, 'notes/lines.md', $2)", [V.main, "Opening line.\nThe wombat plan."]);
+  assert.match(
+    await page(`/v/${V.main}/search?q=wombat`),
+    /notes\/lines\.md<\/a> <span class="badge policy open"[^>]*>Open<\/span>\s*<span class="snippet"><span class="snippet-line"><span class="line-no">2<\/span> The <mark>wombat<\/mark> plan\.<\/span><\/span>/,
+  );
+});
+
 test("search: nothing found in the vault offers searching all vaults", async () => {
   const h = await page(`/v/${V.main}/search?q=qqxxnothing`);
   assert.match(h, /<div class="empty"><strong>Nothing matches “qqxxnothing” in Rules main<\/strong><p>Try fewer words, or part of a file name, or look in all your vaults\.<\/p><p class="empty-action"><a class="button" href="\/search\?q=qqxxnothing">Search all vaults<\/a><\/p><\/div>/);

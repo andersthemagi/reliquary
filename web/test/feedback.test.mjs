@@ -166,6 +166,12 @@ test("feedback page: the top bar has a Feedback button between search and the in
   assert.doesNotMatch(h, /<script/);
 });
 
+test("feedback page: each kind in the top bar's popover says what it is in its label's text, not only a tooltip", async () => {
+  const h = await page(S.mail, `/v/${vault}`);
+  const pop = h.slice(h.indexOf('<details class="menu-wrap feedback-pop">'), h.indexOf('<details class="menu-wrap inbox">'));
+  assert.match(pop, /<input type="radio" name="kind" value="bug" required> Bug<span class="sr-only">: Something broke or didn’t do what it said<\/span><\/label>/);
+});
+
 test("feedback page: with nothing sent, the page has the form at the top, Send in its header, and says what will show up", async () => {
   const h = await page(S.nobody, "/feedback");
   assert.match(h, /<h1>Feedback<\/h1>/);

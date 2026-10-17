@@ -322,6 +322,36 @@ select usename, state, count(*) from pg_stat_activity
  where usename in ('reliquary_mcp', 'reliquary_web') group by 1, 2 order by 1, 2;
 ```
 
+## Search benchmark
+
+How fast `public.search` (words only) is at 1k, 10k and 50k files (#397).
+It starts a throwaway Postgres 17 with every migration, seeds synthetic
+vaults (plus a 10k vault the searcher can't read), times six query shapes
+as the vault's owner under RLS, and prints the plan inside the function for
+the 50k vault. About a minute; it prints numbers and fails nothing.
+
+```bash
+./supabase/bench/search.sh                    # slot 32 by default
+TEST_SLOT=40 BENCH_RUNS=50 ./supabase/bench/search.sh
+BENCH_KEEP=1 ./supabase/bench/search.sh       # leave the container up to try a change
+```
+
+With `BENCH_KEEP=1`, `podman exec -it reliquary-search-bench-32 psql -U postgres -d bench`
+reaches the seeded database; remove it with `podman rm -f -v reliquary-search-bench-32`.
+
+First run, 2026-10-17 (a laptop, data on tmpfs, default settings; ms, 30 warm calls):
+
+| Files in vault | p50 | p95 |
+|---|---|---|
+| 1k | 64 to 67 | 68 to 71 |
+| 10k | 85 to 102 | 87 to 105 |
+| 50k | 245 to 453 | 277 to 768 |
+
+What it showed: the 1k vault costs as much as a scan of every vault's
+files, because a SQL function's statements are planned without the vault id
+(a generic plan) and Postgres picks a sequential scan of all of
+`file_versions`, history and other tenants included. The follow-up is #403.
+
 ## Backups and restore
 
 - **Supabase:** daily backups, 7 days on Pro (dashboard, Database, Backups).

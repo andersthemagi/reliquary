@@ -92,7 +92,22 @@ export async function log(ctx: Ctx, id: string): Promise<Reply> {
               <td class="small path-cell" data-label="Variables"><div>${r.names.length ? r.names.map((n, i) => html`${i ? ", " : ""}<code>${n}</code>`) : NONE}</div></td>
               <td class="small" data-label="Environment"><div>${r.environment ? r.environment : NONE}</div></td></tr>`,
           )}</tbody></table></div>`
-        : emptyState({ title: before ? "No older entries." : action || name ? "Nothing matches these filters." : "Nothing has been set, read or revealed yet." })}
+        : before
+          ? emptyState({
+              title: "No older entries.",
+              body: "This is where the access log begins for these filters.",
+              action: html`<a class="button" href="${link({})}">Back to the newest</a>`,
+            })
+          : action || name
+            ? emptyState({
+                title: "Nothing matches these filters.",
+                body: "No entry matches all of them. Change a filter above, or clear them all.",
+                action: html`<a class="button" href="${base(id, "/log")}">Clear filters</a>`,
+              })
+            : emptyState({
+                title: "Nothing has been set, read or revealed yet.",
+                body: "Each time someone or their agent sets, reads, reveals or is refused a variable here, it shows with who, when and which names, newest first. Values never show.",
+              })}
       ${more || before
         ? html`<nav class="pager" aria-label="Pages">${before ? html`<a href="${link({})}">Newest</a>` : ""}${
             more ? html`<a class="older" href="${link({ before: shown[shown.length - 1].seq })}">Older</a>` : ""

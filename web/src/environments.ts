@@ -64,8 +64,8 @@ export async function environmentsPage(ctx: Ctx, v: Vault, f: { name?: string; o
       ${csrfField(ctx.csrf)}
       <label for="en">Name</label>
       <input id="en" type="text" name="name" value="${f.name ?? ""}" placeholder="staging" required maxlength="32"
-        autocomplete="off" autocapitalize="off" spellcheck="false">
-      <p class="hint">Lowercase letters, digits, <code>-</code> and <code>_</code>, starting with a letter.</p>
+        autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="en-hint">
+      ${nameHint("en-hint")}
       <label class="choice"><input type="checkbox" name="owners_only" value="1"${f.ownersOnly ? raw(" checked") : ""}> Owners only (like production)</label>
       <div class="actions"><button class="primary">Add environment</button></div>
     </form>`;
@@ -84,6 +84,10 @@ export async function createEnvironmentPost(ctx: Ctx, v: Vault): Promise<Reply> 
     return environmentsPage(ctx, v, { name, ownersOnly, error: message(err) }, code === "42501" ? 403 : code === "P0002" ? 404 : 400);
   }
 }
+
+// One rule for both forms, so Add and Rename can't drift apart.
+const nameHint = (id: string) =>
+  html`<p class="hint" id="${id}">Lowercase letters, digits, <code>-</code> and <code>_</code>, starting with a letter.</p>`;
 
 export async function renamePage(ctx: Ctx, v: Vault, from: string, f: { to?: string; error?: string } = {}, status = 200): Promise<Reply> {
   const title = `Rename ${from}`;
@@ -105,7 +109,8 @@ export async function renamePage(ctx: Ctx, v: Vault, from: string, f: { to?: str
       ${csrfField(ctx.csrf)}
       <input type="hidden" name="from" value="${from}">
       <label for="et">New name</label>
-      <input id="et" type="text" name="to" value="${f.to ?? ""}" required maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <input id="et" type="text" name="to" value="${f.to ?? ""}" required maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="et-hint">
+      ${nameHint("et-hint")}
       <div class="actions"><button class="primary">Rename</button><a class="button quiet" href="${envBase(v.id)}">Cancel</a></div>
     </form>`;
   return shell(ctx, v, title, body, status, envBase(v.id));
