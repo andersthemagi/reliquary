@@ -11,18 +11,19 @@
 # one-line count. Exits non-zero if the registry check, the harness check or any
 # suite fails.
 set -uo pipefail
-cd "$(dirname "$0")"
-source scripts/lib/engine.sh
+cd "$(dirname "$0")" || exit
 
+# A plain array and a case, not declare -A: macOS still ships bash 3.2.
+cmds=(./supabase/tests/run.sh ./mcp/test.sh ./web/test.sh ./cli/test.sh)
+index() { case $1 in sql) echo 0 ;; mcp) echo 1 ;; web) echo 2 ;; cli) echo 3 ;; *) return 1 ;; esac; }
 base=${TEST_SLOT:-0}
 suites=("$@")
 [ ${#suites[@]} -eq 0 ] && suites=(sql mcp web cli)
-
-declare -A cmd=([sql]=./supabase/tests/run.sh [mcp]=./mcp/test.sh [web]=./web/test.sh [cli]=./cli/test.sh)
-declare -A slot=([sql]=$base [mcp]=$((base + 1)) [web]=$((base + 2)) [cli]=$((base + 3)))
 for s in "${suites[@]}"; do
-  [ -n "${cmd[$s]:-}" ] || { echo "unknown suite: $s (sql, mcp, web, cli)"; exit 2; }
+  index "$s" >/dev/null || { echo "unknown suite: $s (sql, mcp, web, cli)"; exit 2; }
 done
+
+source scripts/lib/engine.sh
 
 logs=$(mktemp -d)
 trap 'rm -rf "$logs"' EXIT
@@ -40,15 +41,14 @@ echo "== harness"
 ./scripts/check-harness.sh || { echo "harness check failed"; exit 1; }
 
 start=$SECONDS
-declare -A pid
 for s in "${suites[@]}"; do
-  echo "== $s: ${cmd[$s]} (TEST_SLOT=${slot[$s]})"
+  i=$(index "$s")
+  echo "== $s: ${cmds[i]} (TEST_SLOT=$((base + i)))"
   ( t0=$SECONDS
-    TEST_SLOT=${slot[$s]} "${cmd[$s]}" >"$logs/$s.log" 2>&1
+    TEST_SLOT=$((base + i)) "${cmds[i]}" >"$logs/$s.log" 2>&1
     echo "$? $((SECONDS - t0))" >"$logs/$s.status" ) &
-  pid[$s]=$!
 done
-for s in "${suites[@]}"; do wait "${pid[$s]}"; done
+wait
 
 # Counts: SQL prints PASS/FAIL rows; node:test (TAP, no TTY) prints # pass/# fail.
 count() {
@@ -66,7 +66,7 @@ status=0
 echo
 echo "== summary ($((SECONDS - start))s)"
 for s in "${suites[@]}"; do
-  read -r code secs <"$logs/$s.status" || { code=1; secs=?; }
+  read -r code secs <"$logs/$s.status" || { code=1; secs='?'; }
   if [ "$code" = 0 ]; then
     printf '  PASS  %-4s %s (%ss)\n' "$s" "$(count "$logs/$s.log")" "$secs"
   else

@@ -29,15 +29,11 @@ jobs:
         run: docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
   shellcheck:
-    # The runner's own shellcheck. Errors block; warnings are listed without
-    # blocking until the ones in the test scripts are cleaned up, then the
-    # second step loses continue-on-error and the first one goes.
+    # The runner's own shellcheck. Errors and warnings both block; info and
+    # style notes are left out.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - name: Errors
-        run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=error
-      - name: Warnings (not blocking yet)
-        continue-on-error: true
+      - name: Warnings
         run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning

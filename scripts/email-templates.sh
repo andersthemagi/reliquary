@@ -117,7 +117,7 @@ if [ -z "$id" ]; then
   echo "  scripts/email-templates.sh <id>"
   section=""
   n=0
-  while IFS=$'\t' read -r tid file sec name _gotrue notify subject; do
+  while IFS=$'\t' read -r tid file sec name _gotrue _ subject; do
     if [ "$sec" != "$section" ]; then
       section=$sec
       echo

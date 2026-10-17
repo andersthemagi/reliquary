@@ -2,6 +2,7 @@
 # check and the psql-over-a-container wrapper both use. Sourced, not run,
 # from the repo root (both scripts `cd "$(dirname "$0")/.."` first); needs
 # $engine already set, and $ref/$host too unless PLAN_DB_CONTAINER is.
+# shellcheck disable=SC2034,SC2154 # UUID is for the sourcing script; $engine, $ref and $host come from it
 UUID='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 need() { [[ $2 =~ $3 ]] || { echo "That isn't $1: $2" >&2; exit 2; }; }
 
