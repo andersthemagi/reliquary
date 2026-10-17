@@ -45,6 +45,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Move a .env into a vault](how-to/move-env-into-vault.md)
 - [Invite someone](how-to/invite-someone.md)
 - [Set rules](how-to/set-rules.md)
+- [Keep call and meeting notes](how-to/keep-meeting-notes.md)
 - [Add a link](how-to/add-a-link.md)
 - [Work through a plan with agents](how-to/work-through-a-plan.md)
 - [Rotate a leaked token](how-to/rotate-a-leaked-token.md)
