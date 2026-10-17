@@ -131,7 +131,11 @@ before(async () => {
   S.mail = await start({ RESEND_API_KEY: KEY, EMAIL_FROM: FROM, RESEND_API_URL: api });
   S.none = await start({ RESEND_API_URL: api });
   S.half = await start({ EMAIL_FROM: FROM, RESEND_API_URL: api });
-  S.down = await start({ RESEND_API_KEY: KEY, EMAIL_FROM: FROM, RESEND_API_URL: `http://127.0.0.1:${await freePort()}` });
+  // Port 2: never ephemeral, nothing listens, so the refusal is certain. A
+  // port freePort() just released can be taken again (by a parallel suite on
+  // the host network, or by start()'s own freePort()) before the test runs.
+  // Not port 1 or 9: fetch blocks those ("bad port"), with no ECONNREFUSED.
+  S.down = await start({ RESEND_API_KEY: KEY, EMAIL_FROM: FROM, RESEND_API_URL: "http://127.0.0.1:2" });
 });
 
 after(() => {
