@@ -35,11 +35,14 @@ test("plugin: the marketplace installs the plugin, whose connection is the docs'
   assert.doesNotMatch(readFileSync(join(PLUGIN, ".mcp.json"), "utf8"), /headers|token|Bearer/i, "the plugin carries no credential");
 });
 
-test("plugin brief: in a project linked to a vault, the session starts with list_flags and my_places for it, from a subfolder too", () => {
+test("plugin brief: in a project linked to a vault, the session starts with list_flags, waiting proposal age, and my_places for it, from a subfolder too", () => {
   const out = hook("session-brief.sh", join(project('{\n  "vault": "acme-docs",\n  "environment": "dev"\n}\n'), "src"));
   assert.match(out, /Reliquary vault acme-docs\./);
   assert.match(out, /list_flags/);
   assert.match(out, /advance_flags/);
+  assert.match(out, /list_proposals/);
+  assert.match(out, /how many.*how old the oldest is.*in one line/i);
+  assert.match(out, /nothing when none are waiting/i);
   assert.match(out, /my_places/);
 });
 
