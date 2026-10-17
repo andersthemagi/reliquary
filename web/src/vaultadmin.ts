@@ -25,7 +25,7 @@ import type pg from "pg";
 import { asPerson } from "./db.js";
 import { archiveName, MANIFEST, startExport, writeExport } from "./export.js";
 import { leaveRoutes, membersRoutes } from "./members.js";
-import { callout, confirmPage, csrfField, html, pageHeader, plural, policyBadge, raw, type CrumbPart, type Raw } from "./html.js";
+import { callout, confirmPage, csrfField, html, pageHeader, plural, policyBadge, raw, time, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { message, notFound, render, treePath, UUID, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { crumbs as fileCrumbs, deletePath, vaultShell } from "./files.js";
@@ -126,6 +126,7 @@ async function settings(ctx: Ctx, id: string, d?: GeneralForm): Promise<Reply> {
     const owner = v.role === "owner";
     const policy = d?.policy ?? v.default_policy;
     const soleOwner = owner && (await ownerCount(c, id)) <= 1;
+    const missed = owner ? await missedSearches(c, ctx, id) : "";
     return settingsPage(id, v, "general", {
         description: owner ? `The vault’s name, and what its files are when no rule covers them.` : `${v.name}’s name and default policy.`,
       }, html`
@@ -151,6 +152,7 @@ async function settings(ctx: Ctx, id: string, d?: GeneralForm): Promise<Reply> {
             <div><dt>Your role</dt><dd>${v.role === "editor" ? "Editor" : "Viewer"}</dd></div>
           </dl>
           <p class="hint">Only owners rename a vault or change its default.</p>`}
+      ${missed}
       ${dangerZone(id, v, owner, soleOwner)}`);
   }, d ? 400 : undefined);
 }
@@ -224,6 +226,71 @@ async function saveSettings(ctx: Ctx, id: string): Promise<Reply> {
     ctx.setFlash(message(err));
   }
   return { redirect: settingsPath(id) };
+}
+
+// ---------------------------------------------------------------------------
+// Searches that found nothing (20261017140000_missed_searches.sql): owners
+// only, which RLS decides; the page only skips asking for anyone else.
+
+const MISSED_SHOWN = 100;
+
+async function missedSearches(c: pg.PoolClient, ctx: Ctx, id: string): Promise<Raw> {
+  const days = (await c.query(`select missed_search_days as d from public.vaults where id = $1`, [id])).rows[0].d as number;
+  const { rows } = await c.query(
+    `select words, by_agent, searched_at from public.missed_searches where vault_id = $1
+      order by searched_at desc, id desc limit ${MISSED_SHOWN}`,
+    [id],
+  );
+  return html`<section class="panel" id="missed" aria-labelledby="missed-title">
+      <h2 id="missed-title">Searches that found nothing</h2>
+      <p class="section-lede">What members and their agents searched for in this vault and didn’t find, newest first. It says whether a person or an agent searched, never who. Only owners see this list.</p>
+      ${rows.length
+        ? html`<div class="table-wrap"><table class="table-stack"><thead><tr><th>Words</th><th>By</th><th>When</th></tr></thead><tbody>${rows.map(
+            (r) => html`<tr><td>${r.words}</td><td>${r.by_agent ? "An agent" : "A person"}</td><td>${time(r.searched_at)}</td></tr>`,
+          )}</tbody></table></div>
+          ${rows.length === MISSED_SHOWN ? html`<p class="hint">The newest ${String(MISSED_SHOWN)} are shown.</p>` : ""}`
+        : html`<p class="muted">No searches that found nothing in the last ${plural(days, "day")}.</p>`}
+      <form method="post" action="${settingsPath(id, "/missed")}" class="inline-field">
+        ${csrfField(ctx.csrf)}
+        <label for="missed-days">Keep for (days)</label>
+        <input id="missed-days" type="number" name="days" min="1" max="365" value="${String(days)}" required>
+        <button>Save</button>
+      </form>
+      ${rows.length
+        ? html`<form method="post" action="${settingsPath(id, "/missed/clear")}" class="actions">${csrfField(ctx.csrf)}<button class="danger">Clear list</button></form>`
+        : ""}
+    </section>`;
+}
+
+// POST /config/missed: how many days the list keeps a search. Anything but
+// 1 to 365 goes to the database as null, which refuses it in words.
+async function saveMissedDays(ctx: Ctx, id: string): Promise<Reply> {
+  const typed = (ctx.form.get("days") ?? "").trim();
+  const days = /^\d{1,3}$/.test(typed) ? Number(typed) : null;
+  try {
+    await asPerson(ctx.userId, (c) => c.query(`select public.set_missed_search_days($1, $2)`, [id, days]));
+    ctx.setFlash(`Searches that found nothing are kept ${plural(days ?? 0, "day")} now.`, "success");
+  } catch (err) {
+    ctx.setFlash(message(err));
+  }
+  return { redirect: `${settingsPath(id)}#missed` };
+}
+
+// POST /config/missed/clear. RLS deletes only an owner's rows; anyone else
+// is told so, not shown "Cleared 0 searches".
+async function clearMissed(ctx: Ctx, id: string): Promise<Reply> {
+  try {
+    const n = await asPerson(ctx.userId, async (c) => {
+      const v = await vault(c, ctx, id);
+      if (v?.role !== "owner")
+        throw new Refusal({ status: 403, where: "web app (Settings, Searches that found nothing)", why: "Only the vault’s owners clear this list. Nothing was cleared" });
+      return (await c.query(`delete from public.missed_searches where vault_id = $1`, [id])).rowCount ?? 0;
+    });
+    ctx.setFlash(`Cleared ${plural(n, "search", "searches")}.`, "success");
+  } catch (err) {
+    ctx.setFlash(message(err));
+  }
+  return { redirect: `${settingsPath(id)}#missed` };
 }
 
 // ---------------------------------------------------------------------------
@@ -452,6 +519,8 @@ export async function adminRoutes(ctx: Ctx, id: string, rest: string): Promise<R
   if (rest === "/config/members" || rest.startsWith("/config/members/")) return membersRoutes(ctx, id, rest);
   if (rest === "/config/leave") return leaveRoutes(ctx, id);
   if (rest === "/config/take") return get ? notFound(ctx) : takeVault(ctx, id);
+  if (rest === "/config/missed") return get ? notFound(ctx) : saveMissedDays(ctx, id);
+  if (rest === "/config/missed/clear") return get ? notFound(ctx) : clearMissed(ctx, id);
   if (rest === "/config/usage") return get ? usagePage(ctx, id) : notFound(ctx);
   if (rest === "/config/watching") return watchingRoutes(ctx, id);
   if (rest === "/config/export") return get ? exportPage(ctx, id) : exportDownload(ctx, id);

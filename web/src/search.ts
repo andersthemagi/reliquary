@@ -23,21 +23,30 @@ type Hit = { vault_id: string; vault: string; path: string; policy: string; line
 export async function searchAll(ctx: Ctx): Promise<Reply> {
   const query = (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 200);
   const terms = queryTerms(query);
-  const rows: Hit[] = query
-    ? await asPerson(ctx.userId, async (c) =>
-        (
-          await c.query(
-            `select v.id as vault_id, v.name as vault, s.path, s.policy, ${LINES_SQL}
-               from (select v.id, v.name from public.vaults v
+  const searched = `select v.id, v.name from public.vaults v
                        join public.vault_members m on m.vault_id = v.id and m.user_id = $1
-                      order by v.name, v.id limit ${VAULTS}) v
-              cross join lateral public.search(v.id, $2, ${PER_VAULT}) s
-              order by s.rank desc, s.updated_at desc
-              limit ${TOTAL}`,
-            [ctx.userId, query, terms],
-          )
-        ).rows,
-      )
+                      order by v.name, v.id limit ${VAULTS}`;
+  const rows: Hit[] = query
+    ? await asPerson(ctx.userId, async (c) => {
+        const { rows } = await c.query(
+          `select v.id as vault_id, v.name as vault, s.path, s.policy, ${LINES_SQL}
+             from (${searched}) v
+            cross join lateral public.search(v.id, $2, ${PER_VAULT}) s
+            order by s.rank desc, s.updated_at desc
+            limit ${TOTAL}`,
+          [ctx.userId, query, terms],
+        );
+        // Below TOTAL every vault's matches are here, so a vault with none
+        // found nothing: noted for its owners (20261017140000_missed_searches.sql).
+        // At TOTAL a vault may be missing only because others filled the page.
+        if (rows.length < TOTAL)
+          await c.query(`select private.note_missed_search(v.id, $2) from (${searched}) v where v.id <> all($3::uuid[])`, [
+            ctx.userId,
+            query,
+            rows.map((r) => r.vault_id),
+          ]);
+        return rows;
+      })
     : [];
   const vaults = new Set(rows.map((r) => r.vault_id)).size;
   const body = html`

@@ -21,6 +21,7 @@ Some actions need the person, signed in, in the web app. No agent can do them, t
 - set, rotate, delete or reveal a variable's value, or apply an import;
 - add, edit or delete a link, or set its tool grants;
 - rename a vault or change its default policy;
+- see or clear a vault's [searches that found nothing](vaults-and-files.md#searches-that-found-nothing), or change how long they are kept;
 - erase a file, export a vault, or delete one;
 - become the owner of a [vault with no owner](members.md#a-vault-with-no-owner), which counts it against your plan;
 - redact a [thread](threads.md#redacting-a-message) message;
