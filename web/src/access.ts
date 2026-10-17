@@ -388,7 +388,7 @@ const myVaults = (ctx: Ctx) =>
       ).rows as { id: string; name: string }[],
   );
 
-export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
+async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
   const client = d ? d.client : tokenClient(ctx.url.searchParams.get("client"));
   const vaults = await myVaults(ctx);
   // "All my vaults" used to be preselected. An agent that reaches two clients'
@@ -452,7 +452,7 @@ export async function newToken(ctx: Ctx, d?: TokenDraft): Promise<Reply> {
 
 const refuse = (why: string) => message(new Refusal({ status: 400, where: "web app (New token form)", why }));
 
-export async function createToken(ctx: Ctx): Promise<Reply> {
+async function createToken(ctx: Ctx): Promise<Reply> {
   const name = (ctx.form.get("name") ?? "").trim();
   // Ticked vaults always narrow the scope, whatever the radio says: a
   // mismatch between the two must never produce the broader token.
@@ -533,7 +533,7 @@ const again: Record<string, string> = {
 
 // What revoking stops, before it does: the connection by name, its type,
 // vaults, access and last use, and how to connect again.
-export async function revokePage(ctx: Ctx, tid: string): Promise<Reply> {
+async function revokePage(ctx: Ctx, tid: string): Promise<Reply> {
   if (!UUID.test(tid)) return notFound(ctx);
   const t = await one(ctx, tid);
   if (!t) return notFound(ctx);
@@ -564,7 +564,7 @@ export async function revokePage(ctx: Ctx, tid: string): Promise<Reply> {
   );
 }
 
-export async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
+async function revokeToken(ctx: Ctx, tid: string): Promise<Reply> {
   if (!UUID.test(tid)) return notFound(ctx);
   try {
     const t = await one(ctx, tid);

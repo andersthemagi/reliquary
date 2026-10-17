@@ -95,7 +95,7 @@ export function collapse(rows: Row[]): Line[] {
 // One page of lines, starting just below `before` (a log seq), and where the
 // one after starts. Reads events in batches until it has a line more than
 // the page needs (so the last line is whole) or the log runs out.
-export async function readPage(c: pg.PoolClient, me: string, vaultId: string, before?: string, show: Show = "everyone"): Promise<{ lines: Line[]; next?: string }> {
+async function readPage(c: pg.PoolClient, me: string, vaultId: string, before?: string, show: Show = "everyone"): Promise<{ lines: Line[]; next?: string }> {
   const rows: Row[] = [];
   let cursor = before;
   let lines: Line[] = [];

@@ -92,7 +92,7 @@ export type Nav =
 
 // What the top bar shows, from one call per page (inbox.ts, loadShell;
 // public.shell_summary in 20260926100000_shell_inbox.sql).
-export type ShellItem = {
+type ShellItem = {
   kind: "review" | "revise" | "import" | "invite" | "notice";
   at: string;
   vault: string;
@@ -117,7 +117,7 @@ export type Shell = {
   items: ShellItem[];
 };
 
-export type PageOpts = {
+type PageOpts = {
   user?: string;
   flash?: Flash | string; // a bare string is info, or danger when it ends with a ref (flash.ts)
   theme?: Theme;
@@ -133,7 +133,7 @@ const agoText = (iso: string): string => relativeTime(iso);
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // One inbox item as a link: where it goes, what it is, and a line of context.
-export function inboxItem(i: ShellItem): { href: string; title: string; meta: string } {
+function inboxItem(i: ShellItem): { href: string; title: string; meta: string } {
   const when = agoText(i.at);
   switch (i.kind) {
     case "review":
@@ -550,7 +550,7 @@ export function callout(tone: Tone, body: Raw | string, o: { title?: string; id?
 // Canon and open: a filled or hollow diamond (drawn in CSS) and the word,
 // with what the word means in the title, so the policy never rests on the
 // mark alone and the term is explained wherever it appears.
-export const POLICY_HELP: Record<string, string> = {
+const POLICY_HELP: Record<string, string> = {
   canon: "Canon: changes are proposals that people approve",
   open: "Open: members and agents write directly",
 };

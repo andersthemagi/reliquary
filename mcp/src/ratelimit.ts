@@ -211,7 +211,7 @@ export async function limitUnauthorized(ip: string): Promise<number> {
 
 // The answer over a limit: 429, Retry-After, and a JSON-RPC error that tells
 // the agent to wait. Short, and nothing about what was counted or how.
-export const RATE_LIMITED_CODE = -32029;
+const RATE_LIMITED_CODE = -32029;
 export function rateLimitedBody(wait: number, id: unknown = null): object {
   // The error model's where and reference (failure.ts), logged like any failure.
   const f = failure({ status: 429, where: "rate limit", why: `Rate limit reached; retry after ${wait} seconds`, code: "rate_limited" });

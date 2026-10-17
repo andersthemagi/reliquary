@@ -44,7 +44,7 @@ async function tokenRequest(server: Server, fields: Record<string, string>): Pro
 // ---------------------------------------------------------------------------
 // Login
 
-export type LoginOptions = { openBrowser: boolean; print: (line: string) => void };
+type LoginOptions = { openBrowser: boolean; print: (line: string) => void };
 
 // Windows looks a bare name up in the working directory before PATH, so
 // rundll32 is named by its full path, as the other Windows helpers are.

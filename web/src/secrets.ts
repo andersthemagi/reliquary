@@ -31,9 +31,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 export type Sealed = { keyId: string; nonce: Buffer; ciphertext: Buffer }; // ciphertext = encrypted bytes || 16-byte tag
-export type Slot = { vaultId: string; environment: string; name: string };
+type Slot = { vaultId: string; environment: string; name: string };
 
-export const MAX_VALUE_BYTES = 64 * 1024;
+const MAX_VALUE_BYTES = 64 * 1024;
 const TAG_BYTES = 16;
 const KEY_ID = /^[A-Za-z0-9_-]{1,32}$/;
 const KEY_TEXT = /^[A-Za-z0-9_-]{43}$/;

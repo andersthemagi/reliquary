@@ -55,13 +55,13 @@ const STREAM_CAP = 110 * 1024 * 1024;
 const PAGE = 200;
 const MESSAGE_PAGE = 500;
 
-export type ThreadAnchor =
+type ThreadAnchor =
   | { kind: "path"; path: string }
   | { kind: "proposal"; proposal: string }
   | { kind: "task"; plan_path: string; step_key: string }
   | null;
 
-export type ExportThread = {
+type ExportThread = {
   id: string;
   title: string;
   scope: "vault" | "side";
@@ -76,7 +76,7 @@ export type ExportThread = {
   messages: number;
 };
 
-export type ExportHeader = {
+type ExportHeader = {
   export: string; // the snapshot's id: export_files serves this export's files
   vault: { id: string; name: string; default_policy: string; created_at: string };
   exported_at: string;
@@ -161,7 +161,7 @@ export function tarEntry(path: string, body: Buffer, mtime: number): Buffer {
 }
 
 // Two empty blocks end an archive.
-export const tarEnd = () => Buffer.alloc(1024);
+const tarEnd = () => Buffer.alloc(1024);
 
 // ---------------------------------------------------------------------------
 // Entry names
@@ -193,7 +193,7 @@ export function entryProblem(path: string): string | null {
 // The name under renamed/ for the n-th renamed file: one segment, every
 // character entryProblem objects to as "_", no trailing dot or space, and a
 // number first, so it is never a device name and never collides.
-export function renamedEntry(path: string, n: number): string {
+function renamedEntry(path: string, n: number): string {
   const flat = [...path]
     // eslint-disable-next-line no-control-regex
     .map((c) => (/[\u0000-\u001f\u007f/\\:*?"<>|]/.test(c) || BEST_FIT.test(c) ? "_" : c))
@@ -208,7 +208,7 @@ export function renamedEntry(path: string, n: number): string {
 
 export type FileRow = { path: string; body: string; updated_at: Date; version_id: string };
 // One page of the export's files after `after`, in path order.
-export type FilePages = (after: string, limit: number) => Promise<FileRow[]>;
+type FilePages = (after: string, limit: number) => Promise<FileRow[]>;
 
 const dbPages = (userId: string, h: ExportHeader): FilePages => (after, limit) =>
   asPerson(userId, async (c) =>
@@ -225,7 +225,7 @@ const dbPages = (userId: string, h: ExportHeader): FilePages => (after, limit) =
 // ---------------------------------------------------------------------------
 // Threads
 
-export type MessageRow = {
+type MessageRow = {
   id: string;
   author: string;
   agent: string | null;
@@ -234,7 +234,7 @@ export type MessageRow = {
   redacted_at: Date | null;
   redacted_by: string | null;
 };
-export type ThreadSource = {
+type ThreadSource = {
   // One page of a thread's messages after message `after`, oldest first.
   messages: (thread: string, after: string, limit: number) => Promise<MessageRow[]>;
   // How the exporter may see each person; anyone missing is written as their id.
@@ -271,7 +271,7 @@ function aboutLine(a: ThreadAnchor): string | null {
   return `About: task:${a.plan_path}#${a.step_key} (tasks are not in this export; the plan is under files/)`;
 }
 
-export function threadMarkdown(t: ExportThread, messages: MessageRow[], people: Map<string, string>): string {
+function threadMarkdown(t: ExportThread, messages: MessageRow[], people: Map<string, string>): string {
   // One line whatever a name holds, so no name can start a heading of its own.
   const who = (id: string | null, agent: string | null) =>
     // eslint-disable-next-line no-control-regex

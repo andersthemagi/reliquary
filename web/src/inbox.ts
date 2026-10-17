@@ -11,7 +11,7 @@ import type pg from "pg";
 import type { Shell } from "./html.js";
 
 // How many items the inbox menu lists.
-export const INBOX_MENU_ITEMS = 5;
+const INBOX_MENU_ITEMS = 5;
 
 export async function loadShell(c: pg.PoolClient): Promise<Shell> {
   const s = (await c.query(`select public.shell_summary($1) as s`, [INBOX_MENU_ITEMS])).rows[0].s as Shell;

@@ -8,7 +8,7 @@ export type Tone = "info" | "success" | "warning" | "danger";
 export type Flash = { text: string; tone: Tone };
 
 const TONES: readonly Tone[] = ["info", "success", "warning", "danger"];
-export const isTone = (t: unknown): t is Tone => typeof t === "string" && (TONES as readonly string[]).includes(t);
+const isTone = (t: unknown): t is Tone => typeof t === "string" && (TONES as readonly string[]).includes(t);
 
 // A message that carries a reference is a failure: every refusal ends with
 // "(ref 1a2b3c4d)" (errorpage.ts refusalText, failure.ts), and no success

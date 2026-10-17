@@ -32,7 +32,7 @@ import { liveFiles } from "./threadrefs.js";
 import { settingsCrumb } from "./vaultadmin.js";
 import { canWrite, filePath, message, notFound, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 
-export const claimsPath = (id: string) => vaultPath(id, "/claims");
+const claimsPath = (id: string) => vaultPath(id, "/claims");
 
 // A path typed into a URL, said back only when it's plain (as rules.ts and pathowners.ts do).
 const shown = (path: string) => (/^[^\u0000-\u001f\u007f]{1,200}$/.test(path) ? path : "that path");

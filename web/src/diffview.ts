@@ -7,8 +7,8 @@ import { diffLines, fold, splitRows, type DiffLine, type SplitRow } from "./diff
 import { html, raw, type Raw } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
 
-export const DIFF_MODES = ["unified", "split", "rendered"] as const;
-export type DiffMode = (typeof DIFF_MODES)[number];
+const DIFF_MODES = ["unified", "split", "rendered"] as const;
+type DiffMode = (typeof DIFF_MODES)[number];
 
 // ?diff=unified|split|rendered; the older ?view=result means rendered.
 export function diffMode(params: URLSearchParams): DiffMode {

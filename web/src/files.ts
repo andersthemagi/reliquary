@@ -178,7 +178,7 @@ const needsOwner = (ctx: Ctx, v: Vault): Raw =>
     { title: "This vault needs an owner", id: "needs-owner" },
   );
 
-export type RuleInfo = {
+type RuleInfo = {
   rule?: { path: string; policy: string; quorum: number; set_by: string | null; set_at: Date | null };
   def: string;
 };
@@ -203,7 +203,7 @@ export async function ruleFor(c: pg.PoolClient, id: string, path: string): Promi
   return { rule, def };
 }
 
-export function ruleLine(ctx: Ctx, id: string, r: RuleInfo): Raw {
+function ruleLine(ctx: Ctx, id: string, r: RuleInfo): Raw {
   if (!r.rule) return html`<p class="rule">${policyBadge(r.def)} <span>The vault default. <a href="${vaultPath(id, "/rules")}">Rules</a></span></p>`;
   const needs = r.rule.policy === "canon" ? ` Changes need ${r.rule.quorum} approval${r.rule.quorum > 1 ? "s" : ""}.` : "";
   return html`<p class="rule">${policyBadge(r.rule.policy)} <span>From the rule on <a href="${vaultPath(id, "/rules")}"><code>${r.rule.path}</code></a>${

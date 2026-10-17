@@ -30,7 +30,7 @@ export type VaultUsage = {
 
 // Sizes as the database words them (private.size_text): decimal units,
 // one decimal place at most.
-export function formatBytes(n: number): string {
+function formatBytes(n: number): string {
   const trim = (x: number) => String(Math.round(x * 10) / 10);
   if (Math.abs(n) === 1) return `${n} byte`;
   if (Math.abs(n) < 1000) return `${n} bytes`;
@@ -87,7 +87,7 @@ export async function vaultUsages(c: pg.PoolClient, ids: string[]): Promise<Map<
 export const tierLabel = (u: VaultUsage) => (u.tier === "standard" ? `Standard (${u.planName})` : u.tierName);
 const people = (n: number) => `${n} ${n === 1 ? "person" : "people"}`;
 export const peopleOver = (u: VaultUsage) => u.members + (u.invites ?? 0) >= u.maxMembers;
-export const storageOver = (u: VaultUsage) => u.bytes >= u.maxBytes;
+const storageOver = (u: VaultUsage) => u.bytes >= u.maxBytes;
 
 // Limits this large mean none: a self-hosted instance puts everyone on
 // `self_hosted`, whose limits are the largest the columns hold
@@ -107,9 +107,9 @@ export const usageLine = (u: VaultUsage) =>
     u.maxBytes >= NO_LIMIT_BYTES ? formatBytes(u.bytes) : `${formatBytes(u.bytes)} of ${formatBytes(u.maxBytes)}`}`;
 
 export const peopleLimited = (u: VaultUsage) => u.maxMembers < NO_LIMIT_COUNT;
-export const storageLimited = (u: VaultUsage) => u.maxBytes < NO_LIMIT_BYTES;
+const storageLimited = (u: VaultUsage) => u.maxBytes < NO_LIMIT_BYTES;
 // Storage from 80% on is worth a word before anything is refused.
-export const storageNear = (u: VaultUsage) => storageLimited(u) && !storageOver(u) && u.bytes >= u.maxBytes * 0.8;
+const storageNear = (u: VaultUsage) => storageLimited(u) && !storageOver(u) && u.bytes >= u.maxBytes * 0.8;
 const filled = (u: VaultUsage) => u.members + (u.invites ?? 0);
 const PLANS_DOC = html`<a href="/docs/concepts/plans-and-limits">Plans and limits</a>`;
 // How a limit is raised: by hand, by the operator (on a self-hosted

@@ -20,7 +20,7 @@ export { DiscoveryError as UpstreamError } from "./discovery.js";
 // timeout to the agent is 30 s including its own hop to this server.
 const TIMEOUT_MS = 8_000;
 
-export type UpstreamResult = { content: unknown; isError: boolean };
+type UpstreamResult = { content: unknown; isError: boolean };
 
 // Throws DiscoveryError (exported here as UpstreamError), never the
 // credential, with a reason written for people -- mcp/ relays it to the

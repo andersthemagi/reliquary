@@ -27,7 +27,7 @@ const STEP_KEY = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 // A page that cites more distinct things than this links the first of them.
 const MAX_TARGETS = 300;
 
-export function citesIn(body: string): Cite[] {
+function citesIn(body: string): Cite[] {
   const out: Cite[] = [];
   for (const m of body.matchAll(TOKEN)) {
     const target = m[2].replace(TRAILING, "");

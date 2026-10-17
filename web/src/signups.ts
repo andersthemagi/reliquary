@@ -38,7 +38,7 @@ function standing(s: Signup): string {
   return `Number ${s.place} in line of ${s.waiting} waiting; the line lets in ${s.open_per_day} a day.`;
 }
 
-export function signupEmail(s: Signup): { subject: string; html: string } {
+function signupEmail(s: Signup): { subject: string; html: string } {
   const subject = `Reliquary: new account, ${s.email}`.replace(/[\r\n]+/g, " ");
   const row = (k: string, v: string) => `<tr><th style="text-align:left;padding:2px 12px 2px 0;vertical-align:top">${esc(k)}</th><td style="padding:2px 0">${esc(v)}</td></tr>`;
   const html = `<!doctype html><html><body style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.5;color:#111">

@@ -329,7 +329,7 @@ function security(theme: Theme): string {
 // Dispatch ---------------------------------------------------------------------
 
 // status: 200 unless given (a docs page that doesn't exist is 404).
-export type PublicReply = { status?: number; type: string; body: string; location?: string };
+type PublicReply = { status?: number; type: string; body: string; location?: string };
 
 const PAGES: Record<string, (t: Theme) => string> = {
   "/terms": terms,

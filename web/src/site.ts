@@ -89,7 +89,6 @@ export const requestAccessHref = () => mailOperator("Reliquary early access");
 export const waitingHref = () => mailOperator("Reliquary: waiting to get in");
 export const contactEmail = () => OPERATOR.contactEmail;
 export const biggerPlanHref = () => mailOperator("Reliquary: a bigger plan");
-export const suggestFeatureHref = () => mailOperator("Reliquary feature suggestion");
 
 // The site's own origin: SITE_URL when the public site has a host of its
 // own (hosts.ts), else PUBLIC_URL, else the default. server.ts refuses to
@@ -188,7 +187,7 @@ export function robotsTxt(): string {
   return `User-agent: *\nAllow: /\nDisallow: /oauth/\nDisallow: /api/\n\nSitemap: ${siteOrigin}/sitemap.xml\n`;
 }
 
-export const PUBLIC_PAGES = ["/", ...LEGAL_LINKS.map(([href]) => href)];
+const PUBLIC_PAGES = ["/", ...LEGAL_LINKS.map(([href]) => href)];
 
 // `extra`: more public paths, the docs pages (docs.ts), after these.
 export function sitemapXml(extra: readonly string[] = []): string {

@@ -16,8 +16,8 @@
 import type pg from "pg";
 import { html, type Raw } from "./html.js";
 
-export type TemplateFile = { path: string; body: string };
-export type TemplateRule = { path: string; policy: "canon" | "open"; quorum: number };
+type TemplateFile = { path: string; body: string };
+type TemplateRule = { path: string; policy: "canon" | "open"; quorum: number };
 export type Template = {
   id: string;
   name: string;

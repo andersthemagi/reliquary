@@ -55,7 +55,7 @@ const gone = (ctx: Ctx, id: string): Reply => {
   return { redirect: vaultPath(id, "/links") };
 };
 
-export async function linkGrants(ctx: Ctx, id: string, linkId: string): Promise<Reply> {
+async function linkGrants(ctx: Ctx, id: string, linkId: string): Promise<Reply> {
   const data = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
@@ -109,7 +109,7 @@ export async function linkGrants(ctx: Ctx, id: string, linkId: string): Promise<
   return render(ctx, `Grants for ${data.link.name}`, data.shell, "vaults");
 }
 
-export async function saveLinkGrants(ctx: Ctx, id: string, linkId: string): Promise<Reply> {
+async function saveLinkGrants(ctx: Ctx, id: string, linkId: string): Promise<Reply> {
   const back = vaultPath(id, `/links/${linkId}/grants`);
   const posted = new Set(ctx.form.getAll("grant"));
   try {

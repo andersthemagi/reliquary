@@ -13,7 +13,7 @@ import path from "node:path";
 import { CliError, fsFailure, UsageError } from "./errors.js";
 
 export const DEFAULT_SERVER = "https://app.reliquary.redmage.cc";
-export const PROJECT_FILE = ".reliquary.json";
+const PROJECT_FILE = ".reliquary.json";
 export const TIMEOUT_MS = 30_000;
 
 export type ProjectConfig = { file: string; server?: string; vault?: string; environment?: string };

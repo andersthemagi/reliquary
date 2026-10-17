@@ -4,7 +4,7 @@
 // common start and end; the work is capped, and past the cap the caller shows
 // the proposed text whole with a notice instead of a diff.
 
-export type Seg = { text: string; changed: boolean };
+type Seg = { text: string; changed: boolean };
 export type DiffLine = {
   kind: "same" | "add" | "del";
   text: string;
@@ -15,8 +15,8 @@ export type DiffLine = {
 };
 
 // Line LCS table cells, and characters per side, before giving up.
-export const MAX_CELLS = 4_000_000;
-export const MAX_CHARS = 1_000_000;
+const MAX_CELLS = 4_000_000;
+const MAX_CHARS = 1_000_000;
 // Word diffs: cells per line pair, and for the whole file.
 const MAX_WORD_CELLS = 250_000;
 const MAX_WORD_BUDGET = 2_000_000;
@@ -69,7 +69,7 @@ function lcs(a: string[], b: string[], maxCells: number): Op[] | null {
 }
 
 // Words, runs of whitespace, and single punctuation marks.
-export function tokenize(line: string): string[] {
+function tokenize(line: string): string[] {
   return line.match(/\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu) ?? [];
 }
 
@@ -191,9 +191,9 @@ export function splitRows(lines: DiffLine[]): SplitRow[] {
 
 // Runs of unchanged lines longer than this are folded, keeping CONTEXT lines
 // on each side of a change.
-export const CONTEXT = 3;
+const CONTEXT = 3;
 
-export type Chunk<T> = { fold: false; items: T[] } | { fold: true; items: T[] };
+type Chunk<T> = { fold: false; items: T[] } | { fold: true; items: T[] };
 
 // Groups rows into shown and folded chunks. `same` says whether a row is
 // unchanged context.

@@ -18,7 +18,7 @@ import { emptyState, html, raw, time, type Raw } from "./html.js";
 import { personRef, UUID } from "./personref.js";
 import { watchCovers } from "./watchrule.js";
 
-export const PAGE_SIZE = 50;
+const PAGE_SIZE = 50;
 
 // Every event the database writes to the log, in plain words, and a filter
 // choice for each. web/test/activity_labels.test.mjs reads the migrations
@@ -95,7 +95,7 @@ export const EVENT_LABELS: readonly [string, string][] = [
 // Diagnostics. Every event in EVENT_LABELS is sorted here, once;
 // web/test/activity_labels.test.mjs fails on one that isn't, so a new
 // event is sorted on its way in.
-export type EventKind = "content" | "diagnostic";
+type EventKind = "content" | "diagnostic";
 export const EVENT_KIND: Record<string, EventKind> = {
   "file.write": "content",
   "file.delete": "content",
@@ -354,7 +354,7 @@ export function describe(me: string, r: Pick<Row, "event" | "subject" | "role" |
   return label;
 }
 
-export type ActivityOpts = {
+type ActivityOpts = {
   me: string;
   url: URL;
   base: string; // path the form and pager link to

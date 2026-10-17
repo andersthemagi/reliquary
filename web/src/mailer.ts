@@ -99,8 +99,8 @@ export function idempotencyKey(kind: string, unique: string): string {
 
 // `what` names the operation in a failure ("Emailing the invite"); `tag` is
 // the kind, a Resend tag and the log's word for it.
-export type Outgoing = { to: string; subject: string; html: string; idempotencyKey: string; tag: string; what: string; replyTo?: string };
-export type SendResult = { sent: true; id: string } | { sent: false; failure?: Failure; off?: string };
+type Outgoing = { to: string; subject: string; html: string; idempotencyKey: string; tag: string; what: string; replyTo?: string };
+type SendResult = { sent: true; id: string } | { sent: false; failure?: Failure; off?: string };
 
 const WHERE = "email sender (Resend)";
 

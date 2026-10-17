@@ -101,7 +101,7 @@ export const SEARCH_SQL = `
       as s(path, policy, body, updated_at, author, agent, rank, line, ord)
    order by s.ord`;
 
-export type SearchHit = Omit<FileRow, "body"> & { lines: string[] };
+type SearchHit = Omit<FileRow, "body"> & { lines: string[] };
 
 // With `vector` (the query's, from queryVector), files found by meaning
 // join those found by words; one found by meaning alone shows the first

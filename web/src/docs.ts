@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ALPHA, html, alphaNote, raw, type Raw, type Theme } from "./html.js";
+import { html, alphaNote, raw, type Raw, type Theme } from "./html.js";
 import { renderDocMarkdown } from "./markdown.js";
 import { siteOrigin, sitePage } from "./site.js";
 
@@ -39,7 +39,7 @@ function docs(): Docs | null {
   return loaded;
 }
 
-export const pageUrl = (slug: string) => (slug === "index" ? "/docs" : `/docs/${slug}`);
+const pageUrl = (slug: string) => (slug === "index" ? "/docs" : `/docs/${slug}`);
 const rawUrl = (slug: string) => `/docs/${slug}.md`;
 
 // The public paths of every docs page, for the sitemap.
@@ -171,9 +171,9 @@ function llmsFullTxt(d: Docs): string {
 // The roadmap is the GitHub project board, not a page of ours: two copies
 // meant every feature was moved twice. /roadmap stays as the stable URL (the
 // Alpha badge, the README, old links) and sends people there.
-export const ROADMAP_URL = "https://github.com/users/andersthemagi/projects/3";
+const ROADMAP_URL = "https://github.com/users/andersthemagi/projects/3";
 
-export type DocsReply = { status?: number; type: string; body: string; location?: string };
+type DocsReply = { status?: number; type: string; body: string; location?: string };
 
 const TEXT = "text/plain; charset=utf-8";
 const MARKDOWN = "text/markdown; charset=utf-8";

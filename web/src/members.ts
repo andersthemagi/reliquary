@@ -68,7 +68,7 @@ const label = (m: { user_id: string }) => personRef(m.user_id);
 // 20260926150000 stored "this computer", true only for its own person), so
 // its detail says what it reaches instead.
 const CONN_TYPE: Record<string, string> = { pat: "Token", oauth: "App", cli: "Reliquary CLI" };
-export function connectionDetail(c: Pick<Conn, "kind" | "name" | "client_name">): string {
+function connectionDetail(c: Pick<Conn, "kind" | "name" | "client_name">): string {
   if (c.kind === "cli") return "Reliquary CLI · environment variables";
   const type = CONN_TYPE[c.kind] ?? "Token";
   const client = !c.client_name || c.client_name === c.name ? null : c.client_name;

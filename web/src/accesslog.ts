@@ -5,7 +5,7 @@
 // (tabs, breadcrumbs, the vault frame).
 
 import { emptyState, html, raw, time, type Raw } from "./html.js";
-import { notFound, who, type Ctx, type Reply, type Vault } from "./pages.js";
+import { notFound, who, type Ctx, type Reply } from "./pages.js";
 import { accessLog, type AccessLogRow } from "./variables.js";
 import { base, client, NAME, readsLog, sectionHeader, shell, theVault, waitingIn } from "./variablespage.js";
 
