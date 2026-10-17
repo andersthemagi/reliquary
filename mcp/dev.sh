@@ -65,7 +65,7 @@ case "${1:-}" in
   up)
     if ! "$engine" container exists $pg 2>/dev/null; then
       "$engine" run -d --name $pg --network host -v reliquary-devdata:/var/lib/postgresql/data \
-        -e POSTGRES_PASSWORD="$PG_PASSWORD" docker.io/library/postgres:17 \
+        -e POSTGRES_PASSWORD="$PG_PASSWORD" docker.io/pgvector/pgvector:0.8.2-pg17-trixie \
         -c listen_addresses=127.0.0.1 -c port=$pgport >/dev/null
     else
       "$engine" start $pg >/dev/null

@@ -30,6 +30,10 @@ wait_until() {
   done
 }
 
+# Postgres 17 with pgvector (search by meaning, 20261017110000_semantic_search.sql):
+# the official postgres image with the extension added, as Supabase has it.
+PG_IMAGE=docker.io/pgvector/pgvector:0.8.2-pg17-trixie
+
 # start_postgres <container> <port>
 # Postgres 17 on 127.0.0.1:<port> (host network), ready for connections.
 #
@@ -45,7 +49,7 @@ start_postgres() {
     # Data on tmpfs: nothing in a test needs it to survive, and a tmpfs leaves
     # no volume behind even when a cleanup is skipped.
     "$engine" run -d --name "$name" --network host --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=test \
-      docker.io/library/postgres:17 -c listen_addresses=127.0.0.1 -c port="$port" >/dev/null
+      "$PG_IMAGE" -c listen_addresses=127.0.0.1 -c port="$port" >/dev/null
     # Ask over TCP: the image's init-time server listens on the socket only, so
     # a socket check can pass before the real server is up (a flaky race).
     # In a subshell, because wait_until exits and only a taken port is worth

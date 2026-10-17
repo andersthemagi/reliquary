@@ -36,7 +36,8 @@ x-db-env: &db-env
 
 services:
   db:
-    image: docker.io/library/postgres:17.11
+    # Postgres 17 with pgvector, which search needs (docs/design.md, "Search").
+    image: docker.io/pgvector/pgvector:0.8.2-pg17-trixie
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run deploy/setup.sh first}

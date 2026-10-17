@@ -16,6 +16,9 @@ grant usage on schema public to anon, authenticated, service_role;
 -- Supabase installs extensions in their own schema.
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
+-- As in Supabase, the API roles may use what is in it (pgvector's type and
+-- operators, for search: 20261017110000_semantic_search.sql).
+grant usage on schema extensions to anon, authenticated, service_role;
 
 -- Supabase grants the API roles everything on new objects in public by
 -- default. Migrations must revoke what they don't intend to expose; these

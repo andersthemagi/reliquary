@@ -20,7 +20,7 @@ source ../scripts/lib/containers.sh
 # fsyncs on disk and 32 s in memory (900 MB at peak), and a tmpfs leaves no
 # volume behind even when a cleanup is skipped. Nothing here needs durability.
 "$engine" run -d --network none --tmpfs /var/lib/postgresql/data --name "$name" -e POSTGRES_PASSWORD=test \
-  docker.io/library/postgres:17 >/dev/null
+  "$PG_IMAGE" >/dev/null
 # Ask over TCP: the image's init-time server listens on the socket only, so a
 # socket check can pass before the real server is up (a flaky race).
 wait_until "$name" "Postgres to accept connections" "$engine" exec "$name" pg_isready -h 127.0.0.1 -U postgres -q

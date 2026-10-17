@@ -96,7 +96,7 @@ export const SEARCH_SQL = `
            '[]') as lines
     from ${VAULT_REF}
     cross join lateral public.search(v.id, $2, $3) with ordinality
-      as s(path, policy, body, updated_at, author, agent, rank, ord)
+      as s(path, policy, body, updated_at, author, agent, rank, line, ord)
    order by s.ord`;
 
 export type SearchHit = Omit<FileRow, "body"> & { lines: string[] };
