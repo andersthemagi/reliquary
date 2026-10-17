@@ -729,6 +729,47 @@ must be to the question to count. `smoke.sh` prints what the model gives a
 related and an unrelated pair (0.810 and 0.745 on 2026-10-17). Raise it if
 search by meaning returns noise, lower it if it misses.
 
+## Search quality
+
+Whether search by meaning puts the right file first more often than search
+by words (#405), for your own questions. `supabase/bench/quality.sh` loads
+a folder of files into a vault in a throwaway Postgres (tmpfs, gone when it
+ends), embeds them with gte-small in the `embed` function run locally in
+Supabase's edge runtime, and asks each question through the MCP server's
+own search code twice: words alone, and words and meaning (what `search`
+does with `EMBED_URL` set). Nothing leaves your machine but the model
+download, and no model judges anything: a question counts as found when the
+path you wrote next to it comes back.
+
+```bash
+./supabase/bench/quality.sh                          # the made-up sample in supabase/bench/quality/
+./supabase/bench/quality.sh private/search/questions.tsv private/search/files
+EMBED_MIN_SIMILARITY=0.8 ./supabase/bench/quality.sh ...   # try another floor
+QUALITY_EMBED=stand-in ./supabase/bench/quality.sh   # offline: checks the script, not the model
+QUALITY_EMBED=none ./supabase/bench/quality.sh ...   # words only
+```
+
+**Your own vault:** export it (**Settings**, **Export**, **Download
+export**), unpack it into `private/search/` (gitignored) and pass its
+`files/` folder as the second argument, or point it at any folder of your
+notes; dot-folders such as `.git` are
+skipped. Write your questions into `private/search/questions.tsv`, one per
+line: the question as you would ask it, a tab, and the path of the file
+that answers it (`#` starts a comment). Real questions and real files never
+go in the repo: the sample is made up so it can be.
+
+**Reading it:** two rows, `words` and `words and meaning`, each with how
+often the right file came first and how often it was in the top 5, then
+the questions each missed and where the right file came instead (`at 3`, or
+`not in the top 10`). The first line under the counts says which vectors
+were used; if it says `not measured` (no network for the first model
+download, or the function failing), only words were measured and the
+reason is there. A question both rows miss usually means the file doesn't
+say what you asked in any words; one only words misses is what meaning is
+for. If meaning brings the wrong file first, raise the floor and run again.
+The sample's first run, 2026-10-17: words 3 of 12 first, words and meaning
+12 of 12.
+
 ## Rotating secrets
 
 | Secret | Where it lives | How to rotate | Effect |

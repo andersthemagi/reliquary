@@ -1,0 +1,14 @@
+# Made-up questions over the made-up vault beside this file (quality.sh).
+# One per line: the question, a tab, the path search should put first.
+what do we charge teams	decisions/pricing.md
+price per seat	decisions/pricing.md
+where is the database hosted	decisions/hosting.md
+Netlify	decisions/hosting.md
+how often is a copy of our data saved	ops/backups.md
+restore	ops/backups.md
+who answers when something breaks at night	ops/on-call.md
+what happens in a new hire's first week	people/onboarding.md
+tomatoes	notes/garden.md
+which vegetables want sunlight	notes/garden.md
+books for the cold months	notes/reading-list.md
+when is the churn report due	clients/acme/brief.md
