@@ -140,7 +140,7 @@ test("workplan_format: planning fields: due, priority, notes and for parse and r
     "  for: agents",
     "- key: b",
     "  title: B",
-    "  for: Ana@Example.test",
+    "  for: 3FA85F64",
     "- key: c",
     "  title: C",
     "```",
@@ -149,7 +149,7 @@ test("workplan_format: planning fields: due, priority, notes and for parse and r
   assert.equal(first.ok, true, JSON.stringify(first.errors));
   const [a, b, c] = first.plan.steps;
   assert.deepEqual([a.due, a.priority, a.notes, a.for], ["2020-02-29", 1, "Drop rows with no account id;\tkeep the raw file.", "agents"]);
-  assert.equal(b.for, "Ana@Example.test");
+  assert.equal(b.for, "3FA85F64");
   assert.deepEqual([c.due, c.priority, c.notes, c.for], [null, null, null, null]);
   const second = parseWorkPlanBlock(renderWorkPlanBlock(first.plan));
   const strip = (steps) => steps.map(({ line, ...rest }) => rest);
@@ -173,6 +173,11 @@ test("workplan_format: planning fields: empty notes, notes over 2000 characters 
   assertRefused(withLine("notes: a\u0007b"), "line 4: notes have a control character");
 });
 
-test("workplan_format: planning fields: for that is not agents, people or an email is refused with its line", () => {
-  assertRefused(withLine("for: robots"), "line 4: for must be agents, people or a member's email");
+test("workplan_format: planning fields: for that is not agents, people or a short tag is refused with its line", () => {
+  assertRefused(withLine("for: robots"), "line 4: for must be agents, people or a member's short tag");
+  assertRefused(withLine("for: 3fa85f6"), "line 4: for must be agents, people or a member's short tag");
+});
+
+test("for by tag: an email in for is refused with its line, saying to use the tag", () => {
+  assertRefused(withLine("for: ana@example.test"), "line 4: for can't be an email; name the member by their short tag");
 });

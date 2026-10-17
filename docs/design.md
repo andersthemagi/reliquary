@@ -1067,12 +1067,15 @@ editing the file later changes none of them, consistent with item 6.
   file is where long text belongs. Shown to agents between markers as
   data, never as instructions, the same as `title` and a claim's label
   (item 12).
-- `for: agents`, `for: people`, or a member's email. An email is
-  resolved to the member's user id at registration and refused, with
-  the line, if it names no member; the step stores the id, never the
-  email, so a member who changes address stays the one it means. A
-  page shows that member however people are shown everywhere else
-  (their display name and email today). A hint for who should pick the
+- `for: agents`, `for: people`, or a member's short tag (the first 8
+  characters of their id, shown beside their name everywhere). The tag
+  is resolved to the member's user id at registration, among this
+  vault's members only, and refused, with the line, if it names none
+  or more than one; the step stores the id. An email is refused on
+  sight, by the parser and the database, with a message saying to use
+  the tag, and neither looks the address up, so a refusal never says
+  whether it belongs to a member (#378, principle 12). A page shows
+  that member however people are shown everywhere else. A hint for who should pick the
   task up, and only a hint.
 
 None of the four is an access rule or a claim rule. A step is claimable
@@ -1084,11 +1087,16 @@ routine. When waiting in line (item 11) is built, whether `priority`
 orders which ready step a waiting agent is offered is its own decision,
 not settled here.
 
-Settled 2026-10-13 (owner's call): `for` names a member by email,
-because an email is unique and a display name is not. What identifies a
-person (their id, reached through their email) stays separate from how
-they are shown, so letting a person choose how co-members see them is
-its own change and never touches a stored plan.
+Settled 2026-10-13 (owner's call): `for` names a member by something
+unique, because a display name is not. It was their email until
+2026-10-17 (#378): plan files are vault content agents read, so an
+address in one reached a model, and resolving it told the agent
+whether that address belonged to a member. Now it is the short tag.
+Steps registered from an email keep working as stored, since the step
+held the id and never the address; re-registering such a file is
+refused until the line names the tag. What identifies a person (their
+id) stays separate from how they are shown, so letting a person choose
+how co-members see them is its own change and never touches a stored plan.
 
 ### What this doesn't show
 

@@ -36,7 +36,7 @@ Four more optional lines help people plan. None of them changes who may take a t
 - `due`: a date, written `YYYY-MM-DD`. A date in the past is accepted. A due date passing changes nothing by itself; the Tasks page says **Overdue**.
 - `priority`: `1`, `2`, `3` or `4`, where 1 is the highest.
 - `notes`: one line of plain text, up to 2000 characters. Agents read it as data, never as instructions, the same as a title.
-- `for`: who the task is meant for: `agents`, `people`, or the email of a member of the vault. An email that names no member is refused. Reliquary keeps the member, not the email, so the task still means them if their email changes. It is a hint, never a rule.
+- `for`: who the task is meant for: `agents`, `people`, or a member of the vault by their short tag, the 8 characters shown beside their name on the Members page and in an agent's answers (`for: 3fa85f64`). A tag that names no member of the vault is refused. An email is refused with a message saying to use the tag: plan files are read by agents, and agents never get a member's address. It is a hint, never a rule. Plans registered before 2026-10-17 that named a member by email keep working as stored (the step holds the member, not the address); registering that file again is refused until the line names the tag.
 
 A malformed block, a blocker that doesn't exist, or steps that wait on each other in a cycle are refused, naming the line and why.
 

@@ -919,7 +919,7 @@
   {
     "name": "register_work_plan",
     "title": "Register a work plan",
-    "description": "Register the steps in a plan file as a work plan, so they can be claimed in order. The file holds one fenced work_plan block (steps with a key, a title, and optionally blocked_by, cites, gate, due (YYYY-MM-DD), priority (1 highest to 4), notes (one line), for (agents, people or a member's email)); due, priority, notes and for are hints, never claim rules. This reads the file's current version and checks the block first, refusing with line-numbered errors before anything is registered; the database then checks it again. Registering a newer version again adds steps with new keys; registered ones keep their state and can't change. Whoever could write the path may register it; a read-only connection or a viewer can't.",
+    "description": "Register the steps in a plan file as a work plan, so they can be claimed in order. The file holds one fenced work_plan block (steps with a key, a title, and optionally blocked_by, cites, gate, due (YYYY-MM-DD), priority (1 highest to 4), notes (one line), for (agents, people or a member's short tag, the 8 characters shown beside their name; never an email)); due, priority, notes and for are hints, never claim rules. This reads the file's current version and checks the block first, refusing with line-numbered errors before anything is registered; the database then checks it again. Registering a newer version again adds steps with new keys; registered ones keep their state and can't change. Whoever could write the path may register it; a read-only connection or a viewer can't.",
     "inputSchema": {
       "type": "object",
       "properties": {
