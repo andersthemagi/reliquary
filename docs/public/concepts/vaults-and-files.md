@@ -90,7 +90,7 @@ When a search in a vault finds nothing, Reliquary notes it, so the vault's owner
 
 - **What is kept.** The words (up to 200 characters), whether a person or an agent searched, and when. Never who: no name, no account, no agent or connection name.
 - **Who sees it.** Only the vault's owners, in the web app: **Settings**, **General**, **Searches that found nothing**, newest first. Editors, viewers, agents (an owner's own included: it is on [the ceiling](agents.md#the-ceiling)) and anyone outside the vault never see it, and no MCP tool returns it.
-- **How long.** 30 days unless an owner changes **Keep for (days)** to anything from 1 to 365 and chooses **Save**. Older entries are dropped when the next one is noted, and at once when the period is shortened.
+- **How long.** 30 days unless an owner changes **Keep for (days)** to anything from 1 to 365 and chooses **Save**. Older entries are dropped when the next one is noted, and at once when the period is shortened. A vault keeps at most its newest 500, however recent the rest.
 - **Clearing it.** An owner chooses **Clear list**. Deleting the vault deletes the list with it.
 
 ## Diagnostics

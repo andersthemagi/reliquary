@@ -92,6 +92,18 @@ select t.expect('clear: an owner in person clears the list',
   '1 ');
 
 -- ---------------------------------------------------------------------------
+-- The cap
+
+insert into public.missed_searches (vault_id, words, by_agent)
+  select t.id('v1'), 'junk ' || i, true from generate_series(1, 510) i;
+select t.expect('cap: a vault keeps only its newest 500 searches that found nothing, however many are noted',
+  t.note('ben', 'v1', 'compost heap') || ' '
+  || t.run('ana', format($q$select count(*) || ' ' || bool_or(words = 'compost heap') || ' '
+                             || bool_or(words = 'junk 12') || ' ' || bool_or(words = 'junk 11')
+                             from public.missed_searches where vault_id = %L$q$, t.id('v1'))),
+  'true 500 true true false');
+
+-- ---------------------------------------------------------------------------
 -- Deleting the vault
 
 select t.run('dee', format($q$select public.delete_vault(%L, 'Other')::text$q$, t.id('v2')));

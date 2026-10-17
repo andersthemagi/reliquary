@@ -42,6 +42,10 @@ language plpgsql volatile security definer set search_path = '' as $$
 declare
   v_words text := left(trim(coalesce(p_words, '')), 200);
   v_days smallint;
+  -- Any member or agent can call this in a loop with made-up words, so a
+  -- vault keeps only its newest rows: more than an owner reads, and a bound
+  -- on what one member can make the list (and the database) hold.
+  c_keep constant int := 500;
 begin
   if v_words = '' or private.role_in(p_vault) is null then
     return false;
@@ -54,6 +58,10 @@ begin
    where vault_id = p_vault and searched_at < now() - make_interval(days => v_days);
   insert into public.missed_searches (vault_id, words, by_agent)
   values (p_vault, v_words, private.agent() is not null);
+  delete from public.missed_searches
+   where vault_id = p_vault
+     and id <= (select id from public.missed_searches where vault_id = p_vault
+                 order by id desc offset c_keep limit 1);
   return true;
 end $$;
 
