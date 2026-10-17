@@ -123,6 +123,12 @@ before(async () => {
   await sql("select test_support.add_member($1, $2, 'editor', $3)", [V.studio, ELI, DORA]);
   await as(DORA, "select public.write_file($1, 'notes/zebra.md', 'Zebra stripes, by Dora.')", [V.studio]);
   await as(GUS, "select public.write_file($1, 'notes/zebra-gus.md', 'Zebra, but private to Gus.')", [V.gus]);
+  for (const [path, text] of [
+    ["notes/quagga.md", "Intro without the word.\n\nFirst Quagga line.\nfiller\nSecond quagga line.\nThird quagga.\nFourth quagga, not shown.\n"],
+    ["notes/quagga-long.md", `quagga ${"x".repeat(300)}`],
+    ["notes/okapi.md", "\n   \nFirst real line.\nSecond."],
+    ["notes/tapir.md", "<script>alert('tapir')</script> & more"],
+  ]) await as(DORA, "select public.write_file($1, $2, $3)", [V.studio, path, text]);
   S.dora = await startAs(DORA);
   S.eli = await startAs(ELI);
   S.fay = await startAs(FAY);
@@ -263,6 +269,40 @@ test("search empty: no match is the shared empty state, a title and what to try"
   assert.match(
     await page("dora", "/search?q=nothing-matches-this"),
     /<div class="empty"><strong>Nothing in your vaults matches “nothing-matches-this”<\/strong><p>Try fewer words, or part of a file name\.<\/p><\/div>/,
+  );
+});
+
+// The lines a result shows (searchlines.ts), the same shape as the MCP search's.
+const snippetOf = (h, path) =>
+  new RegExp(`${path.replace(/[./]/g, "\\$&")}</a>[\\s\\S]*?<span class="snippet">([\\s\\S]*?)</span></span></li>`).exec(h)?.[1];
+
+test("search lines: a result shows up to three numbered lines that hold the words, not the start of the file", async () => {
+  assert.equal(
+    snippetOf(await page("dora", "/search?q=quagga"), "notes/quagga.md"),
+    '<span class="snippet-line"><span class="line-no">3</span> First <mark>Quagga</mark> line.</span>' +
+      '<span class="snippet-line"><span class="line-no">5</span> Second <mark>quagga</mark> line.</span>' +
+      '<span class="snippet-line"><span class="line-no">6</span> Third <mark>quagga</mark>.</span>',
+  );
+});
+
+test("search lines: a line is cut at 200 characters", async () => {
+  assert.equal(
+    snippetOf(await page("dora", "/search?q=quagga"), "notes/quagga-long.md"),
+    `<span class="snippet-line"><span class="line-no">1</span> <mark>quagga</mark> ${"x".repeat(193)}…</span>`,
+  );
+});
+
+test("search lines: a file found only by its path shows its first non-blank line", async () => {
+  assert.equal(
+    snippetOf(await page("dora", "/search?q=okapi"), "notes/okapi.md"),
+    '<span class="snippet-line"><span class="line-no">3</span> First real line.</span>',
+  );
+});
+
+test("search lines: file text that looks like HTML shows as text, with the words marked", async () => {
+  assert.equal(
+    snippetOf(await page("dora", "/search?q=tapir"), "notes/tapir.md"),
+    '<span class="snippet-line"><span class="line-no">1</span> &lt;script&gt;alert(&#39;<mark>tapir</mark>&#39;)&lt;/script&gt; &amp; more</span>',
   );
 });
 
