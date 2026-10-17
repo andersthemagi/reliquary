@@ -46,7 +46,7 @@ In the web app, **Threads** in a vault's navigation lists every thread in the va
 
 Each row reads like a row on the Proposals page: the title, the file it is about as its path (a task or proposal it is about is named in words), and who opened it, such as "sol@example.com via Claude Code". At the end are **Open** or **Resolved**, how many messages it has, and when the last one was posted. A thread's state and a side thread's marker are words, never only a colour.
 
-The threads addressed to you come first, under **Addressed to you**. Nothing marks a thread as read or unread: the page doesn't track what you have seen. Past 100 threads, **Older threads** shows the next page.
+The threads addressed to you come first, under **Addressed to you**. A thread with a message you haven't seen yet is marked **Unread**, in words. Opening a thread marks it read up to the newest message shown; a message of your own, posted in person, never makes a thread unread, but one your agent posted does. What you have read is yours alone: no other member and no agent can see it. Past 100 threads, **Older threads** shows the next page.
 
 A file's page says how many threads are about it, in a line like **2 threads about this file**, and links to the list for that file. A file with no threads has no line, and the editor never has one.
 

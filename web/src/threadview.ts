@@ -43,6 +43,18 @@ async function messagesOf(c: pg.PoolClient, id: string, tid: string, after: stri
   return { rows: rows.slice(0, PAGE), more: rows.length > PAGE };
 }
 
+// The newest message the person was shown, kept for the Threads page's
+// Unread badge (public.thread_reads: theirs alone, in person). An older page
+// of a long thread never moves it back.
+async function markRead(c: pg.PoolClient, me: string, id: string, tid: string, through: string): Promise<void> {
+  await c.query(
+    `insert into public.thread_reads (user_id, vault_id, thread_id, last_message_id) values ($1, $2, $3, $4)
+       on conflict (user_id, vault_id, thread_id) do update
+       set last_message_id = greatest(public.thread_reads.last_message_id, excluded.last_message_id), updated_at = now()`,
+    [me, id, tid, through],
+  );
+}
+
 function messageItem(ctx: Ctx, id: string, tid: string, m: Message, links: Map<string, string>, owner: boolean): Raw {
   const redact =
     owner && m.body !== null
@@ -89,6 +101,7 @@ export async function threadView(ctx: Ctx, id: string, tid: string, refused?: Re
     const t = v ? await threadIn(c, id, tid) : undefined;
     if (!v || !t) return null;
     const { rows, more } = await messagesOf(c, id, tid, after);
+    if (rows.length) await markRead(c, ctx.userId, id, tid, rows[rows.length - 1].id);
     const links = await resolveCites(c, id, rows.flatMap((m) => (m.body === null ? [] : [m.body])));
     const about = (await anchorLines(c, id, [t])).get(t.id);
     const writer = canWrite(v);
