@@ -43,7 +43,7 @@ export class LinkProxyError extends Error {
 // response, all inside mcp/'s own 30 s request timeout (server.ts).
 const TIMEOUT_MS = 28_000;
 
-export type LinkCallRequest = {
+type LinkCallRequest = {
   vaultId: string;
   url: string;
   keyId: string;
@@ -52,7 +52,7 @@ export type LinkCallRequest = {
   toolName: string;
   args: unknown;
 };
-export type LinkCallResult = { content: unknown; isError: boolean };
+type LinkCallResult = { content: unknown; isError: boolean };
 
 // Throws LinkProxyError, never the credential (this call never holds a
 // plaintext one to begin with), with a reason written for people; the

@@ -58,7 +58,7 @@ export function configureDiscovery(env: NodeJS.ProcessEnv): void {
 }
 export const discoveryAllowsLoopback = (): boolean => ALLOW_LOOPBACK;
 
-export type DiscoveredTool = { name: string; isWrite: boolean; description: string | null };
+type DiscoveredTool = { name: string; isWrite: boolean; description: string | null };
 
 export type DiscoveryOptions = {
   allowLoopback?: boolean;
@@ -183,7 +183,7 @@ function withoutCredential(said: string, credential: string): string {
   return masked;
 }
 
-export type CallOptions = Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve">;
+type CallOptions = Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve">;
 
 export async function call(
   u: URL,
@@ -254,7 +254,7 @@ function toolOf(raw: unknown): DiscoveredTool | null {
   return { name: t.name, isWrite, description };
 }
 
-export type Handshake = { u: URL; sessionId: string | undefined; protocolVersion: string; opts: CallOptions };
+type Handshake = { u: URL; sessionId: string | undefined; protocolVersion: string; opts: CallOptions };
 
 // Validates a link's url and runs the initialize / initialized handshake
 // every call to an upstream MCP server starts with -- shared by

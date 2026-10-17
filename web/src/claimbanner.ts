@@ -21,7 +21,7 @@ import { callout, html, time, type Raw } from "./html.js";
 import { canWrite, who, type Ctx, type Vault } from "./pages.js";
 
 // What the person is about to do on the page the banner sits on.
-export type ClaimMode = "view" | "write" | "propose";
+type ClaimMode = "view" | "write" | "propose";
 
 // `back` is the page Break returns to once the claim is broken. Owners and
 // editors get Break; the database is what decides who may break a claim

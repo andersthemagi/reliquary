@@ -43,7 +43,7 @@ const filePath = (id: string, path: string) => vaultPath(id, `/file?path=${q(pat
 // keep the vault's own settings, the person's own, and the rarely needed
 // apart. Export is an owner's only, so only owners see it.
 
-export type SettingsTab = "general" | "members" | "rules" | "usage" | "watching" | "diagnostics" | "export";
+type SettingsTab = "general" | "members" | "rules" | "usage" | "watching" | "diagnostics" | "export";
 type NavItem = [SettingsTab, string, (id: string) => string];
 const NAV: [string, NavItem[]][] = [
   [
@@ -64,7 +64,7 @@ const NAV: [string, NavItem[]][] = [
     ],
   ],
 ];
-export const settingsTabLabel = (t: SettingsTab) => NAV.flatMap(([, items]) => items).find(([k]) => k === t)![1];
+const settingsTabLabel = (t: SettingsTab) => NAV.flatMap(([, items]) => items).find(([k]) => k === t)![1];
 // Leave and Delete sit at the foot of General; their confirm pages come back here.
 export const dangerPath = (id: string) => `${settingsPath(id)}#danger`;
 

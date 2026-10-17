@@ -111,7 +111,7 @@ const CMD_UNSAFE = /["%\r\n\u0000]/;
 // (CommandLineToArgvW): backslashes before the closing quote are doubled.
 export const quoteForCmd = (arg: string) => `"${arg.replace(/(\\+)$/, "$1$1")}"`;
 
-export type SpawnPlan = { file: string; args: string[]; verbatim: boolean };
+type SpawnPlan = { file: string; args: string[]; verbatim: boolean };
 
 export function windowsSpawnPlan(command: string, args: string[], env: NodeJS.ProcessEnv, cwd: string, exists?: (p: string) => boolean): SpawnPlan {
   const file = resolveWindowsCommand(command, env, cwd, exists);

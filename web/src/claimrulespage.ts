@@ -33,7 +33,7 @@ import { vaultShell } from "./files.js";
 import { settingsCrumb } from "./vaultadmin.js";
 import { message, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
 
-export type ClaimRule = {
+type ClaimRule = {
   path: string; // "" is the whole vault
   lease_minutes: number;
   hold_limit_minutes: number;
@@ -60,7 +60,7 @@ export async function loadClaimRules(c: pg.PoolClient, id: string): Promise<Clai
 
 // What a path gets when no rule covers it: private.claim_rule_for's and
 // private.queue_rule_for's own fallbacks (the Org preset).
-export const BUILT_IN = { lease: 48 * 60, hold: 7 * 24 * 60, conn: 1, person: 5, place: 6 * 60, hint: 60, gap: 15 * 60 };
+const BUILT_IN = { lease: 48 * 60, hold: 7 * 24 * 60, conn: 1, person: 5, place: 6 * 60, hint: 60, gap: 15 * 60 };
 
 // Minutes as a person reads them, exactly: 150 minutes is "150 min", never
 // a rounded "3 h".
@@ -72,7 +72,7 @@ export function duration(minutes: number): string {
 
 // Design item 3: lease, longest check-again hint and place in line as given
 // there; the minimum gap a quarter of the hint, never below the 10 second floor.
-export const CLAIM_RULE_PRESETS = [
+const CLAIM_RULE_PRESETS = [
   { id: "hackathon", name: "Hackathon", lease: 30, hold: 120, place: 15, hint: 1, gap: 15 },
   { id: "team", name: "Team", lease: 480, hold: 1440, place: 120, hint: 15, gap: 225 },
   { id: "org", name: "Org", lease: 2880, hold: 10080, place: 360, hint: 60, gap: 900 },

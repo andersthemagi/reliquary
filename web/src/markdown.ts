@@ -17,7 +17,7 @@ const SAFE_LINK = /^(https?:|mailto:|#|\/(?!\/)|\.{0,2}\/|[^:]*$)/i;
 md.validateLink = (url: string) => SAFE_LINK.test(url.trim());
 
 // What a docs render collects and needs. Absent for file previews.
-export type DocEnv = {
+type DocEnv = {
   resolve: (href: string) => string; // a link as written -> the href to use
   headings: { level: number; text: string; id: string }[];
 };
@@ -39,7 +39,7 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
 
 // A heading's id: its text, lower case, letters, digits, `_` and `-` kept,
 // spaces to `-` (GitHub's rule, so links written for either work).
-export function headingId(text: string): string {
+function headingId(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s_-]/gu, "")

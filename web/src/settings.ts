@@ -54,7 +54,7 @@ import { EMAIL } from "./signin.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 import { shortId } from "./personref.js";
 
-export const DISPLAY_NAME_MAX = 80;
+const DISPLAY_NAME_MAX = 80;
 
 // A refused save, as posted and with the reason (and its reference), shown
 // in the form it came from.

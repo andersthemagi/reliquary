@@ -12,7 +12,7 @@ import { asPerson } from "./db.js";
 import { fromDb, open, reseal, seal, SecretsError } from "./secrets.js";
 
 export type Environment = { name: string; ownersOnly: boolean };
-export type VariableValue = { environment: string; version: number; updatedBy: string; updatedAt: Date };
+type VariableValue = { environment: string; version: number; updatedBy: string; updatedAt: Date };
 export type Variable = { name: string; values: VariableValue[] };
 export type AccessLogRow = {
   seq: string;
@@ -28,7 +28,7 @@ export type AccessLogRow = {
   names: string[];
   detail: Record<string, unknown>;
 };
-export type RevealResult =
+type RevealResult =
   | { ok: true; value: string; updatedAt: string; updatedBy: string }
   | { ok: false; error: "unauthorized" | "forbidden" | "not_found" | "decrypt_failed" };
 
@@ -218,9 +218,9 @@ export async function readersSinceSet(userId: string, vaultId: string): Promise<
 // sees them, and applying copies the ciphertext without opening it. The
 // database decides who may create, see, apply and reject.
 
-export type ImportItem = { name: string; environment: string; key_id: string; nonce: string; ciphertext: string };
+type ImportItem = { name: string; environment: string; key_id: string; nonce: string; ciphertext: string };
 export type ImportRefusal = { line: number; name: string | null; reason: string };
-export type CreateImportResult =
+type CreateImportResult =
   | { ok: true; id: string; source: "web" | "cli"; environments: string[]; names: string[]; overwrites: string[]; expires_at: string }
   | { ok: false; error: "unauthorized" | "forbidden" | "push_not_allowed" | "not_found" | "rate_limited" };
 export type EnvImport = {
@@ -238,7 +238,7 @@ export type EnvImport = {
   decidedBy: string | null;
   decidedAt: Date | null;
 };
-export type DecideResult =
+type DecideResult =
   | { ok: true; applied?: number; names?: string[]; environments?: string[] }
   | { ok: false; error: "unauthorized" | "forbidden" | "not_found" | "expired" | "applied" | "rejected" | "storage_limit"; message?: string };
 

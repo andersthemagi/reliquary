@@ -17,7 +17,7 @@
 
 import { emailHtml, emailTemplates } from "./emails.js";
 
-export const EMAIL_PATH_PREFIX = "/_selfhost/email/";
+const EMAIL_PATH_PREFIX = "/_selfhost/email/";
 
 export const selfHosted = (env: NodeJS.ProcessEnv = process.env): boolean => env.SELF_HOSTED === "1";
 

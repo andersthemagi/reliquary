@@ -16,7 +16,7 @@ import { vaultShell } from "./files.js";
 import { notFound, render, vault, vaultPath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { settingsPage } from "./vaultadmin.js";
 
-export type DiagTab = "claims" | "log";
+type DiagTab = "claims" | "log";
 
 // The tabs, in order, and one line each for the landing page.
 const DIAG_TABS: { tab: DiagTab; label: string; what: string }[] = [
@@ -26,7 +26,7 @@ const DIAG_TABS: { tab: DiagTab; label: string; what: string }[] = [
 // The Log keeps the address the vault's Activity page always had.
 const tabHref = (id: string, tab: DiagTab) => vaultPath(id, tab === "log" ? "/activity" : `/${tab}`);
 
-export const DIAGNOSTICS_NOTE = "For working out why something happened; most people never need it.";
+const DIAGNOSTICS_NOTE = "For working out why something happened; most people never need it.";
 
 // A tab's heading and what it shows, under the frame's own heading.
 export const diagSection = (title: string, what: Raw | string): Raw => html`<h2>${title}</h2><p class="lede">${what}</p>`;

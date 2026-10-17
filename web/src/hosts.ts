@@ -35,7 +35,6 @@ const originOf = (v: string | undefined): string => {
 const APP = originOf(process.env.PUBLIC_URL);
 const SITE = originOf(process.env.SITE_URL);
 export const split = !!SITE && !!APP && SITE !== APP;
-const APP_HOST = split ? new URL(APP).host : "";
 const SITE_HOST = split ? new URL(SITE).host : "";
 
 // Checked once at start (server.ts): a message naming the variable, never
@@ -68,13 +67,12 @@ export function publicSiteOrigin(fallback: string): string {
 export const siteHref = (path: string) => (split ? SITE + path : path);
 export const appHref = (path: string) => (split ? APP + path : path);
 
-export type HostKind = "site" | "app" | "single";
+type HostKind = "site" | "app" | "single";
 
 export function hostKind(hostHeader: string | undefined): HostKind {
   if (!split) return "single";
   return (hostHeader ?? "").toLowerCase() === SITE_HOST ? "site" : "app";
 }
-export const appHostName = () => APP_HOST;
 
 // Paths only the public site serves (GET). Static files are not here: both
 // hosts serve them.

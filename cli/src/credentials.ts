@@ -47,7 +47,7 @@ export type Credential = {
 type Store = { version: 1; servers: Record<string, Credential> };
 
 // One place sign-ins are kept.
-export interface CredentialStore {
+interface CredentialStore {
   readonly kind: "file" | "keychain";
   readonly where: string; // for people: "the macOS Keychain", a file's path
   get(server: string): Credential | null;
@@ -77,9 +77,9 @@ const EXEC_TIMEOUT_MS = 20_000;
 const LOCK_STALE_MS = TIMEOUT_MS + EXEC_TIMEOUT_MS + 10_000;
 const LOCK_WAIT_MS = LOCK_STALE_MS + 15_000;
 
-export const SERVICE = "reliquary-cli";
+const SERVICE = "reliquary-cli";
 
-export function configDir(): string {
+function configDir(): string {
   if (process.env.RELIQUARY_CONFIG_DIR) return path.resolve(process.env.RELIQUARY_CONFIG_DIR);
   if (process.platform === "win32" && process.env.APPDATA) return path.join(process.env.APPDATA, "reliquary");
   const base = process.env.XDG_CONFIG_HOME && path.isAbsolute(process.env.XDG_CONFIG_HOME) ? process.env.XDG_CONFIG_HOME : path.join(os.homedir(), ".config");
@@ -87,7 +87,7 @@ export function configDir(): string {
 }
 
 export const credentialsFile = () => path.join(configDir(), "credentials.json");
-export const dpapiFile = () => path.join(configDir(), "credentials.dpapi");
+const dpapiFile = () => path.join(configDir(), "credentials.dpapi");
 
 // The advice for any failure in the config directory: it is the one place a
 // person can move.
@@ -190,8 +190,8 @@ export function fileStore(): CredentialStore & { has(server: string): boolean } 
 // ---------------------------------------------------------------------------
 // Running a keychain tool: no shell, the secret (if any) on standard input.
 
-export type ExecResult = { status: number | null; stdout: string; stderr: string; failed: boolean };
-export type Exec = (file: string, args: string[], opts?: { input?: string; timeoutMs?: number }) => ExecResult;
+type ExecResult = { status: number | null; stdout: string; stderr: string; failed: boolean };
+type Exec = (file: string, args: string[], opts?: { input?: string; timeoutMs?: number }) => ExecResult;
 
 export const realExec: Exec = (file, args, opts = {}) => {
   const r = spawnSync(file, args, {
@@ -297,10 +297,10 @@ const PS_PROTECT = [
 ].join("; ");
 const PS_UNPROTECT = PS_PROTECT.replace("::Protect(", "::Unprotect(");
 
-export const powershellArgs = (script: string) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")];
+const powershellArgs = (script: string) => ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")];
 export const PS_SCRIPTS = { protect: PS_PROTECT, unprotect: PS_UNPROTECT };
 
-export function windowsPowershell(): string {
+function windowsPowershell(): string {
   return path.win32.join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
 
@@ -355,7 +355,7 @@ export function withFileFallback(keychain: CredentialStore, file: ReturnType<typ
 }
 
 // This platform's keychain, if it has one that answers.
-export function platformKeychain(platform: NodeJS.Platform = process.platform, exec: Exec = realExec): CredentialStore | null {
+function platformKeychain(platform: NodeJS.Platform = process.platform, exec: Exec = realExec): CredentialStore | null {
   if (platform === "darwin") return existsSync("/usr/bin/security") ? macosKeychain(exec) : null;
   if (platform === "win32") {
     const ps = windowsPowershell();

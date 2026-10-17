@@ -7,11 +7,11 @@
 
 import { diffLines } from "./diff.js";
 
-export type Risk = { short: string; long: string };
+type Risk = { short: string; long: string };
 
 // A proposal as far as risk goes: what it does, the text it proposes, the
 // file's current text (null when the file doesn't exist), its revision.
-export type RiskInput = { kind: string; body: string | null; current_body: string | null; revision: number };
+type RiskInput = { kind: string; body: string | null; current_body: string | null; revision: number };
 
 // A file shorter than this (in non-blank lines) is too small for "half of
 // it" to mean anything.

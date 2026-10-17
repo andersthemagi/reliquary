@@ -160,7 +160,7 @@ export async function recordClient(token: string, clientName: string): Promise<v
 // A token as the database resolves it: its hash, and for an OAuth access
 // token the resource it must have been issued for (null for a personal
 // token). Null when the token has neither shape.
-export type TokenRef = { hash: string; resource: string | null };
+type TokenRef = { hash: string; resource: string | null };
 
 export function tokenRef(token: string, resource: string): TokenRef | null {
   if (TOKEN_SHAPE.test(token)) return { hash: hashOf(token), resource: null };

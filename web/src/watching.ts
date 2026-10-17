@@ -21,13 +21,13 @@ import { filePath, message, notFound, render, treePath, UUID, vault, vaultPath, 
 import { settingsPage } from "./vaultadmin.js";
 import { watchCovers } from "./watchrule.js";
 
-export const watchingPath = (id: string) => vaultPath(id, "/config/watching");
+const watchingPath = (id: string) => vaultPath(id, "/config/watching");
 
 type Watch = { id: string; target: string; created_at: Date };
 
 // What the person watches that covers `path`: a watch on it exactly, or on
 // a folder above it (a folder covers everything under it). The closest first.
-export type WatchState = { direct?: Watch; via?: Watch };
+type WatchState = { direct?: Watch; via?: Watch };
 export async function watchState(c: pg.PoolClient, ctx: Ctx, id: string, path: string): Promise<WatchState> {
   const rows = (
     await c.query(

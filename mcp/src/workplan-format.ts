@@ -30,8 +30,8 @@ const CONTROL_RE = /[\u0000-\u0008\u000a-\u001f\u007f]/;
 // Only the shape: whether it names a member is the database's to say.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+$/;
 
-export type WorkPlanCite = { path: string; version: string };
-export type WorkPlanStep = {
+type WorkPlanCite = { path: string; version: string };
+type WorkPlanStep = {
   key: string;
   title: string;
   blockedBy: string[];
@@ -43,8 +43,8 @@ export type WorkPlanStep = {
   for: string | null; // "agents", "people" or a member's email
   line: number; // the line its "- key:" opened on, 1-based
 };
-export type WorkPlan = { steps: WorkPlanStep[] };
-export type WorkPlanParseResult = { ok: true; plan: WorkPlan } | { ok: false; errors: string[] };
+type WorkPlan = { steps: WorkPlanStep[] };
+type WorkPlanParseResult = { ok: true; plan: WorkPlan } | { ok: false; errors: string[] };
 
 export function parseWorkPlanBlock(fileText: string): WorkPlanParseResult {
   const lines = fileText.split("\n").map((l) => l.replace(/\r$/, ""));

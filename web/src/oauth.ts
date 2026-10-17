@@ -78,7 +78,7 @@ export const envResource = () => ENV_RESOURCE;
 
 // The CLI listens on a free port on this computer (RFC 8252, 7.3), so any
 // port matches (cimd.ts, redirectAllowed); the host and path must be these.
-export const cliClient = () => ({
+const cliClient = () => ({
   client_id: CLI_CLIENT_ID,
   client_name: "Reliquary CLI",
   client_uri: ISSUER,
@@ -202,7 +202,7 @@ const DESCRIPTIONS: Record<string, string> = {
   unsupported_grant_type: "grant_type must be authorization_code or refresh_token",
 };
 const ascii = (s: string) => s.replace(/[’‘]/g, "'").replace(/[“”"\\]/g, "").replace(/[^\x20-\x7e]/g, "");
-export function oauthError(res: http.ServerResponse, status: number, error: string, why = DESCRIPTIONS[error] ?? error, extra: Record<string, string> = {}): string {
+function oauthError(res: http.ServerResponse, status: number, error: string, why = DESCRIPTIONS[error] ?? error, extra: Record<string, string> = {}): string {
   const f = failure({ status, where: "OAuth", why, code: error });
   json(res, status, { error, error_description: ascii(`${f.what} failed: ${f.why}`), where: f.where, ref: f.ref }, extra);
   return error;

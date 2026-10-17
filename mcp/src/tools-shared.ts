@@ -432,7 +432,7 @@ const POLICY_LINE: Record<string, string> = {
 // The part of a file a read asked for: a line range, then at most maxBytes,
 // cut at a line end when one fits. `note` says what was left out, and is
 // absent when the whole file is returned.
-export function excerpt(body: string, from?: number, to?: number, maxBytes?: number): { text: string; note?: string } {
+function excerpt(body: string, from?: number, to?: number, maxBytes?: number): { text: string; note?: string } {
   const lines = body.split("\n");
   const first = Math.max(1, from ?? 1);
   if (first > lines.length) {

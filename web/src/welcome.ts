@@ -15,13 +15,13 @@
 
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
-import { csrfField, html, pageHeader, type Raw } from "./html.js";
+import { csrfField, html, type Raw } from "./html.js";
 import { notFound, render, type Ctx, type Reply } from "./pages.js";
 
 type Slide = { title: string; body: Raw };
 
 // Words match docs/public/concepts: vault, canon, open, proposal, connection.
-export const SLIDES: Slide[] = [
+const SLIDES: Slide[] = [
   {
     title: "What Reliquary is",
     body: html`<p>Reliquary is a shared vault for you, your team and your AI agents. It keeps the files everyone works from, the rules for who may change them, and the secrets your tools need.</p>

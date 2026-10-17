@@ -72,7 +72,7 @@ mapped.addSubnet("::ffff:0:0:0", 96, "ipv6");
 
 const familyOf = (ip: string) => (net.isIP(ip) === 6 ? "ipv6" : "ipv4");
 
-export function isLoopbackAddress(ip: string): boolean {
+function isLoopbackAddress(ip: string): boolean {
   return net.isIP(ip) !== 0 && loopback.check(ip, familyOf(ip));
 }
 
@@ -101,7 +101,7 @@ const systemResolve = async (host: string): Promise<Resolved[]> =>
 // The wording each caller supplies, so both keep their own voice ("the
 // client's metadata" vs. "this link's server") for the same underlying
 // failure instead of a shared, vaguer message.
-export type SafeFetchMessages = {
+type SafeFetchMessages = {
   addressNotFound: string;
   addressNotPublic: string;
   redirected: string;
@@ -110,7 +110,7 @@ export type SafeFetchMessages = {
   requestFailed: string;
 };
 
-export type SafeFetchOptions = {
+type SafeFetchOptions = {
   method: "GET" | "POST";
   headers: Record<string, string | number>;
   body?: string;
@@ -136,7 +136,7 @@ export type SafeFetchOptions = {
   messages: SafeFetchMessages;
 };
 
-export type SafeFetchResult = { status: number; headers: http.IncomingHttpHeaders; body: string };
+type SafeFetchResult = { status: number; headers: http.IncomingHttpHeaders; body: string };
 
 export function safeFetch(url: URL, opts: SafeFetchOptions): Promise<SafeFetchResult> {
   const resolve = opts.resolve ?? systemResolve;

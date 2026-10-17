@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 
 const DIR = new URL("../emails/", import.meta.url);
 
-export type EmailTemplate = {
+type EmailTemplate = {
   id: string; // file name without .html
   section: string; // "Templates" or "Security notifications" (Supabase), or "Reliquary"
   name: string; // the template's name in the Supabase dashboard

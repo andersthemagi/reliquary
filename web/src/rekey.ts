@@ -56,10 +56,10 @@ export function opsDatabaseUrl(url: string | undefined, password: string | undef
 
 // A link's environment is null: its additional data is the vault alone.
 type Row = { kind: "value" | "import" | "link"; ref: string; name: string; environment: string | null; key_id: string; nonce: Buffer; ciphertext: Buffer };
-export type KeyCount = { keyId: string; values: number; imports: number; links: number };
-export type RekeyResult = { vaults: number; moved: number; failed: number; changed: number };
+type KeyCount = { keyId: string; values: number; imports: number; links: number };
+type RekeyResult = { vaults: number; moved: number; failed: number; changed: number };
 
-export async function keyCounts(db: pg.Pool | pg.PoolClient): Promise<KeyCount[]> {
+async function keyCounts(db: pg.Pool | pg.PoolClient): Promise<KeyCount[]> {
   return (await db.query(`select key_id, "values", imports, links from private.variable_key_ids()`)).rows.map((r) => ({
     keyId: r.key_id,
     values: Number(r.values),
@@ -114,7 +114,7 @@ async function rekeyVault(pool: pg.Pool, vaultId: string, keyId: string): Promis
 }
 
 // Every vault with anything on another key. Needs configureVariables() first.
-export async function rekeyAll(pool: pg.Pool): Promise<RekeyResult> {
+async function rekeyAll(pool: pg.Pool): Promise<RekeyResult> {
   const keyId = currentKeyId();
   if (!keyId) throw new Error("no VARIABLES_KEYS: nothing to re-encrypt with");
   const vaults: string[] = (await pool.query("select v from private.rekey_vaults($1) v", [keyId])).rows.map((r) => r.v);

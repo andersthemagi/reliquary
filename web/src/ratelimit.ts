@@ -93,7 +93,6 @@ export function configureRateLimits(env: NodeJS.ProcessEnv): void {
   LIMITS = limits;
   PROXY = env.NETLIFY ? "netlify" : env.TRUST_PROXY_IP === "1" ? "self" : undefined;
 }
-export const limitOf = (name: LimitName): Limit => LIMITS[name];
 
 // ---------------------------------------------------------------------------
 // The client's address
@@ -220,7 +219,7 @@ export async function limitToken(tokenHash: string, checks: { name: LimitName; c
 // Answers
 
 // "12 seconds", "3 minutes", "2 hours": rounded up.
-export function waitText(seconds: number): string {
+function waitText(seconds: number): string {
   const unit = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
   if (seconds < 90) return unit(Math.max(1, Math.ceil(seconds)), "second");
   if (seconds < 90 * 60) return unit(Math.ceil(seconds / 60), "minute");

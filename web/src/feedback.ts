@@ -41,7 +41,7 @@ const STATUS: Record<string, { label: string; tone: string; help: string }> = {
   fixed: { label: "Fixed", tone: "success", help: "Fixed or done" },
   wont_fix: { label: "Won’t fix", tone: "", help: "The operator decided not to act on it" },
 };
-export const statusBadge = (s: string) => {
+const statusBadge = (s: string) => {
   const x = STATUS[s] ?? { label: s, tone: "", help: "" };
   return html`<span class="badge${x.tone ? ` ${x.tone}` : ""}" title="${x.help}">${x.label}</span>`;
 };
@@ -209,7 +209,7 @@ type Notice = {
   created_at: Date;
 };
 
-export function noticeEmail(n: Notice): { subject: string; html: string } {
+function noticeEmail(n: Notice): { subject: string; html: string } {
   const kind = KINDS.find((k) => k.id === n.kind)?.label ?? n.kind;
   const first = n.message.split("\n").find((l) => l.trim())?.trim() ?? "";
   const subject = `Reliquary feedback (${kind.toLowerCase()}): ${first.length > 60 ? `${first.slice(0, 57)}...` : first}`.replace(/[\r\n]+/g, " ");

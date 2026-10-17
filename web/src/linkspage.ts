@@ -150,7 +150,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
 
 const refuse = (why: string) => message(new Refusal({ status: 400, where: "web app (Links form)", why }));
 
-export async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
+async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
   const linkId = (ctx.form.get("link_id") ?? "").trim() || undefined;
   const name = (ctx.form.get("name") ?? "").trim();
   const url = (ctx.form.get("url") ?? "").trim();
@@ -263,7 +263,7 @@ async function deleteLink(ctx: Ctx, id: string): Promise<Reply> {
   return { redirect: vaultPath(id, "/links") };
 }
 
-export async function linkAction(ctx: Ctx, id: string): Promise<Reply> {
+async function linkAction(ctx: Ctx, id: string): Promise<Reply> {
   return ctx.form.get("op") === "delete" ? deleteLink(ctx, id) : saveLink(ctx, id);
 }
 

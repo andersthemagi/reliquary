@@ -27,7 +27,7 @@ import { decodeFlash, encodeFlash, type Flash } from "./flash.js";
 import { UUID } from "./personref.js";
 
 export type AuthMode = "local" | "supabase";
-export type Alg = "ES256" | "RS256";
+type Alg = "ES256" | "RS256";
 
 type Config = {
   mode: AuthMode;
@@ -233,7 +233,7 @@ export function flashCookie(f: Flash): string {
 // access token couldn't be checked: the old one is spent). `limited`: the
 // session was refreshed too often (ratelimit.ts); answer 429 with this
 // Retry-After and keep the cookies.
-export type Lookup = { session: Session | null; cookies: string[]; unavailable: boolean; limited?: number };
+type Lookup = { session: Session | null; cookies: string[]; unavailable: boolean; limited?: number };
 
 export async function getSession(req: http.IncomingMessage): Promise<Lookup> {
   return conf().mode === "local" ? localSession(req) : supabaseSession(req);
@@ -463,7 +463,7 @@ export type Tokens = { accessToken: string; refreshToken: string; expiresIn: num
 
 const accessCookie = (t: Tokens) => setCookie(AT, t.accessToken, t.expiresIn);
 const refreshCookie = (t: Tokens) => setCookie(RT, t.refreshToken, REFRESH_DAYS * 86400);
-export const sessionCookies = (t: Tokens): string[] => [accessCookie(t), refreshCookie(t)];
+const sessionCookies = (t: Tokens): string[] => [accessCookie(t), refreshCookie(t)];
 
 // ---------------------------------------------------------------------------
 // Supabase Auth REST (server to server, with the publishable key)
@@ -525,7 +525,7 @@ function tokensOf(status: number, json: any): Tokens | undefined {
 
 // otherAddress: a change of address was confirmed at one address, and waits
 // for the other (Supabase's secure email change); no session yet.
-export type SigninResult = { ok: true; cookies: string[]; newAccount: boolean } | { ok: false; unavailable: boolean; otherAddress?: boolean };
+type SigninResult = { ok: true; cookies: string[]; newAccount: boolean } | { ok: false; unavailable: boolean; otherAddress?: boolean };
 
 // Step 1: ask Supabase to email a code and link. Never tells the caller
 // whether the address has an account: any 4xx (no such user, signups off,
@@ -605,9 +605,9 @@ export async function verifySignin(
 // JWT verification. No library: one pinned algorithm, keys only from the
 // project's JWKS, every claim checked. Exported for unit tests.
 
-export type Jwk = { kty?: string; crv?: string; x?: string; y?: string; n?: string; e?: string; kid?: string; alg?: string; use?: string };
+type Jwk = { kty?: string; crv?: string; x?: string; y?: string; n?: string; e?: string; kid?: string; alg?: string; use?: string };
 export type Claims = { sub: string; role: "authenticated"; session_id: string; exp: number; [k: string]: unknown };
-export type Verified =
+type Verified =
   | { ok: true; claims: Claims }
   | { ok: false; reason: string; expired?: boolean; unknownKey?: boolean; sessionId?: string };
 

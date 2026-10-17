@@ -25,7 +25,7 @@ import type { Ctx } from "./pages.js";
 
 export const INVITE_TOKEN = /^rli_[0-9a-f]{64}$/;
 
-export type InviteMail = {
+type InviteMail = {
   to: string; // the invited address
   link: string; // the invite link; a bearer secret
   token: string; // the link's token (for the idempotency key only)
@@ -105,7 +105,7 @@ export async function peekInvite(token: string): Promise<Peek | undefined> {
 }
 
 // Uses left on a link: 1, always, for an address-bound invite.
-export const usesLeft = (p: Peek): number => p.maxUses - p.usesCount;
+const usesLeft = (p: Peek): number => p.maxUses - p.usesCount;
 
 // The token of an invite page URL (`/invite?token=...`), for the sign-in
 // page's `next`.

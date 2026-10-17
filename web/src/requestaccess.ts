@@ -67,7 +67,7 @@ const sent = (theme: Theme, email: string) =>
     { theme },
   );
 
-export function accessEmail(d: Draft): { subject: string; html: string } {
+function accessEmail(d: Draft): { subject: string; html: string } {
   const subject = `Reliquary: access request, ${d.email}`.replace(/[\r\n]+/g, " ");
   const row = (k: string, v: string) => `<tr><th style="text-align:left;padding:2px 12px 2px 0;vertical-align:top">${esc(k)}</th><td style="padding:2px 0;white-space:pre-wrap">${esc(v)}</td></tr>`;
   return {

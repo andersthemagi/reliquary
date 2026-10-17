@@ -157,7 +157,7 @@ export function describe(method: string, url: URL, form: URLSearchParams): { wha
   return say(get ? `Opening ${p}` : `Sending a form to ${p}`);
 }
 
-export type ErrorPageOpts = {
+type ErrorPageOpts = {
   theme?: Theme;
   title?: string; // default: "<what> failed"
   lede?: Raw | string; // default: the reason
