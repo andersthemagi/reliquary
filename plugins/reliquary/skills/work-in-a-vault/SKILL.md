@@ -9,6 +9,16 @@ You act as your person, with their role in each vault, minus the ceiling: the
 actions that need them present in the web app. The full rules are in the docs;
 read the page when you need the detail rather than guessing.
 
+## Finding things
+
+- `search` matches by words and by meaning, so ask in your own words. It
+  shows up to 3 matching lines per file with their line numbers, and says
+  when meaning is unavailable (words only). Search first, then `read_file`
+  with `from_line` and `to_line`, not the whole file.
+- From one file to what it's connected to: `related_files` (vault, path).
+  `->` it refers to, `<-` refers to it, each with its policy; `missing` means
+  no file there yet. No search needed.
+
 ## Before you write
 
 - `list_files` marks canon files `[canon]`; `read_file` names the policy.
