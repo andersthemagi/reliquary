@@ -16,11 +16,12 @@ Self-hosting is a preview. Reliquary's server is under the Functional Source Lic
 
 | Service | What it does |
 |---|---|
-| `db` | Postgres 17. Its data is in the `db-data` volume. Never published outside the stack. |
+| `db` | Postgres 17 with pgvector (the `pgvector/pgvector` image), which search needs. Its data is in the `db-data` volume. Never published outside the stack. |
 | `auth` | Supabase Auth: email codes and sessions. Only the web app talks to it. |
 | `db-init`, `migrate` | Run once on every start: prepare the database, then apply Reliquary's migrations. |
 | `web` | The web app: sign-in, vaults, review, variables, the docs. |
 | `mcp` | The MCP endpoint your agents connect to. |
+| `embed` | Optional (profile `embed`): the model behind [search by meaning](#search-by-meaning). |
 | `caddy` | Optional (profile `caddy`): HTTPS certificates from Let's Encrypt, renewed on its own. |
 
 Everyone on a self-hosted instance has no plan limits: any number of vaults, people and storage. See [Plans and limits](../concepts/plans-and-limits.md).
@@ -77,6 +78,15 @@ People on your instance can [send feedback](send-feedback.md) from the top bar, 
 
 To be emailed about each new item, set `FEEDBACK_EMAIL` in `deploy/compose/.env` to your address, beside `RESEND_API_KEY` and `EMAIL_FROM`. Without it nothing is emailed, and the feedback waits for `scripts/feedback.sh list`. The same address gets one email for each new account, when it confirms its address: who, when, and whether it's in, in line or waiting on you, with `scripts/plan.sh admit <email>` to let it in. See [Emails](../reference/emails.md#signup-notices).
 
+## Search by meaning
+
+Agents' `search` can also [find files by meaning](../concepts/vaults-and-files.md#search-by-meaning). On your server it is off until you turn it on, and search matches words and file names. To turn it on:
+
+1. In `deploy/compose/.env`, set `EMBED_URL=http://embed:9000/` and `EMBED_SECRET` to a long random value (`openssl rand -hex 32`).
+2. Start with the `embed` profile as well: `docker compose --profile caddy --profile embed up -d`.
+
+The `embed` service is Supabase's open-source edge runtime running Reliquary's embedding function. It downloads the gte-small model (tens of megabytes) the first time it is used, so it needs outbound internet then; no file text goes with that download. Files are embedded as their vaults are searched. If the service stops, search answers by words and says so.
+
 ## Connect your agents
 
 Your MCP URL is your `MCP_RESOURCE`, for example `https://mcp.example.com/mcp`. Use it wherever the guides say `https://mcp.reliquary.redmage.cc/mcp`: [Connect Claude Code](connect-claude-code.md), [Connect another client](connect-other-clients.md).
@@ -111,6 +121,8 @@ docker compose --profile caddy up -d --build
 ```
 
 Every start applies the migrations the database hasn't had yet, each in one transaction, and nothing else. To run them on their own: `docker compose run --rm migrate`.
+
+From the release with search by meaning, `db` runs the `pgvector/pgvector` image (Postgres 17 with pgvector) instead of `postgres:17.11`. The upgrade above switches it and keeps the `db-data` volume: both are Postgres 17, so the data is used as it is.
 
 ## Back up
 

@@ -23,6 +23,7 @@ import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnaut
 import { needsLinkTools, registerTools } from "./tools.js";
 import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
+import { configureEmbeddings } from "./embeddings.js";
 import { BUILD, versionJson } from "./version.js";
 import { compact, fail, failure, withRequest, type Failure } from "./failure.js";
 
@@ -79,6 +80,15 @@ try {
 // is the web app's own URL, already resolved above.
 try {
   configureLinkProxy(process.env, OAUTH.issuer);
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
+
+// Search by meaning (embeddings.ts): optional; without EMBED_URL, search
+// is by words alone.
+try {
+  configureEmbeddings(process.env);
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);

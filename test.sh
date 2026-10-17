@@ -32,7 +32,7 @@ echo "== registry"
 
 # Pull images once, so parallel suites don't race to fetch the same layers.
 # node:22 (it has git) runs the CLI's tests.
-for img in docker.io/library/postgres:17 docker.io/library/node:22-slim docker.io/library/node:22; do
+for img in docker.io/library/postgres:17 docker.io/pgvector/pgvector:0.8.2-pg17-trixie docker.io/library/node:22-slim docker.io/library/node:22; do
   "$engine" image inspect "$img" >/dev/null 2>&1 || "$engine" pull -q "$img" >/dev/null
 done
 

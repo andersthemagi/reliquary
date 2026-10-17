@@ -233,7 +233,7 @@ type Sub = { name: string; what: string; where: string; data: string; link?: [st
 const SUBPROCESSORS: Sub[] = [
   {
     name: "Supabase",
-    what: "Database and sign-in (authentication)",
+    what: "Database and sign-in (authentication), and the embedding model search uses (Edge Functions)",
     where: "EU: AWS Frankfurt (eu-central-1)",
     data: "All vault content, encrypted variable values, account emails",
     link: ["https://supabase.com/privacy", "Supabase privacy policy"],
@@ -268,7 +268,7 @@ function subprocessors(theme: Theme): string {
 </table></div>
 
 <h2>Model providers: none</h2>
-<p>Reliquary runs no AI model and sends your content to no model provider. The AI tools you connect (Claude, ChatGPT, Cursor and others) receive what their agent reads through your account, under your own agreement with their provider. They are your choice, not our sub-processors.</p>
+<p>Reliquary sends your content to no model provider. The one model it runs is gte-small, an embedding model inside Supabase (above), which turns file text into numbers so search can match by meaning. It writes nothing; the numbers are kept beside the text and removed with it. The AI tools you connect (Claude, ChatGPT, Cursor and others) receive what their agent reads through your account, under your own agreement with their provider. They are your choice, not our sub-processors.</p>
 
 <h2>Changes</h2>
 <p>We update this page and tell vault owners ${fill("subprocessorNoticeDays", "notice period")} before adding or replacing a sub-processor. To object, email ${mail(OPERATOR.contactEmail)}.</p>`);

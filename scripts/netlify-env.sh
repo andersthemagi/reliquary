@@ -124,12 +124,21 @@ EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>
 EOF
     ;;
   mcp)
+    # The search embedding function's secret (docs/ops/runbook.md, "Search
+    # by meaning"): the same value goes to Supabase's function secrets.
+    embed_secret=supabase/.embed-secret
+    if [[ ! -s $embed_secret ]]; then
+      (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$embed_secret")
+    fi
     cat > "$out" <<EOF
 DATABASE_URL=postgres://reliquary_mcp.$ref:$(pw mcp | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 MCP_RESOURCE=$mcp/mcp
 AUTH_ISSUER=$web
 LINK_PROXY_SECRET=$(cat "$link_secret")
+EMBED_URL=https://$ref.supabase.co/functions/v1/embed
+EMBED_SECRET=$(cat "$embed_secret")
+EMBED_REGION=eu-central-1
 EOF
     ;;
   *) echo "web or mcp"; exit 1 ;;

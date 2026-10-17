@@ -163,7 +163,7 @@ const logLines: Array<[boolean, string, string]> = [
 
 // Why Reliquary: the six reasons, each one something the code does today.
 const why: Array<[string, Raw]> = [
-  ["Every AI tool, one vault", html`Claude, ChatGPT, Cursor, VS Code and any MCP client read the same context. Reliquary holds no model, so switching tools loses nothing.`],
+  ["Every AI tool, one vault", html`Claude, ChatGPT, Cursor, VS Code and any MCP client read the same context. Reliquary brings no assistant of its own, so switching tools loses nothing.`],
   ["Built for agents and people together", html`Agents read, take notes and propose. People review, approve and talk it through in threads. Every change lands in one append-only log.`],
   ["Secrets stay secret", html`No MCP tool, log line or error message returns a value. <code>reliquary run</code> puts it into one process and nowhere else.`],
   ["Guarded by the database", html`Every permission is a Postgres row-level security rule with a test that tries to break it on every push. A prompt can't talk its way past it.`],
@@ -175,7 +175,7 @@ const problems: Array<[Raw, Raw]> = [
   [html`Every person and every tool has its own AI memory, so three people get three versions of the project.`, html`One vault of approved context that every tool and every person reads, kept current by what agents propose and people approve.`],
   [html`Agents write things nobody checked, and the next agent believes them.`, html`Agents propose. Nothing becomes canon until a person, or a quorum, approves it.`],
   [html`API keys travel by Slack and email and sit in <code>.env</code> files any agent can read.`, html`Variables live in the vault. <code>reliquary run</code> puts them into one process; no AI tool ever gets a value.`],
-  [html`Every AI vendor wants to be the one place your context lives, and your team already uses three of them.`, html`Built for teams on different systems: Reliquary holds no model and takes any MCP client. Use Claude today and something better tomorrow; the context, the approvals and the log stay, and an owner can export it all as plain markdown at any time.`],
+  [html`Every AI vendor wants to be the one place your context lives, and your team already uses three of them.`, html`Built for teams on different systems: Reliquary brings no assistant of its own and takes any MCP client. Use Claude today and something better tomorrow; the context, the approvals and the log stay, and an owner can export it all as plain markdown at any time.`],
 ];
 
 // Teams first: the people who say this out loud (2026-10-11 research) run
@@ -235,7 +235,7 @@ const reel = (theme: Theme) => {
 };
 
 const faq: Array<[string, Raw]> = [
-  ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no model, doesn't search your Drive or Slack, and is not a memory that writes itself. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
+  ["Is Reliquary an AI model or a chatbot?", html`No. Reliquary runs no chat or writing model (its search uses a small one, inside its own database provider, to match files by meaning), doesn't search your Drive or Slack, and is not a memory that writes itself. It holds context and credentials, and the AI tools you already use connect to it over MCP.`],
   ["What will it cost after the alpha?", html`Free stays free during the alpha. The plan is paid vaults for teams that need more room, ways to support the project, and enough to keep the lights on. Nothing is billed today, you'll hear from us well before anything is, and self-hosting stays free.`],
   ["Is it open source?", html`The code is public <a href="${REPO_URL}">on GitHub</a>. The server is under the Functional Source License: run it yourself for any purpose, except offering it to others as a competing service, and each release becomes Apache 2.0 two years on. The CLI is MIT. <a href="/docs/how-to/self-host">Self-host Reliquary</a>.`],
   ["How do I move an existing .env and CLAUDE.md in?", html`Paste the <code>.env</code> or send it with <code>reliquary env push</code>, then run the project with <code>reliquary run</code> and retire the file: <a href="/docs/how-to/move-env-into-vault">Move a .env into a vault</a>. Put <code>CLAUDE.md</code> and your rules files in the vault as canon and point each tool at the vault: <a href="/docs/how-to/connect-claude-code">Connect Claude Code</a>.`],
