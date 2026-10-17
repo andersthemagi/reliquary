@@ -945,6 +945,34 @@
     }
   },
   {
+    "name": "related_files",
+    "title": "Files referring to each other",
+    "description": "The files a path refers to (->) and the files that refer to it (<-), with each one's policy; missing: no file there yet. References are [[path]] and Markdown links to .md files.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vault": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Vault name or id"
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "Path in the vault"
+        }
+      },
+      "required": [
+        "vault",
+        "path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
     "name": "release_claim",
     "title": "Release a claim",
     "description": "Give up a claim before it expires, freeing the path for anyone. Needs the exact fence and secret claim_path returned, from this same connection and person.",
