@@ -99,6 +99,38 @@ function parse(tokens: string[], spec: Spec, stopAtCommand = false): Parsed {
   return { opts, positionals, rest: null };
 }
 
+// Levenshtein distance, for "did you mean" hints on a mistyped command or
+// option.
+function distance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length];
+}
+
+// The candidate nearest to `word`, if it is within two edits.
+function closest(word: string, candidates: string[]): string | undefined {
+  let best: string | undefined;
+  let bestD = 3;
+  for (const c of candidates) {
+    const d = distance(word.toLowerCase(), c);
+    if (d < bestD) [best, bestD] = [c, d];
+  }
+  return best;
+}
+
+const COMMANDS = ["help", "version", "login", "logout", "vaults", "run", "env"];
+
+function unknownCommand(command: string): UsageError {
+  // `pull` and `push` live under `env`; someone who left it out is close.
+  if (command === "pull" || command === "push") return new UsageError(`Unknown command "${command}". Did you mean \`reliquary env ${command}\`?`);
+  const near = closest(command, COMMANDS);
+  return new UsageError(`Unknown command "${command}".${near ? ` Did you mean "${near}"?` : ""} See \`reliquary --help\`.`);
+}
+
 const say = (line: string) => process.stderr.write(`${line}\n`);
 const val = (o: Parsed["opts"], k: string) => (typeof o[k] === "string" ? (o[k] as string) : undefined);
 
@@ -207,7 +239,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     default:
-      throw new UsageError(`Unknown command "${command}". See \`reliquary --help\`.`);
+      throw unknownCommand(command);
   }
 }
 
