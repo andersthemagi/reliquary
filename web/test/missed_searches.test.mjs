@@ -46,6 +46,21 @@ async function as(user, q, params = []) {
 }
 
 const page = async (who, path) => (await fetch(S[who].url + path, { headers: { cookie: S[who].cookie }, redirect: "manual" })).text();
+const post = async (who, path, fields = {}) => {
+  const csrf = /name="csrf" value="([0-9a-f]+)"/.exec(await page(who, "/settings"))[1];
+  return fetch(S[who].url + path, {
+    method: "POST",
+    redirect: "manual",
+    headers: { cookie: S[who].cookie, "content-type": "application/x-www-form-urlencoded", origin: S[who].url },
+    body: new URLSearchParams({ csrf, ...fields }).toString(),
+  });
+};
+const flashAfter = async (who, r) => {
+  assert.equal(r.status, 303);
+  const h = await page(who, r.headers.get("location"));
+  return /<p class="callout (?:info|success|warning|danger) flash" role="(?:status|alert)">([^<]*)<\/p>/.exec(h)?.[1] ?? "";
+};
+const days = async (vault) => (await sql("select missed_search_days as d from public.vaults where id = $1", [vault]))[0].d;
 const missed = async (vault) =>
   (await sql("select words, by_agent from public.missed_searches where vault_id = $1 order by id", [vault])).map((r) => `${r.words}:${r.by_agent}`);
 
@@ -72,4 +87,39 @@ test("missed in the web app: searching every vault notes the words in each vault
   assert.match(await page("mira", "/search?q=kiln"), /notes\/kiln\.md/);
   assert.deepEqual(await missed(V.main), ["glaze recipes:false", "kiln:false"]);
   assert.deepEqual(await missed(V.side), []);
+});
+
+test("missed settings: an owner's General settings list the searches, newest first, saying person or agent, never who", async () => {
+  await sql("insert into public.missed_searches (vault_id, words, by_agent, searched_at) values ($1, 'clay suppliers', true, now() + interval '1 minute')", [V.main]);
+  const h = await page("mira", `/v/${V.main}/config`);
+  const section = /<section class="panel" id="missed"[\s\S]*?<\/section>/.exec(h)?.[0] ?? "";
+  assert.match(section, /<h2 id="missed-title">Searches that found nothing<\/h2>/);
+  const rows = [...section.matchAll(/<tr><td>([^<]*)<\/td><td>([^<]*)<\/td>/g)].map((m) => `${m[1]}:${m[2]}`);
+  assert.deepEqual(rows, ["clay suppliers:An agent", "kiln:A person", "glaze recipes:A person"]);
+  assert.doesNotMatch(section, /mira|nell|example\.test/i);
+  assert.match(section, /<input id="missed-days" type="number" name="days" min="1" max="365" value="30" required>/);
+  assert.match(section, /<button class="danger">Clear list<\/button>/);
+});
+
+test("missed settings: an editor's General settings have no such section", async () => {
+  const h = await page("nell", `/v/${V.main}/config`);
+  assert.match(h, /Danger zone/);
+  assert.doesNotMatch(h, /Searches that found nothing|glaze recipes/);
+});
+
+test("missed settings: an owner sets how many days are kept; a number outside 1 to 365 is refused in words and nothing changes", async () => {
+  assert.equal(await flashAfter("mira", await post("mira", `/v/${V.main}/config/missed`, { days: "7" })), "Searches that found nothing are kept 7 days now.");
+  assert.equal(await days(V.main), 7);
+  const refused = await flashAfter("mira", await post("mira", `/v/${V.main}/config/missed`, { days: "400" }));
+  assert.match(refused, /kept 1 to 365 days.*ref [0-9a-f]{8}/);
+  assert.equal(await days(V.main), 7);
+});
+
+test("missed settings: an editor's Clear list is refused in words and clears nothing; an owner's clears the list", async () => {
+  const refused = await flashAfter("nell", await post("nell", `/v/${V.main}/config/missed/clear`));
+  assert.match(refused, /Only the vault(?:’|&#39;)s owners clear this list\. Nothing was cleared.*ref [0-9a-f]{8}/);
+  assert.equal((await missed(V.main)).length, 3);
+  assert.equal(await flashAfter("mira", await post("mira", `/v/${V.main}/config/missed/clear`)), "Cleared 3 searches.");
+  assert.deepEqual(await missed(V.main), []);
+  assert.match(await page("mira", `/v/${V.main}/config`), /No searches that found nothing in the last 7 days\./);
 });

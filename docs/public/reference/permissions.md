@@ -62,6 +62,7 @@ What people and their agents can each do, where, and who may: every rule here is
 | Name or remove a path's [owners](../concepts/path-ownership.md) | **Rules**, a rule's **⋯**, **Named owners** | none | person, owners |
 | Watch or unwatch a folder or file for [flags](../concepts/flags.md) | its page's **Watch**; **Settings**, **Watching** | none (`list_subscriptions` lists them) | person, any member, their own only |
 | Rename a vault or change its default policy | **Settings**, **General** | none | person, owners |
+| See, keep or clear [searches that found nothing](../concepts/vaults-and-files.md#searches-that-found-nothing) | **Settings**, **General**, **Searches that found nothing** | none | person, owners |
 | See members (by email) | **Settings**, **Members** | none | person, any member |
 | Invite, change roles, remove members | **Members** | none | person, owners |
 | Accept an invite | the invite link | none | person, the invited address |
