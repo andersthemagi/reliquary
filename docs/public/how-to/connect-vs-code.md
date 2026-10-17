@@ -36,3 +36,12 @@ The file holds no secret, so you can commit it; each person enters their own tok
 ## Change or remove it
 
 Revoke the token on Reliquary's **Connections** page. To use a new one, clear the stored input in VS Code and start the server again; it asks for the token again.
+
+## Troubleshooting
+
+- **The server fails with `No token: send Authorization: Bearer <token>`:** VS Code sent no token, usually because its prompt was dismissed. Start the server again and paste the token when asked.
+- **"The token isn’t live: it is unknown, expired or revoked, or was issued for another resource", or a tool call says "This token was revoked or expired during the request. Reconnect.":** the token expired or was revoked. Make a new one on the **Connect** page, clear the stored input and start the server again. If it leaked, see [Rotate a leaked token](rotate-a-leaked-token.md).
+- **It can't see a vault:** the token's vaults were chosen without it, or you aren't a member. Make a new token that reaches it.
+- **Writes are refused:** the token is read only, or you are a viewer in that vault, or the file is canon (use a proposal). See [Canon, open and rules](../concepts/canon-and-rules.md).
+
+Any other refusal says what was being done, where and why, with a reference: see [Errors and reference IDs](../reference/errors.md).

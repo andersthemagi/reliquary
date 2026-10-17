@@ -28,3 +28,12 @@ Once the client has used the token, the **Connect** page says **Connected** and 
 ## Environment variables
 
 MCP never carries variable values. For a program that needs them, use the CLI: `reliquary run` or `reliquary env pull`. See [Use the CLI](use-the-cli.md).
+
+## Troubleshooting
+
+- **`No token: send Authorization: Bearer <token>`:** the client sent no `Authorization` header, or the place it reads the token from was empty when it started. Fix the header or the secret, then restart the client.
+- **"The token isn’t live: it is unknown, expired or revoked, or was issued for another resource", or a tool call says "This token was revoked or expired during the request. Reconnect.":** the token expired or was revoked. Make a new one on the **Connect** page and give it to the client. If it leaked, see [Rotate a leaked token](rotate-a-leaked-token.md).
+- **It can't see a vault:** the token's vaults were chosen without it, or you aren't a member. `list_vaults` shows the ones it reaches. Make a new token that reaches it.
+- **Writes are refused:** the token is read only, or you are a viewer in that vault, or the file is canon (use a proposal). See [Canon, open and rules](../concepts/canon-and-rules.md).
+
+Any other refusal says what was being done, where and why, with a reference: see [Errors and reference IDs](../reference/errors.md).
