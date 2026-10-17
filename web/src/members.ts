@@ -134,7 +134,7 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
         <select name="role" aria-label="Role for ${label(m)}">${ROLES.map(
           (r) => html`<option value="${r}"${r === m.role ? raw(" selected") : ""}>${roleName(r)}</option>`,
         )}</select>
-        <button class="quiet">Change</button>
+        <button class="quiet" aria-label="Change role for ${label(m)}">Change</button>
       </form>`;
     };
 
@@ -185,7 +185,7 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
                   : menu({
                       label: `Actions for ${label(m)}`,
                       icon: "more",
-                      items: [{ href: membersPath(id, `/remove?user=${m.user_id}`), label: "Remove", description: "Asks you to confirm first", danger: true }],
+                      items: [{ href: membersPath(id, `/remove?user=${m.user_id}`), label: "Remove", ariaLabel: `Remove ${label(m)} from this vault`, description: "Asks you to confirm first", danger: true }],
                     })}</td>`
               : ""}</tr>`,
         )}</tbody>
@@ -202,7 +202,7 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
                   (i) => html`<tr><td>${inviteWho(i)}</td><td class="small" data-label="Role">${roleName(i.role)}</td>
                     <td class="small" data-label="Sent">${time(i.created_at)}</td>
                     <td class="small" data-label="Expires">${time(i.expires_at)}</td>
-                    <td class="num row-actions"><a class="button danger" href="${membersPath(id, `/invites/${i.id}/revoke`)}">Revoke</a></td></tr>`,
+                    <td class="num row-actions"><a class="button danger" aria-label="Revoke the invite for ${inviteWho(i)}" href="${membersPath(id, `/invites/${i.id}/revoke`)}">Revoke</a></td></tr>`,
                 )}</tbody>
               </table></div>`
             : emptyState({
@@ -221,7 +221,7 @@ async function membersPage(ctx: Ctx, id: string, fresh?: Fresh): Promise<Reply> 
                       <td class="small" data-label="Access">${accessText(cn)}${cn.all_vaults ? html`<span class="muted token-client">All their vaults</span>` : ""}</td>
                       <td class="small" data-label="Created">${time(cn.created_at)}</td>
                       <td class="small" data-label="Last used">${cn.last_used_at ? time(cn.last_used_at) : "Never"}</td>
-                      <td class="num row-actions"><a class="button danger" href="${membersPath(id, `/connections/${cn.id}/revoke`)}">Revoke</a></td></tr>`,
+                      <td class="num row-actions"><a class="button danger" aria-label="Revoke ${cn.name} (${label(m)})" href="${membersPath(id, `/connections/${cn.id}/revoke`)}">Revoke</a></td></tr>`,
                   ),
                 )}</tbody>
               </table></div>`
