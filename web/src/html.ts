@@ -574,7 +574,7 @@ const ICON_MORE = raw(
   '<svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg>',
 );
 export type MenuItem =
-  | { href: string; label: string; description?: string; danger?: boolean; current?: boolean }
+  | { href: string; label: string; ariaLabel?: string; description?: string; danger?: boolean; current?: boolean }
   | { action: string; csrf: string; fields?: Record<string, string>; label: string; description?: string; danger?: boolean };
 export function menu(o: {
   label: string; // the button's text; with icon "more", its accessible name
@@ -588,7 +588,7 @@ export function menu(o: {
   const item = (i: MenuItem) => {
     const inner = html`<span class="menu-item-title">${i.label}</span>${i.description ? html`<span class="menu-item-meta">${i.description}</span>` : ""}`;
     const cls = `menu-item${i.danger ? " danger" : ""}`;
-    if ("href" in i) return html`<li><a class="${cls}" href="${i.href}"${i.current ? raw(' aria-current="page"') : ""}>${inner}</a></li>`;
+    if ("href" in i) return html`<li><a${i.ariaLabel ? html` aria-label="${i.ariaLabel}"` : ""} class="${cls}" href="${i.href}"${i.current ? raw(' aria-current="page"') : ""}>${inner}</a></li>`;
     return html`<li><form method="post" action="${i.action}">${csrfField(i.csrf)}${hiddenFields(i.fields)}<button class="${cls}">${inner}</button></form></li>`;
   };
   const summary =

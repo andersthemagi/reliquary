@@ -157,10 +157,20 @@ test("members sections: the owner's page has People, Pending invites and Agents,
   assert.ok(at("<h2>People</h2>") > 0 && at("<h2>People</h2>") < at("<h2>Pending invites</h2>") && at("<h2>Pending invites</h2>") < at("<h2>Agents</h2>"));
   const paul = /<tr><td>paul@example\.test<\/td>[\s\S]*?<\/tr>/.exec(h)?.[0] ?? "";
   assert.match(paul, /<summary class="button quiet icon-button" aria-label="Actions for paul@example\.test" title="Actions for paul@example\.test">/);
-  assert.match(paul, new RegExp(`<a class="menu-item danger" href="/v/${V.team}/config/members/remove\\?user=${PAUL}"><span class="menu-item-title">Remove</span>`));
+  assert.match(paul, new RegExp(`<a aria-label="Remove paul@example\\.test from this vault" class="menu-item danger" href="/v/${V.team}/config/members/remove\\?user=${PAUL}"><span class="menu-item-title">Remove</span>`));
   const own = /<tr><td>olga@example\.test <span class="badge">You<\/span><\/td>[\s\S]*?<\/tr>/.exec(h)?.[0] ?? "";
   assert.ok(own, "the owner's own row");
   assert.doesNotMatch(own, /\/remove\?user=|Actions for/);
+});
+
+test("members: each row's Change, Remove and Revoke is named for the member, invite or connection it acts on", async () => {
+  await post("olga", `${members(V.team)}/invite`, { email: "wren@example.test", role: "editor" });
+  const [{ id }] = await sql("select id from private.vault_invites where email = 'wren@example.test' and revoked_at is null");
+  const h = await page("olga", members(V.team));
+  assert.match(h, /<button class="quiet" aria-label="Change role for paul@example\.test">Change<\/button>/);
+  assert.match(h, /aria-label="Revoke the invite for wren@example\.test" href="[^"]*\/revoke">Revoke<\/a>/);
+  assert.match(h, /aria-label="Revoke Paul laptop \(paul@example\.test\)" href="[^"]*\/revoke">Revoke<\/a>/);
+  await post("olga", `${members(V.team)}/invites/${id}/revoke`, {});
 });
 
 test("members: an editor sees the members but no invite form, role controls, invites or connections", async () => {
