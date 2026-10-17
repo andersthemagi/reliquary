@@ -32,7 +32,7 @@ const HELP = `reliquary: a vault's environment variables on this computer
 Usage:
   reliquary login [--no-browser]        connect the Reliquary CLI to your account
   reliquary logout                      revoke this connection and forget it
-  reliquary vaults                      the vaults and environments you can read
+  reliquary vaults [--json]             the vaults and environments you can read
   reliquary run [--vault V] [--env E] -- <command> [args...]
                                         run a command with the variables in its environment
   reliquary env pull [--vault V] [--env E] [--file .env] [--outside-repo]
@@ -54,6 +54,7 @@ Options:
   --timeout <t>    env push --wait: how long, like 90s, 15m or 2h (default 15m)
   --outside-repo   env pull: allow a file outside any git repository
   --no-browser     login: print the link without opening a browser
+  --json           vaults: print them as JSON, for scripts
   -h, --help       this help
   -v, --version    the version
 
@@ -202,11 +203,16 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case "vaults": {
-      const { opts, positionals } = parse(args, { values: ["server"], flags: [] });
+      const { opts, positionals } = parse(args, { values: ["server"], flags: ["json"] });
       if (opts.help) return help();
       if (positionals.length) throw new UsageError("vaults takes no arguments.");
       const server = await discover(serverOrigin(val(opts, "server"), project()));
       const vaults = await listVaults(server);
+      // Ids, names, roles and environment names only: no value is in a Vault.
+      if (opts.json) {
+        process.stdout.write(`${JSON.stringify({ vaults })}\n`);
+        return 0;
+      }
       if (!vaults.length) say("This connection reaches no vaults.");
       for (const v of vaults) process.stdout.write(`${v.id}  ${describe(v)}\n`);
       return 0;

@@ -29,6 +29,10 @@ Revokes this computer's connection on the server, then forgets it. Takes `--serv
 
 Prints each vault the connection reaches, one per line: its id, name, your role, and the environments you may read. Takes `--server <url>`.
 
+| Option | Does |
+|---|---|
+| `--json` | print them as one line of JSON for scripts, `{"vaults":[...]}`, each with `id`, `name`, `role` and `environments`; no vaults prints `{"vaults":[]}`. Nothing goes to stderr |
+
 ### reliquary run
 
 ```text
