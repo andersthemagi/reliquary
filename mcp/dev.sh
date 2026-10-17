@@ -4,6 +4,8 @@
 #
 #   ./dev.sh up              start Postgres, the MCP server and the web UI
 #   ./dev.sh ui              open the web UI, signed in (link never printed)
+#   ./dev.sh down            stop (data kept in the reliquary-devdata volume)
+#   ./dev.sh logs            follow the MCP server's log
 #   ./dev.sh vault "<name>"   create a vault owned by you
 #   ./dev.sh token "<name>"   mint a token into mcp/.tokens/ (never printed)
 #   ./dev.sh claude "<name>"  mint a token and add it to Claude Code (CLI)
@@ -12,10 +14,16 @@
 # Tokens are never written to the terminal: anything printed there can end up
 # in an agent's context (e.g. via Claude Code's ! commands), and secrets must
 # never reach a model.
-#   ./dev.sh down            stop (data kept in the reliquary-devdata volume)
 #
 # Secrets live in mcp/.env.dev (gitignored, mode 600).
 set -euo pipefail
+# Before the cd, so a relative $0 still resolves; and before .env.dev exists or
+# python3 is needed.
+case "${1:-}" in
+  up|ui|down|logs|vault|token|claude|revoke) ;;
+  help) sed -n '2,12p' "$0"; exit 0 ;;
+  *) sed -n '2,12p' "$0"; exit 1 ;;
+esac
 cd "$(dirname "$0")"
 
 source ../scripts/lib/engine.sh
@@ -147,5 +155,4 @@ case "${1:-}" in
     ;;
   down) "$engine" stop $web $srv $pg >/dev/null 2>&1 || true; echo "stopped (data kept)" ;;
   logs) "$engine" logs -f $srv ;;
-  *) sed -n '2,11p' "$0"; exit 1 ;;
 esac
