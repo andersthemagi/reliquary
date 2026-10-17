@@ -8,3 +8,9 @@ major_version = 17
 
 [db.seed]
 enabled = false
+
+# The search embedding function (docs/design.md, "Search"). It checks its
+# own shared secret (EMBED_SECRET), so Supabase's JWT check is off: only
+# the MCP server calls it, and it holds no Supabase JWT.
+[functions.embed]
+verify_jwt = false
