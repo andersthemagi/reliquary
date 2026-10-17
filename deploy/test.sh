@@ -86,6 +86,11 @@ PUBLIC_URL=http://127.0.0.1:$T_WEB MCP_RESOURCE=http://127.0.0.1:$T_MCP/mcp \
   for v in T_PG T_AUTH T_WEB T_MCP T_SMTP T_MAILAPI; do echo "$v=${!v}"; done
 } >>"$envfile"
 
+# Every Docker Hub image the stack and the smoke test use, before compose
+# would pull them itself (that goes straight to Docker Hub).
+compose config --images 2>/dev/null | grep '^docker.io/' | while read -r img; do pull_image "$img"; done || true
+pull_image "$node_image" || true
+
 echo "== build"
 # podman's default (OCI) image format drops HEALTHCHECK; compose.yml has its own.
 fmt=(); [[ $(basename "$engine") == podman ]] && fmt=(--format docker)

@@ -24,9 +24,10 @@ jobs:
       - uses: actions/checkout@v7
       # The image, not the install script: a tag plus the digest it had when
       # this was written, so the linter can't change under a pull request.
-      # Bump both together.
+      # Bump both together. Through Google's public Docker Hub mirror, so the
+      # anonymous pull limit never fails the job (#232); the digest is the same.
       - name: Workflows
-        run: docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo mirror.gcr.io/rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
   shellcheck:
     # The runner's own shellcheck. Errors and warnings both block; info and
