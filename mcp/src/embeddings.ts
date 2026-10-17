@@ -27,16 +27,20 @@ const TIMEOUT_MS = 8000;
 
 let URL_ = "";
 let SECRET = "";
+let REGION = "";
 let MIN_SIMILARITY = 0.78;
 
 // Called once at startup (server.ts). No EMBED_URL: search by words alone.
 export function configureEmbeddings(env: NodeJS.ProcessEnv): void {
   URL_ = env.EMBED_URL ?? "";
   SECRET = env.EMBED_SECRET ?? "";
+  // Hosted, Supabase runs the function in the region nearest the caller
+  // unless pinned: eu-central-1 keeps the text in the database's region.
+  REGION = env.EMBED_REGION ?? "";
   if (URL_ && !/^https?:\/\/[^#]+$/.test(URL_)) throw new Error("Refusing to start: EMBED_URL must be an http(s) URL");
   if (URL_ && !SECRET) throw new Error("Refusing to start: EMBED_URL is set but EMBED_SECRET is not");
   // The calibration knob: gte-small rates unrelated texts around 0.7.
-  const min = Number(env.EMBED_MIN_SIMILARITY ?? 0.78);
+  const min = Number(env.EMBED_MIN_SIMILARITY || 0.78);
   if (!(min >= 0 && min <= 1)) throw new Error("Refusing to start: EMBED_MIN_SIMILARITY must be a number from 0 to 1");
   MIN_SIMILARITY = min;
 }
@@ -75,7 +79,7 @@ const WHERE = "embedding function";
 async function embed(input: string[]): Promise<number[][]> {
   const res = await fetch(URL_, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${SECRET}` },
+    headers: { "content-type": "application/json", authorization: `Bearer ${SECRET}`, ...(REGION ? { "x-region": REGION } : {}) },
     body: JSON.stringify({ input }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
