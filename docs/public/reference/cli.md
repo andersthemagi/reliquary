@@ -101,7 +101,7 @@ Exit code: 0 when sent (with `--wait`, when applied); 1 when refused, rejected o
 | Vault | `--vault`, `vault` in `.reliquary.json`, the only vault the connection reaches |
 | Environment | `--env`, `environment` in `.reliquary.json`, `development` |
 
-A vault name that two of your vaults share is an error listing their ids.
+A vault name that two of your vaults share is an error listing their ids. A `--vault` that matches none of your vaults is an error listing the ones you can reach, by name and id. Names match whatever their case.
 
 ## .reliquary.json
 
