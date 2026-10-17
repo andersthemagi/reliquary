@@ -52,6 +52,7 @@ jobs:
     timeout-minutes: 30
     env:
       CONTAINER_ENGINE: docker
+      IMAGE_MIRROR: mirror.gcr.io # Docker Hub's anonymous pull limit, #232
     steps:
       - uses: actions/checkout@v7
 

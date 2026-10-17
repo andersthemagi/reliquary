@@ -5,6 +5,7 @@
 #   ./test.sh              all suites, in parallel
 #   ./test.sh sql web      only these (sql, mcp, web, cli)
 #   TEST_SLOT=5 ./test.sh  suites use slots 5, 6, 7 and 8 (default 0 to 3)
+#   IMAGE_MIRROR=mirror.gcr.io ./test.sh  Docker Hub images through a mirror (CI does)
 #
 # Each suite gets its own TEST_SLOT, so containers and ports never collide,
 # and its own log. Failing suites print their full log; passing ones print a
@@ -34,7 +35,7 @@ echo "== registry"
 # Pull images once, so parallel suites don't race to fetch the same layers.
 # node:22 (it has git) runs the CLI's tests.
 for img in docker.io/library/postgres:17 docker.io/pgvector/pgvector:0.8.2-pg17-trixie docker.io/library/node:22-slim docker.io/library/node:22; do
-  "$engine" image inspect "$img" >/dev/null 2>&1 || "$engine" pull -q "$img" >/dev/null
+  pull_image "$img" || { echo "could not pull $img"; exit 1; }
 done
 
 echo "== harness"
