@@ -23,24 +23,25 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 5 | [Identity and permissions](#identity-and-permissions) | Built |
 | 6 | [Access surfaces](#access-surfaces) | Built, except service agent tokens |
 | 7 | [Context](#context) | Built |
-| 8 | [Path ownership](#path-ownership) | Built |
-| 9 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
-| 10 | [Claims and work plans](#claims-and-work-plans) | Built, apart from the hosted load test (#82) |
-| 11 | [Threads](#threads) | Built |
-| 12 | [Links](#links) | Built |
-| 13 | [Routines](#routines) | Designed, not built |
-| 14 | [Environment variables](#environment-variables) | Built |
-| 15 | [Continuity](#continuity) | Designed, not built |
-| 16 | [Client engagements](#client-engagements) | Designed, not built |
-| 17 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
-| 18 | [Privacy, erasure and compliance](#privacy-erasure-and-compliance) | Erasure and deletion built; the rest designed |
-| 19 | [Architecture](#architecture) | As built |
-| 20 | [Data model](#data-model) | As built |
-| 21 | [Hostile tests](#hostile-tests) | Built for what exists; the rest is the list to write |
-| 22 | [Build order](#build-order) | Current |
-| 23 | [Open decisions](#open-decisions) | Decided: 1 to 4; open: 5 and 6 |
-| 24 | [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later) | Reference |
-| 25 | [Out of scope](#out-of-scope) | Reference |
+| 8 | [Search](#search) | Designed 2026-10-17, being built (#207) |
+| 9 | [Path ownership](#path-ownership) | Built |
+| 10 | [Notifications](#notifications) | Partly built: flags, watching and the MCP hint; not addressed notes, staleness or nudges |
+| 11 | [Claims and work plans](#claims-and-work-plans) | Built, apart from the hosted load test (#82) |
+| 12 | [Threads](#threads) | Built |
+| 13 | [Links](#links) | Built |
+| 14 | [Routines](#routines) | Designed, not built |
+| 15 | [Environment variables](#environment-variables) | Built |
+| 16 | [Continuity](#continuity) | Designed, not built |
+| 17 | [Client engagements](#client-engagements) | Designed, not built |
+| 18 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
+| 19 | [Privacy, erasure and compliance](#privacy-erasure-and-compliance) | Erasure and deletion built; the rest designed |
+| 20 | [Architecture](#architecture) | As built |
+| 21 | [Data model](#data-model) | As built |
+| 22 | [Hostile tests](#hostile-tests) | Built for what exists; the rest is the list to write |
+| 23 | [Build order](#build-order) | Current |
+| 24 | [Open decisions](#open-decisions) | Decided: 1 to 4; open: 5 and 6 |
+| 25 | [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later) | Reference |
+| 26 | [Out of scope](#out-of-scope) | Reference |
 
 Status is as of 2026-10-09. "Built" means shipped and tested; a section marked
 so can still carry a "what this doesn't settle" list.
@@ -266,7 +267,7 @@ under 6 ms at 200k rows.
 
 | Tool | Notes |
 |---|---|
-| `search` | Full text first; embeddings when it proves too weak |
+| `search` | Words and meaning together: full text, plus gte-small embeddings from an Edge Function in pgvector, blended by rank ([Search](#search)); words alone when the function is down, and the response says so |
 | `read_file`, `list_files` | Text returned as quoted data with its policy, author and approvals |
 | `changes_since` | The feed: events after a cursor, oldest first |
 | `write_file` | Open files only; refused on canon files with a pointer to `propose` |
@@ -343,6 +344,170 @@ What follows from it:
 - **File text is data.** Every surface wraps it as quoted content with its
   policy, author and date. Proposals that address an AI system are flagged in
   review.
+
+## Search
+
+Designed 2026-10-17, before it was built (#207), on the owner's decision
+of that day to build it ahead of milestone 3 (the decision log in
+[progress.md](progress.md#decisions)). Search by words alone misses a
+question that shares no words with its answer: "what are we charging"
+never finds `decisions/pricing.md` if it says "seats" and "plans". So
+`search` also ranks by meaning, gated exactly as reading a file is.
+
+### 1. The model, and where it runs
+
+**gte-small**, Supabase's built-in embedding model
+(`Supabase.ai.Session('gte-small')`, 384 dimensions, mean-pooled and
+normalised), in one Edge Function, `embed` (`supabase/functions/embed/`).
+It runs in Supabase's edge runtime, inside the project that already holds
+every vault's text: there is no third-party model provider and no API key
+for one, and vault text only travels between Reliquary's own servers and
+its own Supabase project, as it already does on every read. This is the
+one model Reliquary runs itself, and it only turns text into numbers; the
+[out of scope](#out-of-scope) line about a Reliquary-hosted model is about
+models that write (routines use the vault's own key).
+
+The function is **stateless**: text in, vectors out. It has no database
+credentials and stores nothing.
+
+- `POST` with `Authorization: Bearer <EMBED_SECRET>` and a JSON body
+  `{"input": ["text", ...]}`: 1 to 16 strings of at most 2,000 characters.
+- `200` with `{"embeddings": [[384 numbers], ...]}`, one per input, in
+  order. `401` without the secret, `400` for any other body, `405` for
+  another method, `503` when its own `EMBED_SECRET` isn't set. A refusal's
+  answer says which, in words.
+- It logs neither the input nor the secret.
+
+**Why stateless**, rather than the usual Supabase pattern of a function
+that drains a queue over its own database connection (pgmq, pg_cron and
+pg_net calling it): no database role or password lives in the function,
+no shared secret lives in the database for pg_net to send, and every rule
+(the queue, the gate, the lifecycle) stays in Postgres and the MCP
+server, which the default test suites run. A test double that keeps the
+same HTTP contract stands in for the function in tests; only the vectors
+differ.
+
+### 2. Where vectors live
+
+`public.file_embeddings(file_id, version_id, vault_id, chunk, line,
+embedding vector(384))`, primary key `(file_id, chunk)`: one row per chunk
+of a file's **current** version, none for older versions. pgvector, with
+an HNSW index on cosine distance.
+
+- **Read:** RLS, `vault_id in (select private.readable_vaults())`, the
+  predicate `file_versions` uses: whoever may read the file may read its
+  vectors, and nobody else. There is no write policy.
+- **Write:** only `private.store_embeddings` (security definer), which
+  stores a file's vectors only if the caller may read it, it isn't deleted
+  and it is still at that version, holding a share lock on the file's row
+  so a write, delete or erasure in flight finishes first (and then the
+  store finds nothing to do).
+- **Chunks:** a file's text split at line breaks into chunks of up to about
+  1,200 characters (a longer line is cut), the first 8 chunks only (about
+  10 KB). The rest of a longer file is found by its words. `line` is the
+  chunk's first line, for the excerpt.
+- **Lifecycle** (triggers): a write that makes a new current version, a
+  delete and an erasure each remove the file's vectors; a live file is then
+  queued for new ones. Erased text leaves no vector behind. `delete_vault`
+  removes them with everything else (the foreign keys cascade). They don't
+  count toward a vault's storage.
+
+### 3. Kept current, with no member machine
+
+`private.embedding_queue(file_id, vault_id, version_id, queued_at)`: one
+row per file whose current version has no vectors yet, filled by the
+trigger above (and, once, by the migration for every file that existed).
+
+**`search` drains it, for the vault it searches.** Before ranking, the MCP
+server takes up to 8 queued files of that vault
+(`private.embedding_pending`, which returns nothing for a vault the caller
+can't read), chunks them and sends their chunks in the **same** function
+call as the query, at most 15 chunks beside it. It stores what comes back,
+then ranks.
+
+Why at search time: vectors are only ever used by search, so the vault
+being searched is the one that needs them; nothing has to run between
+searches, so there is no scheduler, no pg_cron job, no pg_net and no
+worker, and nothing depends on a member's machine. A file whose vectors
+aren't ready is still found by its words. `embedding_pending` takes no
+locks: two searches that embed the same file at once store the same rows
+(the store is an upsert), and a write never waits on a model call.
+
+Where it falls flat: a vault that gains hundreds of files at once (an
+import, a restore) catches up 15 chunks per search. When that shows, a
+scheduled sweep (a Netlify scheduled function, or pg_cron with pg_net)
+calls the same drain.
+
+### 4. The query, and the ranking
+
+The query is the first input of that call. Its vector goes to
+`public.search(p_vault, p_query, p_limit, p_embedding, p_min_similarity)`,
+which stays `security invoker`, so RLS gates both halves:
+
+- **Words:** as before, the `tsvector` match and the path substring, ranked
+  by `ts_rank`.
+- **Meaning:** the vault's nearest chunks by cosine distance, of live files
+  at their current version, the best chunk per file, kept only at a cosine
+  similarity of at least `p_min_similarity` (the MCP server's
+  `EMBED_MIN_SIMILARITY`, default 0.78: gte-small rates unrelated texts
+  around 0.7, so a floor keeps "No matches." meaning something). The vault
+  filter applies after the index's ordering, so the function sets
+  `hnsw.iterative_scan = relaxed_order` and the index keeps scanning until
+  enough of the vault's rows pass; the result is then sorted by distance.
+- **Blend:** reciprocal rank fusion, `1 / (60 + position)` summed over the
+  two lists. A file in both rises above a file in one. Ranks, not scores,
+  are blended, because `ts_rank` and cosine aren't on one scale.
+
+Without `p_embedding` (the web app's searches, a server with no function)
+the result is what it was, row for row. The MCP response keeps its shape;
+a file found by meaning alone shows up to 3 lines from its best chunk.
+
+### 5. When the function is down
+
+A timeout (8 s), a refused connection, a non-200 answer or an answer that
+isn't 384 numbers per text: `search` logs a failure with its reference
+(`failure.ts`), answers from words alone, and its first line says so, with
+the reference: "Search by meaning is unavailable right now (the embedding
+function answered 503; ref 1a2b3c4d). These results match words only."
+Queued files stay queued. The database work of the drain runs under a
+savepoint, so a failure there can't take the search down with it.
+
+A server with no `EMBED_URL` (a self-host that hasn't set it up) searches
+by words, silently: that is a configuration, documented, not an outage.
+
+### 6. Self-hosting
+
+- Postgres needs **pgvector**: `deploy/compose` runs
+  `pgvector/pgvector:0.8.2-pg17-trixie`, which is the official Postgres 17
+  image with pgvector added (on Supabase it is a built-in extension). The
+  migration creates the extension, so a database without it can't migrate.
+- Search by meaning is optional. To have it, run the same function in
+  Supabase's open-source edge runtime (`supabase/edge-runtime`, serving
+  `supabase/functions`), with `EMBED_SECRET` set, and give the MCP server
+  `EMBED_URL` and the same `EMBED_SECRET`. The runtime downloads the model
+  on first use; no vault text goes with that download.
+
+### 7. Encryption at rest (#238)
+
+Vectors leak meaning: an embedding can be turned back into a close
+paraphrase of its text (embedding inversion). So they are content, and
+they get whatever content gets. Today file text is plaintext in
+`file_versions`, and the vectors expose nothing the text beside them
+doesn't. When #238 makes content ciphertext, cosine ranking can't run over
+ciphertext in Postgres, so the vectors are encrypted under the same content
+key and ranking by meaning moves to the MCP server: it decrypts the
+searched vault's vectors and scores them in memory, the same move #238
+recommends for words, and the HNSW index goes. Until #238 lands this is a
+recorded gap, not a decision to keep vectors in the clear; #238's design
+has to cover it.
+
+### What this doesn't settle
+
+- The web app's searches (the top bar and a vault's own) stay words only;
+  they call the same function without a vector.
+- Long files past their first 10 KB, and big imports, as above.
+- Model changes: vectors of two models don't mix. Changing the model means
+  queuing every file again (one `insert ... select` into the queue).
 
 ## Path ownership
 
@@ -1611,8 +1776,11 @@ framework.
 - **Hosting:** two Netlify sites (`web`, `mcp`) and a Supabase project, or
   `deploy/compose` for self-hosting. No customer-side infrastructure.
 - **Multi-tenant:** vaults are the tenancy boundary, and RLS enforces it.
-- **Not built, and not in use anywhere:** `pgmq`, `pg_net`, Edge Functions
-  and Supabase Vault. They belonged to the routines design (Routines,
+- **One Edge Function,** `embed`: gte-small text embeddings for search
+  ([Search](#search)). Stateless, behind a shared secret
+  (`EMBED_SECRET`), called only by the MCP server.
+- **Not built, and not in use anywhere:** `pgmq`, `pg_net` and Supabase
+  Vault. They belonged to the routines design (Routines,
   above) and to the first secret-store recommendation; routines are
   unbuilt, and variables use the web app's own keys instead.
 
@@ -1629,7 +1797,8 @@ API role.
   `private.deleted_accounts`, `private.vault_deletions` (the record
   `delete_vault` leaves).
 - **Files and review.** `files`, `file_versions` (the full text of every
-  version), `path_policies(path, policy, quorum)`, `path_owners`,
+  version), `file_embeddings` (vectors of each file's current version,
+  [Search](#search)), `private.embedding_queue`, `path_policies(path, policy, quorum)`, `path_owners`,
   `proposals`, `approvals`, `proposal_notes`, `review_snoozes`, and
   `log(seq, vault_id, at, actor, agent, event, path, version_id,
   proposal_id, detail)`: append-only, the feed.
@@ -1694,6 +1863,10 @@ New in v3:
 - **Client engagements:** a requester revealing a variable the client
   didn't grant reveal on; a closed engagement's consultant or agent reading
   anything.
+- **Search:** a session for vault A getting a vector, a chunk or a hit by
+  meaning from vault B; a vector for a deleted, erased or superseded
+  version; storing vectors for a file the caller can't read; writing
+  `file_embeddings` directly.
 - **Erasure:** after crypto-shredding, no query, export, feed, or log read
   returns the content, while the log keeps its sequence.
 - **Git mirror:** a push to a one-way mirror changing nothing; on a two-way
@@ -1783,7 +1956,7 @@ says it's time:
 
 | Part | Lean v1 | Falls flat when | Then |
 |---|---|---|---|
-| Search | Postgres full text | Questions don't share words with the answer | Embeddings with pgvector, iterative scans under RLS |
+| Search | Postgres full text plus gte-small embeddings (pgvector, HNSW with iterative scans under RLS), blended by rank, embedded at search time | A vault gains hundreds of files at once, files matter past their first 10 KB, or one index over every vault gets slow | A scheduled sweep, more chunks per file, per-vault indexes or partitions |
 | Gate cost | Per-query helpers (p95 < 6 ms at 200k rows) | A vault passes millions of files | Combined indexes, partitioning by vault |
 | Quorum | Count of distinct approvers | Teams want "one from legal and one from eng" | Approver groups per folder |
 | Routines | One model call, Edge Function time limits | Multi-step agent work, long runs | A worker queue, or Managed Agents, per vault |
@@ -1807,7 +1980,9 @@ default more folders to open if proposals sit unreviewed.
 - Real-time collaboration and live cursors.
 - Client-side (end-to-end) encrypted variables, as a later separate
   feature.
-- A Reliquary-hosted model. Every model call uses the vault's own key.
+- A Reliquary-hosted model that writes. Every such call uses the vault's own
+  key; the one model Reliquary runs is gte-small, for search
+  ([Search](#search)).
 - Chat features around Threads: typing indicators, read receipts,
   presence, reactions, edits, attachments, email notifications,
   cross-vault threads and direct messages ([Threads](#threads), item 6).
