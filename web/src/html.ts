@@ -318,7 +318,7 @@ function feedbackPop(csrf: string, path: string, current: boolean): Raw {
         <form method="post" action="/feedback" class="feedback-form">
           ${csrfField(csrf)}<input type="hidden" name="page" value="${here}">
           <fieldset class="feedback-kinds"><legend class="sr-only">What is it?</legend>${FEEDBACK_KINDS.map(
-            (k, i) => html`<label title="${k.hint}"><input type="radio" name="kind" value="${k.id}"${i === 0 ? raw(" required") : ""}> ${k.label}</label>`,
+            (k, i) => html`<label title="${k.hint}"><input type="radio" name="kind" value="${k.id}"${i === 0 ? raw(" required") : ""}> ${k.label}<span class="sr-only">: ${k.hint}</span></label>`,
           )}</fieldset>
           <label class="sr-only" for="feedback-pop-message">Message</label>
           <textarea id="feedback-pop-message" name="message" rows="4" required maxlength="${FEEDBACK_MAX}" placeholder="What happened, or what would help?"></textarea>
