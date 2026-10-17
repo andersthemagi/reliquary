@@ -18,15 +18,20 @@ pg=reliquary-mcp-test-pg-$slot
 srv=reliquary-mcp-test-server-$slot
 web=reliquary-mcp-test-web-$slot
 rl=reliquary-mcp-test-rl-$slot
+emb=reliquary-mcp-test-embed-$slot
+sem=reliquary-mcp-test-sem-$slot
 pgport=$((54330 + 10 * slot))
 port=$((8788 + 10 * slot))
 webport=$((port + 1))
 # Off the 87xx range, where every last digit is taken by some suite and slot.
 rlport=$((18788 + 10 * slot))
+# The embedding function's stand-in, and an MCP server that searches by meaning with it.
+embport=$((18789 + 10 * slot))
+semport=$((18790 + 10 * slot))
 node=docker.io/library/node:22-slim
 
 # -v: the postgres image keeps its data in an anonymous volume that a plain rm leaves behind.
-cleanup() { "$engine" rm -f -v "$pg" "$srv" "$web" "$rl" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot" ".error-refs-$slot"; }
+cleanup() { "$engine" rm -f -v "$pg" "$srv" "$web" "$rl" "$emb" "$sem" >/dev/null 2>&1 || true; rm -f ".login-oauth-$slot" ".error-refs-$slot" ".sem-refs-$slot"; }
 trap cleanup EXIT
 cleanup
 source ../scripts/lib/containers.sh
@@ -46,6 +51,9 @@ seed=$(psql -A -t < test/seed.sql | grep '=' )
 # session-secret pattern.
 link_test_key=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
 link_proxy_secret=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
+# Shared by the MCP server that searches by meaning and the function's
+# stand-in (test/embed-double.mjs); the server log is checked for it below.
+embed_secret=EMBEDSECRET-$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')
 
 # The web app as the OAuth authorization server, signed in as Ben. It is
 # built inside its own container from a read-only view of web/, so it never
@@ -80,6 +88,18 @@ wait_until "$srv" "the MCP server to answer /healthz" curl -sf "http://127.0.0.1
   -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2,mcp_request_work_minute=1/2" \
   -e PORT=$rlport "$node" node dist/server.js >/dev/null
 wait_until "$rl" "the rate-limit MCP server to answer /healthz" curl -sf "http://127.0.0.1:$rlport/healthz"
+# Search by meaning (test/semantic_search.test.mjs): the other servers have
+# no EMBED_URL, so they search by words alone, as a self-host without the
+# function does. The stand-in's vectors are bags of words, which score
+# lower than gte-small's, hence the lower floor.
+"$engine" run -d --name "$emb" --network host -v "$PWD":/app:Z -w /app \
+  -e EMBED_SECRET="$embed_secret" -e PORT=$embport "$node" node test/embed-double.mjs >/dev/null
+"$engine" run -d --name "$sem" --network host -v "$PWD":/app:Z -w /app \
+  -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
+  -e MCP_RESOURCE="http://127.0.0.1:$semport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
+  -e EMBED_URL="http://127.0.0.1:$embport/" -e EMBED_SECRET="$embed_secret" -e EMBED_MIN_SIMILARITY=0.5 \
+  -e RATE_LIMIT_SCALE=1000 -e PORT=$semport "$node" node dist/server.js >/dev/null
+wait_until "$sem" "the MCP server that searches by meaning to answer /healthz" curl -sf "http://127.0.0.1:$semport/healthz"
 wait_until "$web" "the web app (authorization server) to answer /healthz" curl -sf "http://127.0.0.1:$webport/healthz"
 
 env_args=()
@@ -87,7 +107,8 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 # docs/ read-only, for test/parity.test.mjs (every tool is in docs/parity.md).
 "$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" \
   -e MCP_URL="http://127.0.0.1:$port/mcp" -e TEST_DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
-  -e MCP_ERROR_REFS_FILE="/app/.error-refs-$slot" -e MCP_RL_URL="http://127.0.0.1:$rlport/mcp" -e TEST_SUPER_URL="postgres://postgres:test@127.0.0.1:$pgport/postgres" \
+  -e MCP_ERROR_REFS_FILE="/app/.error-refs-$slot" -e MCP_RL_URL="http://127.0.0.1:$rlport/mcp" \
+  -e MCP_SEM_URL="http://127.0.0.1:$semport/mcp" -e EMBED_DOUBLE_URL="http://127.0.0.1:$embport" -e SEM_REFS_FILE="/app/.sem-refs-$slot" -e TEST_SUPER_URL="postgres://postgres:test@127.0.0.1:$pgport/postgres" \
   -e UPDATE_SNAPSHOTS="${UPDATE_SNAPSHOTS:-}" -e PARITY_FILE=/docs/parity.md \
   -e WEB_AS_URL="http://127.0.0.1:$webport" -e WEB_AS_LOGIN_FILE="/app/.login-oauth-$slot" \
   -e LINK_TEST_KEY="$link_test_key" \
@@ -98,18 +119,26 @@ while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 echo "== server log (must contain no tokens or file text)"
 # Not `tee /dev/stderr`: when stderr is a file (./test.sh logs) that reopens
 # and truncates it, losing the test output.
-server_log=$("$engine" logs "$srv" 2>&1; "$engine" logs "$rl" 2>&1)
+server_log=$("$engine" logs "$srv" 2>&1; "$engine" logs "$rl" 2>&1; "$engine" logs "$sem" 2>&1)
 web_log=$("$engine" logs "$web" 2>&1)
 printf '%s\n' "$server_log" >&2
 grep -E 'rlq_|800 EUR|Hermes|Falcon|CIPHERTEXT-MARKER|SEKRIT' <<< "$server_log" && { echo "LEAK in server log"; exit 1; } || echo "clean"
 # LINKVAL- is link_proxy.test.mjs's real (working) credential marker; the
 # web app is the one that ever holds it in plaintext (linkcall.ts).
 grep -E 'LINKVAL-' <<< "$web_log" && { echo "LEAK: a link credential in the web app's log"; exit 1; } || echo "clean (link credential)"
+grep -F "$embed_secret" <<< "$server_log" && { echo "LEAK: the embedding function's secret in the server log"; exit 1; } || echo "clean (embedding secret)"
 # The addresses test/rate_limits.test.mjs sends from.
 grep -E '198\.51\.100\.|2001:db8' <<< "$server_log" && { echo "LEAK: a client address in the server log"; exit 1; } || echo "clean (addresses)"
 # OAuth: no personal token, access (MCP or CLI) or refresh token, or code in either app's log.
 grep -E 'rl[qorce]_[0-9a-f]' <<< "$server_log
 $web_log" && { echo "LEAK: a token or code in a server log"; exit 1; } || echo "clean (oauth)"
+# Every reference test/semantic_search.test.mjs saw is in the server log.
+if [ -s ".sem-refs-$slot" ]; then
+  while read -r ref; do
+    grep -q "^failure ref=$ref {" <<< "$server_log" || { echo "search by meaning: reference $ref is not in the server log"; exit 1; }
+  done < ".sem-refs-$slot"
+  echo "search by meaning: found $(wc -l < ".sem-refs-$slot") references"
+fi
 # Every reference test/errors.test.mjs saw is in the server log, with its detail.
 if [ -z "${MCP_TESTS:-}" ] || [[ "$MCP_TESTS" == *errors* ]]; then
   echo "== error references"

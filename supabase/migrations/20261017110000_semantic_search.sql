@@ -99,7 +99,8 @@ $$;
 -- live and still at p_version; otherwise does nothing (the version moved on,
 -- and is queued again). The share lock on the file's row makes a write,
 -- delete or erasure in flight finish first; the check then sees its result.
--- Returns the number of chunks stored.
+-- Returns the number of chunks stored; none (a file with no text to embed)
+-- just takes the file off the queue.
 create function private.store_embeddings(p_file uuid, p_version uuid, p_chunks jsonb)
 returns int
 language plpgsql volatile security definer set search_path = '' as $$
@@ -116,8 +117,8 @@ begin
      or not exists (select 1 from public.file_versions v where v.id = p_version and v.body is not null) then
     return 0;
   end if;
-  if jsonb_typeof(p_chunks) is distinct from 'array' or jsonb_array_length(p_chunks) not between 1 and 8 then
-    raise exception 'between 1 and 8 chunks of a file are stored at once' using errcode = '22023';
+  if jsonb_typeof(p_chunks) is distinct from 'array' or jsonb_array_length(p_chunks) > 8 then
+    raise exception 'at most 8 chunks of a file are stored' using errcode = '22023';
   end if;
   delete from public.file_embeddings e
    where e.file_id = p_file and e.chunk >= jsonb_array_length(p_chunks);

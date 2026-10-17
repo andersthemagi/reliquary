@@ -1157,7 +1157,7 @@
   {
     "name": "search",
     "title": "Search a vault",
-    "description": "Full-text search of a vault. Up to 3 matching lines per file, best first.",
+    "description": "Search a vault by words and by meaning, best first: ask in your own words. Up to 3 lines per file.",
     "inputSchema": {
       "type": "object",
       "properties": {

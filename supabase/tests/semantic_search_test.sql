@@ -66,6 +66,10 @@ select t.expect('store: a version that isn''t current stores nothing',
 select t.expect('store: more than 8 chunks are refused',
   t.run('ana', format($q$select private.store_embeddings(%L, %L, (select jsonb_agg(c) from jsonb_array_elements(%L::jsonb) c, generate_series(1, 9)))$q$,
     t.file('v1', 'notes/garden.md'), t.cur('v1', 'notes/garden.md'), t.chunks(2))), 'ERR 22023');
+select t.run('ana', format($q$select public.write_file(%L, 'notes/blank.md', E'\n  \n')$q$, t.id('v1')));
+select t.expect('store: no chunks (a file with no text to embed) takes the file off the queue',
+  t.run('ana', format($q$select private.store_embeddings(%L, %L, '[]')$q$, t.file('v1', 'notes/blank.md'), t.cur('v1', 'notes/blank.md')))
+  || '/' || t.run('ana', format($q$select count(*) from private.embedding_pending(%L, 50)$q$, t.id('v1'))), '0/0');
 
 -- Reading vectors
 
