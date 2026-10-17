@@ -1,4 +1,4 @@
-// Searches that found nothing in the web app (20261017130000_missed_searches.sql):
+// Searches that found nothing in the web app (20261017140000_missed_searches.sql):
 // a vault's own search and the search across every vault note the words for
 // the vault's owners. Who may read the list is proved in
 // supabase/tests/missed_searches_test.sql; these check the wiring.

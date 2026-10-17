@@ -37,7 +37,7 @@ export async function searchAll(ctx: Ctx): Promise<Reply> {
           [ctx.userId, query, terms],
         );
         // Below TOTAL every vault's matches are here, so a vault with none
-        // found nothing: noted for its owners (20261017130000_missed_searches.sql).
+        // found nothing: noted for its owners (20261017140000_missed_searches.sql).
         // At TOTAL a vault may be missing only because others filled the page.
         if (rows.length < TOTAL)
           await c.query(`select private.note_missed_search(v.id, $2) from (${searched}) v where v.id <> all($3::uuid[])`, [

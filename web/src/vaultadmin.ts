@@ -229,7 +229,7 @@ async function saveSettings(ctx: Ctx, id: string): Promise<Reply> {
 }
 
 // ---------------------------------------------------------------------------
-// Searches that found nothing (20261017130000_missed_searches.sql): owners
+// Searches that found nothing (20261017140000_missed_searches.sql): owners
 // only, which RLS decides; the page only skips asking for anyone else.
 
 const MISSED_SHOWN = 100;

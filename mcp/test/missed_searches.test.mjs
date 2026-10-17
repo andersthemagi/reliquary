@@ -1,5 +1,5 @@
 // An agent's search that finds nothing is noted for the vault's owners
-// (private.note_missed_search, 20261017130000_missed_searches.sql): the
+// (private.note_missed_search, 20261017140000_missed_searches.sql): the
 // words and that an agent searched, never which. Who may read the list is
 // proved in supabase/tests/missed_searches_test.sql; this is the wiring.
 // Runs as Gus (seed.sql) in his vault Limits, with words no other file
