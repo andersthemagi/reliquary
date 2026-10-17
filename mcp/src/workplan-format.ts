@@ -27,8 +27,12 @@ const FIELDS = ["title", "blocked_by", "cites", "gate", "due", "priority", "note
 // The database's check on notes (20261014130000_step_planning_fields.sql):
 // a tab is fine, any other control character is not.
 const CONTROL_RE = /[\u0000-\u0008\u000a-\u001f\u007f]/;
-// Only the shape: whether it names a member is the database's to say.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+$/;
+// A member's short tag: the first 8 characters of their id, as the web UI
+// and co_member_people show beside a display name. Only the shape; whether
+// it names a member of the vault is the database's to say. An email is
+// refused here on sight (issue #378, design principle 12): plan files are
+// vault content agents read, so an address in one reaches a model.
+const TAG_RE = /^[0-9a-f]{8}$/i;
 
 type WorkPlanCite = { path: string; version: string };
 type WorkPlanStep = {
@@ -40,7 +44,7 @@ type WorkPlanStep = {
   due: string | null; // YYYY-MM-DD
   priority: number | null; // 1 (highest) to 4
   notes: string | null;
-  for: string | null; // "agents", "people" or a member's email
+  for: string | null; // "agents", "people" or a member's short tag
   line: number; // the line its "- key:" opened on, 1-based
 };
 type WorkPlan = { steps: WorkPlanStep[] };
@@ -155,8 +159,10 @@ export function parseWorkPlanBlock(fileText: string): WorkPlanParseResult {
       else if (CONTROL_RE.test(value)) errors.push(`line ${lineNo}: notes have a control character in them`);
       else cur.notes = value;
     } else if (name === "for") {
-      if (value !== "agents" && value !== "people" && !EMAIL_RE.test(value)) {
-        errors.push(`line ${lineNo}: for must be agents, people or a member's email`);
+      if (value.includes("@")) {
+        errors.push(`line ${lineNo}: for can't be an email; name the member by their short tag, the 8 characters shown beside their name (for: 3fa85f64)`);
+      } else if (value !== "agents" && value !== "people" && !TAG_RE.test(value)) {
+        errors.push(`line ${lineNo}: for must be agents, people or a member's short tag (the 8 characters shown beside their name)`);
       } else cur.for = value;
     }
   }
