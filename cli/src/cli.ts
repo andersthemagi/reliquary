@@ -88,11 +88,11 @@ function parse(tokens: string[], spec: Spec, stopAtCommand = false): Parsed {
         if (v === undefined || v === "") throw new UsageError(`--${name} needs a value.`);
         opts[name] = v;
       } else {
-        throw new UsageError(`Unknown option ${t.slice(0, eq === -1 ? undefined : eq)}. See \`reliquary --help\`.`);
+        throw unknownOption(t.slice(0, eq === -1 ? undefined : eq), spec);
       }
       continue;
     }
-    if (t.startsWith("-") && t !== "-") throw new UsageError(`Unknown option ${t}. See \`reliquary --help\`.`);
+    if (t.startsWith("-") && t !== "-") throw unknownOption(t, spec);
     if (stopAtCommand) return { opts, positionals, rest: tokens.slice(i) };
     positionals.push(t);
   }
@@ -120,6 +120,15 @@ function closest(word: string, candidates: string[]): string | undefined {
     if (d < bestD) [best, bestD] = [c, d];
   }
   return best;
+}
+
+// Only this command's options are suggested. `--environment` is the key's
+// name in .reliquary.json, a natural guess that edit distance won't reach.
+function unknownOption(option: string, spec: Spec): UsageError {
+  const name = option.replace(/^-+/, "");
+  const names = [...spec.values, ...spec.flags];
+  const near = name === "environment" && names.includes("env") ? "env" : closest(name, names);
+  return new UsageError(`Unknown option ${option}.${near ? ` Did you mean --${near}?` : ""} See \`reliquary --help\`.`);
 }
 
 const COMMANDS = ["help", "version", "login", "logout", "vaults", "run", "env"];

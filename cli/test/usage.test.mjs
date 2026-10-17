@@ -30,3 +30,17 @@ test("usage: a command nothing is close to gets no suggestion", () => {
   assert.equal(r.status, 2);
   assert.doesNotMatch(r.stderr, /Did you mean/);
 });
+
+test("usage: --environment suggests --env, exit 2", () => {
+  const r = cli("run", "--environment", "production", "--", "x");
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /Unknown option --environment\. Did you mean --env\?/);
+});
+
+test("usage: a mistyped option suggests the closest one that command accepts", () => {
+  assert.match(cli("run", "--vualt", "a", "--", "x").stderr, /Did you mean --vault\?/);
+  // `vaults` takes no --vault, so nothing is suggested.
+  const r = cli("vaults", "--vualt", "a");
+  assert.equal(r.status, 2);
+  assert.doesNotMatch(r.stderr, /Did you mean/);
+});
