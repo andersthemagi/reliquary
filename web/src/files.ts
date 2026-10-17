@@ -586,7 +586,20 @@ export async function editView(ctx: Ctx, id: string, refused?: Refused): Promise
   return { ...render(ctx, `Edit ${path}`, data.shell, "vaults"), ...(refused ? { status: 400 } : {}) };
 }
 
-export async function newFile(ctx: Ctx, id: string, refused?: Refused): Promise<Reply> {
+// A title typed into Path lands as a file with spaces and no extension,
+// which renders as plain text that nothing links to. A warning, not a
+// refusal: such paths are legal, so the person may keep one.
+function pathHint(path: string): { why: string; suggestion: string } | null {
+  const hyphened = path.replace(/\s+/g, "-");
+  const name = hyphened.slice(hyphened.lastIndexOf("/") + 1);
+  const noExt = name !== "" && !/\.[^./]+$/.test(name);
+  const spaces = hyphened !== path;
+  if (!noExt && !spaces) return null;
+  const has = [noExt ? "no extension, so it will show as plain text" : "", spaces ? "spaces, which make it harder to link to" : ""];
+  return { why: `This path has ${has.filter(Boolean).join(", and it has ")}.`, suggestion: hyphened + (noExt ? ".md" : "") };
+}
+
+export async function newFile(ctx: Ctx, id: string, refused?: Refused & { warn?: { why: string; suggestion: string } }): Promise<Reply> {
   // A refused create is shown again in the folder of the path that was typed.
   const typedDir = refused?.path.slice(0, refused.path.lastIndexOf("/") + 1);
   const given = (typedDir ?? ctx.url.searchParams.get("dir") ?? "").replace(/^\/+/, "");
@@ -609,10 +622,18 @@ export async function newFile(ctx: Ctx, id: string, refused?: Refused): Promise<
         secondary: html`<a class="button quiet" href="${treePath(id, dir)}">Cancel</a>`,
         primary: html`<button class="primary" form="new-file">${verb}</button>`,
       })}
-      ${refused ? callout("danger", refused.error) : ""}
+      ${refused?.error ? callout("danger", refused.error) : ""}
+      ${refused?.warn
+        ? callout(
+            "warning",
+            html`<p>${refused.warn.why} Did you mean <code>${refused.warn.suggestion}</code>?</p>
+              <p><button form="new-file" name="use_path" value="${refused.warn.suggestion}">Use ${refused.warn.suggestion}</button> or choose ${verb} to keep the path as typed.</p>`,
+          )
+        : ""}
       <form method="post" action="${vaultPath(id, "/file")}" class="panel" id="new-file">
         ${csrfField(ctx.csrf)}
         <input type="hidden" name="action" value="create">
+        ${refused?.warn ? html`<input type="hidden" name="warned" value="${refused.path}">` : ""}
         <label for="p">Path</label>
         <p class="hint" id="p-hint">Folders are part of the path. A path under a canon folder becomes a proposal.</p>
         <input id="p" type="text" name="path" value="${refused?.path ?? dir}" placeholder="${dir}new-file.md" required aria-describedby="p-hint">
@@ -628,7 +649,7 @@ export async function newFile(ctx: Ctx, id: string, refused?: Refused): Promise<
     return { v, shell: await vaultShell(c, ctx, v, { path: dir, section: "files" }, body) };
   });
   if (!data) return notFound(ctx);
-  return { ...render(ctx, "New file", data.shell, "vaults"), ...(refused ? { status: 400 } : {}) };
+  return { ...render(ctx, "New file", data.shell, "vaults"), ...(refused?.error ? { status: 400 } : {}) };
 }
 
 // A stale save (public.write_file's RLF01): the file's current text and who
@@ -682,7 +703,8 @@ async function conflictReply(ctx: Ctx, id: string, path: string, typed: string):
 
 export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
   const f = ctx.form;
-  const path = (f.get("path") ?? "").trim();
+  // Use <suggestion> on New file's warning posts the suggested path beside the typed one.
+  const path = (f.get("use_path") || f.get("path") || "").trim();
   const content = (f.get("content") ?? "").replaceAll("\r\n", "\n");
   const reason = f.get("reason") ?? "";
   const action = f.get("action") ?? "";
@@ -693,6 +715,10 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
     // shouldn't cost (web/test/final_sweep.test.mjs).
     return { status: 400, html: errorPage(f, { theme: ctx.theme, back: filePath(id, path) }) };
   }
+  // Warned once about this exact path, posting it again keeps it. A path
+  // that can't be shown back is left to the database to refuse.
+  const warn = action === "create" && f.get("warned") !== path && echoable(path) ? pathHint(path) : null;
+  if (warn) return newFile(ctx, id, { error: "", path, content, reason, expectedVersion: null, warn });
   try {
     // One query in the transaction: the vault is checked inside it
     // (private.vault_ref, under RLS: RLV01 when the person can't see it), as

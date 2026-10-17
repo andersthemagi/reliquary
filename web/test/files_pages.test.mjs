@@ -388,6 +388,43 @@ test("new file: in an open folder there's no Why field and the button says Creat
 });
 
 // ---------------------------------------------------------------------------
+// New file warns about a path typed as a title (issue #264)
+
+const createAt = async (fields) =>
+  post(`/v/${V.main}/file`, { csrf: csrfOf(await page(`/v/${V.main}/new?dir=notes%2F`)), action: "create", content: "Typed.", reason: "New file", ...fields });
+const warningOf = (h) => /<div class="callout warning">([\s\S]*?)<\/div>/.exec(h)?.[1] ?? "";
+
+test("new file path: no extension warns before creating, suggests .md, and creates nothing", async () => {
+  const r = await createAt({ path: "notes/plan" });
+  assert.equal(r.status, 200);
+  const h = await r.text();
+  assert.match(warningOf(h), /This path has no extension, so it will show as plain text\. Did you mean <code>notes\/plan\.md<\/code>\?/);
+  assert.match(warningOf(h), /<button form="new-file" name="use_path" value="notes\/plan\.md">Use notes\/plan\.md<\/button> or choose Create file to keep the path as typed\./);
+  assert.match(h, /<input type="hidden" name="warned" value="notes\/plan">/);
+  assert.match(h, /<textarea id="c" name="content">Typed\.<\/textarea>/);
+  assert.equal(await live(V.main, "notes/plan"), 0);
+});
+
+test("new file path: spaces warn and suggest hyphens", async () => {
+  const h = await (await createAt({ path: "notes/two words.md" })).text();
+  assert.match(warningOf(h), /This path has spaces, which make it harder to link to\. Did you mean <code>notes\/two-words\.md<\/code>\?/);
+  assert.equal(await live(V.main, "notes/two words.md"), 0);
+});
+
+test("new file path: Use the suggestion creates the file at the suggested path", async () => {
+  const r = await createAt({ path: "notes/Call notes", warned: "notes/Call notes", use_path: "notes/Call-notes.md" });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.get("location"), file(V.main, "notes/Call-notes.md"));
+  assert.equal(await live(V.main, "notes/Call notes"), 0);
+});
+
+test("new file path: Create file again on the warned path keeps it as typed", async () => {
+  const r = await createAt({ path: "notes/kept as typed", warned: "notes/kept as typed" });
+  assert.equal(r.status, 303);
+  assert.equal(await live(V.main, "notes/kept as typed"), 1);
+});
+
+// ---------------------------------------------------------------------------
 // A file form the database refuses comes back as its own page
 
 const alertOf = (h) => /<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(h)?.[1] ?? "";
