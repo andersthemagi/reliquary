@@ -13,6 +13,8 @@ On Home, choose **New vault**. Under **Start from**, pick a template's card, the
 | **Personal projects** | `projects/` and `notes/` are open | none |
 | **Product team** | `specs/` and `decisions/` are canon (1 approval); `notes/` is open | `DATABASE_URL`, `SENTRY_DSN` |
 
+For a way to use the **Client engagement** layout with an agent, keeping transcripts as they came, its notes apart and the decisions in canon, see [Keep call and meeting notes](../how-to/keep-meeting-notes.md).
+
 What you choose under **Files without a rule are** is the vault's default policy: it applies to everything the template's rules don't cover, such as the README at the top of the vault.
 
 ## What a template creates

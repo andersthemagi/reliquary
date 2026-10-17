@@ -28,7 +28,7 @@ claude mcp add --transport http --scope user reliquary https://mcp.reliquary.red
 
 Start Claude Code, run `/mcp`, choose **reliquary**, then **Authenticate**. Your browser opens Reliquary's consent page:
 
-1. If **All my vaults** is already chosen, which it is when you have one vault, leave it.
+1. If **All my vaults, including ones I join later** is already chosen, which it is when you have one vault, leave it.
 2. Choose **Read and write**, so the agent can propose changes.
 3. Choose **Allow**.
 
@@ -84,3 +84,6 @@ Nothing is written to disk. Back in the web app, **Variables**, **Access log** s
 - Connect your other tools: [Claude.ai](../how-to/connect-claude-ai.md), [ChatGPT](../how-to/connect-chatgpt.md), [Cursor](../how-to/connect-cursor.md), [VS Code](../how-to/connect-vs-code.md).
 - Bring a project's existing `.env` in: [Move a .env into a vault](../how-to/move-env-into-vault.md).
 - Work with someone: [Invite someone](../how-to/invite-someone.md).
+- Decide what needs approval and what doesn't, per folder: [Set rules](../how-to/set-rules.md).
+- Give your agent a job: [Keep call and meeting notes](../how-to/keep-meeting-notes.md).
+- A word you don't know: the [glossary](../reference/glossary.md).
