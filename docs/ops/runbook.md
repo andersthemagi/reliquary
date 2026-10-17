@@ -341,18 +341,24 @@ BENCH_KEEP=1 ./supabase/bench/search.sh       # leave the container up to try a 
 With `BENCH_KEEP=1`, `podman exec -it reliquary-search-bench-32 psql -U postgres -d bench`
 reaches the seeded database; remove it with `podman rm -f -v reliquary-search-bench-32`.
 
-First run, 2026-10-17 (a laptop, data on tmpfs, default settings; ms, 30 warm calls):
+2026-10-17, a laptop, data on tmpfs, default settings; ms over 30 warm
+calls, the range across the six query shapes:
 
-| Files in vault | p50 | p95 |
-|---|---|---|
-| 1k | 64 to 67 | 68 to 71 |
-| 10k | 85 to 102 | 87 to 105 |
-| 50k | 245 to 453 | 277 to 768 |
+| Files in vault | p50 before #403 | p95 before #403 | p50 now | p95 now |
+|---|---|---|---|---|
+| 1k | 59 to 66 | 63 to 79 | 3.5 to 11.5 | 4.1 to 12.5 |
+| 10k | 87 to 104 | 91 to 107 | 29 to 47 | 33 to 48 |
+| 50k | 233 to 300 | 244 to 308 | 205 to 265 | 208 to 273 |
 
-What it showed: the 1k vault costs as much as a scan of every vault's
-files, because a SQL function's statements are planned without the vault id
-(a generic plan) and Postgres picks a sequential scan of all of
-`file_versions`, history and other tenants included. The follow-up is #403.
+What the first run showed: the 1k vault cost as much as a scan of every
+vault's files, because a SQL function's statements are planned without the
+vault id (a generic plan) and Postgres picked a sequential scan of all of
+`file_versions`, history and other tenants included. Since #403,
+`public.search` is plpgsql with `plan_cache_mode = force_custom_plan`, so
+each call is planned for its vault and reads `file_versions` by the vault's
+index. What is left at 1k is mostly a scan of every `files` row the caller
+can read, in the join that fetches the hits; at 50k it is ranking every
+match.
 
 ## Backups and restore
 
