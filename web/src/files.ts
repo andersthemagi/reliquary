@@ -115,7 +115,7 @@ export async function vaultShell(c: pg.PoolClient, ctx: Ctx, v: Vault, current: 
     html`<ul>${[...node.dirs.entries()].map(([name, child]) => {
       const dir = `${prefix}${name}/`;
       const policy = dirPolicy.get(dir) ?? "open";
-      return html`<li><details${here.startsWith(dir) ? raw(" open") : ""}><summary><span class="mark ${policy}" title="${policy}"></span><a href="${treePath(v.id, dir)}"${here === dir ? raw(' aria-current="page"') : ""}>${name}</a></summary>${renderNode(child, dir)}</details></li>`;
+      return html`<li><details${here.startsWith(dir) ? raw(" open") : ""}><summary><span class="mark ${policy}" title="${policy}"><span class="sr-only">${policy}</span></span><a href="${treePath(v.id, dir)}"${here === dir ? raw(' aria-current="page"') : ""}>${name}</a></summary>${renderNode(child, dir)}</details></li>`;
     })}${node.files.map(
       (f) => html`<li class="leaf"><a href="${filePath(v.id, f.path)}"${here === f.path ? raw(' aria-current="page"') : ""}>${f.name}</a></li>`,
     )}</ul>`;

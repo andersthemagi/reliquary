@@ -144,10 +144,10 @@ test("edit, then approve: my edit lands, credited to me", async () => {
 
 // Files and folders --------------------------------------------------------
 
-test("tree: the sidebar shows folders with their policy and opens the current one", async () => {
+test("tree: the sidebar shows folders with their policy, as text a screen reader announces, and opens the current one", async () => {
   const h = await page(`${V}/file?path=clients%2Facme%2Fbrief.md`);
-  assert.match(h, /<details open><summary><span class="mark open" title="open"><\/span><a href="\/v\/[^"]+\/tree\?path=clients%2F">clients<\/a>/);
-  assert.match(h, /<span class="mark canon" title="canon"><\/span><a href="\/v\/[^"]+\/tree\?path=canon%2F">canon</);
+  assert.match(h, /<details open><summary><span class="mark open" title="open"><span class="sr-only">open<\/span><\/span><a href="\/v\/[^"]+\/tree\?path=clients%2F">clients<\/a>/);
+  assert.match(h, /<span class="mark canon" title="canon"><span class="sr-only">canon<\/span><\/span><a href="\/v\/[^"]+\/tree\?path=canon%2F">canon</);
   assert.match(h, /aria-current="page">brief\.md</);
 });
 
