@@ -31,7 +31,7 @@ The **Connect** page has a tab for each client with only that client's steps. Un
 Quickest, for Cursor, VS Code or another client that can't sign in:
 
 1. On the **Connect** page, open that client's tab.
-2. Name the token after the agent and machine, then choose **Create read-only token** or **Create read and write token**. It reaches all your vaults and expires in 90 days. If you belong to more than one vault, the tab takes you to the full form instead, where nothing is chosen for you.
+2. Name the token after the agent and machine, then choose **Create read-only token** or **Create read and write token**. It reaches all your vaults and expires in 90 days. If you belong to more than one vault, the tab shows **Choose vaults and create a token** instead, which opens the full form, where nothing is chosen for you.
 3. The next page shows the token once, with the steps for that client and the token already in them.
 
 For some vaults, or another expiry, choose **use the full form** on the tab, or **New token** on the Connections page: name it, choose its vaults (if you belong to more than one vault, nothing is chosen for you), **Read only** or **Read and write**, and when it expires, then **Create token**. Copy the token, then choose **Done**. It is shown once.
