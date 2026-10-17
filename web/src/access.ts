@@ -192,15 +192,18 @@ function cursorSetup(url: string) {
   };
 }
 
-const vscodeJson = (url: string) =>
-  JSON.stringify(
-    {
-      inputs: [{ type: "promptString", id: "reliquary-token", description: "Reliquary access token", password: true }],
-      servers: { reliquary: { type: "http", url, headers: { Authorization: "Bearer ${input:reliquary-token}" } } },
-    },
-    null,
-    2,
-  );
+// The install link carries the same server entry and prompt as the file, so
+// VS Code asks for the token once either way and the link holds no secret.
+function vscodeSetup(url: string) {
+  const inputs = [{ type: "promptString", id: "reliquary-token", description: "Reliquary access token", password: true }];
+  const server = { type: "http", url, headers: { Authorization: "Bearer ${input:reliquary-token}" } };
+  const install = q(JSON.stringify({ name: "reliquary", ...server, inputs }));
+  return {
+    json: JSON.stringify({ inputs, servers: { reliquary: server } }, null, 2),
+    link: `vscode:mcp/install?${install}`,
+    insidersLink: `vscode-insiders:mcp/install?${install}`,
+  };
+}
 
 // A token client's steps, one copy for its Connect tab and for the page that
 // shows the token (then `token` is set and the commands carry it), so the two
@@ -225,9 +228,10 @@ function tokenSteps(ctx: Ctx, client: TokenClient, token?: string): Raw[] {
       html`In Cursor’s MCP settings, check that reliquary is on and lists its tools. ${check}`,
     );
   } else if (client === "vscode") {
+    const { json, link, insidersLink } = vscodeSetup(url);
     steps.push(
-      html`Add this to <code>.vscode/mcp.json</code>:${pre(vscodeJson(url))}`,
-      html`Start the server from that file. VS Code asks for the token once and stores it securely: ${token ? "paste the one above" : "paste it"}. ${check}`,
+      html`<a href="${link}">Add Reliquary to VS Code</a> (or <a href="${insidersLink}">Add Reliquary to VS Code Insiders</a>) and confirm the install. If the link doesn’t open, add this to <code>.vscode/mcp.json</code> and start the server from that file:${pre(json)}`,
+      html`VS Code asks for the token once and stores it securely: ${token ? "paste the one above" : "paste it"}. ${check}`,
     );
   } else {
     steps.push(
