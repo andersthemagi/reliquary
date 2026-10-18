@@ -10,7 +10,7 @@ A vault's owner adds, edits and deletes links from its **Links** page in the web
 - **A credential**, encrypted the same way as an environment variable: nobody, including an agent, ever reads it back. It is attached to a call at the last moment, server-side, and re-checked for safety (see below) on every call, not just when the link was added. Editing a link changes its name and url only; the credential isn't shown or changed there. To replace it, an owner chooses **Replace credential** in the link's menu: the new one is stored in place of the old, the link keeps its name, url and grants, its tools are discovered again with it, and the replacement is logged in Activity without the credential. Changing the url keeps the credential, which is then sent to the new address, and the tools already discovered.
 - **Discovered tools.** Adding a link calls the upstream server's own tool list and stores each tool's name, description (as one line of at most 300 characters), arguments and whether it writes (from the tool's own `readOnlyHint`; anything but an explicit yes is treated as a write tool). A slow or unreachable server doesn't stop the link from being added: it's flashed as a warning, and the link's tools stay empty until an owner chooses **Refresh tools** in its menu. **Refresh tools** also picks up tools the server added since: it runs discovery again with the stored credential, gives a new tool the starting grants below, keeps the grants an owner set, and removes a tool the server no longer lists. It says which tools were added and removed; if it fails, the tools stay as they were and the warning says why. If the server answers with an error of its own, the warning gives only the error's code, never the server's words: they can be written to read as instructions, and servers often repeat the credential they were sent. What it said is kept in the web app's server log under the warning's reference, with the credential taken out.
 - **Grants per role.** An owner decides which of a link's tools each role may use, from the link's **Grants** page. Read tools default on for editors and owners; write tools stay off until an owner turns them on there.
-- **A call log**, append-only: who, which agent, which tool, and whether it succeeded, kept as a record even after the link itself is deleted. Never the arguments or the result, only their hashes.
+- **A call log**, append-only: who, which agent, which tool, how it went and the size of the answer, kept as a record even after the link itself is deleted. Never the arguments or the result, only their hashes. See [A link's calls](#a-links-calls).
 
 ## Calling a tool
 
@@ -21,6 +21,19 @@ The upstream server's description of a tool is its own text, not Reliquary's, so
 If two vaults you belong to each have a link with the same name, and both offer a tool with the same name, `tools/list` offers only one of them, the same one every time, and leaves the other out. Rename one of the links to reach both.
 
 When a call fails, the agent is told what was being done, where it broke and why, with a [reference](../reference/errors.md). It has two, the MCP server's and the web app's, since the detail is in the web app's log. If the linked server refuses with an error of its own, the agent gets only the error's code, as the warning shown when you add a link does.
+
+## A link's calls
+
+To see what a shared account is being used for, open the link's **Calls** page: on the **Links** page, pick **Calls** in the link's menu, or select its **Last call** (an editor, who has no menu, uses that). It lists every call through the link, newest first, 100 a page (**Older** for the rest):
+
+- **When**, and **Who**: the person, and the agent that acted for them ("you via Claude Code").
+- **Tool**: the tool called, as `<link>.<tool>`.
+- **Outcome**: **OK**, **Error** (the upstream server answered with an error, or couldn't be reached), or **Refused** (the link's grants or the caller's connection didn't allow it, so nothing reached the server).
+- **Size**: how much the server answered. A dash when there was no answer.
+
+The arguments and the answer are never stored, so they can't be shown. The **Links** page also shows each link's **Last call** and how many calls it had in the **Last 7 days**.
+
+Owners and editors see a link's calls; viewers don't, the database returns them none.
 
 ## Who may do what
 
