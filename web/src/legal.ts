@@ -143,7 +143,7 @@ ${operatorBlock()}
 
 <h2>What we hold</h2>
 <ul>
-  <li><strong>Account:</strong> your email address and an account id, and the vaults you belong to with your role.</li>
+  <li><strong>Account:</strong> your email address and an account id, the vaults you belong to with your role, and which version of these terms and this policy you accepted at sign-in, and when.</li>
   <li><strong>Access requests:</strong> the email address, name, country and note you send with Request access. The service emails them to us and doesn't store them; we keep the email while we arrange your access.</li>
   <li><strong>Vault content:</strong> files and their versions, proposals, approvals, comments and notes, which can include personal data your team writes.</li>
   <li><strong>Variables:</strong> names and encrypted values, and who may use them.</li>
@@ -185,7 +185,7 @@ ${operatorBlock()}
 
 <h2>How long we keep it</h2>
 <ul>
-  <li>Account data: while you have an account. Deleting your account (on Account settings, or by asking us) deletes your email address, display name, plan and sign-in at once. The logs of vaults you were in keep a random account id, shown as "a deleted account", never your address.</li>
+  <li>Account data: while you have an account. Deleting your account (on Account settings, or by asking us) deletes your email address, display name, plan, sign-in and record of accepting the terms at once. The logs of vaults you were in keep a random account id, shown as "a deleted account", never your address.</li>
   <li>Vault content: until an owner erases it or deletes the vault. Erasing a file blanks every version at once; deleting a vault removes everything in it at once, keeping only who deleted it, when, and counts.</li>
   <li>The activity log is append-only: it keeps the fact that something happened, but erased content is gone from it.</li>
   <li>Sent email: our email provider keeps each message's record (address, subject, delivery status) for 30 days.</li>

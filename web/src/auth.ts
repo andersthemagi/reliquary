@@ -525,7 +525,7 @@ function tokensOf(status: number, json: any): Tokens | undefined {
 
 // otherAddress: a change of address was confirmed at one address, and waits
 // for the other (Supabase's secure email change); no session yet.
-type SigninResult = { ok: true; cookies: string[]; newAccount: boolean } | { ok: false; unavailable: boolean; otherAddress?: boolean };
+type SigninResult = { ok: true; cookies: string[]; newAccount: boolean; userId: string } | { ok: false; unavailable: boolean; otherAddress?: boolean };
 
 // Step 1: ask Supabase to email a code and link. Never tells the caller
 // whether the address has an account: any 4xx (no such user, signups off,
@@ -594,7 +594,7 @@ export async function verifySignin(
     }
     // A brand-new account (made in the last day): its first sign-in gets the Welcome tour (welcome.ts).
     const made = Date.parse(String(json?.user?.created_at ?? ""));
-    return { ok: true, cookies: sessionCookies(t), newAccount: Number.isFinite(made) && Date.now() - made < 86_400_000 };
+    return { ok: true, cookies: sessionCookies(t), newAccount: Number.isFinite(made) && Date.now() - made < 86_400_000, userId: r.claims.sub };
   } catch (err) {
     if (err instanceof Unavailable) return { ok: false, unavailable: true };
     throw err;

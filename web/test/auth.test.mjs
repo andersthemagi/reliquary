@@ -279,6 +279,23 @@ test("sign-in: asking for a new code from the code page keeps the agreement", as
   assert.ok((await stats()).otp > before.otp, "a new code asked for");
 });
 
+test("sign-in: a completed sign-in records the terms version accepted, the date the terms page shows, once per version", async () => {
+  const port = 54332 + (Number(new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791").port) - 8791);
+  const db = new pg.Client({ connectionString: `postgres://postgres:test@127.0.0.1:${port}/postgres` });
+  await db.connect();
+  try {
+    await db.query("insert into auth.users (id, email) values ($1, 'ana@example.test') on conflict (id) do nothing", [ANA]);
+    await db.query("delete from private.terms_acceptances where user_id = $1", [ANA]);
+    const shown = /Last updated (\d{4}-\d{2}-\d{2})\./.exec(await (await get(A, "/terms", new Jar())).text())?.[1];
+    assert.equal((await signInByCode(A)).done.status, 303);
+    assert.equal((await signInByCode(A)).done.status, 303);
+    const { rows } = await db.query("select terms_date::text as d from private.terms_acceptances where user_id = $1", [ANA]);
+    assert.deepEqual(rows.map((x) => x.d), [shown]);
+  } finally {
+    await db.end();
+  }
+});
+
 test("sign-in: a bad or expired code is refused in the danger tone, announced, and tied to the code field", async () => {
   const jar = new Jar();
   const page = await (await askForCode(A, jar, "danger-tone@example.test")).text();

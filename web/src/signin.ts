@@ -51,7 +51,7 @@ import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure, noteUpstream, Refusal, sqlstateName, upstreamNote } from "./failure.js";
-import { contactEmail, waitingHref } from "./site.js";
+import { OPERATOR, contactEmail, waitingHref } from "./site.js";
 import { selfHosted } from "./selfhost.js";
 import { pool } from "./db.js";
 
@@ -155,6 +155,11 @@ export const invalid = (id: string, error?: string) => (error ? html` aria-inval
 // without saying which it is.
 const asksAgreement = () => !selfHosted();
 const agreed = (form: URLSearchParams) => !asksAgreement() || form.get("agree") === "1";
+// No code is sent without the box ticked, so a completed sign-in accepted
+// the terms as dated now: the evidence if acceptance is ever disputed (#450).
+const recordAgreement = async (userId: string) => {
+  if (asksAgreement()) await pool.query("select private.record_terms_acceptance($1, $2)", [userId, OPERATOR.lastUpdated]);
+};
 const AGREE_REFUSED = "Tick the box to agree to the Terms and Privacy Policy and confirm you’re not based in the EU, EEA, UK or Switzerland: Reliquary isn’t offered there yet, so no code was sent.";
 
 function emailForm(csrf: string, next: string, theme: Theme, open: boolean, error?: string, invite?: Peek, errorOn: "email" | "agree" = "email"): string {
@@ -391,6 +396,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     if (limited) return out(limited);
     const r = await verifySignin({ email, code });
     if (!r.ok) return out(r.unavailable ? unavailable(i.theme) : { status: 400, html: codeForm(pre(), email, next, i.theme, bad) });
+    await recordAgreement(r.userId);
     cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT), ...(r.newAccount ? [freshCookie()] : []));
     return out({ redirect: next });
   }
@@ -429,6 +435,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT), flashCookie({ text: "Your email address is changed: you sign in with the new one from now on, and people who share a vault with you see it.", tone: "success" }));
     return out({ redirect: "/settings" });
   }
+  await recordAgreement(r.userId);
   let back = "/";
   try {
     back = safeNext(decodeURIComponent(readCookie(i.req, cookieName(NEXT)) ?? ""));
