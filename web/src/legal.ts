@@ -42,6 +42,7 @@ function terms(theme: Theme): string {
 <h2>Who we are</h2>
 ${operatorBlock()}
 <p>"We" means ${OPERATOR.tradingName}. "You" means the person or organisation that uses Reliquary, and "your team" the people you invite. These terms apply to the hosted service at ${OPERATOR.defaultOrigin.replace("https://", "")} and its MCP endpoint.</p>
+<p>You accept these terms, and the <a href="/privacy">privacy policy</a>, by ticking the box on the sign-in page; each sign-in confirms them again.</p>
 
 <h2>The service</h2>
 <p>Reliquary holds shared context (files, proposals, comments, an activity log) and environment variables for your team and the AI tools you connect. It runs no AI model: the tools you connect are yours, under your own agreements with their providers.</p>

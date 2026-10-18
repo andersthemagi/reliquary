@@ -52,7 +52,7 @@ async function signIn() {
     );
   const csrfOf = (h) => /name="csrf" value="([0-9a-f]+)"/.exec(h)[1];
   const form = await take(await fetchAs(A, "/signin")).text();
-  const codePage = await (await post("/signin", { csrf: csrfOf(form), email: "ana@example.test", next: "/" })).text();
+  const codePage = await (await post("/signin", { agree: "1", csrf: csrfOf(form), email: "ana@example.test", next: "/" })).text();
   const { code } = await (await fetch(`${FAKE}/_last_email?email=${encodeURIComponent("ana@example.test")}`)).json();
   if (AUTH_SECRETS_FILE) appendFileSync(AUTH_SECRETS_FILE, `${code}\n`);
   const done = await post("/signin/code", { csrf: csrfOf(codePage), email: "ana@example.test", code, next: "/" });

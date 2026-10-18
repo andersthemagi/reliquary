@@ -66,7 +66,7 @@ async function signIn(email) {
     await app("/signin", {
       method: "POST",
       headers: { cookie: jar.header, origin: new URL(APP).origin, "content-type": FORM },
-      body: form({ csrf: csrfOf(page.body), email, next: "/" }),
+      body: form({ csrf: csrfOf(page.body), email, agree: "1", next: "/" }),
     }),
   );
   assert.equal(asked.status, 200);

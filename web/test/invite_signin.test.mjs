@@ -102,7 +102,7 @@ async function askForCode(jar, token, email) {
   const r = await get(next(token), jar);
   assert.equal(r.status, 303);
   const page = await (await get(r.headers.get("location"), jar)).text();
-  return post("/signin", { csrf: csrfOf(page), email, next: next(token) }, jar);
+  return post("/signin", { agree: "1", csrf: csrfOf(page), email, next: next(token) }, jar);
 }
 
 before(async () => {
@@ -162,7 +162,7 @@ test("open sign-up: an address with no account and no invite gets one, and its c
   openSignup(async () => {
     const jar = new Jar();
     const page = await (await get("/signin", jar)).text();
-    const r = await post("/signin", { csrf: csrfOf(page), email: "walkin@example.test", next: "/" }, jar);
+    const r = await post("/signin", { agree: "1", csrf: csrfOf(page), email: "walkin@example.test", next: "/" }, jar);
     assert.equal(r.status, 200);
     const codePage = await r.text();
     assert.match(codePage, /<h1>Check your email<\/h1>/);
@@ -177,7 +177,7 @@ test("open sign-up: with the project's hourly email limit spent, the page says s
     await failOtp(429, "over_email_send_rate_limit", "email rate limit exceeded");
     const jar = new Jar();
     const page = await (await get("/signin", jar)).text();
-    const r = await post("/signin", { csrf: csrfOf(page), email: "walkin2@example.test", next: "/" }, jar);
+    const r = await post("/signin", { agree: "1", csrf: csrfOf(page), email: "walkin2@example.test", next: "/" }, jar);
     assert.equal(r.status, 503);
     const h = await r.text();
     assert.match(h, /<h1>Sign-in emails are paused<\/h1>/);
@@ -191,7 +191,7 @@ test("sign-in: while invite-only, a spent email limit reads as a sent code for a
   try {
     const jar = new Jar();
     const page = await (await get("/signin", jar)).text();
-    const r = await post("/signin", { csrf: csrfOf(page), email: "ana@example.test", next: "/" }, jar);
+    const r = await post("/signin", { agree: "1", csrf: csrfOf(page), email: "ana@example.test", next: "/" }, jar);
     assert.equal(r.status, 200);
     assert.match(await r.text(), /<h1>Check your email<\/h1>/);
   } finally {
@@ -253,7 +253,7 @@ test("invite sign-in: when the invite can't be looked up, no code is asked for a
     const sent = (await stats()).otp;
     const jar = new Jar();
     const page = await (await get(`/signin?next=${encodeURIComponent(next(T.newbie))}`, jar)).text();
-    const r = await post("/signin", { csrf: csrfOf(page), email: "newbie@example.test", next: next(T.newbie) }, jar);
+    const r = await post("/signin", { agree: "1", csrf: csrfOf(page), email: "newbie@example.test", next: next(T.newbie) }, jar);
     assert.equal(r.status, 503);
     const h = await r.text();
     assert.match(h, /<h1>Sign-in is unavailable<\/h1>/);
@@ -346,7 +346,7 @@ test("invite sign-in: a used invite no longer lets sign-in make an account", asy
   const r = await get(`/signin?next=${encodeURIComponent(next(T.newbie))}`, jar);
   const page = await r.text();
   assert.match(page, /<h1>Sign in to Reliquary<\/h1>/);
-  await post("/signin", { csrf: csrfOf(page), email: "newbie@example.test", next: next(T.newbie) }, jar);
+  await post("/signin", { agree: "1", csrf: csrfOf(page), email: "newbie@example.test", next: next(T.newbie) }, jar);
   assert.equal((await stats()).lastCreateUser, false);
 });
 
