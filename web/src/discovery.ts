@@ -4,11 +4,9 @@
 // adds the link (design.md's first open question about links, resolved
 // this way for v1: a slow or unreachable upstream fails discovery, not the
 // link itself -- linkspage.ts still creates the link and flashes a
-// warning naming why; there is no rediscovery yet, so retrying today means
-// deleting and re-adding the link. A later change can add it once real use
-// shows whether that's needed often enough to justify a new owner-facing
-// action and a way to read a link's own stored credential back, which
-// nothing needs today).
+// warning naming why). An owner retries, or picks up an upstream's new
+// tools, with Replace credential or Refresh tools on the Links page, which
+// run this again with the new or the stored credential.
 //
 // Fetching an upstream URL an owner chose is a server-side request forgery
 // risk, exactly like a Client ID Metadata Document (cimd.ts), and shares its
