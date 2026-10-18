@@ -60,6 +60,19 @@ async function loadLinks(c: pg.PoolClient, id: string): Promise<Link[]> {
   ).rows;
 }
 
+type CallSummary = { last: Date | null; week: number };
+
+// ponytail: aggregates every call of the vault per page view; a per-link
+// summary table if a vault's call log grows into the millions.
+async function callSummary(c: pg.PoolClient, id: string): Promise<Map<string, CallSummary>> {
+  const { rows } = await c.query(
+    `select link_id, max(at) as last, count(*) filter (where at > now() - interval '7 days')::int as week
+       from public.link_calls where vault_id = $1 group by link_id`,
+    [id],
+  );
+  return new Map(rows.map((r) => [r.link_id, { last: r.last, week: r.week }]));
+}
+
 export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Reply> {
   const del = ctx.url.searchParams.get("delete");
   if (ctx.method === "GET" && del !== null) return deletePage(ctx, id, del);
@@ -69,6 +82,10 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
     if (!v) return null;
     const list = await loadLinks(c, id);
     const owner = v.role === "owner";
+    // link_calls' RLS shows owners and editors their vault's calls, and no
+    // one else; a viewer gets no Calls columns rather than empty ones.
+    const readsCalls = owner || v.role === "editor";
+    const calls = readsCalls ? await callSummary(c, id) : new Map<string, CallSummary>();
     // A refused save of an edit comes back as an edit: the form's own id
     // wins over the query, which a POST doesn't carry.
     const replacingId = form?.replace ? form.id : ctx.method === "GET" ? ctx.url.searchParams.get("replace") : null;
@@ -123,12 +140,16 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
 
     const table = list.length
       ? html`<div class="table-wrap"><table class="table-stack rules-table">
-          <thead><tr><th scope="col">Name</th><th scope="col">URL</th><th scope="col">Added by</th>${owner ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""}</tr></thead>
+          <thead><tr><th scope="col">Name</th><th scope="col">URL</th><th scope="col">Added by</th>${readsCalls ? html`<th scope="col">Last call</th><th scope="col" class="num">Last 7 days</th>` : ""}${owner ? html`<th scope="col"><span class="sr-only">Actions</span></th>` : ""}</tr></thead>
           <tbody>${list.map(
             (l) => html`<tr>
               <td data-label="Name"><code>${l.name}</code></td>
               <td data-label="URL" class="small link-url">${l.url}</td>
               <td data-label="Added by" class="small muted"><div>${who(ctx, l.created_by, null)} · ${time(l.created_at)}</div></td>
+              ${readsCalls
+                ? html`<td data-label="Last call" class="small"><a href="${vaultPath(id, `/links/${l.id}/calls`)}">${calls.get(l.id)?.last ? time(calls.get(l.id)!.last!) : "Never"}</a></td>
+                  <td data-label="Last 7 days" class="small num">${calls.get(l.id)?.week ?? 0}</td>`
+                : ""}
               ${owner
                 ? html`<td class="num rule-actions">${menu({
                     label: `Actions for ${l.name}`,
@@ -136,6 +157,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
                     items: [
                       { href: `${vaultPath(id, "/links")}?edit=${q(l.id)}#add-link`, label: "Edit", description: "Name or URL" },
                       { href: vaultPath(id, `/links/${l.id}/grants`), label: "Grants", description: "Which tools each role may call" },
+                      { href: vaultPath(id, `/links/${l.id}/calls`), label: "Calls", description: "Who used it, with which tool, and how it went" },
                       { href: `${vaultPath(id, "/links")}?replace=${q(l.id)}#replace-link`, label: "Replace credential", description: "A new key; grants stay" },
                       { action: vaultPath(id, "/links"), csrf: ctx.csrf, fields: { op: "refresh", link_id: l.id }, label: "Refresh tools", description: "Discover its tools again" },
                       { href: `${vaultPath(id, "/links")}?delete=${q(l.id)}`, label: "Delete", description: "Asks you to confirm first", danger: true },

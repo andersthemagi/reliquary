@@ -136,6 +136,19 @@ select t.expect('record: an error outcome is fine too',
   t.run('ben', format($q$select 'ok' from public.record_link_call(%L, 'list_issues', 'error', 'ah2', null)$q$, t.id('gh'))), 'ok');
 select t.expect('record: both rows are there now', t.call_count('gh', 'ok') || ' ' || t.call_count('gh', 'error'), '1 1');
 
+-- 20261018130000_link_call_size.sql: a call's size, in bytes of what the
+-- upstream answered; a row recorded without one stays null.
+select t.expect('size: the owner records a call with its size',
+  t.run('ana', format($q$select 'ok' from public.record_link_call(%L, 'list_issues', 'ok', 'ah3', 'rh3', 1234)$q$, t.id('gh'))), 'ok');
+select t.expect('size: a recorded call keeps its size in bytes',
+  (select coalesce(max(result_bytes)::text, 'null') from public.link_calls where link_id = t.id('gh') and arg_hash = 'ah3'), '1234');
+select t.expect('size: a call recorded without a size has none',
+  (select coalesce(max(result_bytes)::text, 'null') from public.link_calls where link_id = t.id('gh') and arg_hash = 'arghash'), 'null');
+select t.expect('size: a negative size is refused',
+  t.run('ana', format($q$select 'ok' from public.record_link_call(%L, 'list_issues', 'ok', 'ah4', 'rh4', -1)$q$, t.id('gh'))), 'ERR 22023');
+select t.expect('size: the refused one stored nothing',
+  (select count(*)::text from public.link_calls where link_id = t.id('gh') and arg_hash = 'ah4'), '0');
+
 -- ---------------------------------------------------------------------------
 -- set_link_tools' input_schema (this migration's other change)
 

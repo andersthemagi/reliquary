@@ -30,7 +30,7 @@ export type VaultUsage = {
 
 // Sizes as the database words them (private.size_text): decimal units,
 // one decimal place at most.
-function formatBytes(n: number): string {
+export function formatBytes(n: number): string {
   const trim = (x: number) => String(Math.round(x * 10) / 10);
   if (Math.abs(n) === 1) return `${n} byte`;
   if (Math.abs(n) < 1000) return `${n} bytes`;

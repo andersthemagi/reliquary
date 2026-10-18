@@ -23,6 +23,7 @@ import { variablesRoutes } from "./variablespage.js";
 import { pendingList } from "./imports.js";
 import { pendingPushes } from "./variables.js";
 import { linksRoutes } from "./linkspage.js";
+import { linkCalls } from "./linkcalls.js";
 import { linkGrantsRoutes } from "./linkgrants.js";
 import { claimAction, claims } from "./claimspage.js";
 import { plan, taskAction, tasks } from "./tasks.js";
@@ -705,6 +706,8 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (rest === "/tasks/plan") return get ? plan(ctx, id) : taskAction(ctx, id);
   const lm = /^\/links\/([^/]+)\/grants$/.exec(rest);
   if (lm) return linkGrantsRoutes(ctx, id, lm[1]);
+  const lc = get && /^\/links\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/calls$/.exec(rest);
+  if (lc) return linkCalls(ctx, id, lc[1]);
   if (rest === "/config" || rest.startsWith("/config/") || rest === "/erase") return adminRoutes(ctx, id, rest);
   const pm = /^\/proposals\/([^/]+)(\/[a-z]+)?$/.exec(rest);
   if (pm) {
