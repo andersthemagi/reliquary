@@ -41,6 +41,7 @@ export type ThreadRow = {
   messages: number;
   last_message_id: string;
   last_message_at: Date;
+  unread?: boolean; // the Threads page only (threadspage.ts, load)
 };
 
 // The files of this vault, among `paths`, that are there now.

@@ -3,8 +3,10 @@
 // reads every thread, side threads included: a side thread is addressed to some
 // members, which decides only who is told about it, so the list says so in
 // words and never hides one. Threads addressed to the signed-in person come
-// first, under their own heading. There is no read or unread tracking for
-// people here, on purpose: nothing marks a thread as seen.
+// first, under their own heading. A thread with a message from someone else,
+// or from an agent, newer than the last one the person was shown when they
+// opened it (public.thread_reads, written by threadview.ts) says Unread, in
+// words; what a person has read is theirs alone, and no agent sees it.
 //
 //   GET  /v/:id/threads              the list; ?path=<file> only its threads, ?before=<n> older ones
 //                                    (opening a thread and reading one: threadnew.ts, threadview.ts)
@@ -45,18 +47,25 @@ function row(ctx: Ctx, id: string, t: ThreadRow, about?: Raw): Raw {
     path: onFile ? t.anchor_path : null,
     who: who(ctx, t.opened_by, t.agent),
     meta: to && words ? html`${to} · ${words}` : (words ?? to),
-    end: html`${sideBadge(t)}${t.scope === "side" ? " " : ""}${stateBadge(t)} <span class="muted">${plural(t.messages, "message")}</span>`,
+    end: html`${t.unread ? html`<span class="badge warning">Unread</span> ` : ""}${sideBadge(t)}${t.scope === "side" ? " " : ""}${stateBadge(t)} <span class="muted">${plural(t.messages, "message")}</span>`,
     at: t.last_message_at,
     className: t.resolved_at ? "is-resolved" : undefined,
   });
 }
 
-async function load(c: pg.PoolClient, id: string, path: string | null, before: string | null): Promise<{ rows: ThreadRow[]; more: boolean }> {
+// Unread: a message newer than the person's read mark (none: 0) that isn't
+// their own in person. Their agent's words are news to them too.
+async function load(c: pg.PoolClient, me: string, id: string, path: string | null, before: string | null): Promise<{ rows: ThreadRow[]; more: boolean }> {
   const { rows } = await c.query(
-    `select ${THREAD_COLS} from public.thread_summaries s
+    `select ${THREAD_COLS},
+            exists (select 1 from public.thread_messages m
+                     where m.vault_id = s.vault_id and m.thread_id = s.id and (m.author <> $4 or m.agent is not null)
+                       and m.id > coalesce((select r.last_message_id from public.thread_reads r
+                                             where r.user_id = $4 and r.vault_id = s.vault_id and r.thread_id = s.id), 0)) as unread
+       from public.thread_summaries s
       where s.vault_id = $1 and ($2::text is null or s.anchor_path = $2) and ($3::bigint is null or s.last_message_id < $3)
       order by s.last_message_id desc nulls last limit ${PAGE + 1}`,
-    [id, path, before],
+    [id, path, before, me],
   );
   return { rows: rows.slice(0, PAGE), more: rows.length > PAGE };
 }
@@ -91,7 +100,7 @@ export async function threadList(ctx: Ctx, id: string): Promise<Reply> {
   const out = await asPerson(ctx.userId, async (c) => {
     const v = await vault(c, ctx, id);
     if (!v) return null;
-    const loaded = await load(c, id, path, before);
+    const loaded = await load(c, ctx.userId, id, path, before);
     const about = await anchorLines(c, id, loaded.rows);
     return vaultShell(c, ctx, v, { section: "threads" }, body(ctx, id, v, { ...loaded, about, path }));
   });
