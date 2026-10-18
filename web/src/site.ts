@@ -39,7 +39,7 @@ export const OPERATOR = {
   ukRepresentative: null as string | null, // UK GDPR Article 27 representative, once offered in the UK
   transferSafeguard: null as string | null, // basis for any transfer outside the EU, once offered in the EU
   backupRetention: "Supabase keeps daily backups for 7 days; the operator also keeps up to 14 off-site copies, in which variable values exist only as ciphertext" as string | null, // how long database backups are kept
-  hostingLogRetention: null as string | null, // how long the host keeps request logs
+  hostingLogRetention: "as long as Netlify’s own privacy policy allows (it publishes no fixed period)" as string | null, // how long the host keeps request logs
   disclosureResponse: "5 business days" as string | null, // how soon a security report is acknowledged
   minimumAge: "18" as string | null,
   copyrightAgentPhone: null as string | null, // the DMCA agent's phone, as registered with the US Copyright Office (#444)

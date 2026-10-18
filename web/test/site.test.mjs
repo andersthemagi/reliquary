@@ -379,6 +379,36 @@ test("site legal: the terms name a copyright agent, what a notice and a counter-
   assert.match(sec, /infringe repeatedly/);
 });
 
+test("site legal: the terms say when we look at content, what the content licence covers, where Reliquary is offered, and the standard clauses", async () => {
+  const terms = await text(A, "/terms");
+  assert.match(terms, /<p id="access">Nobody at Red Mage looks at your content except to help you when you ask, to investigate a security problem, abuse or a legal notice/);
+  assert.doesNotMatch(terms, /or read it, unless you ask us to/);
+  assert.match(terms, /copying it to backups, indexing it for search/);
+  assert.match(terms, /offered outside the EU, EEA, UK and Switzerland for now/);
+  assert.match(terms, /Specially Designated Nationals/);
+  assert.match(terms, /ideas or feedback, including through the feedback tool, we may use them freely/);
+  assert.match(terms, /Functional Source License for the server, MIT for the CLI/);
+  assert.match(terms, /<strong>Reliquary is provided as it is and as available, without warranties of any kind, including merchantability/);
+  assert.match(terms, /still apply after an account closes/);
+  assert.match(terms, /at least 30 days before significant changes/);
+  assert.match(terms, /give us 30 days to try to settle it/);
+  assert.match(terms, /<h2>General<\/h2>[\s\S]*whole agreement[\s\S]*haven't given it up[\s\S]*transfer these terms[\s\S]*outside its reasonable control/);
+});
+
+test("site legal: the privacy policy covers authorities, Do Not Track, retention of logs and access requests, and its effective date", async () => {
+  const privacy = await text(A, "/privacy");
+  assert.match(privacy, /<h2 id="authorities">Requests from authorities<\/h2>\s*<p>We give data to the authorities only when a valid US legal order compels us/);
+  assert.match(privacy, /a Do Not Track or Global Privacy Control signal changes nothing here/);
+  assert.match(privacy, /for their direct marketing/);
+  assert.match(privacy, /Access requests: we delete the email within 90 days/);
+  assert.match(privacy, /Our own server logs: our hosting provider deletes them within 7 days/);
+  assert.doesNotMatch(privacy, /to be filled: host log retention/);
+  assert.match(privacy, /or tell you within that time if we need 45 more/);
+  assert.match(privacy, /within 30 days at most/);
+  assert.match(privacy, /If we learn an account belongs to someone younger, we close it/);
+  assert.match(privacy, /This policy took effect on \d{4}-\d{2}-\d{2}\./);
+});
+
 test("site legal: the operator is the Colorado LLC under Colorado law, with US state privacy rights, and what applies in Europe is one marked section of placeholders", async () => {
   const terms = await text(A, "/terms");
   assert.match(terms, /Memento Vivre Fine Arts LLC, doing business as Red Mage, a single-member limited liability company registered in Colorado, United States/);
