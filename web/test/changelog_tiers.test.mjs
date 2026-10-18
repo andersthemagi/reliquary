@@ -53,6 +53,7 @@ test("changelog tiers: a PR's release note is the text under its heading, withou
   assert.equal(releaseNote("## Release note\n\nNone.\n"), "");
   assert.equal(releaseNote("## Release note\n\nLast section.\n"), "Last section.");
   assert.equal(releaseNote(null), "");
+  assert.equal(releaseNote("## Release note\n\n<!<!-- -->-- hidden -->Kept."), "Kept.", "a comment nested to survive one pass is still dropped");
 });
 
 test("changelog tiers: breaking changes come first, then new features and changes with their notes, then one line for everything else", () => {
