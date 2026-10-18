@@ -6,15 +6,17 @@ release-please from conventional commits that touch `cli/`.
 
 ## [0.5.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.2...cli-v0.5.0) (2026-10-18)
 
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
 
-### Features
+### New
 
-* **cli:** suggest the command or option you meant, list your vaults on a wrong --vault, and add vaults --json ([#401](https://github.com/andersthemagi/reliquary/issues/401)) ([64ac4c4](https://github.com/andersthemagi/reliquary/commit/64ac4c469d008ebffefaf29b19ad4bc5df860899))
+#### Suggest the command or option you meant, list your vaults on a wrong --vault, and add vaults --json ([#401](https://github.com/andersthemagi/reliquary/issues/401))
 
+The CLI suggests the command or option you probably meant, lists the vaults you can reach when `--vault` names none, and `reliquary vaults --json` prints your vaults as JSON.
 
-### Bug fixes
+### Fixes
 
-* **cli:** the help shows an example for every command, and an option before the command says where it goes ([#425](https://github.com/andersthemagi/reliquary/issues/425)) ([77d3a69](https://github.com/andersthemagi/reliquary/commit/77d3a697065462b4b640bc5acb02757a7423bf6a))
+- The help shows an example for every command, and an option before the command says where it goes ([#425](https://github.com/andersthemagi/reliquary/issues/425))
 
 ## [0.4.2](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.1...cli-v0.4.2) (2026-10-09)
 
