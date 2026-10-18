@@ -84,9 +84,11 @@ jobs:
 
       # release-please rewrites the pending section as a flat list on every
       # push; this puts it back in tiers, with each PR's "## Release note".
-      # The runner's own Node: the script has no dependencies.
+      # The runner's own Node: the script has no dependencies. Never fails the
+      # job: the hotfix alert below matters more than the changelog's layout.
       - name: The changelog in tiers (open release pull requests)
         if: steps.cut.outputs.ok == 'true' && steps.rp.outputs.release_created != 'true'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: node web/scripts/changelog-tiers.mjs
