@@ -1,10 +1,11 @@
 // Legal and trust pages: terms, privacy, data processing, sub-processors,
-// security. Drafts for a service run by a Colorado LLC (Red Mage), offered
-// in the US and outside the EU first, each marked "Draft, pending legal
-// review" (#8). What only applies once it is offered in the EU sits in one
-// marked section of the privacy policy, with its placeholders (#315, #212). Facts come from docs/design.md (privacy,
-// compliance, variables) and docs/research/hosting.md (where things run);
-// anything not known yet is an OPERATOR field shown as a placeholder.
+// security, for a service run by a Colorado LLC (Red Mage), offered in the
+// US and outside the EU first; a lawyer reviews them before paid plans or an
+// open launch (#8). What only applies once it is offered in the EU sits in
+// one marked section of the privacy policy (#315, #212), saying what is
+// still to be appointed rather than showing placeholders. Facts come from
+// docs/design.md (privacy, compliance, variables) and docs/research/hosting.md
+// (where things run); anything not known yet is a null OPERATOR field.
 //
 // publicRoute() answers the public URLs that need no session: these pages,
 // robots.txt, sitemap.xml and security.txt. The landing page at `/` is not
@@ -14,7 +15,7 @@ import { docsPaths, docsRoute } from "./docs.js";
 import { appHref } from "./hosts.js";
 import { ALPHA, html, type Raw, type Theme } from "./html.js";
 import { BUILD } from "./version.js";
-import { OPERATOR, draftNote, fill, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
+import { OPERATOR, fill, updatedNote, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
 
 const mail = (addr: string) => html`<a href="mailto:${addr}">${addr}</a>`;
 
@@ -27,7 +28,7 @@ function legalPage(theme: Theme, path: string, title: string, description: strin
     body: html`<article class="legal">
   <p class="crumb"><a href="/">Reliquary</a></p>
   <h1>${title}</h1>
-  ${draftNote()}
+  ${updatedNote()}
   ${body}
 </article>`,
   });
@@ -42,25 +43,46 @@ function terms(theme: Theme): string {
 <h2>Who we are</h2>
 ${operatorBlock()}
 <p>"We" means ${OPERATOR.tradingName}. "You" means the person or organisation that uses Reliquary, and "your team" the people you invite. These terms apply to the hosted service at ${OPERATOR.defaultOrigin.replace("https://", "")} and its MCP endpoint.</p>
+<p>You accept these terms, and the <a href="/privacy">privacy policy</a>, by ticking the box on the sign-in page; each sign-in confirms them again.</p>
 
 <h2>The service</h2>
 <p>Reliquary holds shared context (files, proposals, comments, an activity log) and environment variables for your team and the AI tools you connect. It runs no AI model: the tools you connect are yours, under your own agreements with their providers.</p>
-<p>Reliquary is in alpha. Features change, and we may make mistakes.</p>
+<p>Reliquary is an alpha. It may have bugs, be unavailable, or change or remove features without notice, and we don't promise it will become generally available. Don't rely on it as the only copy of anything, or as the only place a credential lives. If a change removes something you rely on, we'll try to tell you first, and you can always export.</p>
+<p>The MCP endpoint and the CLI are covered by these terms. Each token belongs to one person's account: don't share tokens, or use several accounts to get around limits. If use through them harms the service, we may slow it or suspend it, warning you first where we can.</p>
+<p>The AI tools and other services you connect aren't ours. We don't control what they do with what they read, and we're not responsible for them.</p>
+<p>These terms cover only the service we host. Running Reliquary yourself is governed by its licence (the Functional Source License for the server, MIT for the CLI), and we don't operate, support or answer for a self-hosted instance.</p>
 
 <h2>Your account and your team</h2>
 <ul>
   <li>You must be at least ${fill("minimumAge", "minimum age")} and able to enter a binding contract. If you use Reliquary for an organisation, you confirm you may accept these terms for it.</li>
+  <li>Reliquary is offered outside the EU, EEA, UK and Switzerland for now, and you confirm you're not there each time you sign in. You also confirm you're not in a country or region under comprehensive United States sanctions, and not on a US list of restricted parties, such as the Treasury's Specially Designated Nationals list.</li>
   <li>Keep your sign-in email secure. You're responsible for what happens under your account, including what the agents you connect do with your permissions.</li>
   <li>A vault's owners decide who is a member and what each member and their agents may do. Owners are responsible for inviting only people entitled to see the vault's content.</li>
-  <li>Revoke tokens and connections you no longer use.</li>
+  <li>Revoke tokens and connections you no longer use. Tell us at ${mail(OPERATOR.contactEmail)} as soon as you think someone else has used your account or one of its tokens; we may suspend an account or revoke a token we believe is compromised.</li>
 </ul>
 
 <h2>Your content</h2>
-<p>What you put in Reliquary stays yours. You give us permission to store, process and display it only to run the service for you. We don't use it to train models, sell it, or read it, unless you ask us to (for support) or the law requires it. The <a href="/dpa">data processing terms</a> apply to personal data in your content.</p>
+<p>What you put in Reliquary stays yours. You give us permission to store, process and display it only to run the service for you: that covers copying it to backups, indexing it for search (including the numbers search by meaning uses), and letting our <a href="/subprocessors">listed sub-processors</a> handle it for these purposes. The permission ends when the content is deleted, except in backups until they age out. We don't use your content to train models or sell it. The <a href="/dpa">data processing terms</a> apply to personal data in it.</p>
+<p id="access">Nobody at ${OPERATOR.tradingName} looks at your content except to help you when you ask, to investigate a security problem, abuse or a legal notice, to fix a fault that needs it, or when the law requires it. We look at as little as we can, and tell the vault's owners unless the law or a security risk stops us.</p>
 <p>You're responsible for having the right to put content and credentials in Reliquary, including your clients' credentials.</p>
+<p>If you send us ideas or feedback, including through the feedback tool, we may use them freely, without paying you or owing you anything.</p>
 
 <h2>Acceptable use</h2>
 <p>Don't use Reliquary to break the law, to store content you have no right to, to attack or probe the service or other customers (except under our <a href="/security#disclosure">disclosure policy</a>), or to get around its limits. Don't store health data or payment card data: Reliquary isn't built or certified for them. Don't use Reliquary where United States sanctions or export controls forbid it.</p>
+<p>We don't review content in advance. We may remove or disable content that breaks the law or these terms, and we'll tell the vault's owners when we do, unless the law stops us.</p>
+
+<h2 id="copyright">Copyright complaints</h2>
+<p>If you believe content in Reliquary infringes your copyright, send a notice to our designated agent: ${OPERATOR.person}, ${fill("legalName", "legal name")}, ${fill("address", "address")}; ${OPERATOR.copyrightAgentPhone ? html`phone ${OPERATOR.copyrightAgentPhone}; ` : ""}${mail(OPERATOR.contactEmail)}. The notice must include:</p>
+<ul>
+  <li>your physical or electronic signature, as the owner or someone authorised to act for them;</li>
+  <li>the work you say is infringed;</li>
+  <li>the content you say infringes it, and enough to find it (the vault and the file path, or a link);</li>
+  <li>your name, address, phone and email;</li>
+  <li>a statement that you believe in good faith the use isn't authorised by the owner, its agent or the law;</li>
+  <li>a statement, under penalty of perjury, that the notice is accurate and that you're the owner or authorised to act for them.</li>
+</ul>
+<p>We remove or disable the content and tell the vault's owners. If you think we removed your content by mistake, send the agent a counter-notice: your signature, the content and where it was, a statement under penalty of perjury that it was removed by mistake or misidentification, and your name, address and phone, with your consent to the jurisdiction of the federal court for your address (or, outside the United States, any court where we may be found) and to accept service from the person who sent the notice. We pass it to them, and restore the content in 10 to 14 business days unless they tell us they've gone to court.</p>
+<p>We close the accounts of people who infringe repeatedly. Notices are for copyright only; anything else goes to ${mail(OPERATOR.contactEmail)}.</p>
 
 <h2>Fees</h2>
 <p>Reliquary is free while in alpha. Before any fee applies to you, we'll tell you the price and give you ${fill("feeNoticeDays", "notice period")} to decide; you can export and leave at any time.</p>
@@ -70,12 +92,13 @@ ${operatorBlock()}
 <ul>
   <li>You can export a vault and delete it whenever you like. Deletion is immediate; backups age out as the <a href="/privacy">privacy policy</a> says.</li>
   <li>You can delete your account whenever you like, on Account settings, once no vault has you as its only owner. It is immediate: you leave every vault, and what you wrote in a vault stays with that vault (<a href="/docs/how-to/delete-your-account">Delete your account</a>).</li>
-  <li>We may suspend access that breaks these terms or puts the service or other customers at risk. Where we can, we'll tell you first and give you the chance to export.</li>
+  <li>We may suspend or close access that breaks these terms or puts the service or other customers at risk. Where we can, we'll tell you first and give you the chance to export, unless the breach is serious or the law stops us.</li>
   <li>If we ever close Reliquary, we'll give you ${fill("closureNotice", "notice period")} and a way to export first.</li>
+  <li>The sections on your content, feedback, no warranty, liability, indemnity and law still apply after an account closes.</li>
 </ul>
 
 <h2>No warranty</h2>
-<p>During the alpha the service is provided as it is, without warranties of availability or fitness for a purpose, to the extent the law allows. Keep your own copy of anything you can't lose; export makes that easy.</p>
+<p><strong>Reliquary is provided as it is and as available, without warranties of any kind, including merchantability, fitness for a purpose and non-infringement, to the extent the law allows.</strong> Keep your own copy of anything you can't lose; export makes that easy.</p>
 
 <h2>Liability</h2>
 <p>Nothing in these terms limits liability that the law doesn't allow to be limited. Otherwise, each side's total liability is limited to ${fill("liabilityCap", "liability cap")}, and neither side is liable for indirect, incidental, special or consequential loss, or for lost profits or data.</p>
@@ -84,10 +107,20 @@ ${operatorBlock()}
 <p>If someone else brings a claim against us because of content you put in Reliquary or because you broke these terms, you'll cover our reasonable costs of that claim.</p>
 
 <h2>Changes</h2>
-<p>We'll post changes to these terms here and tell account holders by email before significant changes take effect.</p>
+<p>We'll post changes to these terms here and tell account holders by email at least 30 days before significant changes take effect.</p>
 
 <h2>Law</h2>
 <p>These terms are governed by ${fill("governingLaw", "governing law and courts")}. If you're a consumer, you keep the protection of the mandatory law where you live. If a court finds part of these terms unenforceable, the rest still applies.</p>
+<p>Before going to court, email ${mail(OPERATOR.contactEmail)} and give us 30 days to try to settle it. Either side can still use small claims court.</p>
+
+<h2>General</h2>
+<ul>
+  <li>We send notices by email to your account's address, and you agree they count as written. Legal notices to us go by email to ${mail(OPERATOR.contactEmail)} and by post to the address above.</li>
+  <li>These terms, the <a href="/privacy">privacy policy</a> and the <a href="/dpa">data processing terms</a> are the whole agreement between us about Reliquary.</li>
+  <li>If we don't enforce a term, we haven't given it up.</li>
+  <li>We may transfer these terms to a company that takes over Reliquary; you may transfer them only with our written agreement.</li>
+  <li>Neither side is responsible for delays or failures caused by things outside its reasonable control.</li>
+</ul>
 
 <h2>Contact</h2>
 <p>${mail(OPERATOR.contactEmail)}</p>`);
@@ -110,7 +143,7 @@ ${operatorBlock()}
 
 <h2>What we hold</h2>
 <ul>
-  <li><strong>Account:</strong> your email address and an account id, and the vaults you belong to with your role.</li>
+  <li><strong>Account:</strong> your email address and an account id, the vaults you belong to with your role, and which version of these terms and this policy you accepted at sign-in, and when.</li>
   <li><strong>Access requests:</strong> the email address, name, country and note you send with Request access. The service emails them to us and doesn't store them; we keep the email while we arrange your access.</li>
   <li><strong>Vault content:</strong> files and their versions, proposals, approvals, comments and notes, which can include personal data your team writes.</li>
   <li><strong>Variables:</strong> names and encrypted values, and who may use them.</li>
@@ -122,9 +155,13 @@ ${operatorBlock()}
 <h2>What we don't do</h2>
 <ul>
   <li>No analytics, advertising or tracking cookies, and no third-party scripts.</li>
-  <li>We don't train models on your data, sell it or share it beyond the <a href="/subprocessors">listed sub-processors</a>.</li>
-  <li>Nobody at ${OPERATOR.tradingName} reads your content unless you ask us to (for support) or the law requires it.</li>
+  <li>We don't train models on your data, sell it or share it beyond the <a href="/subprocessors">listed sub-processors</a>, except as <a href="#authorities">Requests from authorities</a> says. We don't share personal information with anyone for their direct marketing.</li>
+  <li>Nobody at ${OPERATOR.tradingName} looks at your content except in the cases the <a href="/terms#access">terms</a> list: to help you when you ask, to investigate a security problem, abuse or a legal notice, to fix a fault, or when the law requires it.</li>
+  <li>We don't track you across sites, so a Do Not Track or Global Privacy Control signal changes nothing here. If your browser sends one, we treat it as a request not to sell or share your data, which we never do anyway.</li>
 </ul>
+
+<h2 id="authorities">Requests from authorities</h2>
+<p>We give data to the authorities only when a valid US legal order compels us, or in an emergency involving a risk to someone's life, and we tell the vault's owners first unless the law forbids it. If Reliquary is ever transferred to another company, this policy keeps applying to your data.</p>
 
 <h2>Why we use it</h2>
 <ul>
@@ -148,10 +185,12 @@ ${operatorBlock()}
 
 <h2>How long we keep it</h2>
 <ul>
-  <li>Account data: while you have an account. Deleting your account (on Account settings, or by asking us) deletes your email address, display name, plan and sign-in at once. The logs of vaults you were in keep a random account id, shown as "a deleted account", never your address.</li>
+  <li>Account data: while you have an account. Deleting your account (on Account settings, or by asking us) deletes your email address, display name, plan, sign-in and record of accepting the terms at once. The logs of vaults you were in keep a random account id, shown as "a deleted account", never your address.</li>
   <li>Vault content: until an owner erases it or deletes the vault. Erasing a file blanks every version at once; deleting a vault removes everything in it at once, keeping only who deleted it, when, and counts.</li>
   <li>The activity log is append-only: it keeps the fact that something happened, but erased content is gone from it.</li>
   <li>Sent email: our email provider keeps each message's record (address, subject, delivery status) for 30 days.</li>
+  <li>Access requests: we delete the email within 90 days of arranging or turning down your access.</li>
+  <li>Our own server logs: our hosting provider deletes them within 7 days.</li>
   <li>Database backups keep deleted data until they age out, after ${fill("backupRetention", "backup retention")}.</li>
 </ul>
 
@@ -163,30 +202,30 @@ ${operatorBlock()}
 <ul>
   <li>We don't sell your personal information, share it for cross-context behavioral advertising, or use it for profiling that has legal or similar effects.</li>
   <li>What we collect, by category: identifiers (email address, account id, IP address in host logs), internet activity (the request and access logs above), and what you write in vaults. Sources: you, your team, and the AI tools you connect. Who receives it: the <a href="/subprocessors">sub-processors</a>, for the purposes above.</li>
-  <li>You can ask to know, access, correct or delete your personal information, and get a copy you can take with you. Email ${mail(OPERATOR.contactEmail)}; we answer within 45 days and confirm who you are by your account's email address. Someone you authorise can ask for you.</li>
+  <li>You can ask to know, access, correct or delete your personal information, and get a copy you can take with you. Email ${mail(OPERATOR.contactEmail)}; we answer within 45 days (or tell you within that time if we need 45 more) and confirm who you are by your account's email address. Someone you authorise can ask for you.</li>
   <li>We won't treat you differently for using these rights. If we turn a request down, reply to say so and we'll review it again; if that doesn't settle it, you can contact your state's attorney general.</li>
 </ul>
 
 <h2>Security and breaches</h2>
-<p>See the <a href="/security">security page</a>. If a breach affects your personal data, we'll tell the vault owners without undue delay, and tell you and the authorities as the law where you live requires.</p>
+<p>See the <a href="/security">security page</a>. If a breach affects your personal data, we'll tell the vault owners without undue delay, and tell you and the authorities as the law where you live requires, within 30 days at most.</p>
 
 <h2>Children</h2>
-<p>Reliquary is a work tool, not meant for anyone under ${fill("minimumAge", "minimum age")}. We don't knowingly collect personal information from children under 13; if you believe we have, email ${mail(OPERATOR.contactEmail)} and we'll delete it.</p>
+<p>Reliquary is a work tool for people ${fill("minimumAge", "minimum age")} and over. If we learn an account belongs to someone younger, we close it and delete its personal data. We don't knowingly collect personal information from children under 13; if you believe we have, email ${mail(OPERATOR.contactEmail)} and we'll delete it.</p>
 
 <h2 id="eu">If you're in the EU, EEA, UK or Switzerland</h2>
-<p class="callout attention" role="note">The alpha is offered in the United States and outside Europe first. We're not yet set up for people in the EU, EEA, UK or Switzerland, so please <a href="${appHref("/request-access")}">request access</a> rather than signing up, and we'll tell you when we are. What follows is what will apply then; the bracketed items are still to be put in place.</p>
+<p class="callout attention" role="note">The alpha is offered in the United States and outside Europe first. We're not yet set up for people in the EU, EEA, UK or Switzerland, so please <a href="${appHref("/request-access")}">request access</a> rather than signing up, and we'll tell you when we are. What follows is what will apply then.</p>
 <ul>
   <li><strong>Controller:</strong> ${OPERATOR.tradingName}, as above. For vault content, the vault's owner is the controller and we are their processor (<a href="/dpa">data processing terms</a>).</li>
   <li><strong>Legal bases:</strong> running the service and answering an access request, performance of a contract (or steps you asked for before one); security, fault-fixing and telling you about changes, our legitimate interest; marketing email, only your consent.</li>
   <li><strong>Your rights</strong> under the GDPR: access, correction, erasure, restriction, objection and portability, as in Your rights above, and to withdraw consent at any time.</li>
-  <li><strong>Representative in the EU</strong> (Article 27): ${fill("euRepresentative", "EU representative")}. <strong>In the UK:</strong> ${fill("ukRepresentative", "UK representative")}.</li>
-  <li><strong>Data protection authority:</strong> you can complain to the authority where you live or work; our lead authority is ${fill("supervisoryAuthority", "supervisory authority")}.</li>
-  <li><strong>Transfers:</strong> the database is in the EU; the app and some sub-processors are in the United States. Transfers rely on ${fill("transferSafeguard", "transfer safeguard, e.g. the EU-US Data Privacy Framework or Standard Contractual Clauses")}.</li>
+  <li><strong>Representatives</strong> (Article 27): ${OPERATOR.euRepresentative && OPERATOR.ukRepresentative ? html`in the EU, ${OPERATOR.euRepresentative}; in the UK, ${OPERATOR.ukRepresentative}.` : "we'll appoint one in the EU and one in the UK, and name them here, before Reliquary is offered there."}</li>
+  <li><strong>Data protection authority:</strong> you can complain to the authority where you live or work.${OPERATOR.supervisoryAuthority ? html` Our lead authority is ${OPERATOR.supervisoryAuthority}.` : ""}</li>
+  <li><strong>Transfers:</strong> the database is in the EU; the app and some sub-processors are in the United States. ${OPERATOR.transferSafeguard ? html`Transfers rely on ${OPERATOR.transferSafeguard}.` : "Before Reliquary is offered there, this names the safeguard each transfer relies on."}</li>
   <li><strong>Breaches:</strong> we'll tell the authority within 72 hours of becoming aware of one that affects you, where the GDPR requires it.</li>
 </ul>
 
 <h2>Changes</h2>
-<p>We'll post changes here with a new date, and email account holders about significant ones.</p>`);
+<p>This policy took effect on ${OPERATOR.lastUpdated}. We'll post changes here with a new date, and email account holders about significant ones at least 30 days before they take effect.</p>`);
 }
 
 // Data processing -------------------------------------------------------------
@@ -224,7 +263,7 @@ ${operatorBlock()}
 </ul>
 
 <h2 id="transfers">Transfers outside the EU (once offered in the EU)</h2>
-<p>The database is in the EU; the app runs in the United States, and other sub-processors may access data from outside the EU. Each such transfer relies on ${fill("transferSafeguard", "transfer safeguard, e.g. the provider's Standard Contractual Clauses")}. The <a href="/subprocessors">sub-processor list</a> names each provider and its location.</p>`);
+<p>The database is in the EU; the app runs in the United States, and other sub-processors may access data from outside the EU. ${OPERATOR.transferSafeguard ? html`Each such transfer relies on ${OPERATOR.transferSafeguard}.` : "Before Reliquary is offered in the EU, this names the safeguard each transfer relies on."} The <a href="/subprocessors">sub-processor list</a> names each provider and its location.</p>`);
 }
 
 // Sub-processors ----------------------------------------------------------------

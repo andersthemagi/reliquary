@@ -70,8 +70,15 @@ when the repo shows them done; the rest are the owner's to confirm.
      and `EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>`, then redeploy.
      Invites are then emailed; without them owners keep copying the link.
    - Check: sign in by code, and invite an address you own.
-8. **Legal placeholders** in `OPERATOR` in `web/src/site.ts`, and a legal
-   review before the "Draft" labels come off.
+8. **Legal review** (#8), once the alpha shows Reliquary is worth it and
+   before paid plans, an open launch or a customer's contract. The pages
+   carry no draft label; the questions for the lawyer are in #447.
+9. **Copyright agent** (#444): register yourself as the DMCA designated
+   agent at `dmca.copyright.gov` ($6, renew every 3 years), then put the
+   phone you registered in `copyrightAgentPhone` in `OPERATOR` (the terms
+   leave the phone out until then). The terms'
+   "Copyright complaints" section names the agent; the safe harbour only
+   holds once the registration does.
 
 ## Before the next key rotation
 

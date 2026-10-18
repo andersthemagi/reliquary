@@ -3,15 +3,16 @@
 // script, nothing loaded from another origin (the CSP forbids it anyway).
 //
 // Everything the owner still has to decide or fill in lives in the two
-// config objects below: OPERATOR (who runs the service, placeholders until
-// filled) and PRICING (the tiers, easy to change or hide). A field left null
+// config objects below: OPERATOR (who runs the service) and PRICING (the tiers, easy to change or hide). A field left null
 // renders as a visible "[to be filled: ...]" mark, never as an invented fact.
 
 import { appHref, publicSiteOrigin } from "./hosts.js";
 import { LEGAL_LINKS, esc, footerLinks, html, raw, stageBadge, styleHref, versionLink, type Raw, type Theme } from "./html.js";
 
-// Who runs Reliquary. null = not decided or not known yet: shown as a
-// placeholder on the page. Fill these in before the pages leave draft.
+// Who runs Reliquary. null = not decided or not known yet. A page shows a
+// placeholder for one only where the sentence can't stand without it; the
+// legal pages leave out what is null instead (web/test/site.test.mjs fails
+// on a placeholder there).
 export const OPERATOR = {
   product: "Reliquary",
   brand: "Reliquary by Red Mage",
@@ -23,11 +24,11 @@ export const OPERATOR = {
   // Where the site lives when neither SITE_URL nor PUBLIC_URL is set
   // (links in the sitemap, canonical and Open Graph URLs).
   defaultOrigin: "https://reliquary.redmage.cc",
-  lastUpdated: "2026-10-13",
+  lastUpdated: "2026-10-18",
   legalName: "Memento Vivre Fine Arts LLC, doing business as Red Mage" as string | null, // the legal entity or sole trader's full name
   legalForm: "a single-member limited liability company" as string | null, // e.g. sole trader, limited company
-  registrationNumber: null as string | null, // the Colorado Secretary of State ID
-  address: null as string | null, // registered or postal address
+  registrationNumber: "20238181121" as string | null, // the Colorado Secretary of State ID
+  address: "1500 N Grant St, Ste R, Denver, CO 80203, United States" as string | null, // registered or postal address
   country: "Colorado, United States" as string | null, // country of establishment
   governingLaw: "the laws of the State of Colorado, United States, without regard to its conflict-of-laws rules, and disputes go to the state or federal courts in Denver, Colorado" as string | null, // law and courts for the terms
   supervisoryAuthority: null as string | null, // lead EU data protection authority, once offered in the EU
@@ -39,9 +40,10 @@ export const OPERATOR = {
   ukRepresentative: null as string | null, // UK GDPR Article 27 representative, once offered in the UK
   transferSafeguard: null as string | null, // basis for any transfer outside the EU, once offered in the EU
   backupRetention: "Supabase keeps daily backups for 7 days; the operator also keeps up to 14 off-site copies, in which variable values exist only as ciphertext" as string | null, // how long database backups are kept
-  hostingLogRetention: null as string | null, // how long the host keeps request logs
+  hostingLogRetention: "as long as Netlify’s own privacy policy allows (it publishes no fixed period)" as string | null, // how long the host keeps request logs
   disclosureResponse: "5 business days" as string | null, // how soon a security report is acknowledged
   minimumAge: "18" as string | null,
+  copyrightAgentPhone: null as string | null, // the DMCA agent's phone, as registered with the US Copyright Office (#444)
 };
 
 // A config value, or a visible placeholder naming what goes there.
@@ -96,8 +98,7 @@ export const biggerPlanHref = () => mailOperator("Reliquary: a bigger plan");
 export const siteOrigin = publicSiteOrigin(OPERATOR.defaultOrigin);
 
 // Drafts: every legal page carries this until the owner has had it reviewed.
-export const draftNote = () =>
-  html`<p class="callout attention draft-note" role="note"><strong>Draft, pending legal review.</strong> Last updated ${OPERATOR.lastUpdated}. Bracketed items are still to be filled in.</p>`;
+export const updatedNote = () => html`<p class="meta">Last updated ${OPERATOR.lastUpdated}.</p>`;
 
 // The public page frame: its own header (no app nav, no account menu), the
 // meta a search engine and a link preview need, and the footer with the

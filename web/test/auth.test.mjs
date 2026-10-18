@@ -78,7 +78,7 @@ const mint = async (body) => (await fake("/_mint", { method: "POST", body: JSON.
 // GET /signin, then POST the email: the jar holds the pre-sign-in cookie.
 async function askForCode(base, jar, email, next) {
   const page = await (await get(base, `/signin${next ? `?next=${encodeURIComponent(next)}` : ""}`, jar)).text();
-  return post(base, "/signin", { csrf: csrfOf(page), email, next: next ?? "/" }, jar);
+  return post(base, "/signin", { agree: "1", csrf: csrfOf(page), email, next: next ?? "/" }, jar);
 }
 async function signInByCode(base, email = "ana@example.test", next) {
   const jar = new Jar();
@@ -120,7 +120,7 @@ test("sign-in: a form with its hidden bot field filled sends no code, and reads 
   const page = await (await get(A, "/signin", jar)).text();
   assert.match(page, /<div class="trap" aria-hidden="true"><label for="website">Leave this empty<\/label><input type="text" id="website" name="website" tabindex="-1" autocomplete="off"><\/div>/);
   const before = await stats();
-  const r = await post(A, "/signin", { csrf: csrfOf(page), email: "ana@example.test", website: "http://spam.example", next: "/" }, jar);
+  const r = await post(A, "/signin", { agree: "1", csrf: csrfOf(page), email: "ana@example.test", website: "http://spam.example", next: "/" }, jar);
   assert.equal(r.status, 200);
   assert.match(await r.text(), /<h1>Check your email<\/h1>/);
   assert.equal((await stats()).otp, before.otp, "no code asked for");
@@ -201,17 +201,17 @@ test("sign-in: forms need the pre-sign-in token and the site's Origin", async ()
   const jar = new Jar();
   const token = csrfOf(await (await get(A, "/signin", jar)).text());
   const otp = (await stats()).otp;
-  assert.equal((await post(A, "/signin", { email: "ana@example.test" }, jar)).status, 403, "no token");
-  assert.equal((await post(A, "/signin", { csrf: "0".repeat(48), email: "ana@example.test" }, jar)).status, 403, "wrong token");
-  assert.equal((await post(A, "/signin", { csrf: token, email: "ana@example.test" }, new Jar())).status, 403, "token without its cookie");
+  assert.equal((await post(A, "/signin", { agree: "1", email: "ana@example.test" }, jar)).status, 403, "no token");
+  assert.equal((await post(A, "/signin", { agree: "1", csrf: "0".repeat(48), email: "ana@example.test" }, jar)).status, 403, "wrong token");
+  assert.equal((await post(A, "/signin", { agree: "1", csrf: token, email: "ana@example.test" }, new Jar())).status, 403, "token without its cookie");
   for (const origin of ["https://evil.example", "null", A]) {
-    assert.equal((await post(A, "/signin", { csrf: token, email: "ana@example.test" }, jar, { origin })).status, 403, origin);
+    assert.equal((await post(A, "/signin", { agree: "1", csrf: token, email: "ana@example.test" }, jar, { origin })).status, 403, origin);
   }
   assert.equal((await stats()).otp, otp, "no email may be sent");
 });
 
 test("sign-in: a form refused for its token says why and ends with a reference", async () => {
-  const r = await post(A, "/signin", { email: "ana@example.test" }, new Jar());
+  const r = await post(A, "/signin", { agree: "1", email: "ana@example.test" }, new Jar());
   assert.equal(r.status, 403);
   const h = await r.text();
   assert.match(h, /<p class="callout danger" role="alert" id="email-error">That form expired: its security cookie was missing or didn’t match, which happens when this browser blocks cookies/);
@@ -242,11 +242,58 @@ test("sign-in: a malformed email is refused in the danger tone, announced, and t
   const jar = new Jar();
   const page = await (await get(A, "/signin", jar)).text();
   assert.doesNotMatch(page, /aria-invalid/);
-  const r = await post(A, "/signin", { csrf: csrfOf(page), email: "not-an-address", next: "/" }, jar);
+  const r = await post(A, "/signin", { agree: "1", csrf: csrfOf(page), email: "not-an-address", next: "/" }, jar);
   assert.equal(r.status, 400);
   const h = await r.text();
   assert.match(h, /<p class="callout danger" role="alert" id="email-error">Enter your email address, like name@example\.com\.<\/p>/);
   assert.match(h, /<input type="text" id="email" name="email"[^>]* required aria-invalid="true" aria-describedby="email-error">/);
+});
+
+test("sign-in: the form asks you to agree to the terms and privacy policy and confirm you're outside Europe", async () => {
+  const page = await (await get(A, "/signin", new Jar())).text();
+  assert.match(page, /<label class="choice"><input type="checkbox" name="agree" value="1" required> <span>I agree to the <a href="[^"]*\/terms">Terms<\/a> and <a href="[^"]*\/privacy">Privacy Policy<\/a>, and I’m not based in the EU, EEA, UK or Switzerland\.<\/span><\/label>/);
+});
+
+test("sign-in: without the agreement ticked no code is sent, and the refusal is tied to the checkbox", async () => {
+  const jar = new Jar();
+  const page = await (await get(A, "/signin", jar)).text();
+  const before = await stats();
+  const r = await post(A, "/signin", { csrf: csrfOf(page), email: "ana@example.test", next: "/" }, jar);
+  assert.equal(r.status, 400);
+  const h = await r.text();
+  assert.match(h, /<p class="callout danger" role="alert" id="agree-error">Tick the box to agree to the Terms and Privacy Policy and confirm you’re not based in the EU, EEA, UK or Switzerland: Reliquary isn’t offered there yet, so no code was sent\.<\/p>/);
+  assert.match(h, /name="agree" value="1" required aria-invalid="true" aria-describedby="agree-error">/);
+  assert.equal((await stats()).otp, before.otp, "no code asked for");
+});
+
+test("sign-in: asking for a new code from the code page keeps the agreement", async () => {
+  const jar = new Jar();
+  const page = await (await askForCode(A, jar, "resend-agree@example.test")).text();
+  const resend = page.slice(page.lastIndexOf('<form method="post" action="/signin"'));
+  assert.match(resend, /<input type="hidden" name="agree" value="1">/);
+  const fields = Object.fromEntries([...resend.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)].map((m) => [m[1], m[2]]));
+  const before = await stats();
+  const r = await post(A, "/signin", fields, jar);
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /<h1>Check your email<\/h1>/);
+  assert.ok((await stats()).otp > before.otp, "a new code asked for");
+});
+
+test("sign-in: a completed sign-in records the terms version accepted, the date the terms page shows, once per version", async () => {
+  const port = 54332 + (Number(new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791").port) - 8791);
+  const db = new pg.Client({ connectionString: `postgres://postgres:test@127.0.0.1:${port}/postgres` });
+  await db.connect();
+  try {
+    await db.query("insert into auth.users (id, email) values ($1, 'ana@example.test') on conflict (id) do nothing", [ANA]);
+    await db.query("delete from private.terms_acceptances where user_id = $1", [ANA]);
+    const shown = /Last updated (\d{4}-\d{2}-\d{2})\./.exec(await (await get(A, "/terms", new Jar())).text())?.[1];
+    assert.equal((await signInByCode(A)).done.status, 303);
+    assert.equal((await signInByCode(A)).done.status, 303);
+    const { rows } = await db.query("select terms_date::text as d from private.terms_acceptances where user_id = $1", [ANA]);
+    assert.deepEqual(rows.map((x) => x.d), [shown]);
+  } finally {
+    await db.end();
+  }
 });
 
 test("sign-in: a bad or expired code is refused in the danger tone, announced, and tied to the code field", async () => {

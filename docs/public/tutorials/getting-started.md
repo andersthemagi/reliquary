@@ -6,7 +6,7 @@ This takes about 15 minutes. You need a Reliquary account: sign in with your ema
 
 ## 1. Sign in
 
-Open `https://app.reliquary.redmage.cc` (or choose **Sign in** on `https://reliquary.redmage.cc`). Enter your email, then the 6-digit code from the email (or open its link on the same device).
+Open `https://app.reliquary.redmage.cc` (or choose **Sign in** on `https://reliquary.redmage.cc`). Enter your email, tick the box to agree to the [Terms](https://reliquary.redmage.cc/terms) and [Privacy Policy](https://reliquary.redmage.cc/privacy) and confirm you're not based in the EU, EEA, UK or Switzerland (the hosted alpha isn't offered there yet), then choose **Email me a code**. Enter the 6-digit code from the email (or open its link on the same device).
 
 ## 2. Create a vault
 

@@ -99,6 +99,7 @@ try {
     const form = await (await get("/signin")).text();
     const csrf = field(form, "csrf");
     check(csrf, "the sign-in form has no csrf field");
+    check(!/name="agree"/.test(form), "the self-hosted sign-in form asks for the hosted service's terms");
     const r = await post("/signin", { csrf, next: "/", email: EMAIL });
     const h = await r.text();
     check(r.status === 200, `POST /signin answered HTTP ${r.status}`);

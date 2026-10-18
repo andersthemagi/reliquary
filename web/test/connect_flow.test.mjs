@@ -77,7 +77,7 @@ before(async () => {
   const u = await fake("/_users", { method: "POST", body: JSON.stringify({ email: EMAIL }) });
   userId = u.id;
   await sql("insert into auth.users (id, email) values ($1, $2) on conflict (id) do update set email = excluded.email", [userId, EMAIL]);
-  const asked = await post("/signin", { csrf: csrfOf(await page("/signin")), email: EMAIL, next: "/" });
+  const asked = await post("/signin", { agree: "1", csrf: csrfOf(await page("/signin")), email: EMAIL, next: "/" });
   const m = await fake(`/_last_email?email=${encodeURIComponent(EMAIL)}`);
   remember(m.code, m.token_hash);
   const done = await post("/signin/code", { csrf: csrfOf(await asked.text()), email: EMAIL, code: m.code, next: "/" });

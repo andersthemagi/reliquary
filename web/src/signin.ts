@@ -51,7 +51,8 @@ import { limit, limitStrict, tooManyPage, type Check } from "./ratelimit.js";
 import type { Reply } from "./pages.js";
 import { errorPage, refusalText } from "./errorpage.js";
 import { failure, noteUpstream, Refusal, sqlstateName, upstreamNote } from "./failure.js";
-import { contactEmail, waitingHref } from "./site.js";
+import { OPERATOR, contactEmail, waitingHref } from "./site.js";
+import { selfHosted } from "./selfhost.js";
 import { pool } from "./db.js";
 
 // Whether sign-in makes an account for any address: invite-only is off
@@ -148,7 +149,22 @@ export const hidden = (name: string, value: string) => html`<input type="hidden"
 export const formError = (id: string, error?: string) => (error ? html`<p class="callout danger" role="alert" id="${id}">${error}</p>` : "");
 export const invalid = (id: string, error?: string) => (error ? html` aria-invalid="true" aria-describedby="${id}"` : "");
 
-function emailForm(csrf: string, next: string, theme: Theme, open: boolean, error?: string, invite?: Peek): string {
+// The terms are Red Mage's, for the hosted service only: a self-hosted
+// instance is run by someone else, so it asks nothing. Asked on every
+// sign-in because the server can't tell a new address from a known one
+// without saying which it is.
+const asksAgreement = () => !selfHosted();
+const agreed = (form: URLSearchParams) => !asksAgreement() || form.get("agree") === "1";
+// No code is sent without the box ticked, so a completed sign-in accepted
+// the terms as dated now: the evidence if acceptance is ever disputed (#450).
+const recordAgreement = async (userId: string) => {
+  if (asksAgreement()) await pool.query("select private.record_terms_acceptance($1, $2)", [userId, OPERATOR.lastUpdated]);
+};
+const AGREE_REFUSED = "Tick the box to agree to the Terms and Privacy Policy and confirm you’re not based in the EU, EEA, UK or Switzerland: Reliquary isn’t offered there yet, so no code was sent.";
+
+function emailForm(csrf: string, next: string, theme: Theme, open: boolean, error?: string, invite?: Peek, errorOn: "email" | "agree" = "email"): string {
+  const onEmail = errorOn === "email" ? error : undefined;
+  const onAgree = errorOn === "agree" ? error : undefined;
   const openInvite = invite !== undefined && invite.email === null;
   return page(
     "Sign in",
@@ -164,12 +180,15 @@ function emailForm(csrf: string, next: string, theme: Theme, open: boolean, erro
               <p class="lede">You’ve been invited to <strong>${invite.vaultName}</strong> on Reliquary. Sign in with the address the invite was sent to, <strong>${maskEmail(invite.email as string)}</strong>: we’ll email it a sign-in link and a 6-digit code. New to Reliquary? The same step makes your account.</p>`
         : html`<h1>Sign in to Reliquary</h1>
           <p class="lede">We’ll email you a sign-in link and a 6-digit code.</p>`}
-      ${formError("email-error", error)}
-      <form method="post" action="/signin" class="panel">
+      ${formError("email-error", onEmail)}${formError("agree-error", onAgree)}
+      <form method="post" action="/signin" class="panel choice-form">
         ${hidden("csrf", csrf)}${hidden("next", next)}
         <div class="trap" aria-hidden="true"><label for="${TRAP}">Leave this empty</label><input type="text" id="${TRAP}" name="${TRAP}" tabindex="-1" autocomplete="off"></div>
         <label for="email">Email</label>
-        <input type="text" id="email" name="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${invalid("email-error", error)}>
+        <input type="text" id="email" name="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${invalid("email-error", onEmail)}>
+        ${asksAgreement()
+          ? html`<label class="choice"><input type="checkbox" name="agree" value="1" required${invalid("agree-error", onAgree)}> <span>I agree to the <a href="${siteHref("/terms")}">Terms</a> and <a href="${siteHref("/privacy")}">Privacy Policy</a>, and I’m not based in the EU, EEA, UK or Switzerland.</span></label>`
+          : ""}
         <div class="actions"><button class="primary">Email me a code</button></div>
       </form>
       ${invite
@@ -197,7 +216,7 @@ function codeForm(csrf: string, email: string, next: string, theme: Theme, error
         <div class="actions"><button class="primary">Sign in</button></div>
       </form>
       <form method="post" action="/signin" class="actions">
-        ${hidden("csrf", csrf)}${hidden("next", next)}${hidden("email", email)}
+        ${hidden("csrf", csrf)}${hidden("next", next)}${hidden("email", email)}${asksAgreement() ? hidden("agree", "1") : ""}
         <button class="quiet">Send a new code</button>
         <a href="${signinUrl(next)}">Use a different email</a>
       </form>
@@ -314,6 +333,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     if (!EMAIL.test(email) || email.length > 254) {
       return out({ status: 400, html: emailForm(pre(), next, i.theme, await openForWording(), "Enter your email address, like name@example.com.", invite) });
     }
+    if (!agreed(i.form)) return out({ status: 400, html: emailForm(pre(), next, i.theme, await openForWording(), AGREE_REFUSED, invite, "agree") });
     if (refused) return out(refused);
     if (i.form.get(TRAP)) {
       console.error("sign-in trap field filled: no code sent");
@@ -376,6 +396,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     if (limited) return out(limited);
     const r = await verifySignin({ email, code });
     if (!r.ok) return out(r.unavailable ? unavailable(i.theme) : { status: 400, html: codeForm(pre(), email, next, i.theme, bad) });
+    await recordAgreement(r.userId);
     cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT), ...(r.newAccount ? [freshCookie()] : []));
     return out({ redirect: next });
   }
@@ -414,6 +435,7 @@ export async function signinRoutes(i: In): Promise<Out | undefined> {
     cookies.push(...r.cookies, clearPreToken(), clearCookie(NEXT), flashCookie({ text: "Your email address is changed: you sign in with the new one from now on, and people who share a vault with you see it.", tone: "success" }));
     return out({ redirect: "/settings" });
   }
+  await recordAgreement(r.userId);
   let back = "/";
   try {
     back = safeNext(decodeURIComponent(readCookie(i.req, cookieName(NEXT)) ?? ""));

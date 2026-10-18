@@ -52,7 +52,7 @@ async function signIn() {
     );
   const csrfOf = (h) => /name="csrf" value="([0-9a-f]+)"/.exec(h)[1];
   const form = await take(await fetchAs(A, "/signin")).text();
-  const codePage = await (await post("/signin", { csrf: csrfOf(form), email: "ana@example.test", next: "/" })).text();
+  const codePage = await (await post("/signin", { agree: "1", csrf: csrfOf(form), email: "ana@example.test", next: "/" })).text();
   const { code } = await (await fetch(`${FAKE}/_last_email?email=${encodeURIComponent("ana@example.test")}`)).json();
   if (AUTH_SECRETS_FILE) appendFileSync(AUTH_SECRETS_FILE, `${code}\n`);
   const done = await post("/signin/code", { csrf: csrfOf(codePage), email: "ana@example.test", code, next: "/" });
@@ -348,13 +348,14 @@ test("site links: no URL to another site but the contact mailto and the document
 
 // Legal and trust pages -------------------------------------------------------------
 
-test("site legal: every legal page answers signed out on each instance, marked draft with a date", async () => {
+test("site legal: every legal page answers signed out on each instance with a last-updated date, and shows no draft label or placeholder", async () => {
   for (const base of [A, LOCAL]) {
     for (const path of LEGAL) {
       const r = await fetchAs(base, path);
       assert.equal(r.status, 200, `${base}${path}`);
       const h = await r.text();
-      assert.match(h, /<strong>Draft, pending legal review\.<\/strong> Last updated \d{4}-\d{2}-\d{2}\./, path);
+      assert.match(h, /<p class="meta">Last updated \d{4}-\d{2}-\d{2}\.<\/p>/, path);
+      assert.doesNotMatch(h, /Draft|to be filled|class="placeholder"/, path);
       assert.match(h, /<h1>[^<]+<\/h1>/, path);
       assert.match(h, /<meta name="description" content="[^"]+">/, path);
       assert.doesNotMatch(h, /name="robots"/, path);
@@ -363,13 +364,53 @@ test("site legal: every legal page answers signed out on each instance, marked d
   }
 });
 
-test("site legal: facts not known yet are visible placeholders, not invented", async () => {
+test("site legal: the operator block names the Colorado Secretary of State ID and the postal address", async () => {
   const h = await text(A, "/terms");
-  assert.match(h, /<mark class="placeholder">\[to be filled: Colorado Secretary of State ID\]<\/mark>/);
-  assert.match(h, /<mark class="placeholder">\[to be filled: address\]<\/mark>/);
+  assert.match(h, /under ID 20238181121, 1500 N Grant St, Ste R, Denver, CO 80203, United States\./);
+  assert.doesNotMatch(h, /to be filled: (Colorado Secretary of State ID|address)/);
 });
 
-test("site legal: the operator is the Colorado LLC under Colorado law, with US state privacy rights, and what applies in Europe is one marked section of placeholders", async () => {
+test("site legal: the terms name a copyright agent, what a notice and a counter-notice need, and that repeat infringers lose access", async () => {
+  const terms = await text(A, "/terms");
+  const sec = terms.slice(terms.indexOf('<h2 id="copyright">'), terms.indexOf("<h2>Fees</h2>"));
+  assert.match(sec, /designated agent: Andrés, Memento Vivre Fine Arts LLC, doing business as Red Mage, 1500 N Grant St/);
+  assert.match(sec, /1500 N Grant St, Ste R, Denver, CO 80203, United States; (phone [^;<]+; )?<a href="mailto:/, "the phone shows once the agent is registered");
+  assert.match(sec, /under penalty of perjury/);
+  assert.match(sec, /counter-notice/);
+  assert.match(sec, /infringe repeatedly/);
+});
+
+test("site legal: the terms say when we look at content, what the content licence covers, where Reliquary is offered, and the standard clauses", async () => {
+  const terms = await text(A, "/terms");
+  assert.match(terms, /<p id="access">Nobody at Red Mage looks at your content except to help you when you ask, to investigate a security problem, abuse or a legal notice/);
+  assert.doesNotMatch(terms, /or read it, unless you ask us to/);
+  assert.match(terms, /copying it to backups, indexing it for search/);
+  assert.match(terms, /offered outside the EU, EEA, UK and Switzerland for now/);
+  assert.match(terms, /Specially Designated Nationals/);
+  assert.match(terms, /ideas or feedback, including through the feedback tool, we may use them freely/);
+  assert.match(terms, /Functional Source License for the server, MIT for the CLI/);
+  assert.match(terms, /<strong>Reliquary is provided as it is and as available, without warranties of any kind, including merchantability/);
+  assert.match(terms, /still apply after an account closes/);
+  assert.match(terms, /at least 30 days before significant changes/);
+  assert.match(terms, /give us 30 days to try to settle it/);
+  assert.match(terms, /<h2>General<\/h2>[\s\S]*whole agreement[\s\S]*haven't given it up[\s\S]*transfer these terms[\s\S]*outside its reasonable control/);
+});
+
+test("site legal: the privacy policy covers authorities, Do Not Track, retention of logs and access requests, and its effective date", async () => {
+  const privacy = await text(A, "/privacy");
+  assert.match(privacy, /<h2 id="authorities">Requests from authorities<\/h2>\s*<p>We give data to the authorities only when a valid US legal order compels us/);
+  assert.match(privacy, /a Do Not Track or Global Privacy Control signal changes nothing here/);
+  assert.match(privacy, /for their direct marketing/);
+  assert.match(privacy, /Access requests: we delete the email within 90 days/);
+  assert.match(privacy, /Our own server logs: our hosting provider deletes them within 7 days/);
+  assert.doesNotMatch(privacy, /to be filled: host log retention/);
+  assert.match(privacy, /or tell you within that time if we need 45 more/);
+  assert.match(privacy, /within 30 days at most/);
+  assert.match(privacy, /If we learn an account belongs to someone younger, we close it/);
+  assert.match(privacy, /This policy took effect on \d{4}-\d{2}-\d{2}\./);
+});
+
+test("site legal: the operator is the Colorado LLC under Colorado law, with US state privacy rights, and what applies in Europe is one marked section saying what is still to be appointed", async () => {
   const terms = await text(A, "/terms");
   assert.match(terms, /Memento Vivre Fine Arts LLC, doing business as Red Mage, a single-member limited liability company registered in Colorado, United States/);
   assert.doesNotMatch(terms, /VAT/);
@@ -381,9 +422,9 @@ test("site legal: the operator is the Colorado LLC under Colorado law, with US s
   assert.match(privacy, /children under 13/);
   const eu = /<h2 id="eu">[\s\S]*?<\/ul>/.exec(privacy)?.[0] ?? "";
   assert.match(eu, /We're not yet set up for people in the EU, EEA, UK or Switzerland, so please <a href="[^"]*\/request-access">request access<\/a>/);
-  for (const p of ["EU representative", "UK representative", "supervisory authority"]) assert.match(eu, new RegExp(`\\[to be filled: ${p}\\]`), p);
-  assert.match(eu, /\[to be filled: transfer safeguard/);
-  assert.doesNotMatch(privacy.replace(eu, ""), /to be filled: (supervisory authority|transfer safeguard|EU representative)/, "EU placeholders stay in the EU section");
+  assert.match(eu, /we&#39;ll appoint one in the EU and one in the UK, and name them here, before Reliquary is offered there\./);
+  assert.match(eu, /Before Reliquary is offered there, this names the safeguard each transfer relies on\./);
+  assert.doesNotMatch(privacy.replace(eu, ""), /appoint one in the EU|safeguard each transfer/, "what is still to be put in place for Europe stays in the EU section");
 });
 
 test("site legal: sub-processors names Supabase in Frankfurt, Netlify in the United States, Resend for email, and no model providers", async () => {

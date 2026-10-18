@@ -98,7 +98,7 @@ async function account(email) {
 async function signIn(email) {
   const jar = new Jar();
   const page = await (await get("/signin", jar)).text();
-  const asked = await post("/signin", { csrf: csrfOf(page), email, next: "/" }, jar);
+  const asked = await post("/signin", { agree: "1", csrf: csrfOf(page), email, next: "/" }, jar);
   assert.equal(asked.status, 200);
   const codePage = await asked.text();
   const { code } = await lastEmail(email);

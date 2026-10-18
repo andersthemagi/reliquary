@@ -110,7 +110,7 @@ async function isTooMany(r, window) {
 // Ask for a code (GET /signin, then POST the email), from one address.
 async function askForCode(jar, email, from) {
   const page = await (await get("/signin", jar, from)).text();
-  return post("/signin", { csrf: csrfOf(page), email, next: "/" }, jar, from);
+  return post("/signin", { agree: "1", csrf: csrfOf(page), email, next: "/" }, jar, from);
 }
 
 let ana; // Ana's signed-in jar on the rate-limit instance
@@ -357,9 +357,9 @@ test("rate limits: sign-in from an invite link whose lookup is over its limit is
   const jar = new Jar();
   // Two lookups an hour: the email page counts one, the first post another.
   const csrf = csrfOf(await (await get(`/signin?next=${encodeURIComponent(next)}`, jar, from)).text());
-  assert.equal((await post("/signin", { csrf, email, next }, jar, from)).status, 200);
+  assert.equal((await post("/signin", { agree: "1", csrf, email, next }, jar, from)).status, 200);
   const asked = (await fake("/_stats")).otp;
-  const r = await post("/signin", { csrf, email, next }, jar, from);
+  const r = await post("/signin", { agree: "1", csrf, email, next }, jar, from);
   await isTooMany(r, 3600);
   assert.equal((await fake("/_stats")).otp, asked, "Auth was not asked");
 });
