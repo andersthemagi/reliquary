@@ -67,6 +67,9 @@ jobs:
       # Docker is the well-trodden engine on GitHub runners; the scripts use
       # podman when it's installed unless told otherwise.
       CONTAINER_ENGINE: docker
+      # Docker Hub's anonymous pull limit fails runs on the runners' shared
+      # IPs (#232); Google's public mirror needs no login. scripts/lib/engine.sh.
+      IMAGE_MIRROR: mirror.gcr.io
     steps:
       - uses: actions/checkout@v7
       - name: All suites (sql, mcp, web) in parallel
@@ -81,6 +84,7 @@ jobs:
     timeout-minutes: 20
     env:
       CONTAINER_ENGINE: docker
+      IMAGE_MIRROR: mirror.gcr.io
     steps:
       - uses: actions/checkout@v7
       - name: Self-hosting smoke test
