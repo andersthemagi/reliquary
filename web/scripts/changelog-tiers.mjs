@@ -60,7 +60,7 @@ function entry(line) {
   const m = /^\* (?:\*\*[^*]+:\*\* )?(.*?)(?: \(\[#(\d+)\]\(([^)]+)\)\))?(?: \(\[[0-9a-f]{7,}\]\([^)]+\)\))?(?:, closes .*)?$/.exec(line);
   if (!m) return null;
   // A plain first word only: "dev.sh" or "npm" stay as written.
-  const plain = /^[a-z]+(?:'[a-z]+)?(?=\s|$)/.test(m[1]) && !/^(?:npm|npx|gh|git)\b/.test(m[1]);
+  const plain = /^[a-z]+(?:['-][a-z]+)*(?=\s|$)/.test(m[1]) && !/^(?:npm|npx|gh|git)\b/.test(m[1]);
   const text = plain ? m[1].charAt(0).toUpperCase() + m[1].slice(1) : m[1];
   return { text, pr: m[2] ? Number(m[2]) : null, link: m[2] ? ` ([#${m[2]}](${m[3]}))` : "" };
 }

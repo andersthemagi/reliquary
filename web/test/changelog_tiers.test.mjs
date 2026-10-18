@@ -23,6 +23,7 @@ const PENDING = [
   "",
   bullet("search", "find files by meaning, not only by shared words", 1),
   bullet("web", "New file warns when a path has no extension", 2),
+  bullet("web", "one-click install for VS Code", 8),
   bullet("mcp", "search takes a vault id, not a name", 9),
   bullet("tasks", "a plan names a member by tag", 3),
   "",
@@ -73,7 +74,7 @@ test("changelog tiers: breaking changes come first, then new features and change
   ]);
   assert.match(out, /#### Find files by meaning, not only by shared words \(\[#1\]\(https:\/\/github\.com\/o\/r\/issues\/1\)\)\n\nSearch now matches what a file means\.\n\nAsk in your own words\./);
   assert.match(out, /#### A plan names a member by tag \(\[#3\][^\n]*\n\n`for:` takes a member's short tag; an email is refused\./, "the Changed: prefix is dropped");
-  assert.match(out, /### Smaller changes\n\n- New file warns when a path has no extension \(\[#2\]\([^)]+\)\)\n/);
+  assert.match(out, /### Smaller changes\n\n- New file warns when a path has no extension \(\[#2\]\([^)]+\)\)\n- One-click install for VS Code/, "a hyphenated first word is capitalised");
   assert.match(out, /### Fixes\n\n- Landing page says what Reliquary is in one line \(\[#4\]\([^)]+\)\)\n- dev\.sh lists every subcommand/, "a file name keeps its case");
   assert.match(out, /### Performance\n\n- Search in a small vault no longer scans every vault \(\[#6\]\([^)]+\)\)\n/);
   assert.equal(out.match(/Search takes a vault id/g).length, 1, "a breaking feature is told once, at the top");
@@ -95,5 +96,5 @@ test("changelog tiers: a release pull request's body is rewritten up to its foot
   assert.ok(out.startsWith("Merging this pull request tags this version.\n---\n\n\n## [0.25.0]"));
   assert.ok(out.endsWith("\n---\nThis PR was generated with Release Please."));
   assert.ok(out.includes("### New"));
-  assert.deepEqual(prNumbers(firstSection(body)), [9, 1, 2, 3, 4, 5, 7, 6]);
+  assert.deepEqual(prNumbers(firstSection(body)), [9, 1, 2, 8, 3, 4, 5, 7, 6]);
 });
