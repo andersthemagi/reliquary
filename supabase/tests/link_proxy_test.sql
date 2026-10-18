@@ -88,6 +88,9 @@ select t.expect('begin: a granted read tool returns the sealed credential, never
   t.run('ana', format($q$select (r->>'key_id') || ' ' || encode(decode(r->>'ciphertext', 'base64'), 'hex')
     from (select public.begin_link_call(%L, 'list_issues') as r) x$q$, t.id('gh'))),
   'k1 ' || t.lk('x'));
+select t.expect('header: a granted call returns the link''s header for its credential beside its url',
+  t.run('ana', format($q$select (r->>'url') || ' ' || (r->>'auth_header') from (select public.begin_link_call(%L, 'list_issues') as r) x$q$, t.id('gh'))),
+  'https://api.github.com Authorization');
 
 -- The owner enables the write tool for owner and (later) viewer, to
 -- exercise private.connection_write_capable() as its own gate, distinct

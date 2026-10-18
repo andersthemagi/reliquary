@@ -147,7 +147,7 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
         try {
           const begin = await runAs(async (c) => {
             const { rows } = await c.query(`select public.begin_link_call($1, $2) as r`, [row.link_id, row.tool_name]);
-            return rows[0].r as { ok: boolean; error?: string; vault_id?: string; url?: string; key_id?: string; nonce?: string; ciphertext?: string };
+            return rows[0].r as { ok: boolean; error?: string; vault_id?: string; url?: string; auth_header?: string; key_id?: string; nonce?: string; ciphertext?: string };
           });
           if (!begin.ok) {
             return explain(
@@ -168,6 +168,7 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
             const called = await callLinkProxy({
               vaultId: begin.vault_id!,
               url: begin.url!,
+              authHeader: begin.auth_header,
               keyId: begin.key_id!,
               nonce: begin.nonce!,
               ciphertext: begin.ciphertext!,

@@ -16,7 +16,9 @@
 // is set, matching every other required-secret startup check in this app.
 //
 //   POST /internal/link-call   Authorization: Bearer <LINK_PROXY_SECRET>
-//     {vault_id, url, key_id, nonce, ciphertext, tool_name, args}
+//     {vault_id, url, auth_header?, key_id, nonce, ciphertext, tool_name, args}
+//     (auth_header, the link's header for its credential, defaults to
+//     Authorization, so an mcp/ deployed before it keeps working)
 //     -> {ok: true, result: {content, isError}}
 //      | {ok: false, error, message, why, where, ref}   every refusal and failure past the secret check
 //      | {ok: false, error}                              401 and 405: nothing was attempted, so no reference
@@ -75,6 +77,7 @@ type Body = {
   nonce?: unknown;
   ciphertext?: unknown;
   tool_name?: unknown;
+  auth_header?: unknown;
   args?: unknown;
 };
 
@@ -127,7 +130,8 @@ export async function linkProxyApi(req: http.IncomingMessage, res: http.ServerRe
       outcome = "decrypt_failed";
       return true;
     }
-    const result = await callUpstreamTool(body.url, credential, body.tool_name, body.args, { allowLoopback: discoveryAllowsLoopback() });
+    if (body.auth_header !== undefined && !isNonEmptyString(body.auth_header)) throw new BadRequest(400, "invalid_request");
+    const result = await callUpstreamTool(body.url, credential, body.tool_name, body.args, { allowLoopback: discoveryAllowsLoopback(), header: body.auth_header });
     send(res, 200, { ok: true, result });
   } catch (err) {
     if (err instanceof BadRequest) {

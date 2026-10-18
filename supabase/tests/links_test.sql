@@ -405,3 +405,84 @@ select t.expect('sealed: the owner gets the stored credential back still sealed,
           || (j->>'vault_id') || ' ' || (j->>'url')
      from (select t.run('ana', t.sealed_sql('lk2'))::jsonb as j) s),
   format('CIPHERTEXT-MARKER-new k2 %s https://api.zendesk.example', t.id('gone')));
+
+-- ---------------------------------------------------------------------------
+-- A link's header for its credential (20261018160000_link_auth_header):
+-- Authorization by default, or one the upstream names, checked as an HTTP
+-- field name that Reliquary doesn't set itself.
+
+create function t.create_with_header_sql(p_name text, p_header text) returns text language sql as $$
+  select format($q$select public.create_link(%L, %L, 'https://api.example.test/mcp', 'k1', decode(%L, 'hex'), decode(%L, 'hex'), %L)$q$,
+    t.id('keep'), p_name, repeat('00', 12), t.lk('h'), p_header)
+$$;
+create function t.header_refusal(p_header text) returns text language plpgsql as $$
+begin
+  perform private.check_link_auth_header(p_header);
+  return 'ok';
+exception when others then
+  return sqlstate || ' ' || sqlerrm;
+end $$;
+create function t.set_header_directly(p_link text, p_header text) returns text language plpgsql as $$
+begin
+  update public.links set auth_header = p_header where id = t.id(p_link);
+  raise exception 'updated' using errcode = 'P0001';
+exception when others then
+  return sqlstate;
+end $$;
+create function t.update_header_sql(p_link text, p_name text, p_header text) returns text language sql as $$
+  select format($q$select 'ok' from public.update_link(%L, %L, 'https://api.example.test/mcp', %L)$q$, t.id(p_link), p_name, p_header)
+$$;
+create function t.header_of(p_link text) returns text language sql as
+$$ select auth_header from public.links where id = t.id(p_link) $$;
+
+select t.expect('header: a link added or edited without one keeps Authorization',
+  t.header_of('lk2') || ' ' || t.header_of('legacy'), 'Authorization Authorization');
+select t.expect('header: a name that isn''t an HTTP field name, one over 64 characters, a cookie and a header Reliquary sets itself are refused, and nothing is added',
+  t.run('ana', t.create_with_header_sql('h1', 'X Api Key'))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', 'X-Api-Key:'))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', ''))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', null))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', repeat('a', 65)))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', 'Cookie'))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', 'set-cookie'))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', 'Host'))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', 'content-length'))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', 'Mcp-Session-Id'))
+  || ',' || t.run('ana', t.create_with_header_sql('h1', 'MCP-Protocol-Version'))
+  || ',' || (select count(*) from public.links where name = 'h1'),
+  'ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023,ERR 22023,0');
+select t.expect('header: the refusal says which rule the name broke',
+  t.header_refusal('X Api Key') || ' | ' || t.header_refusal(repeat('a', 65)) || ' | ' || t.header_refusal('Cookie')
+  || ' | ' || t.header_refusal('Mcp-Session-Id') || ' | ' || t.header_refusal('X-Api-Key'),
+  '22023 a link''s header is a header name like Authorization or X-Api-Key: letters, digits and ! # $ % & '' * + - . ^ _ ` | ~, with no spaces or colons'
+  || ' | 22023 a link''s header is at most 64 characters'
+  || ' | 22023 a link''s header can''t be a cookie (Cookie): its credential goes in a header of its own'
+  || ' | 22023 a link''s header can''t be Mcp-Session-Id: Reliquary sets that header itself on every call to the link''s server'
+  || ' | ok');
+
+insert into t.ids select 'lk3', t.run('ana', t.create_with_header_sql('apikey', 'X-Api-Key'))::uuid;
+select t.expect('header: the owner adds a link with its own header, logged with it',
+  t.header_of('lk3') || ' ' || (select detail->>'header' from public.log where event = 'link.create' and detail->>'link' = t.id('lk3')::text),
+  'X-Api-Key X-Api-Key');
+select t.expect('header: the table itself refuses such a name, whoever writes it',
+  t.set_header_directly('lk3', 'x api key') || ',' || t.set_header_directly('lk3', 'HOST')
+  || ',' || t.set_header_directly('lk3', 'cookie') || ',' || t.set_header_directly('lk3', 'mcp-session-id')
+  || ',' || t.set_header_directly('lk3', repeat('a', 65)) || ',' || t.set_header_directly('lk3', 'X-Other'),
+  '23514,23514,23514,23514,23514,P0001');
+select t.expect('header: an editor, the owner''s agent and the owner''s token cannot change a link''s header, and it stays',
+  t.run('ben', t.update_header_sql('lk3', 'apikey', 'X-Other'))
+  || ',' || t.run('ana', t.update_header_sql('lk3', 'apikey', 'X-Other'), 'Claude Code')
+  || ',' || t.run_tok('ana', 'all-rw', t.update_header_sql('lk3', 'apikey', 'X-Other'))
+  || ',' || t.header_of('lk3'),
+  'ERR 42501,ERR 42501,ERR 42501,X-Api-Key');
+select t.expect('header: editing refuses a bad header the same way and changes nothing',
+  t.run('ana', t.update_header_sql('lk3', 'apikey', 'Cookie')) || ',' || t.header_of('lk3'), 'ERR 22023,X-Api-Key');
+select t.expect('header: the owner changes it',
+  t.run('ana', t.update_header_sql('lk3', 'apikey', 'X-Other')) || ' ' || t.header_of('lk3'), 'ok X-Other');
+select t.expect('header: the change is logged with the new and previous header',
+  (select (detail->>'header') || ' ' || (detail->>'previous_header') from public.log
+    where event = 'link.update' and detail->>'link' = t.id('lk3')::text),
+  'X-Other X-Api-Key');
+select t.expect('header: an edit that gives no header keeps the link''s own',
+  t.run('ana', format($q$select 'ok' from public.update_link(%L, 'apikey2', 'https://api.example.test/mcp')$q$, t.id('lk3')))
+  || ' ' || t.header_of('lk3'), 'ok X-Other');

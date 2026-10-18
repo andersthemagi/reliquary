@@ -27,17 +27,17 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { discoverTools, discoveryAllowsLoopback, DiscoveryError } from "./discovery.js";
+import { discoverTools, discoveryAllowsLoopback, DiscoveryError, headerProblem } from "./discovery.js";
 import { callout, confirmPage, csrfField, emptyState, html, menu, pageHeader, time, type Raw } from "./html.js";
 import { fail, failure, Refusal } from "./failure.js";
 import { vaultShell } from "./files.js";
 import { fromDb, openLink, sealLink, SecretsError, variablesConfigured } from "./secrets.js";
 import { message, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
 
-type Link = { id: string; name: string; url: string; created_by: string; created_at: Date };
+type Link = { id: string; name: string; url: string; auth_header: string; created_by: string; created_at: Date };
 
 // The Add/Edit form's values, as typed, when saving was refused.
-type LinkForm = { id?: string; name: string; url: string; credential?: string; error?: string; field?: "name" | "url" | "credential"; replace?: boolean };
+type LinkForm = { id?: string; name: string; url: string; header?: string; credential?: string; error?: string; field?: "name" | "url" | "header" | "credential"; replace?: boolean };
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 // The rules of private.check_link_url (20261009120041_link_url_shape.sql),
@@ -56,7 +56,7 @@ function urlProblem(url: string): string | null {
 
 async function loadLinks(c: pg.PoolClient, id: string): Promise<Link[]> {
   return (
-    await c.query(`select id, name, url, created_by, created_at from public.links where vault_id = $1 order by name`, [id])
+    await c.query(`select id, name, url, auth_header, created_by, created_at from public.links where vault_id = $1 order by name`, [id])
   ).rows;
 }
 
@@ -92,7 +92,7 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
     const replacing = owner && replacingId ? list.find((l) => l.id === replacingId) : undefined;
     const editingId = form?.replace ? null : (form?.id ?? edit);
     const editing = editingId ? list.find((l) => l.id === editingId) : undefined;
-    const values: LinkForm | undefined = form ?? (editing ? { id: editing.id, name: editing.name, url: editing.url } : undefined);
+    const values: LinkForm | undefined = form ?? (editing ? { id: editing.id, name: editing.name, url: editing.url, header: editing.auth_header } : undefined);
     const described = (f: LinkForm["field"], hint: string) =>
       form?.error && form.field === f ? html` aria-invalid="true" aria-describedby="link-error ${hint}"` : html` aria-describedby="${hint}"`;
 
@@ -110,12 +110,14 @@ export async function links(ctx: Ctx, id: string, form?: LinkForm): Promise<Repl
           <div class="fields">
             <div><label for="ln">Name</label><input id="ln" type="text" name="name" placeholder="linear" required maxlength="64" pattern="[A-Za-z_][A-Za-z0-9_]*" value="${values?.name ?? ""}"${described("name", "ln-hint")}></div>
             <div><label for="lu">URL</label><input id="lu" type="text" name="url" placeholder="https://mcp.example.com/mcp" required maxlength="2048" value="${values?.url ?? ""}"${described("url", "lu-hint")}></div>
+            <div><label for="lh">Header</label><input id="lh" type="text" name="header" placeholder="Authorization" maxlength="64" value="${values?.header ?? "Authorization"}"${described("header", "lh-hint")}></div>
             ${editing
               ? ""
               : html`<div><label for="lc">Credential</label><input id="lc" type="password" name="credential" autocomplete="new-password" required maxlength="65536"${described("credential", "lc-hint")}></div>`}
           </div>
           <p class="hint" id="ln-hint">A short name like <code>linear</code>: letters, digits and underscores, not starting with a digit. Agents use it to tell this service’s tools apart from others.</p>
           <p class="hint" id="lu-hint">The address where this service offers its tools to agents, from the service’s own setup page: https://, a host and a path. Everyone in the vault can read it, so a key or token never goes here.</p>
+          <p class="hint" id="lh-hint">The header the service reads its key from. <code>Authorization</code> sends <code>Bearer &lt;credential&gt;</code>; any other name, like <code>X-Api-Key</code>, sends the credential as it is.</p>
           ${editing
             ? html`<p class="hint" id="lc-hint">The credential isn’t shown or changed here. To replace it, choose Replace credential in this link’s menu; its grants stay. Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered.</p>`
             : html`<p class="hint" id="lc-hint">The service’s API key or token. It is stored encrypted and never shown again, to anyone, once saved.</p>`}
@@ -199,30 +201,36 @@ async function saveLink(ctx: Ctx, id: string): Promise<Reply> {
   const linkId = (ctx.form.get("link_id") ?? "").trim() || undefined;
   const name = (ctx.form.get("name") ?? "").trim();
   const url = (ctx.form.get("url") ?? "").trim();
+  // A form without the field (one opened before it existed) keeps an edited
+  // link's header; an empty field is the default.
+  const sentHeader = ctx.form.get("header");
+  const header = (sentHeader ?? "").trim() || "Authorization";
   const credential = ctx.form.get("credential") ?? "";
-  const again = (error: string, field: LinkForm["field"]) => links(ctx, id, { id: linkId, name, url, error, field });
+  const again = (error: string, field: LinkForm["field"]) => links(ctx, id, { id: linkId, name, url, header, error, field });
 
   if (!NAME.test(name)) {
     return again(refuse("A link’s name is letters, digits and underscores, not starting with a digit, up to 64 characters. Nothing was saved"), "name");
   }
   const problem = urlProblem(url);
   if (problem) return again(refuse(`${problem} Nothing was saved`), "url");
+  const badHeader = headerProblem(header);
+  if (badHeader) return again(refuse(`${badHeader} Nothing was saved`), "header");
   if (!linkId && credential.trim().length === 0) {
     return again(refuse("A credential is required to add a link. Nothing was saved"), "credential");
   }
 
   try {
     if (linkId) {
-      await asPerson(ctx.userId, (c) => c.query(`select public.update_link($1, $2, $3)`, [linkId, name, url]));
+      await asPerson(ctx.userId, (c) => c.query(`select public.update_link($1, $2, $3, $4)`, [linkId, name, url, sentHeader === null ? null : header]));
       ctx.setFlash(`Saved changes to ${name}.`, "success");
     } else {
       const sealed = sealLink(credential, id);
       const newLinkId = await asPerson(ctx.userId, async (c) => {
-        const { rows } = await c.query(`select public.create_link($1, $2, $3, $4, $5, $6) as id`, [id, name, url, sealed.keyId, sealed.nonce, sealed.ciphertext]);
+        const { rows } = await c.query(`select public.create_link($1, $2, $3, $4, $5, $6, $7) as id`, [id, name, url, sealed.keyId, sealed.nonce, sealed.ciphertext, header]);
         return rows[0].id as string;
       });
       try {
-        const tools = await discoverTools(url, credential, { allowLoopback: discoveryAllowsLoopback() });
+        const tools = await discoverTools(url, credential, { allowLoopback: discoveryAllowsLoopback(), header });
         await asPerson(ctx.userId, (c) =>
           c.query(`select public.set_link_tools($1, $2::jsonb)`, [
             newLinkId,
@@ -312,9 +320,9 @@ async function deleteLink(ctx: Ctx, id: string): Promise<Reply> {
 // owner's grant choices, seeds new tools' defaults and drops the ones the
 // upstream no longer lists), then flashes what changed. A failure keeps
 // the link as it is and says why, with a reference, like adding does.
-async function rediscover(ctx: Ctx, link: { id: string; name: string; url: string }, credential: string, done: string, failed: string): Promise<void> {
+async function rediscover(ctx: Ctx, link: Link, credential: string, done: string, failed: string): Promise<void> {
   try {
-    const tools = await discoverTools(link.url, credential, { allowLoopback: discoveryAllowsLoopback() });
+    const tools = await discoverTools(link.url, credential, { allowLoopback: discoveryAllowsLoopback(), header: link.auth_header });
     const before = await asPerson(ctx.userId, async (c) => {
       const { rows } = await c.query(`select tool_name from public.link_tools where link_id = $1`, [link.id]);
       await c.query(`select public.set_link_tools($1, $2::jsonb)`, [

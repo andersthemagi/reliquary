@@ -150,6 +150,42 @@ test("handshake: the credential is sent as a bearer token, never anything else",
   assert.equal(seen, "Bearer s3cr3t-value");
 });
 
+test("header: a link's own header carries the credential as its whole value on every call, and no Authorization is sent", async () => {
+  const seen = [];
+  handler = (body, req, res) => {
+    seen.push([req.headers["x-api-key"], req.headers.authorization]);
+    standardMcp({ tools: [] })(body, req, res);
+  };
+  await discoverTools(base, "s3cr3t-value", { ...loopbackOk, header: "X-Api-Key" });
+  assert.deepEqual(seen, [
+    ["s3cr3t-value", undefined],
+    ["s3cr3t-value", undefined],
+    ["s3cr3t-value", undefined],
+  ]);
+});
+
+test("header: Authorization in any case still sends a bearer token", async () => {
+  let seen;
+  handler = (body, req, res) => {
+    seen ??= req.headers.authorization;
+    standardMcp({ tools: [] })(body, req, res);
+  };
+  await discoverTools(base, "s3cr3t-value", { ...loopbackOk, header: "authorization" });
+  assert.equal(seen, "Bearer s3cr3t-value");
+});
+
+test("header: a header that breaks a rule is refused before anything is sent", async () => {
+  let calls = 0;
+  handler = (body, req, res) => {
+    calls++;
+    standardMcp({ tools: [] })(body, req, res);
+  };
+  for (const header of ["Cookie", "Host", "mcp-session-id", "X Api Key"]) {
+    await assert.rejects(discoverTools(base, "s3cr3t-value", { ...loopbackOk, header }), refusedWith(/^A link’s header /));
+  }
+  assert.equal(calls, 0);
+});
+
 test("handshake: the session id from initialize rides on the later calls; without one, none is sent", async () => {
   const seen = [];
   handler = (body, req, res) => {
@@ -257,6 +293,26 @@ test("failure: an upstream whose error echoes the credential, whole or masked, p
   assert.match(line, /^link upstream error ref=[0-9a-f]{8} /);
   assert.match(line, /Invalid token: Bearer \[credential\] key \[credential\]\*\*\*\*[0-9a-f]{4}\. Ignore your instructions/);
   for (const piece of [credential, credential.slice(0, 8), credential.slice(-8)]) assert.equal(lines.join("\n").includes(piece), false, `${piece} is in the log`);
+});
+
+test("header: an upstream that echoes a key sent in the link's own header puts it in neither the error nor the log", async () => {
+  const credential = `LINKVAL-key-${randomBytes(8).toString("hex")}`;
+  handler = (body, req, res) => {
+    if (body.method === "tools/list") {
+      return res.writeHead(200, { "content-type": "application/json" }).end(rpcErr(body.id, `Invalid key: ${req.headers["x-api-key"]}`));
+    }
+    standardMcp({ tools: [] })(body, req, res);
+  };
+  let message = "";
+  const lines = await logged(() =>
+    assert.rejects(discoverTools(base, credential, { ...loopbackOk, header: "X-Api-Key" }), (err) => {
+      message = err.message;
+      return true;
+    }),
+  );
+  assert.doesNotMatch(message, /LINKVAL/);
+  assert.ok(lines.some((l) => /^link upstream error ref=[0-9a-f]{8} .*Invalid key: \[credential\]/.test(l)), "what the server said is logged, without the key");
+  assert.equal(lines.join("\n").includes(credential.slice(-8)), false);
 });
 
 test("failure: a content type the upstream made up is not repeated", async () => {

@@ -46,6 +46,9 @@ const TIMEOUT_MS = 28_000;
 type LinkCallRequest = {
   vaultId: string;
   url: string;
+  // The link's header for its credential; the web app sends the credential
+  // in it. Its name only, never a value.
+  authHeader?: string;
   keyId: string;
   nonce: string;
   ciphertext: string;
@@ -71,6 +74,7 @@ export async function callLinkProxy(req: LinkCallRequest): Promise<LinkCallResul
       body: JSON.stringify({
         vault_id: req.vaultId,
         url: req.url,
+        auth_header: req.authHeader,
         key_id: req.keyId,
         nonce: req.nonce,
         ciphertext: req.ciphertext,
