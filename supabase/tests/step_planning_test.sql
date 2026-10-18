@@ -4,8 +4,13 @@
 -- a claim rule. The rest of registration is work_plans_test.sql's and
 -- work_plan_gains_steps_test.sql's.
 --
--- Ana owns, Ben is an editor, Dee is not a member.
+-- Ana owns, Ben is an editor, Dee is not a member. `for` names a member by
+-- their short tag (20261017160000_plan_for_tag.sql, issue #378), so here
+-- their ids start unlike each other (the harness's all start 00000000).
 
+update t.ids set id = 'a0a0a0a0-0000-0000-0000-00000000000a' where name = 'ana';
+update t.ids set id = 'b0b0b0b0-0000-0000-0000-00000000000b' where name = 'ben';
+update t.ids set id = 'd0d0d0d0-0000-0000-0000-00000000000d' where name = 'dee';
 insert into auth.users (id, email) values
   (t.id('ana'), 'ana@example.test'), (t.id('ben'), 'ben@example.test'), (t.id('dee'), 'dee@example.test')
 on conflict (id) do update set email = excluded.email;
@@ -30,22 +35,23 @@ $$;
 create function t.has_plan(p_path text) returns text language sql as $$
   select count(*)::text from public.work_plans where vault_id = t.id('pf') and path = p_path
 $$;
+create function t.tag(p_name text) returns text language sql as $$ select left(t.id(p_name)::text, 8) $$;
 
 -- ---------------------------------------------------------------------------
 -- Stored from the registered version
 
 select t.write('plans/p.md', 'v1');
 select t.expect_ok('planning fields: a plan with all four registers', t.register('plans/p.md',
-  '[{"key":"a","title":"A","line":2,"due":"2020-01-31","priority":1,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
+  format('[{"key":"a","title":"A","line":2,"due":"2020-01-31","priority":1,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
     {"key":"b","title":"B","priority":"4","for":"people"},
-    {"key":"c","title":"C","for":"  ANA@Example.test "},
-    {"key":"d","title":"D"}]'));
+    {"key":"c","title":"C","for":"  %s "},
+    {"key":"d","title":"D"}]', upper(t.tag('ana')))));
 select t.expect('planning fields: a past due date, priority, notes and for are stored as given',
   (select row(s.due, s.priority, s.notes, s.for_kind, s.for_member)::text from t.step('plans/p.md', 'a') s),
   row('2020-01-31'::date, 1::smallint, E'Keep the raw file.\tTabs are fine.', 'agents', null::uuid)::text);
 select t.expect('planning fields: priority given as text is stored as a number',
   (select s.priority::text from t.step('plans/p.md', 'b') s), '4');
-select t.expect('planning fields: for an email stores the member''s user id, matched without case or spaces',
+select t.expect('planning fields: for a short tag stores the member''s user id, matched without case or spaces',
   (select s.for_kind || ' ' || s.for_member from t.step('plans/p.md', 'c') s), 'member ' || t.id('ana'));
 select t.expect('planning fields: a step with none stores none',
   (select row(s.due, s.priority, s.notes, s.for_kind, s.for_member)::text from t.step('plans/p.md', 'd') s), '(,,,,)');
@@ -58,17 +64,17 @@ select t.expect('planning fields: work_plan_status returns them',
 -- step's fields can't change, the same as its title.
 select t.write('plans/p.md', 'v2');
 select t.expect('planning fields: a registered step with a changed priority is refused', t.register('plans/p.md',
-  '[{"key":"a","title":"A","due":"2020-01-31","priority":2,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
-    {"key":"b","title":"B","priority":"4","for":"people"},{"key":"c","title":"C","for":"ana@example.test"},{"key":"d","title":"D"}]'),
+  format('[{"key":"a","title":"A","due":"2020-01-31","priority":2,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
+    {"key":"b","title":"B","priority":"4","for":"people"},{"key":"c","title":"C","for":"%s"},{"key":"d","title":"D"}]', t.tag('ana'))),
   'ERR 22023');
 select t.expect('planning fields: a registered step gaining a due date is refused', t.register('plans/p.md',
-  '[{"key":"a","title":"A","due":"2020-01-31","priority":1,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
-    {"key":"b","title":"B","priority":"4","for":"people"},{"key":"c","title":"C","for":"ana@example.test"},{"key":"d","title":"D","due":"2026-10-20"}]'),
+  format('[{"key":"a","title":"A","due":"2020-01-31","priority":1,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
+    {"key":"b","title":"B","priority":"4","for":"people"},{"key":"c","title":"C","for":"%s"},{"key":"d","title":"D","due":"2026-10-20"}]', t.tag('ana'))),
   'ERR 22023');
 select t.expect_ok('planning fields: a step added to a registered plan is stored with its fields', t.register('plans/p.md',
-  '[{"key":"a","title":"A","due":"2020-01-31","priority":1,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
-    {"key":"b","title":"B","priority":"4","for":"people"},{"key":"c","title":"C","for":"ana@example.test"},{"key":"d","title":"D"},
-    {"key":"e","title":"E","due":"2026-10-20","priority":3,"notes":"New","for":"ben@example.test"}]'));
+  format('[{"key":"a","title":"A","due":"2020-01-31","priority":1,"notes":"Keep the raw file.\tTabs are fine.","for":"agents"},
+    {"key":"b","title":"B","priority":"4","for":"people"},{"key":"c","title":"C","for":"%s"},{"key":"d","title":"D"},
+    {"key":"e","title":"E","due":"2026-10-20","priority":3,"notes":"New","for":"%s"}]', t.tag('ana'), t.tag('ben'))));
 select t.expect('planning fields: the added step''s fields are the registered version''s',
   (select row(s.due, s.priority, s.notes, s.for_kind, s.for_member)::text from t.step('plans/p.md', 'e') s),
   row('2026-10-20'::date, 3::smallint, 'New', 'member', t.id('ben'))::text);
@@ -95,11 +101,15 @@ select t.expect('planning fields: refused: notes over 2000 characters',
 select t.expect('planning fields: refused: notes with a line break',
   t.refused('{"key":"x","title":"X","notes":"one\ntwo"}'), 'ERR 22023 0');
 select t.expect('planning fields: refused: for naming someone not a member of the vault',
-  t.refused('{"key":"x","title":"X","for":"dee@example.test"}'), 'ERR 22023 0');
+  t.refused(format('{"key":"x","title":"X","for":"%s"}', t.tag('dee'))), 'ERR 22023 0');
 select t.expect('planning fields: refused: for naming no account',
-  t.refused('{"key":"x","title":"X","for":"nobody@example.test"}'), 'ERR 22023 0');
-select t.expect('planning fields: refused: for that is neither agents, people nor an email',
+  t.refused('{"key":"x","title":"X","for":"deadbeef"}'), 'ERR 22023 0');
+select t.expect('planning fields: refused: for that is neither agents, people nor a short tag',
   t.refused('{"key":"x","title":"X","for":"robots"}'), 'ERR 22023 0');
+select t.expect('for by tag: refused: for a member''s email',
+  t.refused('{"key":"x","title":"X","for":"ana@example.test"}'), 'ERR 22023 0');
+select t.expect('for by tag: refused: for an email that is no one''s',
+  t.refused('{"key":"x","title":"X","for":"nobody@example.test"}'), 'ERR 22023 0');
 
 create function t.refusal(p_steps jsonb) returns text language plpgsql as $$
 declare v_vault uuid := t.id('pf'); v_version uuid := t.version('plans/bad.md');
@@ -114,8 +124,14 @@ exception when others then
   return sqlerrm;
 end $$;
 select t.expect('planning fields: a refusal names the step and the line, never the value',
-  t.refusal('[{"key":"x","title":"X","line":7,"for":"dee@example.test"}]'),
-  'step "x" (line 7): for must be agents, people or the email of a member of this vault, and it names no member');
+  t.refusal(format('[{"key":"x","title":"X","line":7,"for":"%s"}]', t.tag('dee'))::jsonb),
+  'step "x" (line 7): for must be agents, people or the short tag of one member of this vault, and it names none');
+select t.expect('for by tag: an email is refused saying to use the tag, without looking it up',
+  t.refusal('[{"key":"x","title":"X","line":7,"for":"ana@example.test"}]'),
+  'step "x" (line 7): for can''t be an email; name the member by their short tag, the 8 characters shown beside their name');
+select t.expect('for by tag: the refusal of an email is the same whether it is a member''s or no one''s',
+  t.refusal('[{"key":"x","title":"X","line":7,"for":"nobody@example.test"}]'),
+  t.refusal('[{"key":"x","title":"X","line":7,"for":"ana@example.test"}]'));
 
 -- The table's own checks, for any writer that isn't register_work_plan.
 select t.expect('planning fields: the table refuses priority 5',

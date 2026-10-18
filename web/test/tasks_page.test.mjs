@@ -846,10 +846,13 @@ test("review gate: a task with a linked proposal links it, and the proposal's pa
 
 test("planning: a task row shows its priority as a word with its colour, its due date, who it is for and its notes as text", async () => {
   const [{ id: v }] = await as(NOA, "select public.create_vault('Tasks planning rows', 'open') as id");
-  await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, EDDA, NOA]);
+  // Fay's id starts unlike Noa's and Edda's: `for:` names her by its first 8 characters.
+  const FAY = "fa700000-0000-0000-0000-0000000055a4";
+  await sql("insert into auth.users (id, email) values ($1, 'fay@example.test') on conflict (id) do nothing", [FAY]);
+  await sql("select test_support.add_member($1, $2, 'editor', $3)", [v, FAY, NOA]);
   const path = "plans/rows.md";
   await register(NOA, v, path, [
-    { key: "hi", title: "Urgent one", priority: 1, due: "2999-01-01", for: "edda@example.test", notes: "<b>not markup</b> & kept" },
+    { key: "hi", title: "Urgent one", priority: 1, due: "2999-01-01", for: FAY.slice(0, 8), notes: "<b>not markup</b> & kept" },
     { key: "ag", title: "For agents", for: "agents" },
     { key: "pe", title: "For people", priority: 4, for: "people" },
   ]);
@@ -857,7 +860,7 @@ test("planning: a task row shows its priority as a word with its colour, its due
   const hi = taskRow(h, "hi");
   assert.match(hi, /<span class="task-prio p1" title="Priority 1, 1 is highest">P1<\/span>/);
   assert.match(hi, /Due <time datetime="2999-01-01">2999-01-01<\/time>/);
-  assert.match(hi, /<p class="task-meta"><span class="task-prio p1"[^>]*>P1<\/span> · <span class="task-due">Due <time datetime="2999-01-01">2999-01-01<\/time><\/span> · for edda@example\.test · &lt;b&gt;not markup&lt;\/b&gt; &amp; kept<\/p>/);
+  assert.match(hi, /<p class="task-meta"><span class="task-prio p1"[^>]*>P1<\/span> · <span class="task-due">Due <time datetime="2999-01-01">2999-01-01<\/time><\/span> · for fay@example\.test · &lt;b&gt;not markup&lt;\/b&gt; &amp; kept<\/p>/);
   assert.doesNotMatch(hi, /Overdue/);
   assert.match(taskRow(h, "ag"), /<p class="task-meta">for agents<\/p>/);
   assert.match(taskRow(h, "pe"), />P4<\/span>/);
