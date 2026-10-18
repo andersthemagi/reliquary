@@ -50,10 +50,10 @@ For a task with `gate: review`, the task is **Awaiting review** instead. If its 
 
 ## 6. Approve it (person)
 
-Open the vault's **Tasks**, then the plan. Tasks awaiting review come first.
+Open the vault's **Tasks**. Tasks waiting for you come first, under **Awaiting review**, each with its plan; the plan's own page lists them first too.
 
 - Check the work, choose **Approve** on the task, and confirm. Or, if its agent linked a proposal, approve that proposal in your **Inbox**: applying it approves the task too.
-- Not ready? **Not yet** on the confirm page leaves it as it is. To drop the task, choose **Cancel**; to let what waits on it go ahead without it, **Skip**.
+- Not ready? **Not yet** on the confirm page leaves it as it is. To drop the task, choose **Cancel** in its row's **⋯** menu; to let what waits on it go ahead without it, **Skip** in the same menu.
 
 Once approved, `page` and `emails` are ready, and the agents waiting in line get them.
 

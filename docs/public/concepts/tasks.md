@@ -83,7 +83,7 @@ The lease, the hold limit and how many tasks an agent may hold come from the vau
 
 ## The Tasks page
 
-Open **Tasks** in the vault's sidebar (on a phone, in the row of tabs). It opens on what is open across every plan in the vault, in up to four sections: **Awaiting review**, **In progress**, **Ready to pick up** and **Blocked**. Each task names its plan, linked. Within each section, the highest priority comes first, then the earliest due date; tasks with neither come last. Done and cancelled tasks stay on their plan's page.
+Open **Tasks** in the vault's sidebar (on a phone, in the section menu at the top). It opens on what is open across every plan in the vault, in up to four sections: **Awaiting review**, **In progress**, **Ready to pick up** and **Blocked**. Each task names its plan, linked. Within each section, the highest priority comes first, then the earliest due date; tasks with neither come last. Done and cancelled tasks stay on their plan's page.
 
 Under **Plans**, each plan is a card:
 
