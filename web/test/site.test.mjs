@@ -363,10 +363,10 @@ test("site legal: every legal page answers signed out on each instance, marked d
   }
 });
 
-test("site legal: facts not known yet are visible placeholders, not invented", async () => {
+test("site legal: the operator block names the Colorado Secretary of State ID and the postal address", async () => {
   const h = await text(A, "/terms");
-  assert.match(h, /<mark class="placeholder">\[to be filled: Colorado Secretary of State ID\]<\/mark>/);
-  assert.match(h, /<mark class="placeholder">\[to be filled: address\]<\/mark>/);
+  assert.match(h, /under ID 20238181121, 1500 N Grant St, Ste R, Denver, CO 80203, United States\./);
+  assert.doesNotMatch(h, /to be filled: (Colorado Secretary of State ID|address)/);
 });
 
 test("site legal: the operator is the Colorado LLC under Colorado law, with US state privacy rights, and what applies in Europe is one marked section of placeholders", async () => {

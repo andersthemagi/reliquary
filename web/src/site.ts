@@ -23,11 +23,11 @@ export const OPERATOR = {
   // Where the site lives when neither SITE_URL nor PUBLIC_URL is set
   // (links in the sitemap, canonical and Open Graph URLs).
   defaultOrigin: "https://reliquary.redmage.cc",
-  lastUpdated: "2026-10-13",
+  lastUpdated: "2026-10-18",
   legalName: "Memento Vivre Fine Arts LLC, doing business as Red Mage" as string | null, // the legal entity or sole trader's full name
   legalForm: "a single-member limited liability company" as string | null, // e.g. sole trader, limited company
-  registrationNumber: null as string | null, // the Colorado Secretary of State ID
-  address: null as string | null, // registered or postal address
+  registrationNumber: "20238181121" as string | null, // the Colorado Secretary of State ID
+  address: "1500 N Grant St, Ste R, Denver, CO 80203, United States" as string | null, // registered or postal address
   country: "Colorado, United States" as string | null, // country of establishment
   governingLaw: "the laws of the State of Colorado, United States, without regard to its conflict-of-laws rules, and disputes go to the state or federal courts in Denver, Colorado" as string | null, // law and courts for the terms
   supervisoryAuthority: null as string | null, // lead EU data protection authority, once offered in the EU
