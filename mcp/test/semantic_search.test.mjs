@@ -56,6 +56,21 @@ test("meaning: when the function is down, words still answer, a file not yet emb
   assert.match(r.text, /notes\/rates\.md/);
 });
 
+test("meaning: when the function refuses this server's secret, words still answer and the first line says the two secrets differ", async () => {
+  await functionAnswers(401);
+  let r;
+  try {
+    r = await search(MCP_SEM_URL, "rates");
+  } finally {
+    await functionAnswers(200);
+  }
+  assert.equal(r.isError, false);
+  const m = /^Search by meaning is unavailable right now \(The embedding function answered 401: its EMBED_SECRET and this server's differ; ref ([0-9a-f]{8})\)\. These results match words only\.$/.exec(r.text.split("\n")[0]);
+  assert.ok(m, r.text);
+  appendFileSync(SEM_REFS_FILE, `${m[1]}\n`);
+  assert.match(r.text, /notes\/rates\.md/);
+});
+
 test("meaning: once the function is back, the next search embeds what waited and finds it by meaning", async () => {
   const r = await search(MCP_SEM_URL, "what will it cost");
   assert.equal(r.isError, false);

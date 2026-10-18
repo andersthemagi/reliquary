@@ -83,6 +83,10 @@ async function embed(input: string[]): Promise<number[][]> {
     body: JSON.stringify({ input }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
+  // 401 is the one an operator causes: the secret was set in one place only.
+  if (res.status === 401) {
+    throw new Refusal({ status: 503, where: WHERE, why: "The embedding function answered 401: its EMBED_SECRET and this server's differ", code: "embed_secret" });
+  }
   if (!res.ok) throw new Refusal({ status: 503, where: WHERE, why: `The embedding function answered ${res.status}`, code: "embed_status" });
   const body = (await res.json().catch(() => null)) as { embeddings?: unknown } | null;
   const e = body?.embeddings;
@@ -131,5 +135,24 @@ export async function queryVector(c: pg.PoolClient, vault: string, query: string
       vector: null,
       note: `Search by meaning is unavailable right now (${f.why.replace(/\.$/, "")}; ref ${f.ref}). These results match words only.`,
     };
+  }
+}
+
+// GET /healthz?embed=1 (server.ts, scripts/deploy-check.sh): whether search
+// by meaning works here, without a vault. "off" when it isn't set up, "ok"
+// when the function embedded a fixed text, otherwise why not, in words this
+// file wrote (never the secret or a response body). An "ok" is kept a
+// minute, so the probe can't be used to keep the function busy; a failure
+// isn't, so a fixed secret shows at once.
+let probedOk = 0;
+export async function probe(): Promise<string> {
+  if (!URL_) return "off";
+  if (Date.now() - probedOk < 60_000) return "ok";
+  try {
+    await embed(["Reliquary health check"]);
+    probedOk = Date.now();
+    return "ok";
+  } catch (err) {
+    return err instanceof Refusal ? err.message : "The embedding function couldn't be reached";
   }
 }

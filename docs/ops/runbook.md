@@ -739,27 +739,54 @@ stateless and checks one shared secret, `EMBED_SECRET`; the MCP server
 holds the same value and `EMBED_URL`. Nothing deploys the function on a
 release: it changes rarely, and deploying it is a step by hand.
 
-**First deploy** (in your own terminal; nothing here prints the secret):
+**First deploy** (in your own terminal). Nothing here prints the secret,
+but two things went wrong on 2026-10-17 and 18, so the steps guard both:
+`npx` printed a command line holding the secret into a terminal that was
+then pasted into a chat (rotate it if that happens), and the secret reached
+Netlify for Production only, so the deploy's draft started without it.
 
 1. `./supabase/functions/smoke.sh`: the function in the real edge runtime,
    with the real model (needs the network). It must end `smoke: ok`.
-2. `scripts/netlify-env.sh mcp https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc`:
-   makes `supabase/.embed-secret` if it isn't there, and writes
-   `EMBED_URL`, `EMBED_SECRET` and `EMBED_REGION` into
-   `supabase/.netlify-mcp.env` with the rest.
-3. `supabase secrets set --project-ref <ref> EMBED_SECRET="$(cat supabase/.embed-secret)"`
-4. `supabase functions deploy embed --project-ref <ref> --no-verify-jwt`
-   (`supabase/config.toml` also turns the JWT check off: the function
-   checks its own secret).
-5. Import `supabase/.netlify-mcp.env` into the `reliquary-mcp` site and
-   redeploy it (or let the next release do it).
+2. `scripts/netlify-env.sh embed`: makes `supabase/.embed-secret` if it
+   isn't there, and writes only `EMBED_URL`, `EMBED_SECRET` and
+   `EMBED_REGION` to `supabase/.netlify-mcp-embed.env`. Not `mcp`: that
+   rewrites every variable, and without `supabase/.link-proxy-secret` it
+   makes a new `LINK_PROXY_SECRET`, breaking link calls until both sites
+   have it.
+3. The secret to Supabase, kept off the command line and out of the output:
 
-**Check:** a `search` over MCP in a vault with files answers without a
-first line starting `Search by meaning is unavailable`. If it has one, its
-ref is in the Netlify function log (`failure ref=...`, where
-`embedding function`); a `401` there means the two secrets differ. The
-function's own log is in the Supabase dashboard, Edge Functions, `embed`;
-it never holds text or the secret.
+   ```bash
+   export NPM_CONFIG_LOGLEVEL=warn
+   s="$(cat supabase/.embed-secret)"
+   npx -y supabase secrets set --project-ref <ref> --env-file <(printf 'EMBED_SECRET=%s\n' "$s") 2>&1 | sed "s/$s/<redacted>/g"
+   unset s
+   ```
+
+   It must say it finished setting secrets. Don't hide its output: a
+   failure hidden here looked like success on 2026-10-18.
+4. `npx -y supabase functions deploy embed --project-ref <ref> --no-verify-jwt --use-api`
+   (`supabase/config.toml` also turns the JWT check off: the function
+   checks its own secret; `--use-api` builds without a local container).
+5. In Netlify, `reliquary-mcp`, **Site configuration**, **Environment
+   variables**, **Import from a .env file**: paste the file's three lines,
+   tick **Contains secret values**, and give them **a value for every
+   deploy context**, as `LINK_PROXY_SECRET` has. The deploy smoke-tests a
+   draft before publishing it; a variable set for Production only is
+   missing there, and `EMBED_URL` without `EMBED_SECRET` stops the server
+   from starting. Then delete the file; keep `supabase/.embed-secret`.
+6. Redeploy: `gh workflow run deploy.yml --ref main -f tag=<the live release>`.
+
+**Check:** the deploy's last line is `PASS  mcp search by meaning (ok)`.
+Any other answer is a warning, not a failure (search still answers by
+words), with why: `its EMBED_SECRET and this server's differ` (the two
+copies don't match: redo step 3, or step 5 for every context), `couldn't
+be reached`, or the status the function gave. By hand:
+`curl https://mcp.reliquary.redmage.cc/healthz?embed=1` (add `-H
+"x-keepalive: ..."` when `KEEPALIVE_TOKEN` is set). A search that falls
+back says so on its first line with a ref that is in the Netlify function
+log (`failure ref=...`, where `embedding function`). The function's own
+log is in the Supabase dashboard, Edge Functions, `embed`; it never holds
+text or the secret.
 
 **Turning it off:** remove `EMBED_URL` from the `reliquary-mcp` site and
 redeploy: search goes back to words, silently. Queued files wait in
@@ -820,7 +847,7 @@ The sample's first run, 2026-10-17: words 3 of 12 first, words and meaning
 | `SESSION_SECRET` (web) | `supabase/.web-session-secret`; Netlify | delete the file, run `netlify-env.sh web ...`, update Netlify, redeploy | everyone is signed out of the web UI once; CLI and connectors unaffected |
 | `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Netlify; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values and link credentials are re-encrypted loses them |
 | `LINK_PROXY_SECRET` (web and mcp, the same value on both) | `supabase/.link-proxy-secret`; Netlify (both sites) | rewrite the file, `scripts/netlify-env.sh web ...` and `scripts/netlify-env.sh mcp ...`, redeploy both at once (a mismatch refuses every proxied link call with 401 until both are live) | proxied `<link>.<tool>` calls fail (401) between the two deploys; nothing else |
-| `EMBED_SECRET` (mcp, and the `embed` function) | `supabase/.embed-secret`; Netlify (`reliquary-mcp`); Supabase function secrets | delete the file, run `scripts/netlify-env.sh mcp ...`, `supabase secrets set ... EMBED_SECRET="$(cat supabase/.embed-secret)"`, then import into Netlify and redeploy mcp | search answers by words, saying search by meaning is unavailable, between the two steps; nothing else |
+| `EMBED_SECRET` (mcp, and the `embed` function) | `supabase/.embed-secret`; Netlify (`reliquary-mcp`); Supabase function secrets | delete the file, then steps 2, 3, 5 and 6 of "Search by meaning" (`netlify-env.sh embed`, the Supabase secret, the Netlify import for every context, a redeploy) | search answers by words, saying the two secrets differ, between the Supabase and Netlify steps; nothing else |
 | `postgres` password | `supabase/.db-password`; GitHub secret `SUPABASE_DB_PASSWORD` | reset in the dashboard, rewrite the file, `tr -d '[:space:]' < supabase/.db-password \| gh secret set SUPABASE_DB_PASSWORD` | migrations and backups need the new one |
 | A person's agent token or connection | database | Connections page, Revoke | stops within one request |
 

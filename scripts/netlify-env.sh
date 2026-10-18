@@ -40,6 +40,14 @@
 #   scripts/netlify-env.sh new-variables-key       a new current key; then `web`
 #   scripts/netlify-env.sh drop-variables-key <id> after re-encrypting; then `web`
 #   scripts/netlify-env.sh variables-keys          the key ids, current first
+#
+# Search by meaning (docs/ops/runbook.md, "Search by meaning") only needs
+# its three variables on the mcp site, and `mcp` rewrites them all (with a
+# new LINK_PROXY_SECRET if supabase/.link-proxy-secret is missing, which
+# would break link calls until both sites have it). So:
+#
+#   scripts/netlify-env.sh embed   writes only EMBED_URL, EMBED_SECRET and
+#                                  EMBED_REGION to supabase/.netlify-mcp-embed.env
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
@@ -58,6 +66,21 @@ case ${1:-} in
     ;;
   variables-keys)
     scripts/variables-keys.sh list
+    exit 0
+    ;;
+  embed)
+    source scripts/lib/supabase-env.sh
+    if [[ ! -s supabase/.embed-secret ]]; then
+      head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > supabase/.embed-secret
+      echo "Made supabase/.embed-secret: a new value, so set it in Supabase too (runbook step 3)."
+    fi
+    out=supabase/.netlify-mcp-embed.env
+    printf 'EMBED_URL=https://%s.supabase.co/functions/v1/embed\nEMBED_SECRET=%s\nEMBED_REGION=eu-central-1\n' \
+      "$ref" "$(cat supabase/.embed-secret)" > "$out"
+    chmod 600 "$out"
+    echo "Wrote $out (mode 600, gitignored). Names only:"
+    cut -d= -f1 "$out" | sed "s/^/  /"
+    echo "Import it into the mcp site with a value for every deploy context, then delete it (docs/ops/runbook.md, \"Search by meaning\")."
     exit 0
     ;;
 esac
