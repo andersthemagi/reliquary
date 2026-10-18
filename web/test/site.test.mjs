@@ -369,6 +369,16 @@ test("site legal: the operator block names the Colorado Secretary of State ID an
   assert.doesNotMatch(h, /to be filled: (Colorado Secretary of State ID|address)/);
 });
 
+test("site legal: the terms name a copyright agent, what a notice and a counter-notice need, and that repeat infringers lose access", async () => {
+  const terms = await text(A, "/terms");
+  const sec = terms.slice(terms.indexOf('<h2 id="copyright">'), terms.indexOf("<h2>Fees</h2>"));
+  assert.match(sec, /designated agent: Andrés, Memento Vivre Fine Arts LLC, doing business as Red Mage, 1500 N Grant St/);
+  assert.match(sec, /<mark class="placeholder">\[to be filled: copyright agent phone\]<\/mark>/);
+  assert.match(sec, /under penalty of perjury/);
+  assert.match(sec, /counter-notice/);
+  assert.match(sec, /infringe repeatedly/);
+});
+
 test("site legal: the operator is the Colorado LLC under Colorado law, with US state privacy rights, and what applies in Europe is one marked section of placeholders", async () => {
   const terms = await text(A, "/terms");
   assert.match(terms, /Memento Vivre Fine Arts LLC, doing business as Red Mage, a single-member limited liability company registered in Colorado, United States/);

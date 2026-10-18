@@ -72,6 +72,11 @@ when the repo shows them done; the rest are the owner's to confirm.
    - Check: sign in by code, and invite an address you own.
 8. **Legal placeholders** in `OPERATOR` in `web/src/site.ts`, and a legal
    review before the "Draft" labels come off.
+9. **Copyright agent** (#444): register yourself as the DMCA designated
+   agent at `dmca.copyright.gov` ($6, renew every 3 years), then put the
+   phone you registered in `copyrightAgentPhone` in `OPERATOR`. The terms'
+   "Copyright complaints" section names the agent; the safe harbour only
+   holds once the registration does.
 
 ## Before the next key rotation
 

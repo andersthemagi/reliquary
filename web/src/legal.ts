@@ -62,6 +62,19 @@ ${operatorBlock()}
 <h2>Acceptable use</h2>
 <p>Don't use Reliquary to break the law, to store content you have no right to, to attack or probe the service or other customers (except under our <a href="/security#disclosure">disclosure policy</a>), or to get around its limits. Don't store health data or payment card data: Reliquary isn't built or certified for them. Don't use Reliquary where United States sanctions or export controls forbid it.</p>
 
+<h2 id="copyright">Copyright complaints</h2>
+<p>If you believe content in Reliquary infringes your copyright, send a notice to our designated agent: ${OPERATOR.person}, ${fill("legalName", "legal name")}, ${fill("address", "address")}; phone ${fill("copyrightAgentPhone", "copyright agent phone")}; ${mail(OPERATOR.contactEmail)}. The notice must include:</p>
+<ul>
+  <li>your physical or electronic signature, as the owner or someone authorised to act for them;</li>
+  <li>the work you say is infringed;</li>
+  <li>the content you say infringes it, and enough to find it (the vault and the file path, or a link);</li>
+  <li>your name, address, phone and email;</li>
+  <li>a statement that you believe in good faith the use isn't authorised by the owner, its agent or the law;</li>
+  <li>a statement, under penalty of perjury, that the notice is accurate and that you're the owner or authorised to act for them.</li>
+</ul>
+<p>We remove or disable the content and tell the vault's owners. If you think we removed your content by mistake, send the agent a counter-notice: your signature, the content and where it was, a statement under penalty of perjury that it was removed by mistake or misidentification, and your name, address and phone, with your consent to the jurisdiction of the federal court for your address (or, outside the United States, any court where we may be found) and to accept service from the person who sent the notice. We pass it to them, and restore the content in 10 to 14 business days unless they tell us they've gone to court.</p>
+<p>We close the accounts of people who infringe repeatedly. Notices are for copyright only; anything else goes to ${mail(OPERATOR.contactEmail)}.</p>
+
 <h2>Fees</h2>
 <p>Reliquary is free while in alpha. Before any fee applies to you, we'll tell you the price and give you ${fill("feeNoticeDays", "notice period")} to decide; you can export and leave at any time.</p>
 <p>Your plan sets how many vaults you own, and each vault's tier how many people and how much storage it holds (<a href="/docs/concepts/plans-and-limits">Plans and limits</a>). If a plan gets smaller, nothing is deleted: a vault over a limit keeps everything and takes nothing new until it is under.</p>

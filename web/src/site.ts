@@ -42,6 +42,7 @@ export const OPERATOR = {
   hostingLogRetention: null as string | null, // how long the host keeps request logs
   disclosureResponse: "5 business days" as string | null, // how soon a security report is acknowledged
   minimumAge: "18" as string | null,
+  copyrightAgentPhone: null as string | null, // the DMCA agent's phone, as registered with the US Copyright Office (#444)
 };
 
 // A config value, or a visible placeholder naming what goes there.
