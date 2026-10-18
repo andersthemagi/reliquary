@@ -222,6 +222,13 @@ select t.expect('calls: the viewer reads nothing',
   t.run('cal', format($q$select count(*)::text from public.link_calls where link_id = %L$q$, t.id('lk1'))), '0');
 select t.expect('calls: an outsider reads nothing',
   t.run('dee', format($q$select count(*)::text from public.link_calls where link_id = %L$q$, t.id('lk1'))), '0');
+-- Keep is Ana's other vault; Ben edits Gone, not Keep.
+insert into public.link_calls (link_id, vault_id, actor, tool_name, outcome)
+values (gen_random_uuid(), t.id('keep'), t.id('ana'), 'keep_tool', 'ok');
+select t.expect('calls: an editor of one vault reads none of another vault''s calls',
+  t.run('ben', $q$select count(*)::text from public.link_calls where tool_name = 'keep_tool'$q$), '0');
+select t.expect('calls: an editor reads only their own vault''s calls, whatever the query asks',
+  t.run('ben', format($q$select string_agg(distinct vault_id::text, ',') from public.link_calls$q$)), t.id('gone')::text);
 select t.expect('calls: nobody in authenticated may insert one directly',
   t.run('ana', format($q$insert into public.link_calls (link_id, vault_id, tool_name, outcome) values (%L, %L, 'x', 'ok') returning 1$q$,
     t.id('lk1'), t.id('gone'))), 'ERR 42501');
