@@ -269,7 +269,12 @@ export function registerVaultFileTools(
         const { vector, note } = await queryVector(c, vault, query);
         const rows = await searchHits(c, vault, query, limit ?? 10, vector);
         const lead = note ? [note] : [];
-        if (rows.length === 0) return ok([...lead, "No matches."].join("\n"));
+        if (rows.length === 0) {
+          // For the vault's owners (20261017140000_missed_searches.sql): the
+          // words and that an agent searched, never which one.
+          await c.query(`select private.note_missed_search(v.id, $2) from ${VAULT_REF}`, [vault, query]);
+          return ok([...lead, "No matches."].join("\n"));
+        }
         const nonce = freshNonce(rows.flatMap((h) => [h.path, h.agent, ...h.lines]));
         const out = [
           ...lead,

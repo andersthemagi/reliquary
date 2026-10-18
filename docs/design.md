@@ -201,6 +201,7 @@ Five jobs:
 | Reveal a variable's value in the UI | if granted | if granted | no | never |
 | Manage members, grants, emergency access | yes | no | no | never |
 | Export, configure git mirror | yes | no | no | never |
+| See and clear searches that found nothing, set how long they are kept | yes, in person | no | no | never |
 
 ### Delegation: agents act as their person, with a ceiling
 

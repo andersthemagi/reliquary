@@ -349,6 +349,8 @@ export async function search(ctx: Ctx, id: string): Promise<Reply> {
     if (!v) return null;
     const terms = queryTerms(query);
     const rows = query ? (await c.query(`select s.path, s.policy, ${LINES_SQL} from public.search($1, $2, 30) s`, [id, query, terms])).rows : [];
+    // For the vault's owners (20261017140000_missed_searches.sql): the words, never who.
+    if (query && rows.length === 0) await c.query(`select private.note_missed_search($1, $2)`, [id, query]);
     const everywhere = `/search${query ? `?q=${q(query)}` : ""}`;
     const body = html`
       ${pageHeader({
