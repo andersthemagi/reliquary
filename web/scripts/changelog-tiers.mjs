@@ -44,9 +44,13 @@ const ONE_LINE = [
 // empty when there is none, or it only says there is none.
 export function releaseNote(body) {
   const m = /^##[ \t]+Release note[^\n]*\n([\s\S]*?)(?=^##[ \t]|$(?![\s\S]))/im.exec((body ?? "").replace(/\r\n?/g, "\n"));
-  // Until nothing changes: one pass over "<!<!-- -->-- x -->" leaves a new "<!--".
+  // Until no "<!--" is left: one regex pass over "<!<!-- -->-- x -->" leaves
+  // a new one. An unclosed comment runs to the end.
   let note = m?.[1] ?? "";
-  for (let prev; prev !== note; ) [prev, note] = [note, note.replace(/<!--[\s\S]*?-->/g, "")];
+  for (let i; (i = note.indexOf("<!--")) !== -1; ) {
+    const end = note.indexOf("-->", i + 4);
+    note = note.slice(0, i) + (end === -1 ? "" : note.slice(end + 3));
+  }
   note = note.trim();
   return /^(none|n\/a|-|no)\.?$/i.test(note) ? "" : note;
 }
