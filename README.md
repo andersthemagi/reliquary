@@ -27,12 +27,12 @@ Agents propose, people approve, and secrets never reach a model.
 <a href="https://reliquary.redmage.cc/roadmap"><img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="status: alpha"></a>
 </p>
 
-<p align="center"><img src="web/public/img/reel.gif" width="720" alt="The core loop: a proposal from Claude Code waits in the Inbox, the person opens the diff and approves it, the file is canon, and the log says who did what"></p>
+<p align="center"><img src="web/public/img/reel.gif" width="720" alt="The core loop: a proposal from Claude Code waits in the Inbox, the person opens the diff and approves it, the file is canon, and Updates says who did what"></p>
 
 <p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="web/public/img/variables-dark.webp">
-  <img width="720" alt="The Variables page: four variable names across development, preview and production, with who set each and when, and never a value" src="web/public/img/variables-light.webp">
+  <img width="720" alt="The Variables page: four variable names across development, preview and production, each Set or Not set, with what is missing where, and never a value" src="web/public/img/variables-light.webp">
 </picture>
 </p>
 
