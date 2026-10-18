@@ -4,6 +4,22 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.5.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.2...cli-v0.5.0) (2026-10-18)
+
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
+
+The CLI points you to what you meant: a mistyped command or option gets a suggestion, a wrong `--vault` lists the vaults you can reach, and every command in the help has an example.
+
+### New
+
+#### Suggest the command or option you meant, list your vaults on a wrong --vault, and add vaults --json ([#401](https://github.com/andersthemagi/reliquary/issues/401))
+
+The CLI suggests the command or option you probably meant, lists the vaults you can reach when `--vault` names none, and `reliquary vaults --json` prints your vaults as JSON.
+
+### Fixes
+
+- The help shows an example for every command, and an option before the command says where it goes ([#425](https://github.com/andersthemagi/reliquary/issues/425))
+
 ## [0.4.2](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.1...cli-v0.4.2) (2026-10-09)
 
 
