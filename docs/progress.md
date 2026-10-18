@@ -321,9 +321,17 @@ Connections page already meant, `docs(design) 35d5078`). Done so far:
   credential. The table's check is `NOT VALID`: a link saved before keeps
   its url, and its next edit must give one that passes.
 
-Not built: rediscovering a link's tools by hand (`web/src/discovery.ts`'s
-own header: today, retrying a failed discovery means deleting and
-re-adding the link).
+- Replace credential and Refresh tools (2026-10-18, issue #439,
+  `20261018120000_link_replace_credential.sql`, `web/src/linkspage.ts`;
+  tests in `supabase/tests/links_test.sql` and
+  `web/test/links_page.test.mjs`): rotating a key or picking up an
+  upstream's new tools used to mean deleting and re-adding the link, which
+  wiped its grants and split its call history across two ids. Now an
+  owner, in person, replaces the credential in place
+  (`replace_link_credential`, logged as `link.credential` without the
+  value) or rediscovers with the stored one (`link_credential_for_discovery`
+  hands it back still sealed, opened only in the web app); both go through
+  `set_link_tools`, which already kept an owner's grants on a second run.
 
 ## Alongside milestone 3: path ownership
 

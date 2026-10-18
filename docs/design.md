@@ -1447,9 +1447,9 @@ Open questions this doesn't resolve:
 - Key rotation for `link_secrets`: answered (2026-10-09), it reuses
   `VARIABLES_KEYS`'s rotation as it stands
   (`20261009120040_link_secrets_rotation.sql`: `rotate-variables-key.sh`
-  moves link credentials with the values). Still open: does a compromised
-  upstream credential need same-day replacement without deleting and
-  re-adding the link?
+  moves link credentials with the values). A compromised upstream
+  credential is replaced in place, without deleting and re-adding the
+  link (2026-10-18, issue #439, `20261018120000_link_replace_credential.sql`).
 
 ## Routines
 
