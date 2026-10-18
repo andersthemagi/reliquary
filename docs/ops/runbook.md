@@ -95,9 +95,14 @@ volume before buying more.
   possible. See `AGENTS.md`'s Conventions section.
 - **Before merging a release PR, read its `CHANGELOG.md` as a person who
   wasn't in the room would.** release-please only ever emits the raw
-  commit subject per entry; dedupe anything doubled (see above), and add a
-  one- or two-sentence plain-language summary above the bullets for that
-  version. This is the *pending* section (nothing below it is released
+  commit subject per entry; the release workflow then rewrites the pending
+  section in tiers (`web/scripts/changelog-tiers.mjs`): breaking changes,
+  then New and Changed, each with its PR's `## Release note` under a
+  heading, then one line for everything else. A feature that deserves a
+  paragraph but sits in **Smaller changes** had no note: add one to that
+  PR's description (the next push to `main` picks it up), or write it here.
+  Dedupe anything doubled (see above), and add a one- or two-sentence
+  plain-language summary for that version below its heading. This is the *pending* section (nothing below it is released
   yet), so it's not the "never edit a released entry" rule in
   `AGENTS.md`'s Conventions: edit the file directly on the release PR's
   branch and push, then `gh api repos/:owner/:repo/pulls/:n -X PATCH -f

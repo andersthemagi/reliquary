@@ -4,6 +4,10 @@
 
 <!-- The job this does, not just what changed. -->
 
+## Release note
+
+<!-- For the changelog, to someone who uses Reliquary. A small fix or tweak: leave this empty; the PR title is its one line. A new feature, a change to how something works, or anything breaking: a short paragraph on what they can do now, what is different, and what to do about it. Start with "Changed:" when existing behaviour changes. -->
+
 ## Issue
 
 <!-- One line. "Closes #N" if merging finishes the issue; "Part of #N" if it is one step (then say here what is left); "No issue: <why>" for a dependency bump, a docs fix or a bug found on the way. CI fails the PR without one. -->

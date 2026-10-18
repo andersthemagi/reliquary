@@ -273,6 +273,12 @@ like `CL-3.9` only after it, if at all.
     commit whose subject a person reading the changelog understands
     ("feat(web): export a vault as .tar.gz", not "feat: wip"); `feat` bumps
     the minor, the others the patch;
+  - how much an entry says matches how much it changes: a new feature, a
+    change to how something works or a breaking change gets a short
+    paragraph under the PR description's `## Release note`, and the
+    changelog shows it under its own heading (`web/scripts/changelog-tiers.mjs`,
+    run by the release workflow); a small fix leaves it empty and stays one
+    line. Start the note with `Changed:` when existing behaviour changes;
   - `chore`, `test`, `ci`, `refactor`, `docs` and merge commits are left out
     of the changelog and release nothing on their own;
   - a breaking change to an MCP tool, the CLI, the env API or anything else

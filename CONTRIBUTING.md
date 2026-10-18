@@ -83,7 +83,11 @@ for working on the code.
   (see AGENTS.md's Testing section for exactly when).
 - Follow [conventional commits](https://www.conventionalcommits.org/)
   (`feat(web): ...`, `fix(mcp): ...`) for your **PR title**, the line that
-  becomes the changelog entry. CI checks it on open and on edit.
+  becomes the changelog entry. CI checks it on open and on edit. A new
+  feature, a change to how something works or a breaking change also gets
+  a short **Release note** in the description (the template has the spot):
+  the changelog shows it under its own heading, while a small fix stays one
+  line.
 - Say which issue the PR is for, on a line of its own in the description:
   `Closes #N` (merging finishes it), `Part of #N`, or `No issue: <why>` for
   a small fix nobody filed. CI checks that too; the PR template has the spot.
