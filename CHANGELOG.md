@@ -8,37 +8,64 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.25.0](https://github.com/andersthemagi/reliquary/compare/v0.24.0...v0.25.0) (2026-10-18)
 
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
 
-### Features
+### New
 
-* **cli:** suggest the command or option you meant, list your vaults on a wrong --vault, and add vaults --json ([#401](https://github.com/andersthemagi/reliquary/issues/401)) ([64ac4c4](https://github.com/andersthemagi/reliquary/commit/64ac4c469d008ebffefaf29b19ad4bc5df860899))
-* **files:** see which files refer to each other ([#394](https://github.com/andersthemagi/reliquary/issues/394)) ([59a6eeb](https://github.com/andersthemagi/reliquary/commit/59a6eeb4d3cbc9075c37514a34e97f552c174670))
-* **plugin:** a Claude Code plugin that connects to Reliquary and briefs you on what changed ([#391](https://github.com/andersthemagi/reliquary/issues/391)) ([e4a6949](https://github.com/andersthemagi/reliquary/commit/e4a6949d11e6f90e687c7662c2377a789750b7c2))
-* **plugin:** a how-to and agent guidance for keeping call and meeting notes in a vault ([#411](https://github.com/andersthemagi/reliquary/issues/411)) ([fd7486b](https://github.com/andersthemagi/reliquary/commit/fd7486bc6a49c76d54cf8024f617e49f376d6480))
-* **plugin:** the Claude Code skill tells agents to search first and follow related files ([#416](https://github.com/andersthemagi/reliquary/issues/416)) ([61e87e3](https://github.com/andersthemagi/reliquary/commit/61e87e35841ba363d3d611a897df9e9bbf5dc0f1))
-* **release:** the changelog gives new, changed and breaking work a heading and a note ([#434](https://github.com/andersthemagi/reliquary/issues/434)) ([e4945e6](https://github.com/andersthemagi/reliquary/commit/e4945e69b3c41692faafb6c6a27bf73e95d2707e))
-* **search:** find files by meaning, not only by shared words ([#396](https://github.com/andersthemagi/reliquary/issues/396)) ([4b9d43a](https://github.com/andersthemagi/reliquary/commit/4b9d43a9240752fdb661d5d6a0b3a0b47ca66f98))
-* **search:** vault owners see which searches found nothing ([#429](https://github.com/andersthemagi/reliquary/issues/429)) ([32dd1c1](https://github.com/andersthemagi/reliquary/commit/32dd1c175f6cc7226ed2e8ddf40c6efe7718d29e))
-* **web:** New file warns when a path has no extension or has spaces ([#417](https://github.com/andersthemagi/reliquary/issues/417)) ([75a30ab](https://github.com/andersthemagi/reliquary/commit/75a30abf4747d0a7453ecc776e03e6079e0e4517))
-* **web:** one-click install for VS Code on the Connect page ([#421](https://github.com/andersthemagi/reliquary/issues/421)) ([9bf67bf](https://github.com/andersthemagi/reliquary/commit/9bf67bf0c85ebaf73a166757f97026494dabbb7c))
-* **web:** search results show the lines that matched, not the start of the file ([#400](https://github.com/andersthemagi/reliquary/issues/400)) ([7b41184](https://github.com/andersthemagi/reliquary/commit/7b411849e0f122a054b452c1a3a65897b553d04a))
-* **web:** Threads shows which threads have unread messages ([#431](https://github.com/andersthemagi/reliquary/issues/431)) ([e11d169](https://github.com/andersthemagi/reliquary/commit/e11d169c62e566df91858169de560268e0f36ebc)), closes [#371](https://github.com/andersthemagi/reliquary/issues/371)
+#### Suggest the command or option you meant, list your vaults on a wrong --vault, and add vaults --json ([#401](https://github.com/andersthemagi/reliquary/issues/401))
 
+The CLI suggests the command or option you probably meant, lists the vaults you can reach when `--vault` names none, and `reliquary vaults --json` prints your vaults as JSON.
 
-### Bug fixes
+#### See which files refer to each other ([#394](https://github.com/andersthemagi/reliquary/issues/394))
 
-* **cli:** the help shows an example for every command, and an option before the command says where it goes ([#425](https://github.com/andersthemagi/reliquary/issues/425)) ([77d3a69](https://github.com/andersthemagi/reliquary/commit/77d3a697065462b4b640bc5acb02757a7423bf6a))
-* **dev:** dev.sh lists every subcommand and prints usage before creating .env.dev ([#414](https://github.com/andersthemagi/reliquary/issues/414)) ([89bdf6a](https://github.com/andersthemagi/reliquary/commit/89bdf6afaa3c9676145f4b64a5eead9deb62095c))
-* **mcp:** a plan names a member by tag, never by email ([#432](https://github.com/andersthemagi/reliquary/issues/432)) ([83561a8](https://github.com/andersthemagi/reliquary/commit/83561a81e9122b8695cf37d631e5b822823a09b2))
-* **sql:** a held step is released, not deleted, when its holder leaves the vault ([#428](https://github.com/andersthemagi/reliquary/issues/428)) ([48a9346](https://github.com/andersthemagi/reliquary/commit/48a93460ac5862b584f999601ba24647e898518d))
-* **web:** invite email test no longer aims its unreachable Resend at a reusable port ([#426](https://github.com/andersthemagi/reliquary/issues/426)) ([6f6dea7](https://github.com/andersthemagi/reliquary/commit/6f6dea7fc71a327f370cd09cf6781be1f66f6b45))
-* **web:** landing page says what Reliquary is in one line ([#423](https://github.com/andersthemagi/reliquary/issues/423)) ([c4c9015](https://github.com/andersthemagi/reliquary/commit/c4c9015681b9839cc39aabe3f39249733662dadb))
-* **web:** screen readers name Members buttons, feedback hints and empty states ([#402](https://github.com/andersthemagi/reliquary/issues/402)) ([a202b27](https://github.com/andersthemagi/reliquary/commit/a202b27bd6a668b649b1465b70bb4085ff4ee2d6))
+Reliquary now keeps track of which files refer to each other, through `[[path]]` references and Markdown links to `.md` files. A file's page lists its **References** and what it is **Referenced by**, and agents get the same with the new `related_files` tool.
 
+#### A Claude Code plugin that connects to Reliquary and briefs you on what changed ([#391](https://github.com/andersthemagi/reliquary/issues/391))
+
+There is a Reliquary plugin for Claude Code: `claude plugin marketplace add andersthemagi/reliquary`, then `claude plugin install reliquary@reliquary`. It connects Claude Code to Reliquary, teaches it how to work in a vault, briefs you on what changed when a session starts in a project linked to a vault, and reminds you to propose an update after `git push`.
+
+#### Find files by meaning, not only by shared words ([#396](https://github.com/andersthemagi/reliquary/issues/396))
+
+Agents' `search` now finds files by meaning as well as by shared words: asking "what are you charging" finds a pricing note that talks about seats and plans. It runs on Supabase's built-in model, with no third-party AI provider and no key to set up. If it is unavailable, search answers by words and says so on its first line. Self-hosting: the database image is now `pgvector/pgvector:0.8.2-pg17-trixie`, and search by meaning is the optional `embed` compose profile.
+
+#### Vault owners see which searches found nothing ([#429](https://github.com/andersthemagi/reliquary/issues/429))
+
+Vault owners can see what people and agents searched for and didn't find, under **Settings**, **General**, **Searches that found nothing**: a gap in the vault, or words it uses differently. It keeps the words, whether a person or an agent searched, and when, never who. Entries are kept 30 days unless an owner changes it (1 to 365), and only owners see or clear them.
+
+#### Search results show the lines that matched, not the start of the file ([#400](https://github.com/andersthemagi/reliquary/issues/400))
+
+Search results in the web app now show up to three lines that contain your words, with the words highlighted, instead of the start of each file.
+
+#### Threads shows which threads have unread messages ([#431](https://github.com/andersthemagi/reliquary/issues/431))
+
+The **Threads** page marks a thread **Unread** when someone else, or an agent (your own included), has posted since you last opened it. What you have read is yours alone: no other member and no agent can see it.
+
+### Changed
+
+#### A plan names a member by tag, never by email ([#432](https://github.com/andersthemagi/reliquary/issues/432))
+
+In a work plan, `for:` now names a member by their short tag, the 8 characters shown beside their name (`for: 3fa85f64`), instead of their email, so plan files no longer carry addresses to agents. Plans already registered keep working. Registering a file whose `for:` line still holds an email is refused until it uses the tag.
+
+### Smaller changes
+
+- A how-to and agent guidance for keeping call and meeting notes in a vault ([#411](https://github.com/andersthemagi/reliquary/issues/411))
+- The Claude Code skill tells agents to search first and follow related files ([#416](https://github.com/andersthemagi/reliquary/issues/416))
+- The changelog gives new, changed and breaking work a heading and a note ([#434](https://github.com/andersthemagi/reliquary/issues/434))
+- New file warns when a path has no extension or has spaces ([#417](https://github.com/andersthemagi/reliquary/issues/417))
+- one-click install for VS Code on the Connect page ([#421](https://github.com/andersthemagi/reliquary/issues/421))
+
+### Fixes
+
+- The help shows an example for every command, and an option before the command says where it goes ([#425](https://github.com/andersthemagi/reliquary/issues/425))
+- dev.sh lists every subcommand and prints usage before creating .env.dev ([#414](https://github.com/andersthemagi/reliquary/issues/414))
+- A held step is released, not deleted, when its holder leaves the vault ([#428](https://github.com/andersthemagi/reliquary/issues/428))
+- Invite email test no longer aims its unreachable Resend at a reusable port ([#426](https://github.com/andersthemagi/reliquary/issues/426))
+- Landing page says what Reliquary is in one line ([#423](https://github.com/andersthemagi/reliquary/issues/423))
+- Screen readers name Members buttons, feedback hints and empty states ([#402](https://github.com/andersthemagi/reliquary/issues/402))
 
 ### Performance
 
-* **search:** search in a small vault no longer scans every vault's files ([#419](https://github.com/andersthemagi/reliquary/issues/419)) ([858ab46](https://github.com/andersthemagi/reliquary/commit/858ab467b9fdb18cfd8bd1678c351d50a6cde0df))
+- Search in a small vault no longer scans every vault's files ([#419](https://github.com/andersthemagi/reliquary/issues/419))
 
 ## [0.24.0](https://github.com/andersthemagi/reliquary/compare/v0.23.0...v0.24.0) (2026-10-13)
 
