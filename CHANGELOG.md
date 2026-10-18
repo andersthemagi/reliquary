@@ -10,23 +10,25 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
 
+Search finds files by meaning, not only by shared words, and a file now shows what it refers to and what refers to it. There is a Reliquary plugin for Claude Code, Threads marks what you haven't read, and vault owners can see which searches found nothing. A work plan's `for:` line names a member by their short tag instead of their email. This release applies 7 database migrations. The command line's changes are in its own changelog, as CLI 0.5.0.
+
 ### New
 
-#### Suggest the command or option you meant, list your vaults on a wrong --vault, and add vaults --json ([#401](https://github.com/andersthemagi/reliquary/issues/401))
+#### Find files by meaning, not only by shared words ([#396](https://github.com/andersthemagi/reliquary/issues/396))
 
-The CLI suggests the command or option you probably meant, lists the vaults you can reach when `--vault` names none, and `reliquary vaults --json` prints your vaults as JSON.
-
-#### See which files refer to each other ([#394](https://github.com/andersthemagi/reliquary/issues/394))
-
-Reliquary now keeps track of which files refer to each other, through `[[path]]` references and Markdown links to `.md` files. A file's page lists its **References** and what it is **Referenced by**, and agents get the same with the new `related_files` tool.
+Agents' `search` now finds files by meaning as well as by shared words: asking "what are you charging" finds a pricing note that talks about seats and plans. It runs on Supabase's built-in model, with no third-party AI provider and no key to set up. If it is unavailable, search answers by words and says so on its first line. Self-hosting: the database image is now `pgvector/pgvector:0.8.2-pg17-trixie`, and search by meaning is the optional `embed` compose profile.
 
 #### A Claude Code plugin that connects to Reliquary and briefs you on what changed ([#391](https://github.com/andersthemagi/reliquary/issues/391))
 
 There is a Reliquary plugin for Claude Code: `claude plugin marketplace add andersthemagi/reliquary`, then `claude plugin install reliquary@reliquary`. It connects Claude Code to Reliquary, teaches it how to work in a vault, briefs you on what changed when a session starts in a project linked to a vault, and reminds you to propose an update after `git push`.
 
-#### Find files by meaning, not only by shared words ([#396](https://github.com/andersthemagi/reliquary/issues/396))
+#### See which files refer to each other ([#394](https://github.com/andersthemagi/reliquary/issues/394))
 
-Agents' `search` now finds files by meaning as well as by shared words: asking "what are you charging" finds a pricing note that talks about seats and plans. It runs on Supabase's built-in model, with no third-party AI provider and no key to set up. If it is unavailable, search answers by words and says so on its first line. Self-hosting: the database image is now `pgvector/pgvector:0.8.2-pg17-trixie`, and search by meaning is the optional `embed` compose profile.
+Reliquary now keeps track of which files refer to each other, through `[[path]]` references and Markdown links to `.md` files. A file's page lists its **References** and what it is **Referenced by**, and agents get the same with the new `related_files` tool.
+
+#### Threads shows which threads have unread messages ([#431](https://github.com/andersthemagi/reliquary/issues/431))
+
+The **Threads** page marks a thread **Unread** when someone else, or an agent (your own included), has posted since you last opened it. What you have read is yours alone: no other member and no agent can see it.
 
 #### Vault owners see which searches found nothing ([#429](https://github.com/andersthemagi/reliquary/issues/429))
 
@@ -36,10 +38,6 @@ Vault owners can see what people and agents searched for and didn't find, under 
 
 Search results in the web app now show up to three lines that contain your words, with the words highlighted, instead of the start of each file.
 
-#### Threads shows which threads have unread messages ([#431](https://github.com/andersthemagi/reliquary/issues/431))
-
-The **Threads** page marks a thread **Unread** when someone else, or an agent (your own included), has posted since you last opened it. What you have read is yours alone: no other member and no agent can see it.
-
 ### Changed
 
 #### A plan names a member by tag, never by email ([#432](https://github.com/andersthemagi/reliquary/issues/432))
@@ -48,20 +46,18 @@ In a work plan, `for:` now names a member by their short tag, the 8 characters s
 
 ### Smaller changes
 
+- New file warns when a path has no extension or has spaces ([#417](https://github.com/andersthemagi/reliquary/issues/417))
+- One-click install for VS Code on the Connect page ([#421](https://github.com/andersthemagi/reliquary/issues/421))
 - A how-to and agent guidance for keeping call and meeting notes in a vault ([#411](https://github.com/andersthemagi/reliquary/issues/411))
 - The Claude Code skill tells agents to search first and follow related files ([#416](https://github.com/andersthemagi/reliquary/issues/416))
 - The changelog gives new, changed and breaking work a heading and a note ([#434](https://github.com/andersthemagi/reliquary/issues/434))
-- New file warns when a path has no extension or has spaces ([#417](https://github.com/andersthemagi/reliquary/issues/417))
-- one-click install for VS Code on the Connect page ([#421](https://github.com/andersthemagi/reliquary/issues/421))
 
 ### Fixes
 
-- The help shows an example for every command, and an option before the command says where it goes ([#425](https://github.com/andersthemagi/reliquary/issues/425))
-- dev.sh lists every subcommand and prints usage before creating .env.dev ([#414](https://github.com/andersthemagi/reliquary/issues/414))
 - A held step is released, not deleted, when its holder leaves the vault ([#428](https://github.com/andersthemagi/reliquary/issues/428))
-- Invite email test no longer aims its unreachable Resend at a reusable port ([#426](https://github.com/andersthemagi/reliquary/issues/426))
 - Landing page says what Reliquary is in one line ([#423](https://github.com/andersthemagi/reliquary/issues/423))
 - Screen readers name Members buttons, feedback hints and empty states ([#402](https://github.com/andersthemagi/reliquary/issues/402))
+- dev.sh lists every subcommand and prints usage before creating .env.dev ([#414](https://github.com/andersthemagi/reliquary/issues/414))
 
 ### Performance
 
