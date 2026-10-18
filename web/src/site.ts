@@ -3,15 +3,16 @@
 // script, nothing loaded from another origin (the CSP forbids it anyway).
 //
 // Everything the owner still has to decide or fill in lives in the two
-// config objects below: OPERATOR (who runs the service, placeholders until
-// filled) and PRICING (the tiers, easy to change or hide). A field left null
+// config objects below: OPERATOR (who runs the service) and PRICING (the tiers, easy to change or hide). A field left null
 // renders as a visible "[to be filled: ...]" mark, never as an invented fact.
 
 import { appHref, publicSiteOrigin } from "./hosts.js";
 import { LEGAL_LINKS, esc, footerLinks, html, raw, stageBadge, styleHref, versionLink, type Raw, type Theme } from "./html.js";
 
-// Who runs Reliquary. null = not decided or not known yet: shown as a
-// placeholder on the page. Fill these in before the pages leave draft.
+// Who runs Reliquary. null = not decided or not known yet. A page shows a
+// placeholder for one only where the sentence can't stand without it; the
+// legal pages leave out what is null instead (web/test/site.test.mjs fails
+// on a placeholder there).
 export const OPERATOR = {
   product: "Reliquary",
   brand: "Reliquary by Red Mage",
@@ -97,8 +98,7 @@ export const biggerPlanHref = () => mailOperator("Reliquary: a bigger plan");
 export const siteOrigin = publicSiteOrigin(OPERATOR.defaultOrigin);
 
 // Drafts: every legal page carries this until the owner has had it reviewed.
-export const draftNote = () =>
-  html`<p class="callout attention draft-note" role="note"><strong>Draft, pending legal review.</strong> Last updated ${OPERATOR.lastUpdated}. Bracketed items are still to be filled in.</p>`;
+export const updatedNote = () => html`<p class="meta">Last updated ${OPERATOR.lastUpdated}.</p>`;
 
 // The public page frame: its own header (no app nav, no account menu), the
 // meta a search engine and a link preview need, and the footer with the

@@ -1,10 +1,11 @@
 // Legal and trust pages: terms, privacy, data processing, sub-processors,
-// security. Drafts for a service run by a Colorado LLC (Red Mage), offered
-// in the US and outside the EU first, each marked "Draft, pending legal
-// review" (#8). What only applies once it is offered in the EU sits in one
-// marked section of the privacy policy, with its placeholders (#315, #212). Facts come from docs/design.md (privacy,
-// compliance, variables) and docs/research/hosting.md (where things run);
-// anything not known yet is an OPERATOR field shown as a placeholder.
+// security, for a service run by a Colorado LLC (Red Mage), offered in the
+// US and outside the EU first; a lawyer reviews them before paid plans or an
+// open launch (#8). What only applies once it is offered in the EU sits in
+// one marked section of the privacy policy (#315, #212), saying what is
+// still to be appointed rather than showing placeholders. Facts come from
+// docs/design.md (privacy, compliance, variables) and docs/research/hosting.md
+// (where things run); anything not known yet is a null OPERATOR field.
 //
 // publicRoute() answers the public URLs that need no session: these pages,
 // robots.txt, sitemap.xml and security.txt. The landing page at `/` is not
@@ -14,7 +15,7 @@ import { docsPaths, docsRoute } from "./docs.js";
 import { appHref } from "./hosts.js";
 import { ALPHA, html, type Raw, type Theme } from "./html.js";
 import { BUILD } from "./version.js";
-import { OPERATOR, draftNote, fill, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
+import { OPERATOR, fill, updatedNote, requestAccessHref, robotsTxt, securityTxt, sitePage, sitemapXml } from "./site.js";
 
 const mail = (addr: string) => html`<a href="mailto:${addr}">${addr}</a>`;
 
@@ -27,7 +28,7 @@ function legalPage(theme: Theme, path: string, title: string, description: strin
     body: html`<article class="legal">
   <p class="crumb"><a href="/">Reliquary</a></p>
   <h1>${title}</h1>
-  ${draftNote()}
+  ${updatedNote()}
   ${body}
 </article>`,
   });
@@ -71,7 +72,7 @@ ${operatorBlock()}
 <p>We don't review content in advance. We may remove or disable content that breaks the law or these terms, and we'll tell the vault's owners when we do, unless the law stops us.</p>
 
 <h2 id="copyright">Copyright complaints</h2>
-<p>If you believe content in Reliquary infringes your copyright, send a notice to our designated agent: ${OPERATOR.person}, ${fill("legalName", "legal name")}, ${fill("address", "address")}; phone ${fill("copyrightAgentPhone", "copyright agent phone")}; ${mail(OPERATOR.contactEmail)}. The notice must include:</p>
+<p>If you believe content in Reliquary infringes your copyright, send a notice to our designated agent: ${OPERATOR.person}, ${fill("legalName", "legal name")}, ${fill("address", "address")}; ${OPERATOR.copyrightAgentPhone ? html`phone ${OPERATOR.copyrightAgentPhone}; ` : ""}${mail(OPERATOR.contactEmail)}. The notice must include:</p>
 <ul>
   <li>your physical or electronic signature, as the owner or someone authorised to act for them;</li>
   <li>the work you say is infringed;</li>
@@ -212,14 +213,14 @@ ${operatorBlock()}
 <p>Reliquary is a work tool for people ${fill("minimumAge", "minimum age")} and over. If we learn an account belongs to someone younger, we close it and delete its personal data. We don't knowingly collect personal information from children under 13; if you believe we have, email ${mail(OPERATOR.contactEmail)} and we'll delete it.</p>
 
 <h2 id="eu">If you're in the EU, EEA, UK or Switzerland</h2>
-<p class="callout attention" role="note">The alpha is offered in the United States and outside Europe first. We're not yet set up for people in the EU, EEA, UK or Switzerland, so please <a href="${appHref("/request-access")}">request access</a> rather than signing up, and we'll tell you when we are. What follows is what will apply then; the bracketed items are still to be put in place.</p>
+<p class="callout attention" role="note">The alpha is offered in the United States and outside Europe first. We're not yet set up for people in the EU, EEA, UK or Switzerland, so please <a href="${appHref("/request-access")}">request access</a> rather than signing up, and we'll tell you when we are. What follows is what will apply then.</p>
 <ul>
   <li><strong>Controller:</strong> ${OPERATOR.tradingName}, as above. For vault content, the vault's owner is the controller and we are their processor (<a href="/dpa">data processing terms</a>).</li>
   <li><strong>Legal bases:</strong> running the service and answering an access request, performance of a contract (or steps you asked for before one); security, fault-fixing and telling you about changes, our legitimate interest; marketing email, only your consent.</li>
   <li><strong>Your rights</strong> under the GDPR: access, correction, erasure, restriction, objection and portability, as in Your rights above, and to withdraw consent at any time.</li>
-  <li><strong>Representative in the EU</strong> (Article 27): ${fill("euRepresentative", "EU representative")}. <strong>In the UK:</strong> ${fill("ukRepresentative", "UK representative")}.</li>
-  <li><strong>Data protection authority:</strong> you can complain to the authority where you live or work; our lead authority is ${fill("supervisoryAuthority", "supervisory authority")}.</li>
-  <li><strong>Transfers:</strong> the database is in the EU; the app and some sub-processors are in the United States. Transfers rely on ${fill("transferSafeguard", "transfer safeguard, e.g. the EU-US Data Privacy Framework or Standard Contractual Clauses")}.</li>
+  <li><strong>Representatives</strong> (Article 27): ${OPERATOR.euRepresentative && OPERATOR.ukRepresentative ? html`in the EU, ${OPERATOR.euRepresentative}; in the UK, ${OPERATOR.ukRepresentative}.` : "we'll appoint one in the EU and one in the UK, and name them here, before Reliquary is offered there."}</li>
+  <li><strong>Data protection authority:</strong> you can complain to the authority where you live or work.${OPERATOR.supervisoryAuthority ? html` Our lead authority is ${OPERATOR.supervisoryAuthority}.` : ""}</li>
+  <li><strong>Transfers:</strong> the database is in the EU; the app and some sub-processors are in the United States. ${OPERATOR.transferSafeguard ? html`Transfers rely on ${OPERATOR.transferSafeguard}.` : "Before Reliquary is offered there, this names the safeguard each transfer relies on."}</li>
   <li><strong>Breaches:</strong> we'll tell the authority within 72 hours of becoming aware of one that affects you, where the GDPR requires it.</li>
 </ul>
 
@@ -262,7 +263,7 @@ ${operatorBlock()}
 </ul>
 
 <h2 id="transfers">Transfers outside the EU (once offered in the EU)</h2>
-<p>The database is in the EU; the app runs in the United States, and other sub-processors may access data from outside the EU. Each such transfer relies on ${fill("transferSafeguard", "transfer safeguard, e.g. the provider's Standard Contractual Clauses")}. The <a href="/subprocessors">sub-processor list</a> names each provider and its location.</p>`);
+<p>The database is in the EU; the app runs in the United States, and other sub-processors may access data from outside the EU. ${OPERATOR.transferSafeguard ? html`Each such transfer relies on ${OPERATOR.transferSafeguard}.` : "Before Reliquary is offered in the EU, this names the safeguard each transfer relies on."} The <a href="/subprocessors">sub-processor list</a> names each provider and its location.</p>`);
 }
 
 // Sub-processors ----------------------------------------------------------------
