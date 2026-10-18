@@ -342,3 +342,59 @@ select t.expect('tools: calling again with the exact same set logs nothing',
     '[{"name": "create_ticket", "is_write": false, "description": "Create a ticket"}, {"name": "delete_ticket", "is_write": true}]'))
   || ' ' || (select count(*)::text from public.log where vault_id = t.id('gone') and event = 'link.discover'),
   'ok 2');
+
+-- ---------------------------------------------------------------------------
+-- replace_link_credential and link_credential_for_discovery
+-- (20261018120000_link_replace_credential): an owner, in person, replaces a
+-- link's credential or reads it back still sealed to rediscover its tools.
+
+create function t.replace_sql(p_link text, p_tag text) returns text language sql as $$
+  select format($q$select 'ok' from public.replace_link_credential(%L, 'k2', decode(%L, 'hex'), decode(%L, 'hex'))$q$,
+    t.id(p_link), repeat('11', 12), t.lk(p_tag))
+$$;
+create function t.stored_marker(p_link text) returns text language sql as $$
+  select key_id || ' ' || convert_from(ciphertext, 'utf8') from private.link_secrets where link_id = t.id(p_link)
+$$;
+create function t.link_state(p_link text) returns text language sql as $$
+  select l.id || ' ' || l.name || ' ' || l.url || ' '
+         || (select string_agg(tool_name, ',' order by tool_name) from public.link_tools where link_id = l.id) || ' '
+         || (select string_agg(role || ':' || tool_name || '=' || enabled, ',' order by role, tool_name)
+               from public.link_grants where link_id = l.id)
+    from public.links l where l.id = t.id(p_link)
+$$;
+create function t.sealed_sql(p_link text) returns text language sql as $$
+  select format($q$select public.link_credential_for_discovery(%L)::text$q$, t.id(p_link))
+$$;
+create table t.before_replace as select t.link_state('lk2') as state;
+
+select t.expect('replace: an editor, a viewer, an outsider, anonymous, the owner''s agent and the owner''s token cannot replace a credential',
+  t.run('ben', t.replace_sql('lk2', 'new')) || ',' || t.run('cal', t.replace_sql('lk2', 'new'))
+  || ',' || t.run('dee', t.replace_sql('lk2', 'new')) || ',' || t.run(null, t.replace_sql('lk2', 'new'))
+  || ',' || t.run('ana', t.replace_sql('lk2', 'new'), 'Claude Code')
+  || ',' || t.run_tok('ana', 'all-rw', t.replace_sql('lk2', 'new')),
+  'ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501');
+select t.expect('replace: refused calls change nothing and log nothing',
+  t.stored_marker('lk2') || ' ' || t.log_count('gone', 'link.credential'), 'k1 CIPHERTEXT-MARKER-x 0');
+select t.expect('replace: something that isn''t a sealed credential is refused',
+  t.run('ana', format($q$select 'ok' from public.replace_link_credential(%L, 'k2', decode('00', 'hex'), decode(%L, 'hex'))$q$,
+    t.id('lk2'), t.lk('bad'))), 'ERR 22023');
+select t.expect('replace: the owner replaces it; the link keeps its id, name, url, tools and grants',
+  t.run('ana', t.replace_sql('lk2', 'new'))
+  || ' ' || t.stored_marker('lk2')
+  || ' ' || (t.link_state('lk2') = (select state from t.before_replace))::text,
+  'ok k2 CIPHERTEXT-MARKER-new true');
+select t.expect('replace: logged in Activity with the link''s name, never the credential',
+  (select string_agg(detail::text || ' ' || actor::text, '; ') from public.log where vault_id = t.id('gone') and event = 'link.credential'),
+  format('{"link": "%s", "name": "zendesk"} %s', t.id('lk2'), t.id('ana')));
+
+select t.expect('sealed: an editor, a viewer, an outsider, anonymous, the owner''s agent and the owner''s token cannot read a link''s credential back',
+  t.run('ben', t.sealed_sql('lk2')) || ',' || t.run('cal', t.sealed_sql('lk2'))
+  || ',' || t.run('dee', t.sealed_sql('lk2')) || ',' || t.run(null, t.sealed_sql('lk2'))
+  || ',' || t.run('ana', t.sealed_sql('lk2'), 'Claude Code')
+  || ',' || t.run_tok('ana', 'all-rw', t.sealed_sql('lk2')),
+  'ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501,ERR 42501');
+select t.expect('sealed: the owner gets the stored credential back still sealed, with its vault and url',
+  (select convert_from(decode(j->>'ciphertext', 'base64'), 'utf8') || ' ' || (j->>'key_id') || ' '
+          || (j->>'vault_id') || ' ' || (j->>'url')
+     from (select t.run('ana', t.sealed_sql('lk2'))::jsonb as j) s),
+  format('CIPHERTEXT-MARKER-new k2 %s https://api.zendesk.example', t.id('gone')));

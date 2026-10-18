@@ -300,7 +300,7 @@ test("links page: owner edits a link's name and url; the credential is untouched
 test("links page: the Edit form says the credential isn’t shown or changed there, and how to replace it", async () => {
   const row = await linkRow(V.own, "linear2");
   const edit = await page(lp(V.own, `?edit=${row.id}`));
-  assert.match(edit, /The credential isn’t shown or changed here\. To replace it, delete this link and add it again; its grants are deleted too\./);
+  assert.match(edit, /The credential isn’t shown or changed here\. To replace it, choose Replace credential in this link’s menu; its grants stay\./);
   assert.match(edit, /Changing the URL keeps the credential, which is then sent to the new address, and keeps the tools already discovered\./);
   assert.doesNotMatch(await page(lp(V.own)), /isn’t shown or changed here/);
 });
@@ -581,4 +581,131 @@ test("discovery: an upstream whose error echoes the credential is not repeated i
     echo.closeAllConnections();
     echo.close();
   }
+});
+
+// Replace credential and Refresh tools (issue #439): a fixture whose tool
+// list the test changes between runs, recording the bearer it was sent.
+async function startRotatingFixture() {
+  const state = { tools: [], auth: [] };
+  const srv = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    state.auth.push(req.headers.authorization);
+    if (body.method === "initialize") {
+      res.writeHead(200, { "content-type": "application/json" }).end(mcpRpc(body.id, { protocolVersion: body.params.protocolVersion, capabilities: {} }));
+    } else if (body.method === "notifications/initialized") {
+      res.writeHead(202).end();
+    } else {
+      res.writeHead(200, { "content-type": "application/json" }).end(mcpRpc(body.id, { tools: state.tools }));
+    }
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  return { srv, state, url: `https://127.0.0.1:${srv.address().port}/mcp` };
+}
+const READ = (name) => ({ name, annotations: { readOnlyHint: true } });
+const grantsOf = async (linkId) =>
+  Object.fromEntries((await sql("select role, tool_name, enabled from public.link_grants where link_id = $1", [linkId])).map((g) => [`${g.role}:${g.tool_name}`, g.enabled]));
+let rotating;
+after(() => {
+  rotating?.srv.closeAllConnections();
+  rotating?.srv.close();
+});
+
+test("replace credential: an owner types a new one; the link keeps its id, name, URL and grants, and discovery runs again with it", async () => {
+  rotating = await startRotatingFixture();
+  rotating.state.tools = [READ("list_issues"), { name: "create_issue" }];
+  const first = credential("rotate-old");
+  let h = await page(lp(V.own), disco);
+  await landed(await post(lp(V.own), { op: "save", name: "rotating", url: rotating.url, credential: first }, { s: disco, csrf: csrfOf(h) }), disco);
+  const before = await linkRow(V.own, "rotating");
+  await as(LU, "select public.set_link_grant($1, 'editor', 'create_issue', true)", [before.id]);
+
+  h = await page(lp(V.own), disco);
+  assert.match(h, new RegExp(`href="/v/${V.own}/links\\?replace=${before.id}#replace-link"[^>]*><span class="menu-item-title">Replace credential</span>`));
+  const form = await page(lp(V.own, `?replace=${before.id}`), disco);
+  assert.match(form, /<h2 id="replace-link-title" class="form-title">Replace the credential for <code>rotating<\/code><\/h2>/);
+  assert.match(form, /<input id="lr" type="password" name="credential"/);
+  assert.match(form, /<button class="primary">Replace credential<\/button>/);
+
+  rotating.state.tools = [READ("list_issues"), { name: "create_issue" }, READ("archive_issue")];
+  rotating.state.auth = [];
+  const second = credential("rotate-new");
+  const h2 = await landed(await post(lp(V.own), { op: "replace", link_id: before.id, credential: second }, { s: disco, csrf: csrfOf(form) }), disco);
+  assert.deepEqual(flashOf(h2), ["success", "status", "Replaced rotating’s credential. Discovered 3 tools. Added archive_issue."]);
+  assert.ok(rotating.state.auth.length > 0 && rotating.state.auth.every((a) => a === `Bearer ${second}`), "discovery used the new credential");
+  noCredentials(h2);
+
+  assert.deepEqual(await linkRow(V.own, "rotating"), before);
+  const crypto = await import("../dist/secrets.js");
+  const [row] = await sql("select key_id, nonce, ciphertext from private.link_secrets where link_id = $1", [before.id]);
+  assert.equal(crypto.openLink({ keyId: row.key_id, nonce: row.nonce, ciphertext: row.ciphertext }, V.own), second);
+  const grants = await grantsOf(before.id);
+  assert.equal(grants["editor:create_issue"], true, "the owner's own grant is kept");
+  assert.equal(grants["editor:archive_issue"], true, "a new read tool gets its default");
+  assert.equal(log.includes(first) || log.includes(second), false);
+});
+
+test("refresh tools: discovery runs again with the stored credential; new tools get defaults, an owner's choices stay, a tool no longer listed is removed", async () => {
+  const link = await linkRow(V.own, "rotating");
+  rotating.state.tools = [{ name: "create_issue" }, READ("archive_issue"), { name: "close_issue" }];
+  rotating.state.auth = [];
+  const h = await page(lp(V.own), disco);
+  assert.match(h, /<input type="hidden" name="op" value="refresh"><input type="hidden" name="link_id" value="[^"]+"><button class="menu-item"><span class="menu-item-title">Refresh tools<\/span>/);
+  const h2 = await landed(await post(lp(V.own), { op: "refresh", link_id: link.id }, { s: disco, csrf: csrfOf(h) }), disco);
+  assert.deepEqual(flashOf(h2), ["success", "status", "Refreshed rotating’s tools. Discovered 3 tools. Added close_issue. Removed list_issues."]);
+  assert.ok(rotating.state.auth.length > 0 && rotating.state.auth.every((a) => a?.startsWith("Bearer LINKVAL-rotate-new-")), "discovery used the stored credential");
+  noCredentials(h2);
+  const tools = await sql("select tool_name from public.link_tools where link_id = $1 order by tool_name", [link.id]);
+  assert.deepEqual(tools.map((t) => t.tool_name), ["archive_issue", "close_issue", "create_issue"]);
+  const grants = await grantsOf(link.id);
+  assert.equal(grants["editor:create_issue"], true, "the owner's own grant is kept");
+  assert.equal(grants["editor:close_issue"], false, "a new write tool starts off");
+
+  const again = await landed(await post(lp(V.own), { op: "refresh", link_id: link.id }, { s: disco, csrf: csrfOf(h) }), disco);
+  assert.equal(flashOf(again)?.[2], "Refreshed rotating’s tools. Discovered 3 tools. No tools were added or removed.");
+});
+
+test("replace credential and refresh tools: when discovery fails, the link and its tools stay and the warning says why, with a reference", async () => {
+  const link = await linkRow(V.own, "rotating");
+  const tools = await sql("select tool_name from public.link_tools where link_id = $1 order by tool_name", [link.id]);
+  // main has no loopback allowance: the same address is refused as not public.
+  const h = await page(lp(V.own));
+  const refreshed = await landed(await post(lp(V.own), { op: "refresh", link_id: link.id }, { csrf: csrfOf(h) }));
+  assert.equal(flashOf(refreshed)?.[0], "warning");
+  assert.match(flashOf(refreshed)?.[2] ?? "", /^Couldn’t refresh rotating’s tools, so they are as they were\. This link’s address isn’t public\. \(ref [0-9a-f]{8}\)$/);
+  const third = credential("rotate-third");
+  const replaced = await landed(await post(lp(V.own), { op: "replace", link_id: link.id, credential: third }, { csrf: csrfOf(h) }));
+  assert.match(flashOf(replaced)?.[2] ?? "", /^Replaced rotating’s credential, but its tools couldn’t be discovered, so they are as they were\. This link’s address isn’t public\. \(ref [0-9a-f]{8}\)$/);
+  noCredentials(replaced);
+  assert.deepEqual(await linkRow(V.own, "rotating"), link);
+  assert.deepEqual(await sql("select tool_name from public.link_tools where link_id = $1 order by tool_name", [link.id]), tools);
+  assert.equal(log.includes(third), false);
+});
+
+test("replace credential: an empty one is refused in its form, 400, and nothing changes", async () => {
+  const link = await linkRow(V.own, "rotating");
+  const [before] = await sql("select ciphertext from private.link_secrets where link_id = $1", [link.id]);
+  const h = await page(lp(V.own, `?replace=${link.id}`));
+  const r = await post(lp(V.own), { op: "replace", link_id: link.id, credential: " " }, { csrf: csrfOf(h) });
+  assert.equal(r.status, 400);
+  const body = await r.text();
+  assert.match(body, /Replace the credential for <code>rotating<\/code>/);
+  assert.match(refusedForm(body) ?? "", /Type the new credential\. Nothing was changed/);
+  assert.match(body, /<input id="lr" type="password" name="credential" autocomplete="new-password" required maxlength="65536" aria-invalid="true"/);
+  const [after] = await sql("select ciphertext from private.link_secrets where link_id = $1", [link.id]);
+  assert.deepEqual(after, before);
+});
+
+test("replace credential and refresh tools: an editor sees neither, and a direct POST from one is refused by the database", async () => {
+  const link = await linkRow(V.own, "rotating");
+  const [before] = await sql("select ciphertext from private.link_secrets where link_id = $1", [link.id]);
+  const h = await page(lp(V.own), moss);
+  assert.doesNotMatch(h, /Replace credential|Refresh tools/);
+  const replaced = await landed(await post(lp(V.own), { op: "replace", link_id: link.id, credential: credential("editor") }, { s: moss, csrf: csrfOf(h) }), moss);
+  assert.match(flashOf(replaced)?.[2] ?? "", /only owners replace a link(&#39;|’)s credential/i);
+  const refreshed = await landed(await post(lp(V.own), { op: "refresh", link_id: link.id }, { s: moss, csrf: csrfOf(h) }), moss);
+  assert.match(flashOf(refreshed)?.[2] ?? "", /only owners refresh a link(&#39;|’)s tools/i);
+  const [after] = await sql("select ciphertext from private.link_secrets where link_id = $1", [link.id]);
+  assert.deepEqual(after, before);
 });
