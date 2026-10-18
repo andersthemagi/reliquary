@@ -214,6 +214,17 @@ test("a successful call is logged once, with hashes, never the arguments or the 
   }
 });
 
+test("a call's size is logged: the bytes the upstream answered", async () => {
+  const r = await ownerClient.callTool({ name: "widgets.list_widgets", arguments: { args: { limit: 7 } } });
+  assert.equal(r.isError, false);
+  const [row] = await sql(
+    `select result_bytes from public.link_calls where link_id = $1 and tool_name = 'list_widgets' and outcome = 'ok' order by id desc limit 1`,
+    [linkId],
+  );
+  assert.ok(Number.isInteger(row.result_bytes) && row.result_bytes > 0, `result_bytes was ${row.result_bytes}`);
+  assert.ok(row.result_bytes >= Buffer.byteLength('called list_widgets with {"limit":7}'));
+});
+
 test("an editor's direct call to a tool their role isn't granted is refused, not silently proxied", async () => {
   const r = await editorClient.callTool({ name: "widgets.explode", arguments: { args: {} } }).catch((e) => e);
   // Not registered for the editor's own connection at all (tools/list

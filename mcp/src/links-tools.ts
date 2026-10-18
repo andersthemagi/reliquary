@@ -163,6 +163,7 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
           let outcome: "ok" | "error" = "ok";
           let result: ToolResult;
           let resultHash: string;
+          let resultBytes: number | null = null;
           try {
             const called = await callLinkProxy({
               vaultId: begin.vault_id!,
@@ -174,6 +175,7 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
               args: upstreamArgs,
             });
             resultHash = hash(called.content);
+            resultBytes = Buffer.byteLength(JSON.stringify(called.content) ?? "null");
             if (called.isError) outcome = "error";
             result = { content: [{ type: "text", text: upstreamBlock(toolName, called.content, called.isError) }], isError: called.isError };
           } catch (err) {
@@ -188,7 +190,7 @@ async function registerUpstreamLinkTools(server: McpServer, runAs: <T>(fn: (c: p
             result = explain(refused);
           }
           try {
-            await runAs((c) => c.query(`select public.record_link_call($1, $2, $3, $4, $5)`, [row.link_id, row.tool_name, outcome, argHash, resultHash]));
+            await runAs((c) => c.query(`select public.record_link_call($1, $2, $3, $4, $5, $6)`, [row.link_id, row.tool_name, outcome, argHash, resultHash, resultBytes]));
           } catch (err) {
             // Best effort (the migration's own reasoning): the upstream
             // call already happened either way, and the agent is
