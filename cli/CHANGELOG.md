@@ -8,6 +8,8 @@ release-please from conventional commits that touch `cli/`.
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
 
+The CLI points you to what you meant: a mistyped command or option gets a suggestion, a wrong `--vault` lists the vaults you can reach, and every command in the help has an example.
+
 ### New
 
 #### Suggest the command or option you meant, list your vaults on a wrong --vault, and add vaults --json ([#401](https://github.com/andersthemagi/reliquary/issues/401))
