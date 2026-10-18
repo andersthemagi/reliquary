@@ -83,6 +83,10 @@ async function embed(input: string[]): Promise<number[][]> {
     body: JSON.stringify({ input }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
+  // 401 is the one an operator causes: the secret was set in one place only.
+  if (res.status === 401) {
+    throw new Refusal({ status: 503, where: WHERE, why: "The embedding function answered 401: its EMBED_SECRET and this server's differ", code: "embed_secret" });
+  }
   if (!res.ok) throw new Refusal({ status: 503, where: WHERE, why: `The embedding function answered ${res.status}`, code: "embed_status" });
   const body = (await res.json().catch(() => null)) as { embeddings?: unknown } | null;
   const e = body?.embeddings;
