@@ -6,6 +6,7 @@
 //   GET  /.well-known/oauth-protected-resource[/mcp]  RFC 9728 metadata
 //   GET  /healthz  liveness
 //   GET  /healthz?db=1  keepalive: `select 1`, then `ok` or 503 `unavailable`
+//   GET  /healthz?embed=1  search by meaning: `ok`, `off`, or 503 and why not
 //   GET  /version  {"version","commit"} of this build (the release it is)
 //
 // A 401 names the protected resource metadata (WWW-Authenticate:
@@ -23,7 +24,7 @@ import { clientIp, configureRateLimits, knownBlocked, limitToolCalls, limitUnaut
 import { needsLinkTools, registerTools } from "./tools.js";
 import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
-import { configureEmbeddings } from "./embeddings.js";
+import { configureEmbeddings, probe } from "./embeddings.js";
 import { BUILD, versionJson } from "./version.js";
 import { compact, fail, failure, withRequest, type Failure } from "./failure.js";
 
@@ -157,7 +158,7 @@ function send(res: http.ServerResponse, status: number, body: object, headers: R
   res.end(JSON.stringify(body));
 }
 
-// With KEEPALIVE_TOKEN set, /healthz?db=1 needs `x-keepalive: <token>`, so it
+// With KEEPALIVE_TOKEN set, /healthz?db=1 (and ?embed=1) needs `x-keepalive: <token>`, so it
 // can't be used to hammer the pooler. Compared as digests: constant time,
 // whatever the lengths.
 function keepaliveAllowed(header: string | string[] | undefined): boolean {
@@ -223,7 +224,8 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
 
   if (path === "/healthz") {
     const plain = { "content-type": "text/plain", "cache-control": "no-store" };
-    if (url.searchParams.get("db") !== "1") {
+    const embedCheck = url.searchParams.get("embed") === "1";
+    if (url.searchParams.get("db") !== "1" && !embedCheck) {
       res.writeHead(200, plain).end("ok");
       return;
     }
@@ -231,6 +233,13 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
     // role, touching no table. Only `ok` or `unavailable`, never error text.
     if (!keepaliveAllowed(req.headers["x-keepalive"])) {
       res.writeHead(401, plain).end("unauthorized");
+      return;
+    }
+    // Search by meaning (embeddings.ts, probe): a deploy checks it, so a
+    // secret set in one place only shows there, not in someone's search.
+    if (embedCheck) {
+      const state = await probe();
+      res.writeHead(state === "ok" || state === "off" ? 200 : 503, plain).end(state);
       return;
     }
     const up = await Promise.race([

@@ -137,3 +137,22 @@ export async function queryVector(c: pg.PoolClient, vault: string, query: string
     };
   }
 }
+
+// GET /healthz?embed=1 (server.ts, scripts/deploy-check.sh): whether search
+// by meaning works here, without a vault. "off" when it isn't set up, "ok"
+// when the function embedded a fixed text, otherwise why not, in words this
+// file wrote (never the secret or a response body). An "ok" is kept a
+// minute, so the probe can't be used to keep the function busy; a failure
+// isn't, so a fixed secret shows at once.
+let probedOk = 0;
+export async function probe(): Promise<string> {
+  if (!URL_) return "off";
+  if (Date.now() - probedOk < 60_000) return "ok";
+  try {
+    await embed(["Reliquary health check"]);
+    probedOk = Date.now();
+    return "ok";
+  } catch (err) {
+    return err instanceof Refusal ? err.message : "The embedding function couldn't be reached";
+  }
+}

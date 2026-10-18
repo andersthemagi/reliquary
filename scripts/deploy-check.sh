@@ -10,15 +10,20 @@
 # Env:
 #   WEB_URL, MCP_URL   origins of the two apps (required; a trailing /mcp or /
 #                      on MCP_URL is dropped)
-#   KEEPALIVE_TOKEN    sent as x-keepalive to /healthz?db=1 when set
+#   KEEPALIVE_TOKEN    sent as x-keepalive to /healthz?db=1 and ?embed=1 when set
 #   DEPLOY_WAIT        seconds to keep retrying each check (default 300)
+#   EMBED_WAIT         seconds to retry the search-by-meaning probe (default 60)
 #   EXPECT_VERSION     the release deployed (e.g. 0.2.0): both apps' /version
 #                      must answer it (needs jq)
 #   EXPECT_COMMIT      its commit: /version's commit must be it, or "unknown"
 #                      (a build that wasn't told its commit)
 #
-# Prints only check names, HTTP status codes and /version's fields: never
-# other bodies, headers or the token. Exits non-zero if any check never passes.
+# Prints only check names, HTTP status codes, /version's fields and the
+# embed probe's answer (words the server wrote, never a secret): no other
+# bodies, headers or the token. Exits non-zero if any check never passes.
+# Search by meaning only warns (a GitHub warning in Actions): search still
+# answers by words without it, and an outage of the function shouldn't stop
+# a release, but a secret set in one place only must not go unnoticed.
 set -euo pipefail
 
 : "${WEB_URL:?WEB_URL is required}"
@@ -53,6 +58,18 @@ keepalive() {
   else
     healthz "$mcp/healthz?db=1"
   fi
+}
+
+embed_probe() {
+  local code
+  if [ -n "$token" ]; then
+    code=$(fetch "$mcp/healthz?embed=1" -H @- <<< "x-keepalive: $token")
+  else
+    code=$(fetch "$mcp/healthz?embed=1")
+  fi
+  embed_state=$(head -c 200 "$tmp/body" | tr -d '\r\n')
+  last="HTTP $code: $embed_state"
+  [ "$code" = 200 ]
 }
 
 oauth_401() {
@@ -98,4 +115,18 @@ else
   echo "SKIP  /version (set EXPECT_VERSION to the release deployed)"
 fi
 check "mcp 401 names resource_metadata" oauth_401
+
+# Search by meaning: a minute of retries (the function's first call loads
+# the model), then a warning, never a failure.
+embed_state=""
+deadline=$((SECONDS + ${EMBED_WAIT:-60}))
+until embed_probe; do
+  if [ $SECONDS -ge $deadline ]; then
+    echo "WARN  mcp search by meaning ($last)"
+    [ -z "${GITHUB_ACTIONS:-}" ] || echo "::warning title=Search by meaning is unavailable::$last (docs/ops/runbook.md, \"Search by meaning\")"
+    exit $status
+  fi
+  sleep 5
+done
+echo "PASS  mcp search by meaning ($embed_state)"
 exit $status
