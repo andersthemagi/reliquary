@@ -86,8 +86,10 @@ jobs:
       # push; this puts it back in tiers, with each PR's "## Release note".
       # The runner's own Node: the script has no dependencies. Never fails the
       # job: the hotfix alert below matters more than the changelog's layout.
+      # Runs on a release's own push too: merging one release pull request
+      # regenerates the other component's, which is still open.
       - name: The changelog in tiers (open release pull requests)
-        if: steps.cut.outputs.ok == 'true' && steps.rp.outputs.release_created != 'true'
+        if: steps.cut.outputs.ok == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
