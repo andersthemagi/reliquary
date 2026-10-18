@@ -56,7 +56,14 @@ async function startFixture() {
   fixture = http.createServer(async (req, res) => {
     const chunks = [];
     for await (const c of req) chunks.push(c);
-    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    // A request cut off when the file ends closes its connections has no
+    // whole body; parsing it would throw after the last test has finished.
+    let body;
+    try {
+      body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    } catch {
+      return res.writeHead(400).end();
+    }
     if (body.method === "initialize") {
       res.writeHead(200, { "content-type": "application/json" }).end(rpc(body.id, { protocolVersion: body.params.protocolVersion, capabilities: {} }));
     } else if (body.method === "notifications/initialized") {
