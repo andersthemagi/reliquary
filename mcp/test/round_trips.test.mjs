@@ -65,7 +65,9 @@ async function own(name, args) {
   return { queries: n.roundTrips - start - (isError ? 2 : 3), text: r.content[0].text, isError };
 }
 
-test("round trips: every tool that names a vault finds it in its own query (one query each, was two)", async () => {
+// A tool that writes content resolves the vault first: its id is the sealed
+// body's additional data (src/content.ts), so the write is two queries.
+test("round trips: every tool that names a vault finds it in its own query (one query each, was two; a write seals under the vault's id first, so two)", async () => {
   const counts = {};
   for (const [name, args] of [
     ["list_files", { vault: VAULT }],
@@ -86,9 +88,9 @@ test("round trips: every tool that names a vault finds it in its own query (one 
     list_files: 1,
     read_file: 1,
     search: 1,
-    write_file: 1,
+    write_file: 2,
     delete_file: 1,
-    propose: 1,
+    propose: 2,
     list_proposals: 1,
     changes_since: 1, // was three: the vault, the events, their notes
     list_variables: 1,

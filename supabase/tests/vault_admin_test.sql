@@ -150,13 +150,13 @@ select t.expect('export: no ciphertext, nonce or value anywhere in the header',
   (select position('CIPHERTEXT' in m::text)::text || position(encode(convert_to('CIPHERTEXT', 'utf8'), 'hex') in m::text)::text
      || position('nonce' in m::text)::text from t.manifest), '000');
 select t.expect('export: files are the current text of live files, in path order; deleted and erased ones are left out',
-  t.run('ana', format($q$select string_agg(path || '=' || body, ', ' order by path) from public.export_files(%L)$q$, t.id('gone'))),
+  t.run('ana', format($q$select string_agg(path || '=' || convert_from(body, 'UTF8'), ', ' order by path) from public.export_files(%L)$q$, t.id('gone'))),
   'canon/c.md=Canon text, notes/a.md=Alpha two, notes/b.md=Bravo, notes/z.md=Zulu');
 select t.expect('export: files page after a path, with a limit',
   t.run('ana', format($q$select string_agg(path, ', ' order by path) from public.export_files(%L, 'notes/a.md', 1)$q$, t.id('gone'))),
   'notes/b.md');
 select t.expect('export: another vault''s files never appear',
-  t.run('ana', format($q$select count(*)::text from public.export_files(%L) where body = 'Kept text'$q$, t.id('gone'))), '0');
+  t.run('ana', format($q$select count(*)::text from public.export_files(%L) where convert_from(body, 'UTF8') = 'Kept text'$q$, t.id('gone'))), '0');
 
 -- The size cap, lowered for this test only (as the table owner).
 create or replace function private.export_cap() returns bigint

@@ -3,7 +3,7 @@
 // agent see the same files and lines), and the lines a result shows as HTML.
 
 import type pg from "pg";
-import { openBody } from "./content.js";
+import { openBody, openBytes } from "./content.js";
 import { minSimilarity } from "./embeddings.js";
 import { html, type Raw } from "./html.js";
 import { capNote, queryTerms, rankFiles, SEARCH_CAP, type Candidate, type Hit, type Vector } from "./search.js";
@@ -28,7 +28,7 @@ export async function searchVault(c: pg.PoolClient, vault: string, query: string
             where e.vault_id = $1`,
           [vault],
         )
-      ).rows
+      ).rows.map((v: Vector) => ({ ...v, embedding: openBytes(v.embedding, vault) }))
     : [];
   return { hits: rankFiles(files, query, limit, vector, minSimilarity(), vectors), note: rows.length ? capNote(Number(rows[0].total), rows.length) : "" };
 }

@@ -15,6 +15,7 @@ import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDis
 import { feedbackRoutes } from "./feedback.js";
 import { welcomeLanding, welcomeRoutes } from "./welcome.js";
 import { errorPage, refusalText } from "./errorpage.js";
+import { openText } from "./content.js";
 import { failure, Refusal } from "./failure.js";
 import type { Flash, Tone } from "./flash.js";
 import { fillPeople, personRef } from "./people.js";
@@ -193,9 +194,15 @@ const withQuorums = (list: string) => `
 
 // Proposals waiting on this person: open, in a vault they can approve in, and
 // not yet decided by them at the current revision.
+// A proposal row's two bodies, opened under its vault (WAITING_SQL and the
+// lists below select them as bytes).
+const openOne = <T extends { vault_id: string; body: Buffer | null; current_body: Buffer | null }>(r: T) => ({ ...r, body: openText(r.body, r.vault_id), current_body: openText(r.current_body, r.vault_id) });
+export const openProposalRows = <T extends { vault_id: string; body: Buffer | null; current_body: Buffer | null }>(rows: T[]) =>
+  rows.map(openOne);
+
 export const WAITING_SQL = `
   select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
-         p.revision, p.status, convert_from(cur.body, 'UTF8') as current_body, convert_from(p.body, 'UTF8') as body,
+         p.revision, p.status, cur.body as current_body, p.body,
          (select count(*) from public.approvals a
            where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision)::int as approvals
     from public.proposals p
@@ -290,7 +297,7 @@ async function home(ctx: Ctx): Promise<Reply> {
       vaults: rows.map((v) => ({ ...v, usage: usage.get(v.id) })),
       // Asked only when the top bar's count says something waits, or there
       // are notices to show (and so take).
-      waiting: waitingCount > 0 ? (await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows : [],
+      waiting: waitingCount > 0 ? openProposalRows((await c.query(waitingSql("q.created_at", 5), [ctx.userId])).rows) : [],
       gone: (counts?.notices ?? 1) > 0 ? await deletionNotices(c) : html``,
     };
   });
@@ -508,7 +515,7 @@ async function inbox(ctx: Ctx): Promise<Reply> {
       ? (
           await c.query(
             withQuorums(`select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
-                    p.revision, convert_from(p.body, 'UTF8') as body, convert_from(cur.body, 'UTF8') as current_body, 0 as approvals,
+                    p.revision, p.body, cur.body as current_body, 0 as approvals,
                     row_number() over (order by p.created_at desc) as ord
                from public.proposals p join public.vaults v on v.id = p.vault_id
                left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
@@ -516,14 +523,14 @@ async function inbox(ctx: Ctx): Promise<Reply> {
               where p.status = 'changes_requested' and p.proposed_by = $1`),
             [ctx.userId],
           )
-        ).rows
+        ).rows.map(openOne)
       : [],
-    waiting: has(ctx.reviewCount) ? (await c.query(waitingSql("q.vault, q.created_at"), [ctx.userId])).rows : [],
+    waiting: has(ctx.reviewCount) ? openProposalRows((await c.query(waitingSql("q.vault, q.created_at"), [ctx.userId])).rows) : [],
     snoozed: await snoozedList(c, ctx.userId),
     revising: (
       await c.query(
         withQuorums(`select p.id, p.vault_id, v.name as vault, p.kind, p.path, p.proposed_by, p.agent, p.created_at,
-                p.revision, convert_from(p.body, 'UTF8') as body, convert_from(cur.body, 'UTF8') as current_body, 0 as approvals,
+                p.revision, p.body, cur.body as current_body, 0 as approvals,
                 row_number() over (order by p.created_at) as ord
            from public.proposals p join public.vaults v on v.id = p.vault_id
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
@@ -533,7 +540,7 @@ async function inbox(ctx: Ctx): Promise<Reply> {
                          and a.decision = 'request_changes')`),
         [ctx.userId],
       )
-    ).rows,
+    ).rows.map(openOne),
   }));
   // Environment variables sent with `reliquary env push` that this person
   // may apply (docs/variables.md, "Imports").

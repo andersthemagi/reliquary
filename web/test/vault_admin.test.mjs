@@ -435,14 +435,14 @@ test("erase: a wrong path erases nothing", async () => {
 test("erase: an editor's forged post is refused by the database", async () => {
   const flash = await flashAfter(await post(`/v/${V.walt}/erase`, { path: "walt.md", confirm_path: "walt.md" }));
   assert.equal(flash, "Only owners erase.");
-  assert.equal((await sql("select count(*)::int as n from public.file_versions where vault_id = $1 and body = 'Walt text'", [V.walt]))[0].n, 1);
+  assert.equal((await sql("select count(*)::int as n from public.file_versions where vault_id = $1 and body is not null", [V.walt]))[0].n, 1);
 });
 
 test("erase: typing the path blanks every version and the log gains one entry", async () => {
   const before = await sql("select count(*)::int as n, max(seq) as top from public.log where vault_id = $1", [V.erase]);
   const flash = await flashAfter(await post(`/v/${V.erase}/erase`, { path: "people/pat.md", confirm_path: "people/pat.md" }));
   assert.equal(flash, "Erased people/pat.md: 2 versions blanked.");
-  const rows = await sql("select convert_from(body, 'UTF8') as body, erased_at from public.file_versions where vault_id = $1", [V.erase]);
+  const rows = await sql("select body, erased_at from public.file_versions where vault_id = $1", [V.erase]);
   assert.equal(rows.length, 2);
   assert.ok(rows.every((v) => v.body === null && v.erased_at), "every version blanked");
   const afterRows = await sql("select count(*)::int as n from public.log where vault_id = $1 and seq <= $2", [V.erase, before[0].top]);

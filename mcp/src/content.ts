@@ -89,10 +89,10 @@ function aad(vaultId: string): Buffer {
   return Buffer.from(JSON.stringify(["reliquary.content.v1", vaultId]), "utf8");
 }
 
-export function sealBody(text: string, vaultId: string): Buffer {
+// Bytes sealed under the current key. The text form checks the 1 MiB
+// ceiling the database keeps for a body.
+export function sealBytes(plain: Buffer, vaultId: string): Buffer {
   if (!CURRENT) throw new ContentError("content keys are not configured (CONTENT_KEYS)");
-  const plain = Buffer.from(text, "utf8");
-  if (plain.length > MAX_BODY_BYTES) throw new ContentError("a body is at most 1 MiB");
   const nonce = randomBytes(NONCE_BYTES);
   const cipher = createCipheriv("aes-256-gcm", KEYS.get(CURRENT)!, nonce, { authTagLength: TAG_BYTES });
   cipher.setAAD(aad(vaultId));
@@ -100,14 +100,26 @@ export function sealBody(text: string, vaultId: string): Buffer {
   return Buffer.concat([Buffer.from([MARKER, id.length]), id, nonce, cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
 }
 
+export function sealBody(text: string, vaultId: string): Buffer {
+  const plain = Buffer.from(text, "utf8");
+  if (plain.length > MAX_BODY_BYTES) throw new ContentError("a body is at most 1 MiB");
+  return sealBytes(plain, vaultId);
+}
+
+// What a write stores: sealed when this server holds a content key, the
+// plain bytes otherwise (a development server with no CONTENT_KEYS; hosted
+// and self-hosted servers refuse to start without one, configureContent).
+export const storeBody = (text: string, vaultId: string): Buffer => (CURRENT ? sealBody(text, vaultId) : Buffer.from(text, "utf8"));
+export const storeBytes = (plain: Buffer, vaultId: string): Buffer => (CURRENT ? sealBytes(plain, vaultId) : plain);
+
 export const isSealed = (body: Buffer) => body.length > 0 && body[0] === MARKER;
 
-// The text of a stored body: opened if sealed, as it is if plaintext (a row
-// from before the backfill; refused once #238's last step lands). Throws
-// ContentError naming nothing if this server has no key by the envelope's
-// id, or the body was altered or belongs to another vault.
-export function openBody(body: Buffer, vaultId: string): string {
-  if (!isSealed(body)) return body.toString("utf8");
+// The bytes of a stored body: opened if sealed, as they are if plaintext
+// (a row from before the backfill; refused once #238's last step lands).
+// Throws ContentError naming nothing if this server has no key by the
+// envelope's id, or the body was altered or belongs to another vault.
+export function openBytes(body: Buffer, vaultId: string): Buffer {
+  if (!isSealed(body)) return body;
   const fail = () => new ContentError("this content could not be decrypted");
   const idLength = body[1] ?? 0;
   const id = body.subarray(2, 2 + idLength).toString("utf8");
@@ -119,8 +131,31 @@ export function openBody(body: Buffer, vaultId: string): string {
     const decipher = createDecipheriv("aes-256-gcm", key, nonce, { authTagLength: TAG_BYTES });
     decipher.setAAD(aad(vaultId));
     decipher.setAuthTag(sealed.subarray(sealed.length - TAG_BYTES));
-    return Buffer.concat([decipher.update(sealed.subarray(0, sealed.length - TAG_BYTES)), decipher.final()]).toString("utf8");
+    return Buffer.concat([decipher.update(sealed.subarray(0, sealed.length - TAG_BYTES)), decipher.final()]);
   } catch {
     throw fail();
   }
 }
+
+export const openBody = (body: Buffer, vaultId: string): string => openBytes(body, vaultId).toString("utf8");
+
+// A nullable body column as read from a row (null: erased or redacted).
+export const openText = (body: Buffer | null, vaultId: string): string | null => (body === null ? null : openBody(body, vaultId));
+// A body carried inside JSON as base64 (encode(body, 'base64') in SQL).
+export const openB64 = (body: string | null, vaultId: string): string | null => (body === null ? null : openBody(Buffer.from(body, "base64"), vaultId));
+// Rows with a `body` column, opened in place.
+export function openRows<T extends { body: Buffer | null }>(rows: T[], vaultId: string): (Omit<T, "body"> & { body: string | null })[] {
+  return rows.map((r) => ({ ...r, body: openText(r.body, vaultId) }));
+}
+
+// A thread message's text as private.thread_body read it before bodies were
+// sealed: leading blank lines and trailing whitespace go, the first line's
+// indent stays; blank is "" (the function refuses it); null when it holds a
+// control character other than a line break or a tab, for the caller to
+// refuse in the function's words.
+export function threadText(message: string | undefined): string | null {
+  const text = (message ?? "").replace(/^\s*\n|\s+$/g, "");
+  if (/^\s*$/.test(text)) return "";
+  return /[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text) ? null : text;
+}
+export const CONTROL_CHARS = "a message can't contain control characters other than line breaks and tabs";

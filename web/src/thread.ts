@@ -8,6 +8,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { refusalText } from "./errorpage.js";
+import { openText, storeBody } from "./content.js";
 import { csrfField, html, menu, textareaText, time, when, type Raw } from "./html.js";
 import type { Ctx, Reply } from "./pages.js";
 import { personRef, UUID } from "./personref.js";
@@ -50,16 +51,16 @@ const live = (status: string) => status === "open" || status === "changes_reques
 // of a revised proposal reads it before deciding, and snooze. Both sit with
 // the decision controls, above the diff.
 
-export async function latestFeedback(c: pg.PoolClient, ctx: Ctx, p: { id: string; status: string; revision: number }): Promise<Raw> {
+export async function latestFeedback(c: pg.PoolClient, ctx: Ctx, p: { id: string; vault_id: string; status: string; revision: number }): Promise<Raw> {
   if (!live(p.status)) return html``;
   const n = (
     await c.query(
-      `select convert_from(body, 'UTF8') as body, author, agent, revision, at from public.proposal_notes
+      `select body, author, agent, revision, at from public.proposal_notes
         where proposal_id = $1 and kind = 'request_changes' and erased_at is null
         order by at desc limit 1`,
       [p.id],
     )
-  ).rows[0];
+  ).rows.map((r) => ({ ...r, body: openText(r.body, p.vault_id) }))[0];
   if (!n) return html``;
   return html`<section class="feedback" aria-labelledby="feedback">
     <h2 id="feedback">Latest requested changes</h2>
@@ -142,7 +143,7 @@ export async function threadSection(
   const { vaultId: id, p } = o;
   const entries = (
     await c.query(
-      `select kind, convert_from(body, 'UTF8') as body, author, agent, revision, at, erased_at from public.proposal_notes
+      `select kind, body, author, agent, revision, at, erased_at from public.proposal_notes
         where proposal_id = $1
        union all
        select 'approve', null, user_id, null, revision, at, null from public.approvals
@@ -150,7 +151,7 @@ export async function threadSection(
        order by at`,
       [p.id],
     )
-  ).rows;
+  ).rows.map((r) => ({ ...r, body: openText(r.body, id) }));
 
   // A decided proposal nobody discussed has no discussion to show.
   if (!live(p.status) && !entries.length) return html``;
@@ -199,7 +200,7 @@ export async function postComment(
   try {
     const found = await asPerson(ctx.userId, async (c) => {
       if (!(await inVault(c, id, pid))) return false;
-      await c.query(`select public.comment_on_proposal($1, $2)`, [pid, body]);
+      await c.query(`select public.comment_on_proposal($1, $2::bytea)`, [pid, body.trim() ? storeBody(body.trim(), id) : null]);
       return true;
     });
     if (!found) return notFound();

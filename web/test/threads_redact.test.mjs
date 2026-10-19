@@ -11,6 +11,7 @@
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { openBody } from "./open-row.mjs";
 import { addPeople, as, csrfOf, EDDA, flashOf, get, landed, NOA, OLA, page, post, REX, sql, start, visibleText } from "./threads-harness.mjs";
 
 const { describe } = await import("../dist/errorpage.js");
@@ -25,7 +26,10 @@ let ola;
 
 const thread = (v, t, rest = "") => `/v/${v}/threads/${t}${rest}`;
 const confirm = (m) => `?redact=${m}`;
-const row = async (m) => (await sql("select convert_from(body, 'UTF8') as body, redacted_by, author, at from public.thread_messages where id = $1", [m]))[0];
+const row = async (m) => {
+  const [r] = await sql("select body, vault_id, redacted_by, author, at from public.thread_messages where id = $1", [m]);
+  return { ...r, body: openBody(r.body, r.vault_id) };
+};
 const logged = async (v) => sql("select actor, agent, detail from public.log where vault_id = $1 and event = 'thread.redact' order by seq", [v]);
 
 before(async () => {

@@ -30,6 +30,7 @@ import type pg from "pg";
 import { z } from "zod";
 import type { Identity } from "./db.js";
 import { ADDITIVE, at, FENCE, fenced, freshNonce, makeRun, ok, PATH, peopleLabeler, PROPOSAL, READ, refuse, SECRET, ToolError, TTL_MINUTES, VAULT, VAULT_REF } from "./tools-shared.js";
+import { openText } from "./content.js";
 import { parseWorkPlanBlock } from "./workplan-format.js";
 
 // The same pattern the database enforces on a step's key (and the plan
@@ -142,7 +143,7 @@ export function registerWorkPlanTools(
     async ({ vault, path }) =>
       run(async (c) => {
         const { rows } = await c.query(
-          `select convert_from(fv.body, 'UTF8') as body, fv.id as version
+          `select fv.body, v.id as vault_id, fv.id as version
              from ${VAULT_REF}
              cross join lateral (select * from public.files f
                                   where f.vault_id = v.id and f.path = $2 and f.deleted_at is null offset 0) f
@@ -150,9 +151,10 @@ export function registerWorkPlanTools(
           [vault, path],
         );
         if (rows.length === 0) return refuse("No file at that path. Use list_files to see the vault's.");
-        if (rows[0].body === null) return refuse("That file's content was erased, so there is no plan in it to register.");
+        const text = openText(rows[0].body, rows[0].vault_id);
+        if (text === null) return refuse("That file's content was erased, so there is no plan in it to register.");
 
-        const parsed = parseWorkPlanBlock(rows[0].body);
+        const parsed = parseWorkPlanBlock(text);
         if (!parsed.ok) {
           // The messages quote the file (a bad key, an unknown field), so
           // they are data too, not ours.

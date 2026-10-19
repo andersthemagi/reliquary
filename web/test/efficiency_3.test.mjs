@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { openBody } from "./open-row.mjs";
 import { asCliToken, asPerson, usePool } from "../dist/db.js";
 
 const BASE = process.env.WEB_URL ?? "http://127.0.0.1:8791";
@@ -175,14 +176,15 @@ test("file forms: 1 MiB of non-Latin text (about 3 MB as a form) is saved, not r
   const r = await post(`${V}/file`, { csrf: token, action: "write", path: "notes/efficiency3-kana.md", content });
   assert.equal(r.status, 303);
   assert.match(r.headers.get("location"), /\/file\?path=notes%2Fefficiency3-kana\.md$/);
+  // The row is sealed (the envelope over the text); opened, it is the text.
   const stored = await asPerson(ANA, async (c) =>
     (await c.query(
-      `select octet_length(fv.body) as n from public.files f join public.file_versions fv on fv.id = f.current_version_id
+      `select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id
         where f.vault_id = $1 and f.path = 'notes/efficiency3-kana.md'`,
       [TEAM_VAULT],
-    )).rows[0].n,
+    )).rows[0].body,
   );
-  assert.equal(stored, 1_048_575);
+  assert.equal(Buffer.byteLength(openBody(stored, TEAM_VAULT), "utf8"), 1_048_575);
 });
 
 test("file forms: text over 1 MiB in a file form is refused with the ceiling, not a 413", async () => {

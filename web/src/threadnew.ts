@@ -11,6 +11,7 @@
 //   POST /v/:id/threads         title, body, path, to (any number of member ids)
 
 import { asPerson } from "./db.js";
+import { CONTROL_CHARS, storeBody, threadText } from "./content.js";
 import { Refusal } from "./failure.js";
 import { callout, csrfField, html, pageHeader, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
@@ -80,11 +81,13 @@ export async function openThread(ctx: Ctx, id: string): Promise<Reply> {
     to: ctx.form.getAll("to"),
   };
   if (typed.to.some((u) => !UUID.test(u))) return form(ctx, id, v, { ...typed, to: [] }, refuse("An addressee wasn’t one of this vault’s members, so no thread was opened"));
+  const body = threadText(typed.body);
+  if (body === null) return form(ctx, id, v, typed, message(new Refusal({ status: 400, where: "web app (the thread form)", why: CONTROL_CHARS })));
   try {
     const tid = await asPerson(
       ctx.userId,
       async (c) =>
-        (await c.query(`select public.open_thread($1, $2, $3, $4::uuid[], $5) as id`, [id, typed.title, typed.body, typed.to.length ? typed.to : null, typed.path || null])).rows[0].id as string,
+        (await c.query(`select public.open_thread($1, $2, $3::bytea, $4, $5::uuid[], $6, null, null) as id`, [id, typed.title, body && storeBody(body, id), body.length, typed.to.length ? typed.to : null, typed.path || null])).rows[0].id as string,
     );
     ctx.setFlash("Thread opened.", "success");
     return { redirect: threadPath(id, tid) };

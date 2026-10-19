@@ -19,12 +19,13 @@ test("plans: list_vaults notes a vault near its storage limit, with its usage", 
   assert.match(r.text, /^Pat full \(owner\) id=[0-9a-f-]{36}; limits: storage 90 bytes of 100 bytes$/m);
 });
 
+// Storage counts the sealed body: a 20-character text plus its 32-byte envelope (test.sh's key id is two characters).
 test("plans: a write past the storage limit reaches the agent as a clear refusal, and nothing is written", async () => {
   const r = await call("write_file", { vault: "Pat full", path: "notes/more.md", content: "m".repeat(20) });
   assert.equal(r.isError, true);
   const [first, second] = r.text.split("\n");
   assert.equal(first,
-    "Limit reached: Pat full has 90 bytes of its 100 bytes storage limit on the MCP small plan, and this needs 20 bytes more. Erase files you no longer need (deleting a file keeps its history) or delete variables, then try again");
+    "Limit reached: Pat full has 90 bytes of its 100 bytes storage limit on the MCP small plan, and this needs 52 bytes more. Erase files you no longer need (deleting a file keeps its history) or delete variables, then try again");
   assert.match(second, /^\(what: .*; where: MCP tool write_file.*; ref [0-9a-f]{8}\)$/);
   const files = await call("list_files", { vault: "Pat full" });
   assert.doesNotMatch(files.text, /more\.md/);

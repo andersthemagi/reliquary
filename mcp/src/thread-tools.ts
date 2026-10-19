@@ -22,6 +22,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
+import { CONTROL_CHARS, openB64, storeBody, threadText } from "./content.js";
 import type { Identity } from "./db.js";
 import { ADDITIVE, at, freshNonce, makeRun, oneLine, ok, peopleLabeler, READ, ToolError, VAULT } from "./tools-shared.js";
 
@@ -127,9 +128,12 @@ export function registerThreadTools(
           if (!rows[0]) throw new ToolError(`No task ${target} in this vault: check the plan's path and the step's key.`);
           step = rows[0].id;
         }
+        const v = (await c.query("select private.vault_ref($1) as id", [vault])).rows[0].id as string;
+        const text = threadText(message);
+        if (text === null) throw new ToolError(CONTROL_CHARS);
         const { rows } = await c.query(
-          "select public.open_thread(private.vault_ref($1), $2, $3, $4::uuid[], $5, $6, $7) as id",
-          [vault, title, message, to ?? null, kind === "file" ? target : null, step, kind === "proposal" ? target : null],
+          "select public.open_thread($1::uuid, $2, $3::bytea, $4, $5::uuid[], $6, $7, $8) as id",
+          [v, title, text && storeBody(text, v), text.length, to ?? null, kind === "file" ? target : null, step, kind === "proposal" ? target : null],
         );
         return ok(
           `Opened thread ${rows[0].id} as ${id.agent}. ` +
@@ -162,7 +166,10 @@ export function registerThreadTools(
         if (status === "open") await c.query("select public.reopen_thread($1)", [thread_id]);
         let posted: string | null = null;
         if (message !== undefined) {
-          posted = (await c.query("select public.post_message($1, $2) as id", [thread_id, message])).rows[0].id;
+          const v = ((await c.query("select vault_id from public.threads where id = $1", [thread_id])).rows[0]?.vault_id ?? thread_id) as string;
+          const text = threadText(message);
+          if (text === null) throw new ToolError(CONTROL_CHARS);
+          posted = (await c.query("select public.post_message($1, $2::bytea, $3) as id", [thread_id, text && storeBody(text, v), text.length])).rows[0].id;
         }
         if (status === "resolved") await c.query("select public.resolve_thread($1)", [thread_id]);
         const did = [
@@ -254,7 +261,8 @@ export function registerThreadTools(
              from (select public.read_thread($1, $2, $3) as r offset 0) x`,
           [thread_id, after ?? null, limit ?? 50],
         );
-        const { thread: t, messages, more } = rows[0].r as { thread: Summary; messages: Message[]; more: boolean };
+        const { thread: t, messages: sealed, more } = rows[0].r as { thread: Summary; messages: Message[]; more: boolean };
+        const messages = sealed.map((m) => ({ ...m, body: openB64(m.body, t.vault_id) }));
         const { who, summary } = peopleLabeler(id.userId);
         const nonce = freshNonce([t.title, ...messages.map((m) => m.body)]);
         const anchor = about(t);

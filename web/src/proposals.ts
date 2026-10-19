@@ -24,6 +24,7 @@ import {
   type Vault,
 } from "./pages.js";
 import { byWhom, latestFeedback, person, rowSnooze, snoozeControl, threadSection, type Commented } from "./thread.js";
+import { openText, storeBody } from "./content.js";
 import { Refusal } from "./failure.js";
 import { risks } from "./risk.js";
 import { planPath } from "./tasks.js";
@@ -165,12 +166,12 @@ export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
         // rule_for() per row. Who decided: the approvers of the applied
         // revision, or who rejected it. Decided ones by when, newest first.
         `with page as (
-           select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, convert_from(p.body, 'UTF8') as body,
+           select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
                   p.status, p.decided_at, p.base_version_id,
                   row_number() over (order by coalesce(p.decided_at, p.created_at) desc) as ord
              from public.proposals p where p.vault_id = $1 and p.status = any($2::text[])
             order by coalesce(p.decided_at, p.created_at) desc limit 100)
-         select p.*, convert_from(cur.body, 'UTF8') as current_body, r.quorum,
+         select p.*, cur.body as current_body, r.quorum,
                 (select count(*) from public.approvals a where a.proposal_id = p.id and a.decision = 'approve'
                   and a.revision = p.revision)::int as approvals,
                 array(select a.user_id from public.approvals a
@@ -184,7 +185,7 @@ export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
           order by p.ord`,
         [id, IN_TAB[tab]],
       )
-    ).rows;
+    ).rows.map((r) => ({ ...r, body: openText(r.body, id), current_body: openText(r.current_body, id) }));
     const count = (t: TabId) => IN_TAB[t].reduce((n, s) => n + (counts.get(s) ?? 0), 0);
     const body = html`
       ${pageHeader({
@@ -224,7 +225,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     if (!v) return null;
     const p = (
       await c.query(
-        `select p.*, convert_from(p.body, 'UTF8') as body, convert_from(cur.body, 'UTF8') as current_body, f.current_version_id, convert_from(base.body, 'UTF8') as base_body, (private.rule_for(p.vault_id, p.path)).quorum
+        `select p.*, cur.body as current_body, f.current_version_id, base.body as base_body, (private.rule_for(p.vault_id, p.path)).quorum
            from public.proposals p
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
@@ -232,7 +233,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
           where p.id = $1 and p.vault_id = $2`,
         [pid, id],
       )
-    ).rows[0];
+    ).rows.map((r) => ({ ...r, body: openText(r.body, id), current_body: openText(r.current_body, id), base_body: openText(r.base_body, id) }))[0];
     if (!p) return null;
     const approvals = (
       await c.query(`select user_id, decision, at from public.approvals where proposal_id = $1 and revision = $2 order by at`, [
@@ -474,7 +475,7 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string, refused?: 
 async function loadEditable(c: pg.PoolClient, id: string, pid: string, own: string | null) {
   return (
     await c.query(
-      `select p.*, convert_from(p.body, 'UTF8') as body, convert_from(cur.body, 'UTF8') as current_body
+      `select p.*, cur.body as current_body
          from public.proposals p
          left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
          left join public.file_versions cur on cur.id = f.current_version_id
@@ -483,7 +484,7 @@ async function loadEditable(c: pg.PoolClient, id: string, pid: string, own: stri
           and ($3::uuid is null or p.proposed_by = $3)`,
       [pid, id, own],
     )
-  ).rows[0];
+  ).rows.map((r) => ({ ...r, body: openText(r.body, id), current_body: openText(r.current_body, id) }))[0];
 }
 
 // Revising your own proposal: the same editor, without approving. The
@@ -528,10 +529,11 @@ export async function reviseProposal(ctx: Ctx, id: string, pid: string): Promise
       ctx.userId,
       async (c) =>
         (
-          await c.query(`select public.revise_proposal($1, $2, $3) as r`, [
+          await c.query(`select public.revise_proposal($1, $2::bytea, $3, $4::bytea) as r`, [
             pid,
-            (ctx.form.get("content") ?? "").replaceAll("\r\n", "\n"),
+            storeBody((ctx.form.get("content") ?? "").replaceAll("\r\n", "\n"), id),
             ctx.form.get("reason") || null,
+            (ctx.form.get("reason") ?? "").trim() ? storeBody((ctx.form.get("reason") ?? "").trim(), id) : null,
           ])
         ).rows[0].r as number,
     );
@@ -578,9 +580,10 @@ export async function decide(ctx: Ctx, id: string, pid: string): Promise<Reply> 
         // The references an approval records: read from the proposal, as
         // the person sees it, in the transaction that applies it (the
         // revision check refuses a text that changed in between).
-        const p = (await c.query(`select path, convert_from(body, 'UTF8') as body from public.proposals where id = $1 and kind = 'write'`, [pid])).rows[0];
-        const refs = decision === "approve" && p ? referencesIn(p.path, p.body) : null;
-        return (await c.query(`select public.decide($1, $2, $3, $4, $5) as r`, [pid, decision, note || null, revision, refs])).rows[0].r as string;
+        const p = (await c.query(`select path, body from public.proposals where id = $1 and kind = 'write'`, [pid])).rows[0];
+        const refs = decision === "approve" && p ? referencesIn(p.path, openText(p.body, id) ?? "") : null;
+        const why = note.trim();
+        return (await c.query(`select public.decide($1, $2, $3::bytea, $4, $5) as r`, [pid, decision, why ? storeBody(why, id) : null, revision, refs])).rows[0].r as string;
       },
     );
     decidedFlash(ctx, result);
@@ -601,7 +604,8 @@ export async function editAndApprove(ctx: Ctx, id: string, pid: string): Promise
       async (c) => {
         const p = (await c.query(`select path from public.proposals where id = $1`, [pid])).rows[0];
         const refs = p ? referencesIn(p.path, content) : null;
-        return (await c.query(`select public.edit_and_approve($1, $2, $3, $4, $5) as r`, [pid, content, note || null, revision, refs])).rows[0].r as string;
+        const why = note.trim();
+        return (await c.query(`select public.edit_and_approve($1, $2::bytea, $3::bytea, $4, $5) as r`, [pid, storeBody(content, id), why ? storeBody(why, id) : null, revision, refs])).rows[0].r as string;
       },
     );
     decidedFlash(ctx, result);
@@ -624,7 +628,7 @@ export async function repropose(ctx: Ctx, id: string, pid: string): Promise<Repl
         await c.query(`select * from public.proposals where id = $1 and vault_id = $2 and status = 'stale' and kind = 'write'`, [pid, id])
       ).rows[0];
       if (!p || p.body === null) return null;
-      return (await c.query(`select public.propose($1, $2, $3, $4) as id`, [id, p.path, p.body, `Proposed again: ${p.reason}`])).rows[0]
+      return (await c.query(`select public.propose($1, $2, $3::bytea, $4) as id`, [id, p.path, storeBody(openText(p.body, id) ?? "", id), `Proposed again: ${p.reason}`])).rows[0]
         .id as string;
     });
     if (!next) return notFound(ctx);

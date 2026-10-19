@@ -31,7 +31,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 13 | [Links](#links) | Built |
 | 14 | [Routines](#routines) | Designed, not built |
 | 15 | [Environment variables](#environment-variables) | Built |
-| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461), the bytea columns (#462), search in the server (#463) and references from the writer (#464) are built; sealing writes and the backfill to come (#238) |
+| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461), the bytea columns and sealing writes (#462), search in the server (#463) and references from the writer (#464) are built; the backfill (#465) and dropping the plaintext path (#466) to come (#238) |
 | 17 | [Continuity](#continuity) | Designed, not built |
 | 18 | [Client engagements](#client-engagements) | Designed, not built |
 | 19 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
@@ -1956,9 +1956,10 @@ of `search` moved up into the server that holds the key (built, #463:
    first byte isn't the envelope marker is plaintext), so reads work
    during the backfill.
 2. `alter column body type bytea` per table, with the plaintext bytes
-   kept as they are (built: writes keep taking text through an assignment
-   cast, and every SQL read converts; the type change alone), then, once
-   search and references have left SQL, every write sealing.
+   kept as they are (built, #468), then, once search and references have
+   left SQL, every write sealing (built: each write function has a bytea
+   form the servers call with the sealed body; the text forms and the
+   assignment cast stay for the SQL tests until step 4).
 3. The backfill: `rekey.ts` extended, run as `reliquary_ops` (the role
    that serves no requests), in batches, sealing each plaintext row in
    place and reporting counts only.
