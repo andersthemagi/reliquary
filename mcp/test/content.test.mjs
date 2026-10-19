@@ -14,7 +14,7 @@ const start = (env) =>
   });
 
 test("mcp content: self-hosted, no CONTENT_KEYS refuses to start", () => {
-  const r = start({ SELF_HOSTED: "1", DATABASE_TLS: "off", MCP_RESOURCE: "https://mcp.example.com/mcp", AUTH_ISSUER: "https://app.example.com", LINK_PROXY_SECRET: randomBytes(24).toString("base64url") });
+  const r = start({ CONTENT_KEYS: "", SELF_HOSTED: "1", DATABASE_TLS: "off", MCP_RESOURCE: "https://mcp.example.com/mcp", AUTH_ISSUER: "https://app.example.com", LINK_PROXY_SECRET: randomBytes(24).toString("base64url") });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /Refusing to start: SELF_HOSTED is set but CONTENT_KEYS is not/);
 });

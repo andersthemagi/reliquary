@@ -9,6 +9,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { openText } from "./content.js";
 import { callout, html, pageHeader, plural, raw, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { recentChanges } from "./changes.js";
@@ -62,7 +63,7 @@ async function facts(c: pg.PoolClient, ctx: Ctx, v: Vault): Promise<Facts> {
       `with w as (select q.id, q.path, q.kind, q.current_body, q.proposed_by, q.agent, q.created_at
                     from (${WAITING_SQL}) q where q.vault_id = $2),
             fl as (select public.list_flags($2, ${FLAG_LIMIT}) as r),
-            readme as (select f.path, convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id
+            readme as (select f.path, fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id
                         where f.vault_id = $2 and f.deleted_at is null and lower(f.path) = 'readme.md' limit 1)
        select coalesce((select json_agg(x order by x.created_at) from (select * from w order by w.created_at limit ${ROWS}) x), '[]') as waiting,
               (select count(*) from w)::int as waiting_n,
@@ -76,7 +77,7 @@ async function facts(c: pg.PoolClient, ctx: Ctx, v: Vault): Promise<Facts> {
               (select path from readme) as readme_path, (select body from readme) as readme`,
       [ctx.userId, v.id],
     )
-  ).rows[0];
+  ).rows.map((r) => ({ ...r, readme: openText(r.readme, v.id) }))[0];
 }
 
 // The tasks someone holds right now, across every plan, with the agent that

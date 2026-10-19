@@ -49,6 +49,7 @@ import {
   type Reply,
   type Vault,
 } from "./pages.js";
+import { openText, storeBody } from "./content.js";
 import { referencesIn } from "./references.js";
 
 // Vault shell: sidebar with search, links and the folder tree.
@@ -251,7 +252,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         // is listing, and a folder of large files shouldn't be read whole.
         `with here as (
            select f.path, f.updated_at,
-                  case when lower(f.path) = lower($2 || 'readme.md') then convert_from(fv.body, 'UTF8') end as body
+                  case when lower(f.path) = lower($2 || 'readme.md') then fv.body end as body
              from public.files f left join public.file_versions fv on fv.id = f.current_version_id
             where f.vault_id = $1 and f.deleted_at is null and starts_with(f.path, $2))
          select here.path, r.policy, here.updated_at, here.body
@@ -259,7 +260,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
           order by here.path`,
         [id, dir],
       )
-    ).rows;
+    ).rows.map((r) => ({ ...r, body: openText(r.body, id) }));
     if (dir && children.length === 0) return null;
     const rule = dir ? await ruleFor(c, id, dir) : null;
     const subdirs = new Map<string, Date>();
@@ -358,12 +359,12 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const f = (
       await c.query(
         `select f.id, f.path, (private.rule_for(f.vault_id, f.path)).policy,
-                convert_from(fv.body, 'UTF8') as body, fv.author, fv.agent, fv.created_at, fv.erased_at
+                fv.body, fv.author, fv.agent, fv.created_at, fv.erased_at
            from public.files f left join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null`,
         [id, path],
       )
-    ).rows[0];
+    ).rows.map((r) => ({ ...r, body: openText(r.body, id) }))[0];
     if (!f) return null;
     const rule = await ruleFor(c, id, path);
     const pending = (
@@ -539,12 +540,12 @@ export async function editView(ctx: Ctx, id: string, refused?: Refused): Promise
     } else {
       f = (
         await c.query(
-          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, convert_from(fv.body, 'UTF8') as body
+          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, fv.body
              from public.files f join public.file_versions fv on fv.id = f.current_version_id
             where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
           [id, path],
         )
-      ).rows[0];
+      ).rows.map((r) => ({ ...r, body: openText(r.body, id) }))[0];
     }
     if (!f) return null;
     const canon = f.policy === "canon";
@@ -663,12 +664,12 @@ async function conflictReply(ctx: Ctx, id: string, path: string, typed: string):
     if (!v || !(await writablePath(c, v, path))) return null;
     const cur = (
       await c.query(
-        `select fv.id as version, convert_from(fv.body, 'UTF8') as body, fv.author, fv.agent, f.updated_at
+        `select fv.id as version, fv.body, fv.author, fv.agent, f.updated_at
            from public.files f join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
         [id, path],
       )
-    ).rows[0];
+    ).rows.map((r) => ({ ...r, body: openText(r.body, id) }))[0];
     if (!cur) return { gone: true as const };
     const body = html`
       ${pageHeader({ crumb: crumbs(id, v, path, false, "Edit"), title: `Someone saved ${path.split("/").pop()} first`, path: true })}
@@ -732,13 +733,13 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
       if (action === "create") {
         const r = (
           await c.query(
-            `select case when x.canon then public.propose(x.id, $2, $3, $4, false) end as pid,
-                    case when not x.canon and not x.taken then public.write_file(x.id, $2, $3, null, $5) end as written,
+            `select case when x.canon then public.propose(x.id, $2, $3::bytea, $4, false) end as pid,
+                    case when not x.canon and not x.taken then public.write_file(x.id, $2, $3::bytea, null, $5) end as written,
                     not x.canon and x.taken as taken
                from (select v.id, (private.rule_for(v.id, $2)).policy = 'canon' as canon,
                             exists (select 1 from public.files f where f.vault_id = v.id and f.path = $2 and f.deleted_at is null) as taken
                        from ${V} offset 0) x`,
-            [id, path, content, reason, referencesIn(path, content)],
+            [id, path, storeBody(content, id), reason, referencesIn(path, content)],
           )
         ).rows[0];
         if (r.taken) {
@@ -747,7 +748,7 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
         return r.pid ? ({ kind: "proposed", pid: r.pid as string } as const) : ({ kind: "write" } as const);
       }
       if (action === "write") {
-        await c.query(`select public.write_file(v.id, $2, $3, $4, $5) from ${V}`, [id, path, content, expectedVersion, referencesIn(path, content)]);
+        await c.query(`select public.write_file(v.id, $2, $3::bytea, $4, $5) from ${V}`, [id, path, storeBody(content, id), expectedVersion, referencesIn(path, content)]);
         return { kind: "write" } as const;
       }
       if (action === "delete") {
@@ -755,7 +756,7 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
         return { kind: "delete" } as const;
       }
       const del = action === "propose-delete";
-      const pid = (await c.query(`select public.propose(v.id, $2, $3, $4, $5) as id from ${V}`, [id, path, del ? null : content, reason, del]))
+      const pid = (await c.query(`select public.propose(v.id, $2, $3::bytea, $4, $5) as id from ${V}`, [id, path, del ? null : storeBody(content, id), reason, del]))
         .rows[0].id as string;
       return { kind: "proposed", pid } as const;
     });

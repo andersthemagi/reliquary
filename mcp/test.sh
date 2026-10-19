@@ -54,6 +54,9 @@ link_proxy_secret=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
 # Shared by the MCP server that searches by meaning and the function's
 # stand-in (test/embed-double.mjs); the server log is checked for it below.
 embed_secret=EMBEDSECRET-$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# Every server seals content under this key (src/content.ts); tests that read
+# a row directly open it with the same key.
+content_keys="t1:$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')"
 
 # The web app as the OAuth authorization server, signed in as Ben. It is
 # built inside its own container from a read-only view of web/, so it never
@@ -63,7 +66,7 @@ embed_secret=EMBEDSECRET-$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')
 "$engine" run -d --name "$web" --network host -v "$PWD/../web":/src:ro,z -v "$PWD":/mcp:z -v "$PWD/../version.txt":/version.txt:ro,z \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000b -e LOGIN_FILE="/mcp/.login-oauth-$slot" \
-  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e LINK_DISCOVERY_ALLOW_LOOPBACK=1 -e RATE_LIMIT_SCALE=1000 -e PORT=$webport \
+  -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e CIMD_ALLOW_LOOPBACK=1 -e LINK_DISCOVERY_ALLOW_LOOPBACK=1 -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT=$webport \
   -e VARIABLES_KEY="$link_test_key" -e LINK_PROXY_SECRET="$link_proxy_secret" "$node" sh -c \
   'mkdir -p /app && cd /src && cp -r src public package.json package-lock.json tsconfig.json stamp-version.mjs /app/ && cd /app &&
    if [ -x /src/node_modules/.bin/tsc ]; then ln -s /src/node_modules node_modules; else npm ci --no-audit --no-fund --silent; fi &&
@@ -78,14 +81,14 @@ embed_secret=EMBEDSECRET-$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$port/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
   -e LINK_PROXY_SECRET="$link_proxy_secret" \
-  -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
+  -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
 wait_until "$srv" "the MCP server to answer /healthz" curl -sf "http://127.0.0.1:$port/healthz"
 # Tool calls: 3 per 2-second window (so a test can wait one out) and 5 a
 # day per token, 1 of them a thread write; 3 401s a minute per address.
 "$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$rlport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
-  -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2,mcp_request_work_minute=1/2" \
+  -e CONTENT_KEYS="$content_keys" -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2,mcp_request_work_minute=1/2" \
   -e PORT=$rlport "$node" node dist/server.js >/dev/null
 wait_until "$rl" "the rate-limit MCP server to answer /healthz" curl -sf "http://127.0.0.1:$rlport/healthz"
 # Search by meaning (test/semantic_search.test.mjs): the other servers have
@@ -98,14 +101,14 @@ wait_until "$rl" "the rate-limit MCP server to answer /healthz" curl -sf "http:/
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$semport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
   -e EMBED_URL="http://127.0.0.1:$embport/" -e EMBED_SECRET="$embed_secret" -e EMBED_MIN_SIMILARITY=0.5 \
-  -e RATE_LIMIT_SCALE=1000 -e PORT=$semport "$node" node dist/server.js >/dev/null
+  -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT=$semport "$node" node dist/server.js >/dev/null
 wait_until "$sem" "the MCP server that searches by meaning to answer /healthz" curl -sf "http://127.0.0.1:$semport/healthz"
 wait_until "$web" "the web app (authorization server) to answer /healthz" curl -sf "http://127.0.0.1:$webport/healthz"
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
 # docs/ read-only, for test/parity.test.mjs (every tool is in docs/parity.md).
-"$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" \
+"$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/../docs":/docs:ro,z -w /app "${env_args[@]}" -e CONTENT_KEYS="$content_keys" \
   -e MCP_URL="http://127.0.0.1:$port/mcp" -e TEST_DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_ERROR_REFS_FILE="/app/.error-refs-$slot" -e MCP_RL_URL="http://127.0.0.1:$rlport/mcp" \
   -e MCP_SEM_URL="http://127.0.0.1:$semport/mcp" -e EMBED_DOUBLE_URL="http://127.0.0.1:$embport" -e SEM_REFS_FILE="/app/.sem-refs-$slot" -e TEST_SUPER_URL="postgres://postgres:test@127.0.0.1:$pgport/postgres" \

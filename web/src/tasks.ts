@@ -31,6 +31,7 @@
 import type pg from "pg";
 import { asPerson } from "./db.js";
 import { callout, confirmPage, emptyState, html, menu, pageHeader, plural, time, type Raw } from "./html.js";
+import { openText } from "./content.js";
 import { Refusal } from "./failure.js";
 import { filePath, message, notFound, proposalPath, q, render, vault, vaultPath, who, writablePath, type Ctx, type Reply, type Vault } from "./pages.js";
 import { vaultShell } from "./files.js";
@@ -82,14 +83,14 @@ async function loadPlans(c: pg.PoolClient, id: string): Promise<Plan[]> {
       `select l.o_path as path, l.o_registered_at as registered_at, l.o_registered_by as registered_by, l.o_file as file,
               l.o_ready as ready, l.o_blocked as blocked, l.o_claimed as claimed, l.o_done as done, l.o_cancelled as cancelled,
               l.o_review as review,
-              substring(left(convert_from(fv.body, 'UTF8'), 4000) from '(?n)^#[[:blank:]]+(.*[^[:space:]])') as title
+              fv.body
          from public.list_work_plans($1) l
          left join public.files f on f.vault_id = $1 and f.path = l.o_path and f.deleted_at is null
          left join public.file_versions fv on fv.id = f.current_version_id
         order by l.o_path`,
       [id],
     )
-  ).rows;
+  ).rows.map(({ body, ...r }) => ({ ...r, title: /^#[ \t]+(.*[^\s])/m.exec((openText(body, id) ?? "").slice(0, 4000))?.[1] ?? null }));
 }
 
 // One round trip, for one plan or (path null) every plan in the vault: the
