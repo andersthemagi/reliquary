@@ -123,6 +123,23 @@ Status 2026-10-17: references are built (#393:
 `20261017100000_file_references.sql`, `related_files`, the file page's
 References and Referenced by). Semantic search (#207) is in progress.
 
+### 2026-10-19: vault content as ciphertext (the content key)
+
+Owner's decision, 2026-10-19: take up #234's children now, alongside
+milestone 3. The off-site dumps are encrypted first (#237). Vault content
+(#238) is designed before any migration, in design.md's "Encryption at
+rest: the content key": one sealed `bytea` column per content table with
+the vault id as additional data, a separate `CONTENT_KEYS` set held by
+both servers (the MCP server keeps refusing the variables key), search
+moved up into the server that holds the key with a cap of 2,000 files per
+search, references extracted by the writing server instead of a trigger,
+and a four-step migration that drops the plaintext read path only after
+an encrypted backup has restored. Crypto-shredding (#239) and the feedback
+and invite columns (#240) follow it. The IPv6 check left on #221 is
+waived.
+
+Status 2026-10-19: #237 built (PR pending). #238 designed, not started.
+
 ## Milestone 1: core, MCP and UI
 
 Vaults, files with canon/open policies, proposals with quorum, log, gate,

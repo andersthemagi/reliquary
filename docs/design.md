@@ -31,17 +31,18 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 13 | [Links](#links) | Built |
 | 14 | [Routines](#routines) | Designed, not built |
 | 15 | [Environment variables](#environment-variables) | Built |
-| 16 | [Continuity](#continuity) | Designed, not built |
-| 17 | [Client engagements](#client-engagements) | Designed, not built |
-| 18 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
-| 19 | [Privacy, erasure and compliance](#privacy-erasure-and-compliance) | Erasure and deletion built; the rest designed |
-| 20 | [Architecture](#architecture) | As built |
-| 21 | [Data model](#data-model) | As built |
-| 22 | [Hostile tests](#hostile-tests) | Built for what exists; the rest is the list to write |
-| 23 | [Build order](#build-order) | Current |
-| 24 | [Open decisions](#open-decisions) | Decided: 1 to 4; open: 5 and 6 |
-| 25 | [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later) | Reference |
-| 26 | [Out of scope](#out-of-scope) | Reference |
+| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | Designed 2026-10-19, not built (#238) |
+| 17 | [Continuity](#continuity) | Designed, not built |
+| 18 | [Client engagements](#client-engagements) | Designed, not built |
+| 19 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
+| 20 | [Privacy, erasure and compliance](#privacy-erasure-and-compliance) | Erasure and deletion built; the rest designed |
+| 21 | [Architecture](#architecture) | As built |
+| 22 | [Data model](#data-model) | As built |
+| 23 | [Hostile tests](#hostile-tests) | Built for what exists; the rest is the list to write |
+| 24 | [Build order](#build-order) | Current |
+| 25 | [Open decisions](#open-decisions) | Decided: 1 to 4; open: 5 and 6 |
+| 26 | [Where it falls flat, and what scales later](#where-it-falls-flat-and-what-scales-later) | Reference |
+| 27 | [Out of scope](#out-of-scope) | Reference |
 
 Status is as of 2026-10-09. "Built" means shipped and tested; a section marked
 so can still carry a "what this doesn't settle" list.
@@ -499,9 +500,9 @@ doesn't. When #238 makes content ciphertext, cosine ranking can't run over
 ciphertext in Postgres, so the vectors are encrypted under the same content
 key and ranking by meaning moves to the MCP server: it decrypts the
 searched vault's vectors and scores them in memory, the same move #238
-recommends for words, and the HNSW index goes. Until #238 lands this is a
-recorded gap, not a decision to keep vectors in the clear; #238's design
-has to cover it.
+makes for words, and the HNSW index goes. Until #238 lands this is a
+recorded gap, not a decision to keep vectors in the clear; the design is
+[Encryption at rest: the content key](#encryption-at-rest-the-content-key).
 
 ### What this doesn't settle
 
@@ -1831,6 +1832,147 @@ accounts.
   environment could still decrypt them. Teams that need otherwise get
   client-side encryption (per-member `age` keys) as a separate feature.
 
+## Encryption at rest: the content key
+
+Designed 2026-10-19 (#238, part of #234), before it is built. Variable
+values, link credentials and pending imports are already AES-256-GCM
+ciphertext under `VARIABLES_KEYS`, keys the database never holds. Vault
+content is not: file text, proposed text, notes, thread messages and the
+search vectors sit in plaintext, so a leaked database, a stolen database
+credential or a lost backup is a leak of every vault. This section makes
+content ciphertext the same way, with the operator still able to decrypt
+(level B of #234; zero-access for content was decided against on
+2026-10-10, since hosted agents, search and routines read it server-side).
+
+### 1. What is content
+
+The columns that hold what people and agents write, and anything a
+model's output can be turned back into:
+
+| Column | Today | Becomes |
+|---|---|---|
+| `file_versions.body` | text | sealed |
+| `proposals.body` | text | sealed |
+| `proposal_notes.body` | text | sealed |
+| `thread_messages.body` | text | sealed |
+| `file_embeddings.embedding` | `vector(384)` | sealed (the 384 floats as bytes) |
+
+Metadata stays plaintext: paths, names, authors, agents, timestamps,
+statuses, proposal reasons, work plan step keys and titles (a plan's
+outline, quoted from the file so the Tasks view and claims work in SQL),
+and the log, which holds no content by design. Feedback messages and
+invite addresses are not vault content and are #240's. The schema guard
+(F799) gains a list of content columns: each must be `bytea`, and a
+`text` column whose name is `body` or `message` outside that list fails
+the test.
+
+### 2. The envelope
+
+One `bytea` column keeps every SQL path that copies, blanks, counts or
+null-checks a body unchanged. A sealed body is
+`key_id (8 bytes, padded) || nonce (12) || ciphertext || tag (16)`, built
+by `seal()` in `web/src/secrets.ts` with the **vault id as the additional
+data** and nothing else. The vault id alone, not the row, is deliberate:
+`approve` copies a proposal's body into a new version in SQL, and
+erasure and redaction set it null; neither needs the key. A body moved to
+another vault fails to open, which is the hostile test. The key id is in
+the envelope so rotation can find rows by `substring(body, 1, 8)`; no
+second column.
+
+Storage accounting (`octet_length(body)`) counts the envelope, 36 bytes
+over the text; the 1 MiB check keeps its number. `thread_messages`'
+`(body is null) = (redacted_at is not null)` is unchanged.
+
+### 3. The key set
+
+`CONTENT_KEYS`, the same `id:key` list, parser, rotation script and
+`rekey.ts` path as `VARIABLES_KEYS`, and a separate set: a content key
+opens no variable, and the rotation of one leaves the other alone. Both
+servers hold it. The MCP server serves files, so it must decrypt them; it
+keeps refusing to start with `VARIABLES_KEYS`, so it still can never open
+a value. This widens nothing: the MCP server reads every body it serves
+today. What changes is that a database alone, or a backup alone, opens
+nothing.
+
+Required on Netlify and when `SELF_HOSTED=1`, like the variables key;
+refused if it equals a variables key. `deploy/setup.sh` generates it.
+
+### 4. Search
+
+Postgres can't match words or rank vectors it can't read, so both halves
+of `search` move up into the server that holds the key:
+
+- **Words:** `search()` keeps RLS and the path match, and returns the
+  vault's live files with their current sealed bodies, newest first, up to
+  a cap. The server opens each and matches words over its first 10 KB,
+  the same slice meaning already covers; a longer file is found by its
+  path and its head. Ranking is the same `ts_rank` idea done in the app
+  (term frequency over the slice), blended with meaning by rank as today.
+- **Meaning:** the vault's sealed vectors come back in the same call; the
+  server opens them and scores cosine in memory. The HNSW index and
+  `hnsw.iterative_scan` go; pgvector stays installed only because a
+  migration created it.
+- **The cap:** 2,000 files per search (20 MB of text to open and scan,
+  tens of milliseconds of AES-GCM). A vault past it searches its newest
+  2,000 and the first line says so. That is the new "falls flat" row.
+- The web app's searches work the same way, words only, in `web/`.
+- **Done when:** `search` returns what it returns today, row for row, for
+  the existing test corpus, by both words and meaning.
+
+### 5. Everything else that reads or parses a body
+
+- **Reads:** `read_file`, diffs, the editor, proposals, threads, export,
+  `changes_since` and the feed's excerpts open bodies in the app. One
+  helper, `openBody(row, vaultId)`, so no caller handles an envelope.
+- **References** (`[[path]]`, section Search): the trigger that parses a
+  file's text in SQL goes. The server that writes a version already has
+  the plaintext: it extracts the references and passes them as
+  `p_references text[]` to the write and approve functions, which replace
+  the file's rows. Paths are metadata; the hostile test is that an agent
+  can't name a target its text doesn't contain (the function trusts the
+  list, so the test checks the two servers, not SQL).
+- **Embeddings:** computed from plaintext in the MCP server as now,
+  sealed before `store_embeddings`.
+- **Work plans:** parsed in the MCP server already; unchanged.
+- **Erasure, redaction, `delete_vault`, export's byte counts:** unchanged
+  in SQL.
+
+### 6. Migration
+
+1. The key set, `seal`/`open` for bodies, and the guard's content list,
+   behind nothing: both servers can open a plaintext body (a row whose
+   first byte isn't the envelope marker is plaintext), so reads work
+   during the backfill.
+2. `alter column body type bytea` per table, with the plaintext bytes
+   kept as they are, and every function that writes a body sealing it.
+3. The backfill: `rekey.ts` extended, run as `reliquary_ops` (the role
+   that serves no requests), in batches, sealing each plaintext row in
+   place and reporting counts only.
+4. The plaintext read path is dropped only after `scripts/restore-test.sh`
+   has restored an encrypted backup taken after the backfill, and the
+   guard then fails on any unsealed row.
+
+Each step is its own PR; the week-of-use gate holds between 3 and 4.
+
+### Hostile tests
+
+- No `public` or `private` column holds vault content as text (F799's
+  content list, run on every push).
+- A body sealed in vault A fails to open under vault B's id.
+- `reliquary_web` and `reliquary_mcp` can't call the backfill.
+- A search over a vault whose bodies are sealed returns the test corpus's
+  results by words and by meaning.
+- The MCP server refuses to start holding `VARIABLES_KEYS`, with
+  `CONTENT_KEYS` set.
+
+### What this doesn't settle
+
+- A key per vault, dropped on delete, so backups forget at once (#239):
+  it wraps per-vault keys under this key set and follows this.
+- Feedback and invites (#240).
+- The security page's table: every content row says "ciphertext" when
+  step 4 lands, not before.
+
 ## Continuity
 
 "If I get hit by a bus, my team and their agents carry on":
@@ -2063,8 +2205,9 @@ framework.
   (AES-256-GCM, `web/src/secrets.ts`; docs/variables.md).
 - **`mcp/`** is a separate Node `http` server using the MCP SDK: the
   stateless remote endpoint at `/mcp`. It refuses to start with the
-  variables key, so it can never decrypt anything; link calls go through
-  the web app's internal endpoint with a shared secret.
+  variables key, so it can never decrypt a value; link calls go through
+  the web app's internal endpoint with a shared secret. (When #238 lands
+  it holds `CONTENT_KEYS`, to open the files it serves.)
 - **`cli/`** is the `reliquary` binary (Node, no runtime dependencies).
 - **Hosting:** two Netlify sites (`web`, `mcp`) and a Supabase project, or
   `deploy/compose` for self-hosting. No customer-side infrastructure.
@@ -2250,6 +2393,7 @@ says it's time:
 | Part | Lean v1 | Falls flat when | Then |
 |---|---|---|---|
 | Search | Postgres full text plus gte-small embeddings (pgvector, HNSW with iterative scans under RLS), blended by rank, embedded at search time | A vault gains hundreds of files at once, files matter past their first 10 KB, or one index over every vault gets slow | A scheduled sweep, more chunks per file, per-vault indexes or partitions |
+| Search over ciphertext (#238) | The server opens a vault's newest 2,000 files and scores words and vectors in memory | A vault passes 2,000 files, or searches get frequent enough that opening 20 MB each time shows | An encrypted index kept by the server (a per-vault cache with a lease), or searchable encryption |
 | Gate cost | Per-query helpers (p95 < 6 ms at 200k rows) | A vault passes millions of files | Combined indexes, partitioning by vault |
 | Quorum | Count of distinct approvers | Teams want "one from legal and one from eng" | Approver groups per folder |
 | Routines | One model call, Edge Function time limits | Multi-step agent work, long runs | A worker queue, or Managed Agents, per vault |
