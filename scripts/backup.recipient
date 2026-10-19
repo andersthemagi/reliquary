@@ -1,0 +1,3 @@
+# Public half of the off-site backup key (scripts/backup.sh seals every dump
+# to it). The identity that opens them is in the password manager, never here.
+age1s8ykzelm9xnjnmuz8xyufqdyzjxk0kfed8kyq24qv7h3cpyy2uus7w6sw4
