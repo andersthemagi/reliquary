@@ -1,7 +1,8 @@
 -- Hostile tests for 20261017140000_missed_searches: searches that found
 -- nothing are read and cleared only by the vault's owners in person, written
--- only through private.note_missed_search (and only for words that really
--- find nothing), never say who searched, and age out by the vault's period.
+-- only through private.note_missed_search (which trusts its callers, the
+-- servers, since #463 moved the search out of SQL), never say who searched,
+-- and age out by the vault's period.
 --
 -- Ana owns Team (Ben edits, Cal views); Dee owns Other.
 
@@ -25,9 +26,10 @@ $$;
 select t.expect('record: a member''s search that finds nothing is written, as a person''s or an agent''s',
   t.note('cal', 'v1', 'pricing') || ' ' || t.note('ben', 'v1', 'onboarding', 'Claude Code') || ' ' || t.listed('ana', 'v1'),
   'true true pricing:false,onboarding:true');
-select t.expect('record: words that find a file are not written, even called directly',
-  t.note('ben', 'v1', 'tomatoes') || ' ' || t.note('ben', 'v1', 'garden') || ' ' || t.listed('ana', 'v1'),
-  'false false pricing:false,onboarding:true');
+select t.expect('record: the function trusts its caller: it no longer checks the words itself (the search is the servers'')',
+  t.note('ben', 'v1', 'tomatoes') || ' ' || t.listed('ana', 'v1'),
+  'true pricing:false,onboarding:true,tomatoes:false');
+delete from public.missed_searches where vault_id = t.id('v1') and words = 'tomatoes';
 select t.expect('record: someone outside the vault writes nothing to it',
   t.note('dee', 'v1', 'planted') || ' ' || t.note(null, 'v1', 'planted') || ' ' || t.listed('ana', 'v1'),
   'false ERR 42501 pricing:false,onboarding:true');

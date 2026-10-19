@@ -13,6 +13,7 @@
 
 import type pg from "pg";
 import { fail, Refusal } from "./failure.js";
+import { vectorBytes } from "./search.js";
 
 const DIMENSIONS = 384;
 // The function's limits (supabase/functions/embed): 16 inputs a call, 2,000
@@ -108,7 +109,7 @@ async function embed(input: string[]): Promise<number[][]> {
 // no note when search by meaning isn't set up here. The database work runs
 // under a savepoint, so a failure in it leaves the search's transaction
 // usable.
-export async function queryVector(c: pg.PoolClient, vaults: string[], query: string): Promise<{ vector: string | null; note: string }> {
+export async function queryVector(c: pg.PoolClient, vaults: string[], query: string): Promise<{ vector: number[] | null; note: string }> {
   if (!URL_) return { vector: null, note: "" };
   await c.query("savepoint embed");
   try {
@@ -127,11 +128,11 @@ export async function queryVector(c: pg.PoolClient, vaults: string[], query: str
     const vectors = await embed([query, ...batch.flatMap((b) => b.parts.map((p) => p.text))]);
     let i = 1;
     for (const b of batch) {
-      const stored = b.parts.map((p, chunk) => ({ chunk, line: p.line, embedding: vectors[i++] }));
+      const stored = b.parts.map((p, chunk) => ({ chunk, line: p.line, embedding: vectorBytes(vectors[i++]).toString("base64") }));
       await c.query("select private.store_embeddings($1, $2, $3::jsonb)", [b.file, b.version, JSON.stringify(stored)]);
     }
     await c.query("release savepoint embed");
-    return { vector: JSON.stringify(vectors[0]), note: "" };
+    return { vector: vectors[0], note: "" };
   } catch (err) {
     await c.query("rollback to savepoint embed");
     const f = fail(err, { where: WHERE });

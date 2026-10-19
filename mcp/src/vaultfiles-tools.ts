@@ -12,7 +12,9 @@ import type { Identity } from "./db.js";
 import { minSimilarity, queryVector } from "./embeddings.js";
 import { Refusal } from "./failure.js";
 import { ADDITIVE, at, DESTRUCTIVE, fenced, fileBlock, freshNonce, makeRun, ok, PATH, READ, refuse, TEXT, type FileRow, VAULT, VAULT_REF, VERSION, via } from "./tools-shared.js";
+import { openBody } from "./content.js";
 import { referencesIn } from "./references.js";
+import { capNote, rankFiles, SEARCH_CAP, type Candidate, type Vector } from "./search.js";
 
 // Sizes as the database words them (private.size_text): decimal units.
 function size(n: number): string {
@@ -42,75 +44,37 @@ function limitNote(u: Usage): string {
 // shouldn't fill an agent's context by accident.
 const READ_DEFAULT_BYTES = 100_000;
 
-// The words of a websearch query, for picking matching lines: quotes, `or`
-// and -exclusions dropped. The database already decided which files match;
-// this only chooses which of their lines to show.
-export function queryTerms(q: string): string[] {
-  return q
-    .toLowerCase()
-    .replace(/"/g, " ")
-    .split(/\s+/)
-    .filter((w) => w && w !== "or" && !w.startsWith("-"))
-    .map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
-    .filter(Boolean);
-}
-
-const SNIPPET_LINES = 3;
-const SNIPPET_CHARS = 200;
-
-// Up to three matching lines of a file, numbered, each at most 200
-// characters; the first non-blank line when only the path matched. The
-// reference for SEARCH_SQL below, which search uses (the tests compare them).
-export function snippet(body: string, terms: string[]): string[] {
-  const lines = body.split("\n");
-  const clip = (l: string) => (l.length > SNIPPET_CHARS ? l.slice(0, SNIPPET_CHARS) + "..." : l);
-  const out: string[] = [];
-  for (let i = 0; i < lines.length && out.length < SNIPPET_LINES; i++) {
-    const low = lines[i].toLowerCase();
-    if (terms.some((t) => low.includes(t))) out.push(`${i + 1}: ${clip(lines[i])}`);
-  }
-  if (out.length === 0) {
-    const i = lines.findIndex((l) => l.trim() !== "");
-    if (i >= 0) out.push(`${i + 1}: ${clip(lines[i])}`);
-  }
-  return out;
-}
-
-// The same lines as snippet(), picked by the database: each result's text
-// stays there, and only its (up to three) lines come back, each cut to 201
-// characters for clip() to finish (so a line is cut exactly as snippet()
-// cuts it). Before, search fetched every result's whole text (up to 50
-// files of up to 1 MiB) to pick three lines each. Lines match by lower() in
-// the database, which agrees with JavaScript's toLowerCase() for the
-// scripts the tests cover (mcp/test/search_lines.test.mjs); "blank" is
-// JavaScript's trim() whitespace.
-const JS_SPACE = "\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
-export const SEARCH_SQL = `
-  select s.path, s.policy, s.author, s.agent, s.updated_at,
-         coalesce(
-           (select json_agg(json_build_array(m.n, left(m.line, ${SNIPPET_CHARS + 1})) order by m.n)
-              from (select l.line, l.n from string_to_table(s.body, E'\\n') with ordinality l(line, n)
-                     where exists (select 1 from unnest($4::text[]) t where strpos(lower(l.line), t) > 0)
-                     order by l.n limit ${SNIPPET_LINES}) m),
-           (select json_agg(json_build_array(m.n, left(m.line, ${SNIPPET_CHARS + 1})))
-              from (select l.line, l.n from string_to_table(s.body, E'\\n') with ordinality l(line, n)
-                     where l.line ~ '[^${JS_SPACE}]' and l.n >= coalesce(s.line, 1)
-                     order by l.n limit case when s.line is null then 1 else ${SNIPPET_LINES} end) m),
-           '[]') as lines
-    from ${VAULT_REF}
-    cross join lateral public.search(v.id, $2, $3, $5::extensions.vector, $6::real) with ordinality
-      as s(path, policy, body, updated_at, author, agent, rank, line, ord)
-   order by s.ord`;
-
 type SearchHit = Omit<FileRow, "body"> & { lines: string[] };
 
-// With `vector` (the query's, from queryVector), files found by meaning
-// join those found by words; one found by meaning alone shows the first
-// lines of its best chunk.
-export async function searchHits(c: pg.PoolClient, vault: string, query: string, limit: number, vector: string | null = null): Promise<SearchHit[]> {
-  const clip = (l: string) => (l.length > SNIPPET_CHARS ? l.slice(0, SNIPPET_CHARS) + "..." : l);
-  const { rows } = await c.query(SEARCH_SQL, [vault, query, limit, queryTerms(query), vector, minSimilarity()]);
-  return rows.map(({ lines, ...r }) => ({ ...r, lines: (lines as [number, string][]).map(([n, l]) => `${n}: ${clip(l)}`) }));
+// A vault's search, done here (search.ts): public.search_files gives the
+// vault's newest files under RLS, up to SEARCH_CAP, with their bodies,
+// which this server opens; with `vector` (the query's, from queryVector)
+// the files' stored vectors come too, and files found by meaning join
+// those found by words. `note` says when the vault had more files than
+// were read.
+export async function searchHits(c: pg.PoolClient, vault: string, query: string, limit: number, vector: number[] | null = null): Promise<{ hits: SearchHit[]; note: string }> {
+  const { rows } = await c.query(
+    `select v.id as vault_id, s.path, s.policy, s.body, s.updated_at, s.author, s.agent, s.total
+       from ${VAULT_REF} cross join lateral public.search_files(v.id, $2) s`,
+    [vault, SEARCH_CAP],
+  );
+  const files: Candidate[] = rows.map((r) => ({ ...r, body: openBody(r.body, r.vault_id) }));
+  const vectors: Vector[] = vector
+    ? (
+        await c.query(
+          `select f.path, e.line, e.embedding
+             from ${VAULT_REF}
+             join public.file_embeddings e on e.vault_id = v.id
+             join public.files f on f.id = e.file_id and f.current_version_id = e.version_id and f.deleted_at is null`,
+          [vault],
+        )
+      ).rows
+    : [];
+  const hits = rankFiles(files, query, limit, vector, minSimilarity(), vectors).map(({ lines, rank: _rank, line: _line, ...r }) => ({
+    ...r,
+    lines: lines.map(([n, l]) => `${n}: ${l}`),
+  }));
+  return { hits, note: rows.length ? capNote(Number(rows[0].total), rows.length) : "" };
 }
 
 export function registerVaultFileTools(
@@ -268,8 +232,8 @@ export function registerVaultFileTools(
     async ({ vault, query, limit }) =>
       run(async (c) => {
         const { vector, note } = await queryVector(c, vault, query);
-        const rows = await searchHits(c, vault, query, limit ?? 10, vector);
-        const lead = note ? [note] : [];
+        const { hits: rows, note: cap } = await searchHits(c, vault, query, limit ?? 10, vector);
+        const lead = [cap, note].filter(Boolean);
         if (rows.length === 0) {
           // For the vault's owners (20261017140000_missed_searches.sql): the
           // words and that an agent searched, never which one.

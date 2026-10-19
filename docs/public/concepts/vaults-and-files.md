@@ -46,7 +46,7 @@ In the web app, **Files** in a vault's sidebar is its folder list: each folder a
 
 On a wide screen, a vault's sidebar lists its sections in two groups: **Work** (**Overview**, **Files**, **Proposals**, **Threads**, **Tasks**, **Updates**), the ones you use every day, then **Setup** (**Variables**, **Links**, **Settings**). **Proposals** counts the open proposals, and **Updates** counts the [flags](flags.md) waiting for you. Under them, **Files** heads the folder tree, and the search box has its own search button. On a phone, one menu at the top names the section you're in, with a count when proposals or flags are waiting; open it for the same sections and groups as the sidebar, then the folder tree. Agents use `list_files`, `read_file` and `search`, and follow changes with `changes_since` (see [MCP tools](../reference/mcp-tools.md)).
 
-Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text.
+Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It looks only at each file's current text, and matches words over the first 10,000 characters of each file: a longer file is found by its name and its opening. A search reads a vault's newest 2,000 files; a vault with more says so on the first line of the answer (over MCP) or in a notice above the results (in the web app).
 
 ### Search by meaning
 

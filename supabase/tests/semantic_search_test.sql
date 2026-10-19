@@ -2,13 +2,13 @@
 -- vectors are read exactly as file text is, written only through
 -- private.store_embeddings, and follow a file's current version.
 
--- A unit vector along dimension i: two of them are as alike as they get
--- (similarity 1) or not at all (0).
+-- A unit vector along dimension i, as the servers store one: 384 float4s
+-- in network order (float4send), base64 for store_embeddings.
 create function t.vec(i int) returns text language sql as $$
-  select '[' || string_agg(case when g = i then '1' else '0' end, ',' order by g) || ']' from generate_series(0, 383) g
+  select encode(string_agg(float4send(case when g = i then 1 else 0 end::float4), ''::bytea order by g), 'base64') from generate_series(0, 383) g
 $$;
 create function t.chunks(i int) returns text language sql as $$
-  select jsonb_build_array(jsonb_build_object('chunk', 0, 'line', 1, 'embedding', t.vec(i)::jsonb))::text
+  select jsonb_build_array(jsonb_build_object('chunk', 0, 'line', 1, 'embedding', t.vec(i)))::text
 $$;
 create function t.file(p_vault text, p_path text) returns uuid language sql as $$
   select id from public.files where vault_id = t.id(p_vault) and path = p_path
@@ -20,11 +20,6 @@ $$;
 create function t.store(p_user text, p_vault text, p_path text, i int) returns text language sql as $$
   select t.run(p_user, format($q$select private.store_embeddings(%L, %L, %L::jsonb)$q$,
     t.file(p_vault, p_path), t.cur(p_vault, p_path), t.chunks(i)))
-$$;
--- The paths a search by meaning returns, as p_user.
-create function t.near(p_user text, p_vault text, p_query text, i int) returns text language sql as $$
-  select t.run(p_user, format($q$select coalesce(string_agg(path, ',' order by rank desc, path), '') from public.search(%L, %L, 10, %L::extensions.vector)$q$,
-    t.id(p_vault), p_query, t.vec(i)))
 $$;
 
 insert into t.ids select 'v1', t.run('ana', $q$select public.create_vault('Team')$q$)::uuid;
@@ -56,6 +51,9 @@ select t.expect('store: an outsider stores nothing for another vault''s file',
 select t.expect_true('store: ...and nothing is there',
   not exists (select 1 from public.file_embeddings where file_id = t.file('v1', 'decisions/pricing.md')));
 select t.expect('store: a reader stores the vectors of a file they can read', t.store('cal', 'v1', 'decisions/pricing.md', 1), '1');
+select t.expect('store: a vector is kept as the bytes given, 384 float4s',
+  (select octet_length(embedding)::text || ' ' || encode(substring(embedding from 5 for 4), 'hex') from public.file_embeddings where file_id = t.file('v1', 'decisions/pricing.md')),
+  '1536 3f800000');
 select t.expect('store: stored, the file leaves the queue',
   (select count(*)::text from private.embedding_queue where file_id = t.file('v1', 'decisions/pricing.md')), '0');
 select t.store('ana', 'v1', 'notes/garden.md', 2);
@@ -89,25 +87,8 @@ select t.expect('write: an owner can''t change a vector directly',
 select t.expect('write: an owner can''t delete a vector directly',
   t.run('ana', $q$delete from public.file_embeddings returning 'x'$q$), 'ERR 42501');
 
--- Searching by meaning
-
-select t.expect('search: a query with no shared words finds the file by meaning',
-  t.near('cal', 'v1', 'what are you charging', 1), 'decisions/pricing.md');
-select t.expect('search: an agent finds it the same way',
-  t.run('ana', format($q$select string_agg(path, ',') from public.search(%L, 'what are you charging', 10, %L::extensions.vector)$q$, t.id('v1'), t.vec(1)), 'Claude Code'),
-  'decisions/pricing.md');
-select t.expect('search: an unrelated vector finds nothing',
-  t.near('ana', 'v1', 'what are you charging', 9), '');
-select t.expect('search: an outsider finds nothing by meaning in another vault',
-  t.near('dee', 'v1', 'what are you charging', 1), '');
-select t.expect('search: another vault''s vector never answers',
-  t.near('ana', 'v1', 'zzz', 1), 'decisions/pricing.md');
-select t.expect('search: the hit names its best chunk''s line',
-  t.run('ana', format($q$select line from public.search(%L, 'zzz', 10, %L::extensions.vector)$q$, t.id('v1'), t.vec(1))), '1');
-select t.expect('search: a file found by words and meaning ranks above one found by words only',
-  t.near('ana', 'v1', 'seats or tomatoes', 2), 'notes/garden.md,decisions/pricing.md');
-select t.expect('search: without a vector, words only, as before',
-  t.run('ana', format($q$select string_agg(path, ',') from public.search(%L, 'what are you charging', 10)$q$, t.id('v1'))), null);
+-- Searching by meaning is the servers' (web/test/search_unit.test.mjs,
+-- mcp/test/semantic_search.test.mjs): SQL gives a reader the vectors above.
 
 -- Following the file
 
@@ -117,15 +98,11 @@ select t.expect('lifecycle: a new version removes the old version''s vectors',
 select t.expect('lifecycle: ...and queues the new one',
   (select version_id::text from private.embedding_queue where file_id = t.file('v1', 'notes/garden.md')),
   t.cur('v1', 'notes/garden.md')::text);
-select t.expect('lifecycle: a superseded version is never found by meaning',
-  t.near('ana', 'v1', 'zzz', 2), '');
 
 select t.run('ana', format($q$select 'ok' from public.delete_file(%L, 'decisions/pricing.md')$q$, t.id('v1')));
 select t.expect('lifecycle: a deleted file has no vectors and isn''t queued',
   (select count(*)::text from public.file_embeddings e full join private.embedding_queue q using (file_id)
     where coalesce(e.file_id, q.file_id) = t.file('v1', 'decisions/pricing.md')), '0');
-select t.expect('lifecycle: a deleted file is never found by meaning',
-  t.near('ana', 'v1', 'zzz', 1), '');
 
 select t.store('ana', 'v1', 'notes/garden.md', 2);
 select t.run('ana', format($q$select public.erase_file(%L, 'notes/garden.md')$q$, t.id('v1')));
