@@ -25,7 +25,7 @@ let ola;
 
 const thread = (v, t, rest = "") => `/v/${v}/threads/${t}${rest}`;
 const confirm = (m) => `?redact=${m}`;
-const row = async (m) => (await sql("select body, redacted_by, author, at from public.thread_messages where id = $1", [m]))[0];
+const row = async (m) => (await sql("select convert_from(body, 'UTF8') as body, redacted_by, author, at from public.thread_messages where id = $1", [m]))[0];
 const logged = async (v) => sql("select actor, agent, detail from public.log where vault_id = $1 and event = 'thread.redact' order by seq", [v]);
 
 before(async () => {

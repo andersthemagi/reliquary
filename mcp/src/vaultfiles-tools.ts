@@ -234,7 +234,7 @@ export function registerVaultFileTools(
     async ({ vault, path, from_line, to_line, max_bytes }) =>
       run(async (c) => {
         const { rows } = await c.query(
-          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.body,
+          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, convert_from(fv.body, 'UTF8') as body,
                   fv.author, fv.agent, f.updated_at, fv.id as version,
                   pc.holder as claim_holder, pc.holder_label as claim_label, pc.expires_at as claim_expires
              from ${VAULT_REF}

@@ -124,7 +124,7 @@ select t.expect('delete account: the log keeps everything they did, plus one ent
   '3 3 invite.revoke,member.leave,member.leave');
 select t.expect('delete account: what they wrote stays in the vault, under their id',
   (select count(*) from public.file_versions where author = t.id('dee'))::text
-  || ' ' || t.run('ana', format($q$select body from public.file_versions v join public.files f on f.id = v.file_id
+  || ' ' || t.run('ana', format($q$select convert_from(body, 'UTF8') from public.file_versions v join public.files f on f.id = v.file_id
                                    where f.vault_id = %L and f.path = 'notes/dee.md'$q$, t.id('team'))),
   (select n from t.before where what = 'versions')::text || ' Dee was here');
 select t.expect('delete account: a vault they created counts against its remaining owner, and none is left counting against no one',

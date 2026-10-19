@@ -250,7 +250,7 @@ export async function folder(ctx: Ctx, id: string, rawDir: string): Promise<Repl
         // is listing, and a folder of large files shouldn't be read whole.
         `with here as (
            select f.path, f.updated_at,
-                  case when lower(f.path) = lower($2 || 'readme.md') then fv.body end as body
+                  case when lower(f.path) = lower($2 || 'readme.md') then convert_from(fv.body, 'UTF8') end as body
              from public.files f left join public.file_versions fv on fv.id = f.current_version_id
             where f.vault_id = $1 and f.deleted_at is null and starts_with(f.path, $2))
          select here.path, r.policy, here.updated_at, here.body
@@ -357,7 +357,7 @@ export async function fileView(ctx: Ctx, id: string): Promise<Reply> {
     const f = (
       await c.query(
         `select f.id, f.path, (private.rule_for(f.vault_id, f.path)).policy,
-                fv.body, fv.author, fv.agent, fv.created_at, fv.erased_at
+                convert_from(fv.body, 'UTF8') as body, fv.author, fv.agent, fv.created_at, fv.erased_at
            from public.files f left join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null`,
         [id, path],
@@ -538,7 +538,7 @@ export async function editView(ctx: Ctx, id: string, refused?: Refused): Promise
     } else {
       f = (
         await c.query(
-          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, fv.body
+          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.id as version, convert_from(fv.body, 'UTF8') as body
              from public.files f join public.file_versions fv on fv.id = f.current_version_id
             where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
           [id, path],
@@ -662,7 +662,7 @@ async function conflictReply(ctx: Ctx, id: string, path: string, typed: string):
     if (!v || !(await writablePath(c, v, path))) return null;
     const cur = (
       await c.query(
-        `select fv.id as version, fv.body, fv.author, fv.agent, f.updated_at
+        `select fv.id as version, convert_from(fv.body, 'UTF8') as body, fv.author, fv.agent, f.updated_at
            from public.files f join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null and fv.erased_at is null`,
         [id, path],

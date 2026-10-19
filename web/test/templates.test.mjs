@@ -51,7 +51,7 @@ const contents = (user, id) =>
   asPerson(user, async (c) => ({
     files: (
       await c.query(
-        `select f.path, v.body from public.files f join public.file_versions v on v.id = f.current_version_id
+        `select f.path, convert_from(v.body, 'UTF8') as body from public.files f join public.file_versions v on v.id = f.current_version_id
           where f.vault_id = $1 and f.deleted_at is null order by f.path collate "C"`,
         [id],
       )

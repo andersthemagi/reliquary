@@ -317,7 +317,7 @@ test("races, one wins: 12 connections write the same file from one base version,
   assert.deepEqual(codes(results), { ok: 1, RLF01: 11 });
   const winner = results.findIndex((r) => r.ok);
   const [row] = await sql(
-    `select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.vault_id = $1 and f.path = 'swap.md'`,
+    `select convert_from(v.body, 'UTF8') as body from public.files f join public.file_versions v on v.id = f.current_version_id where f.vault_id = $1 and f.path = 'swap.md'`,
     [v],
   );
   assert.equal(row.body, `writer ${winner}`);
@@ -611,7 +611,7 @@ test("races, one wins: two proposals for the same file approved at once, interle
     );
     outcomes.push(`${decided(a)}/${decided(b)} (${bState})`);
     const [row] = await sql(
-      `select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.vault_id = $1 and f.path = $2`,
+      `select convert_from(v.body, 'UTF8') as body from public.files f join public.file_versions v on v.id = f.current_version_id where f.vault_id = $1 and f.path = $2`,
       [v, path],
     );
     assert.equal(row.body, "first", path);

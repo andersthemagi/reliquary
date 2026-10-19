@@ -87,10 +87,10 @@ select t.expect('secret columns: the rekey functions cover every sealed table',
 -- body or message that isn't listed is content nobody accounted for.
 create temp table content (col text primary key, data_type text not null, why text not null);
 insert into content values
-  ('public.file_versions.body',       'text', 'file text; sealed by #238'),
-  ('public.proposals.body',           'text', 'proposed text; sealed by #238'),
-  ('public.proposal_notes.body',      'text', 'notes on a proposal; sealed by #238'),
-  ('public.thread_messages.body',     'text', 'thread messages; sealed by #238'),
+  ('public.file_versions.body',       'bytea', 'file text; sealed by #238'),
+  ('public.proposals.body',           'bytea', 'proposed text; sealed by #238'),
+  ('public.proposal_notes.body',      'bytea', 'notes on a proposal; sealed by #238'),
+  ('public.thread_messages.body',     'bytea', 'thread messages; sealed by #238'),
   ('public.file_embeddings.embedding','USER-DEFINED', 'search vectors, which invert to text; sealed by #238'),
   ('public.feedback.message',         'text', 'feedback to the operator, not vault content; #240'),
   ('public.feedback.reply',           'text', 'the operator''s reply; #240');

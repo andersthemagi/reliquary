@@ -54,7 +54,7 @@ export async function latestFeedback(c: pg.PoolClient, ctx: Ctx, p: { id: string
   if (!live(p.status)) return html``;
   const n = (
     await c.query(
-      `select body, author, agent, revision, at from public.proposal_notes
+      `select convert_from(body, 'UTF8') as body, author, agent, revision, at from public.proposal_notes
         where proposal_id = $1 and kind = 'request_changes' and erased_at is null
         order by at desc limit 1`,
       [p.id],
@@ -142,7 +142,7 @@ export async function threadSection(
   const { vaultId: id, p } = o;
   const entries = (
     await c.query(
-      `select kind, body, author, agent, revision, at, erased_at from public.proposal_notes
+      `select kind, convert_from(body, 'UTF8') as body, author, agent, revision, at, erased_at from public.proposal_notes
         where proposal_id = $1
        union all
        select 'approve', null, user_id, null, revision, at, null from public.approvals

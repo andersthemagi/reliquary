@@ -49,7 +49,7 @@ One test reads the database's own schema rather than its data: a column whose na
 
 ## Vault content
 
-- File text, proposals, notes and thread messages are not yet encrypted at the application level: the database holds them as text, under the provider's disk encryption. Encrypting them is in progress; the key set that will seal them (`CONTENT_KEYS`) is separate from the values key, so no key opens both.
+- File text, proposals, notes and thread messages are not yet encrypted at the application level: the database holds them as bytes (their UTF-8 text as it is), under the provider's disk encryption. Encrypting them is in progress; the key set that will seal them (`CONTENT_KEYS`) is separate from the values key, so no key opens both.
 - Both servers hold the content key set, since the MCP server serves files. The MCP server still refuses to start with the values key.
 - The schema test above also keeps a list of every column that holds content, with its type, so a new content column, or one that changes type, fails the test until it is accounted for.
 

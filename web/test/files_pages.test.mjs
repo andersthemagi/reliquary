@@ -362,7 +362,7 @@ test("edit: a text that starts with a newline comes back from the box, and saves
   const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(h), action: "write", path: "notes/lead.md", content: shown, expected_version: formFields(h, "Save").fields.expected_version });
   assert.equal(r.status, 303);
   const [{ body: saved }] = await sql(
-    "select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/lead.md'",
+    "select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/lead.md'",
     [V.main],
   );
   assert.equal(saved, body);
@@ -510,7 +510,7 @@ test("refused: a save the database refuses answers the editor again (400), the t
     assert.match(h, /<textarea id="content" name="content">My edit &lt;i&gt;kept&lt;\/i&gt;<\/textarea>/);
     assert.match(h, /<input id="r" type="text" name="reason" required/);
     assert.doesNotMatch(h, /name="expected_version"/);
-    assert.equal((await sql("select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/flip.md'", [V.main]))[0].body, "Before");
+    assert.equal((await sql("select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/flip.md'", [V.main]))[0].body, "Before");
   } finally {
     await as(BREE, "select public.set_policy($1, 'notes/flip.md', null, 1)", [V.main]);
   }

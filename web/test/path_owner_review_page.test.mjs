@@ -148,7 +148,7 @@ test("edit: Sol opens the editor and saves specs/plan.md directly, no proposal",
   const landedPage = await landed(sol, r);
   assert.match(landedPage, /Saved specs\/plan\.md\./);
   assert.equal(
-    (await sql("select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'specs/plan.md'", [V]))[0].body,
+    (await sql("select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'specs/plan.md'", [V]))[0].body,
     "Sol's direct edit",
   );
 });
@@ -180,7 +180,7 @@ test("edit, then approve: Sol edits Remy's next proposal herself and approves it
   const landedPage = await landed(sol, r);
   assert.match(landedPage, /Approved and applied\./);
   assert.equal(
-    (await sql("select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'specs/plan.md'", [V]))[0].body,
+    (await sql("select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'specs/plan.md'", [V]))[0].body,
     "Sol's edit of Remy's proposal",
   );
 });

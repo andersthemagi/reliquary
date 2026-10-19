@@ -102,7 +102,7 @@ export function registerProposalsTools(
                   (select count(*) from public.approvals a
                     where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision) as approvals,
                   r.quorum,
-                  coalesce((select json_agg(json_build_object('kind', n.kind, 'body', n.body, 'revision', n.revision) order by n.at)
+                  coalesce((select json_agg(json_build_object('kind', n.kind, 'body', convert_from(n.body, 'UTF8'), 'revision', n.revision) order by n.at)
                               from public.proposal_notes n
                              where n.proposal_id = p.id and n.body is not null
                                and n.kind in ('request_changes', 'reject', 'edit')), '[]') as notes,
@@ -254,11 +254,11 @@ export function registerProposalsTools(
       run(async (c) => {
         // The proposal and its thread in one round trip.
         const { rows } = await c.query(
-          `select p.*, v.name as vault_name, (private.rule_for(p.vault_id, p.path)).quorum,
+          `select p.*, convert_from(p.body, 'UTF8') as body, v.name as vault_name, (private.rule_for(p.vault_id, p.path)).quorum,
                   (select count(*) from public.approvals a where a.proposal_id = p.id
                      and a.decision = 'approve' and a.revision = p.revision)::int as approvals,
                   (select coalesce(json_agg(e order by e.at), '[]') from (
-                     select kind, body, author, agent, revision, at, erased_at from public.proposal_notes
+                     select kind, convert_from(body, 'UTF8') as body, author, agent, revision, at, erased_at from public.proposal_notes
                       where proposal_id = p.id
                      union all
                      select 'approve', null, user_id, null, revision, at, null from public.approvals

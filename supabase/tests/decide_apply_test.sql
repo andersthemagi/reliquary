@@ -28,7 +28,7 @@ select t.expect('decide characterization: an approval at quorum returns applied'
   t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('a1'))), 'applied');
 select t.expect_true('decide characterization: the proposal is applied and decided, and the file holds its text',
   (select status = 'applied' and decided_at is not null from public.proposals where id = t.id('a1'))
-  and (select v.body from public.files f join public.file_versions v on v.id = f.current_version_id
+  and (select convert_from(v.body, 'UTF8') from public.files f join public.file_versions v on v.id = f.current_version_id
         where f.vault_id = t.id('da') and f.path = 'canon/a.md') = 'A body');
 select t.expect('decide characterization: an applied proposal logs open, approve, then the write, and nothing else',
   t.trail(t.id('a1')), 'proposal.open by ben, proposal.approve by ana, file.write by ben');
@@ -55,7 +55,7 @@ select t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('a4b'
 select t.expect('decide characterization: an approval of a proposal whose file moved returns stale',
   t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('a4'))), 'stale');
 select t.expect('decide characterization: a stale proposal logs the approval and proposal.stale, and writes nothing',
-  t.trail(t.id('a4')) || ' / ' || (select v.body from public.files f join public.file_versions v on v.id = f.current_version_id
+  t.trail(t.id('a4')) || ' / ' || (select convert_from(v.body, 'UTF8') from public.files f join public.file_versions v on v.id = f.current_version_id
                                     where f.vault_id = t.id('da') and f.path = 'canon/d.md'),
   'proposal.open by ben, proposal.approve by ana, proposal.stale by ana / moved');
 

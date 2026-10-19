@@ -22,7 +22,7 @@ select t.expect('request changes: keeps it alive, marked for the proposer',
   t.run('ana', format($q$select public.decide(%L, 'request_changes', 'Use 850, as agreed')$q$, t.id('p1'))),
   'changes_requested');
 select t.expect('request changes: the note is readable by members',
-  t.run('ben', format($q$select body from public.proposal_notes where proposal_id = %L and kind = 'request_changes'$q$, t.id('p1'))),
+  t.run('ben', format($q$select convert_from(body, 'UTF8') from public.proposal_notes where proposal_id = %L and kind = 'request_changes'$q$, t.id('p1'))),
   'Use 850, as agreed');
 select t.expect('request changes: can''t be approved until revised',
   t.run('cal', format($q$select public.decide(%L, 'approve')$q$, t.id('p1'))), 'ERR 55000');
@@ -38,7 +38,7 @@ select t.expect('revise: status is open again',
 select t.expect('revise: approving the revision applies it',
   t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('p1'))), 'applied');
 select t.expect('revise: the file has the revised text, credited to the agent',
-  (select v.body || ' / ' || v.agent from public.files f join public.file_versions v on v.id = f.current_version_id
+  (select convert_from(v.body, 'UTF8') || ' / ' || v.agent from public.files f join public.file_versions v on v.id = f.current_version_id
     where f.path = 'canon/rate.md'), 'Rate 850 / Hermes');
 
 -- Revision-bound approvals (quorum 2)
@@ -53,7 +53,7 @@ select t.expect('revision: after a revision, the old approval no longer counts',
 select t.expect('revision: Ana can approve the new revision',
   t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('p2'))), 'applied');
 select t.expect('revision: the applied text is the latest revision',
-  (select v.body from public.files f join public.file_versions v on v.id = f.current_version_id
+  (select convert_from(v.body, 'UTF8') from public.files f join public.file_versions v on v.id = f.current_version_id
     where f.path = 'board/minutes.md'), 'v2 minutes');
 
 -- Edit & approve
@@ -67,11 +67,11 @@ select t.expect('edit & approve: an outsider can''t',
 select t.expect('edit & approve: a reviewer fixes it and it applies',
   t.run('ana', format($q$select public.edit_and_approve(%L, 'Net 30', 'we agreed 30')$q$, t.id('p3'))), 'applied');
 select t.expect('edit & approve: the file is credited to the editor, not the agent',
-  (select v.body || ' / ' || v.author || ' / ' || coalesce(v.agent, 'no agent')
+  (select convert_from(v.body, 'UTF8') || ' / ' || v.author || ' / ' || coalesce(v.agent, 'no agent')
      from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/terms.md'),
   'Net 30 / ' || t.id('ana') || ' / no agent');
 select t.expect('edit & approve: the edit is on record as a note',
-  (select kind || ': ' || body from public.proposal_notes where proposal_id = t.id('p3')), 'edit: we agreed 30');
+  (select kind || ': ' || convert_from(body, 'UTF8') from public.proposal_notes where proposal_id = t.id('p3')), 'edit: we agreed 30');
 
 insert into t.ids select 'p4', t.run('ben',
   format($q$select public.propose(%L, 'board/budget.md', '100k', 'budget')$q$, t.id('v1')), 'Hermes')::uuid;
@@ -128,7 +128,7 @@ select t.run('ben', format($q$select public.revise_proposal(%L, 'Edit 2', 'swapp
 select t.expect('read revision: edit & approve from a revision you didn''t read is refused',
   t.run('ana', format($q$select public.edit_and_approve(%L, 'Mine', null, 1)$q$, t.id('r2'))), 'ERR 55000');
 select t.expect('read revision: the refused edit leaves the revision the agent wrote',
-  (select revision || ' / ' || body || ' / ' || status from public.proposals where id = t.id('r2')), '2 / Edit 2 / open');
+  (select revision || ' / ' || convert_from(body, 'UTF8') || ' / ' || status from public.proposals where id = t.id('r2')), '2 / Edit 2 / open');
 select t.expect('read revision: edit & approve from the revision you read applies the edit',
   t.run('ana', format($q$select public.edit_and_approve(%L, 'Mine', null, 2)$q$, t.id('r2'))), 'applied');
 
@@ -141,6 +141,6 @@ select t.run('ben', format($q$select public.revise_proposal(%L, 'Agent 3', 'afte
 select t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('r3')));
 select t.run('cal', format($q$select public.decide(%L, 'approve')$q$, t.id('r3')));
 select t.expect('revise after an edit: the applied text is credited to the proposer''s agent, not the earlier editor',
-  (select v.body || ' / ' || (v.author = t.id('ben')) || ' / ' || coalesce(v.agent, 'no agent')
+  (select convert_from(v.body, 'UTF8') || ' / ' || (v.author = t.id('ben')) || ' / ' || coalesce(v.agent, 'no agent')
      from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'board/credit.md'),
   'Agent 3 / true / Hermes');
