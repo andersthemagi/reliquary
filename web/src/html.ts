@@ -114,6 +114,7 @@ export type Shell = {
   total: number;
   welcome_unseen?: boolean; // no Welcome tour seen yet (welcome.ts)
   show_email?: boolean; // "Show me to others as" (settings.ts)
+  thread_emails?: boolean; // "Email me about threads" (settings.ts)
   items: ShellItem[];
 };
 

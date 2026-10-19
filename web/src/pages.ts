@@ -11,7 +11,7 @@ import { activityBody } from "./activity.js";
 import { callout, csrfField, emptyState, html, ICON_SEARCH, page, pageHeader, plural, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
 import { searchAll } from "./search.js";
-import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, saveShownAs, signOutEverywhere } from "./settings.js";
+import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, saveShownAs, saveThreadEmails, signOutEverywhere } from "./settings.js";
 import { feedbackRoutes } from "./feedback.js";
 import { welcomeLanding, welcomeRoutes } from "./welcome.js";
 import { errorPage, refusalText } from "./errorpage.js";
@@ -660,6 +660,7 @@ async function route(ctx: Ctx): Promise<Reply> {
   if (get && p === "/settings") return accountSettings(ctx);
   if (!get && p === "/settings/name") return saveDisplayName(ctx);
   if (!get && p === "/settings/shown-as") return saveShownAs(ctx);
+  if (!get && p === "/settings/thread-emails") return saveThreadEmails(ctx);
   if (!get && p === "/settings/sign-out-everywhere") return signOutEverywhere(ctx);
   if (!get && p === "/settings/email") return changeEmail(ctx);
   if (p === "/settings/delete") return get ? deleteAccountPage(ctx) : deleteAccount(ctx);
