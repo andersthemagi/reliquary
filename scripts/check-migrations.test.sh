@@ -73,6 +73,27 @@ check "editing a migration that is on main fails and says how to restore it" 1 \
   "20260101000000_core.sql is edited" "git checkout origin/main -- supabase/migrations/20260101000000_core.sql" "new migration"
 
 fresh
+sql 20260101000000_core.sql "rewritten"
+commit "$(printf 'rewrite\n\nMigration-never-applied: 20260101000000 production refused it')"
+check "editing a migration a trailer declares never applied passes and says so" 0 \
+  "20260101000000_core.sql is rewritten, declared by a Migration-never-applied trailer"
+
+fresh
+sql 20260101000000_core.sql "rewritten"
+commit "$(printf 'rewrite\n\nMigration-never-applied: 20260102000000 the wrong stamp')"
+check "the trailer covers only the migration it names" 1 "20260101000000_core.sql is edited"
+
+fresh
+sql 20260101000000_core.sql "rewritten"
+commit "$(printf 'rewrite\n\nMigration-never-applied: 20260101000000 not a trailer\n\nmore prose after it')"
+check "the trailer counts only in the last paragraph" 1 "20260101000000_core.sql is edited"
+
+fresh
+echo "create cast (text as bytea) with function f(text) as assignment;" > "$repo/supabase/migrations/20260103000000_cast.sql"
+commit "cast"
+check "a migration that creates a cast fails and says why" 1 "20260103000000_cast.sql creates a cast" "owns no built-in type"
+
+fresh
 g rm -q supabase/migrations/20260101000000_core.sql
 commit "delete"
 check "deleting a migration that is on main fails" 1 "20260101000000_core.sql is deleted or renamed"

@@ -101,6 +101,18 @@ volume before buying more.
   that way: their PR-level guard runs had passed, so the test changes were
   declared, but `main` showed three red `test` runs. No blank line between
   them (`AGENTS.md`'s Conventions section).
+- **CI applies migrations as a superuser; production doesn't.** Hosted
+  Supabase's `postgres` role can't own a built-in type, so a migration
+  with `create cast (text as bytea)` passed every suite and the self-host
+  smoke test, then failed v0.27.0's deploy at the migrations step ("must
+  be owner of type text or type bytea", 2026-10-19). The deploy stops
+  before building anything, so production stayed on the previous release.
+  `scripts/check-migrations.sh` refuses `create cast` now; anything else
+  only a superuser can run (`alter system`, an untrusted language, owning
+  a built-in object) is the same trap. A migration that failed that way
+  never applied anywhere but CI, and is rewritten in place with a
+  `Migration-never-applied:` trailer (`AGENTS.md`, Conventions) rather
+  than fixed forward, because `supabase db push` retries the same file.
 - **Before merging a release PR, read its `CHANGELOG.md` as a person who
   wasn't in the room would.** release-please only ever emits the raw
   commit subject per entry; the release workflow then rewrites the pending
