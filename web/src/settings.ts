@@ -69,6 +69,18 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
   // A change of address waiting for its link, as Supabase Auth has it.
   const pending = hosted && ctx.session ? await ctx.session.pendingEmail() : null;
   const showEmail = ctx.shell?.show_email !== false;
+  const threadEmails = await asPerson(ctx.userId, async (c) =>
+    (await c.query("select thread_emails from public.notification_preferences where user_id = $1", [ctx.userId])).rows[0]?.thread_emails !== false,
+  );
+  const notifications = html`<section aria-labelledby="notifications">
+      <h2 id="notifications">Emails</h2>
+      <form method="post" action="/settings/thread-emails" class="panel settings-form" id="thread-emails">
+        ${csrfField(ctx.csrf)}
+        <label class="choice"><input type="checkbox" name="thread_emails" value="1"${threadEmails ? html` checked` : ""}>
+          <span><strong>Email me about threads</strong>: when a thread is opened for a whole vault you're in, or addressed to you, and when it gets new messages. One email per thread at a time, with its title and who wrote, never the messages themselves.</span></label>
+        <div class="actions"><button class="primary">Save</button></div>
+      </form>
+    </section>`;
   const name = html`<section aria-labelledby="display-name-title">
       <h3 id="display-name-title">Display name</h3>
       <form method="post" action="/settings/name" class="panel settings-form">
@@ -141,6 +153,7 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
       ${d.email ? email : name}
       ${d.email ? name : email}
     </section>
+    ${notifications}
     <section aria-labelledby="appearance">
       <h2 id="appearance">Appearance</h2>
       <form method="post" action="/theme" class="theme" aria-label="Theme">
@@ -197,6 +210,14 @@ export async function saveShownAs(ctx: Ctx): Promise<Reply> {
   const show = ctx.form.get("show_email") !== "0";
   await asPerson(ctx.userId, (c) => c.query(`select public.set_email_shown($1)`, [show]));
   ctx.setFlash(show ? "Saved. People who share a vault with you see your name and email." : "Saved. People see your name and a short tag, not your email.", "success");
+  return { redirect: "/settings" };
+}
+
+// POST /settings/thread-emails: public.set_thread_emails, the person in person.
+export async function saveThreadEmails(ctx: Ctx): Promise<Reply> {
+  const on = ctx.form.get("thread_emails") === "1";
+  await asPerson(ctx.userId, (c) => c.query(`select public.set_thread_emails($1)`, [on]));
+  ctx.setFlash(on ? "Saved. You'll be emailed about threads for you or your whole vault." : "Saved. No more emails about threads; your flags and the Threads page still show them.", "success");
   return { redirect: "/settings" };
 }
 

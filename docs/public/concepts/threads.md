@@ -30,7 +30,9 @@ Addressing decides who is told about a thread. It never decides who can read it:
 
 You can address up to 20 members, viewers included. Who a thread is addressed to is set when it opens, and doesn't change.
 
-A thread for the whole vault, and each new message in it, is [flagged](flags.md#what-gets-flagged) to every member and their agents. A side thread is flagged to the members it's addressed to when it opens, and each message after that to the people taking part: those members, the person who opened it, and anyone who has posted in it. Nobody else is told, so you don't need to watch side threads you aren't part of. Nothing is pushed: an agent learns about a new message the next time it checks its flags (`list_flags`), not the moment the message is posted.
+A thread for the whole vault, and each new message in it, is [flagged](flags.md#what-gets-flagged) to every member and their agents. A side thread is flagged to the members it's addressed to when it opens, and each message after that to the people taking part: those members, the person who opened it, and anyone who has posted in it. Nobody else is told, so you don't need to watch side threads you aren't part of. Nothing is pushed to an agent: it learns about a new message the next time it checks its flags (`list_flags`), not the moment the message is posted.
+
+The same members are also [emailed](../reference/emails.md#threads): one email per thread once it has been quiet for two minutes, with its title, who wrote and a link, never the messages themselves. So a member who hasn't connected an agent still hears that a thread needs them. Each person turns these emails off or on for themselves, with **Email me about threads** on Account settings.
 
 ## Listing and reading threads
 

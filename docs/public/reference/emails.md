@@ -50,7 +50,16 @@ Sent after a change to your account, to tell you it happened. If it was you, the
 |---|---|---|
 | You're invited to *vault name* on Reliquary | A vault owner invited your address | The vault, your role, the address it's for, when it expires, and a button with the invite link, also written out. The link works once, only for someone signed in with that address. |
 
-Invites are emailed when the site has an email sender (the hosted service does). Otherwise, or if the email couldn't be sent, the owner copies the link from the **Members** page and sends it to you another way: it's the same link. See [Members and invites](../concepts/members.md).
+Invites are emailed when the site has an email sender (the hosted service does), and so are emails about threads. Otherwise, or if the email couldn't be sent, the owner copies the link from the **Members** page and sends it to you another way: it's the same link. See [Members and invites](../concepts/members.md).
+
+## Threads
+
+| Subject | When | What's in it |
+|---|---|---|
+| New thread in *vault name*: *title* | A thread is opened for a whole vault you're in, or addressed to you | The vault, the thread's title, who opened it, how many messages it has so far, and a **Read the thread** link. Never the messages themselves. |
+| *N* new messages in *vault name*: *title* | Messages are posted in such a thread after you were last emailed about it | The same, for the new messages. |
+
+One email per thread at a time: Reliquary waits until a thread has been quiet for two minutes, then sends one email for everything posted since you were last told. You aren't emailed about your own messages, your agent's, or a resolved thread. Turn these off, and back on, with **Email me about threads** on Account settings; your [flags](../concepts/flags.md) and the Threads page show the same threads either way. See [Threads](../concepts/threads.md#addressing-someone).
 
 ## Feedback notices
 
@@ -76,4 +85,4 @@ If the request can't be sent, the form says why, with a reference, keeps what wa
 
 ## On a self-hosted instance
 
-The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites). Feedback and signup notices, and access requests, go to the address in `FEEDBACK_EMAIL`, the instance's own operator; with none set, none are sent.
+The same emails, sent through your own SMTP server. Nothing to set up: the web app hands them to the sign-in service. Vault invites and emails about threads are the exception: the web app sends them itself, through Resend, only if you set `RESEND_API_KEY` and `EMAIL_FROM`. See [Self-host Reliquary](../how-to/self-host.md#email-for-invites). Feedback and signup notices, and access requests, go to the address in `FEEDBACK_EMAIL`, the instance's own operator; with none set, none are sent.

@@ -56,6 +56,7 @@ import { configureMailer } from "./mailer.js";
 import { configureEmbeddings } from "./embeddings.js";
 import { feedbackTick, flushFeedbackNotices, noticeTarget } from "./feedback.js";
 import { flushSignupNotices } from "./signups.js";
+import { flushThreadEmails } from "./threademails.js";
 import { BUILD, versionJson } from "./version.js";
 import { emailTemplate, selfHosted } from "./selfhost.js";
 import { welcomeLanding } from "./welcome.js";
@@ -625,9 +626,13 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse, url: U
     send(res, reply, landed ? { "set-cookie": clearCookie(FRESH_SIGNIN) } : {}, auth.cookies);
     console.info(`${req.method} ${url.pathname} ${reply.redirect ? 303 : reply.status ?? 200}`);
     // Feedback notices waiting (an agent's, or one whose email failed),
-    // and new accounts (signups.ts): at most once a minute per instance,
-    // after the page has gone out.
-    if (req.method === "GET" && feedbackTick()) void flushSignupNotices();
+    // new accounts (signups.ts) and threads to email members about
+    // (threademails.ts): at most once a minute per instance, after the
+    // page has gone out.
+    if (req.method === "GET" && feedbackTick()) {
+      void flushSignupNotices();
+      void flushThreadEmails(url.origin);
+    }
   } catch (err) {
     // What was being done, where it broke, why, and the reference, which
     // is also in the log with the detail (failure.ts).
@@ -653,5 +658,6 @@ if (!process.env.NETLIFY) {
   setInterval(() => {
     void flushFeedbackNotices();
     void flushSignupNotices();
+    void flushThreadEmails(`http://${HOST}:${PORT}`);
   }, 60_000).unref();
 }
