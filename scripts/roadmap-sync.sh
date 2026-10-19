@@ -14,8 +14,10 @@
 #
 # Open issues only. A top-level issue needs exactly one `status:` label; one
 # with none or several is reported, never guessed at, since choosing a status
-# can be the owner's decision. A sub-issue carries no status label: its
-# parent does. Needs gh, signed in with the project scope.
+# can be the owner's decision. A sub-issue carries no status label: its open
+# parent does. Once the parent closes, an open sub-issue stands alone and
+# needs its own, or it drops off the roadmap. Needs gh, signed in with the
+# project scope.
 set -euo pipefail
 
 repo=andersthemagi/reliquary
@@ -58,7 +60,7 @@ query($endCursor: String) {
       pageInfo { hasNextPage endCursor }
       nodes {
         number
-        parent { number }
+        parent { number state }
         labels(first: 30) { nodes { name } }
         projectItems(first: 10) {
           nodes {
@@ -73,7 +75,7 @@ query($endCursor: String) {
   }
 }' --jq '.data.repository.issues.nodes[] | [
   .number,
-  (.parent.number // "-"),
+  (if .parent.state == "OPEN" then .parent.number else "-" end),
   ([.labels.nodes[].name | select(startswith("status: ")) | ltrimstr("status: ")
     | (.[:1] | ascii_upcase) + .[1:]] | join(",")),
   ([.projectItems.nodes[] | select(.project.number == 3) | .fieldValueByName.name // "none"][0] // "-")
