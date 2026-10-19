@@ -98,3 +98,18 @@ test("changelog tiers: a release pull request's body is rewritten up to its foot
   assert.ok(out.includes("### New"));
   assert.deepEqual(prNumbers(firstSection(body)), [9, 1, 2, 8, 3, 4, 5, 7, 6]);
 });
+
+test("changelog tiers: an issue a pull request's title names is not read as the pull request", () => {
+  const section = "## [0.26.0](u) (2026-10-19)\n\n\n### Features\n\n* **plugin:** say how long ([#408](u/408)) ([#413](u/413)) ([0e4a8b7](u/c))\n";
+  assert.deepEqual(prNumbers(section), [413]);
+  assert.ok(tierSection(section, new Map([[413, "A note."]])).includes("### New"));
+});
+
+test("changelog tiers: the attribution footer after a release note is not part of it", () => {
+  assert.equal(releaseNote("## Release note\n\nA note.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n"), "A note.");
+});
+
+test("changelog tiers: a note that started with Changed: starts with a capital once the prefix is dropped", () => {
+  const section = "## [0.26.0](u) (2026-10-19)\n\n\n### Features\n\n* sign in ([#447](u/447)) ([ece7261](u/c))\n";
+  assert.ok(tierSection(section, new Map([[447, "Changed: signing in asks."]])).includes("\n\nSigning in asks."));
+});

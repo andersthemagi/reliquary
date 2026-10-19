@@ -51,7 +51,8 @@ export function releaseNote(body) {
     const end = note.indexOf("-->", i + 4);
     note = note.slice(0, i) + (end === -1 ? "" : note.slice(end + 3));
   }
-  note = note.trim();
+  // The attribution footer agents end a PR body with isn't part of the note.
+  note = note.replace(/^🤖 Generated with \[Claude Code\].*$/gm, "").trim();
   return /^(none|n\/a|-|no)\.?$/i.test(note) ? "" : note;
 }
 
@@ -65,9 +66,13 @@ function entry(line) {
   return { text, pr: m[2] ? Number(m[2]) : null, link: m[2] ? ` ([#${m[2]}](${m[3]}))` : "" };
 }
 
-// The PR numbers a pending section names, for fetching their notes.
+const upperFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// The PR numbers a pending section's entries are for, for fetching their
+// notes: one per entry, as entry() reads it, so an issue a title names
+// ("... (#408) (#413)") isn't fetched as a pull request.
 export function prNumbers(section) {
-  return [...new Set([...section.matchAll(/\(\[#(\d+)\]\(/g)].map((m) => Number(m[1])))];
+  return [...new Set(section.split("\n").map((l) => l.startsWith("* ") && entry(l)?.pr).filter(Boolean))];
 }
 
 // One release's section (its "## [x.y.z]" heading through the line before
@@ -100,7 +105,7 @@ export function tierSection(section, notes) {
     for (const e of list) {
       if (e.pr && breaking.has(e.pr)) continue; // already told, at the top
       const note = (e.pr && notes.get(e.pr)) || "";
-      if (/^changed:/i.test(note)) headed.changed.push({ ...e, note: note.replace(/^changed:\s*/i, "") });
+      if (/^changed:/i.test(note)) headed.changed.push({ ...e, note: upperFirst(note.replace(/^changed:\s*/i, "")) });
       else if (note && t === "feat") headed.new.push({ ...e, note });
       else if (note) headed.changed.push({ ...e, note });
       else (oneLine[t] ??= []).push(e);
