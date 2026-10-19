@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.27.2](https://github.com/andersthemagi/reliquary/compare/v0.27.1...v0.27.2) (2026-10-19)
+
+
+### Bug fixes
+
+* **security:** the bytea migration sets no pgvector option, and the suites apply migrations as production's role ([#476](https://github.com/andersthemagi/reliquary/issues/476)) ([8881073](https://github.com/andersthemagi/reliquary/commit/8881073a8bf8517abc3a2c34a034665c3ed9edd6))
+
 ## [0.27.1](https://github.com/andersthemagi/reliquary/compare/v0.27.0...v0.27.1) (2026-10-19)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
