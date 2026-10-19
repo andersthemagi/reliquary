@@ -6,6 +6,13 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.27.1](https://github.com/andersthemagi/reliquary/compare/v0.27.0...v0.27.1) (2026-10-19)
+
+
+### Bug fixes
+
+* **security:** the body writers convert text themselves; no cast for hosted Supabase ([#474](https://github.com/andersthemagi/reliquary/issues/474)) ([a9b0c3b](https://github.com/andersthemagi/reliquary/commit/a9b0c3b9570b5bc5ebab84a1e726c29b42505cf7))
+
 ## [0.27.0](https://github.com/andersthemagi/reliquary/compare/v0.26.0...v0.27.0) (2026-10-19)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
