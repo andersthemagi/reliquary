@@ -4,14 +4,14 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
-import { minSimilarity, queryVector } from "./embeddings.js";
+import { queryVector } from "./embeddings.js";
 import { claimRulesSummary, loadClaimRules } from "./claimrulespage.js";
 import { callout, confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge, time, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
 import { filePath, message, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
 import { settingsPage } from "./vaultadmin.js";
-import { LINES_SQL, queryTerms, snippetLines } from "./searchlines.js";
+import { queryTerms, searchVault, snippetLines } from "./searchlines.js";
 
 // ---------------------------------------------------------------------------
 // Rules
@@ -349,18 +349,9 @@ export async function search(ctx: Ctx, id: string): Promise<Reply> {
     const v = await vault(c, ctx, id);
     if (!v) return null;
     const terms = queryTerms(query);
-    const { vector, note } = query ? await queryVector(c, [id], query) : { vector: null, note: "" };
-    const rows = query
-      ? (
-          await c.query(`select s.path, s.policy, ${LINES_SQL} from public.search($1, $2, 30, $4::extensions.vector, $5::real) s`, [
-            id,
-            query,
-            terms,
-            vector,
-            minSimilarity(),
-          ])
-        ).rows
-      : [];
+    const { vector, note: embedNote } = query ? await queryVector(c, [id], query) : { vector: null, note: "" };
+    const { hits: rows, note: cap } = query ? await searchVault(c, id, query, 30, vector) : { hits: [], note: "" };
+    const note = [cap, embedNote].filter(Boolean).join(" ");
     // For the vault's owners (20261017140000_missed_searches.sql): the words, never who.
     if (query && rows.length === 0) await c.query(`select private.note_missed_search($1, $2)`, [id, query]);
     const everywhere = `/search${query ? `?q=${q(query)}` : ""}`;

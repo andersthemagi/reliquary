@@ -73,18 +73,15 @@ select t.expect('expiry: an expired token stops resolving',
 
 -- Search
 
-select t.expect('search: finds a file by a word in it',
-  t.run('ben', format($q$select string_agg(path, ',') from public.search(%L, 'Acme')$q$, t.id('v1')), 'Claude Code'),
-  'clients/acme.md');
-select t.expect('search: reports the file''s policy',
-  t.run('ben', format($q$select policy from public.search(%L, 'Lisbon')$q$, t.id('v1'))), 'open');
-select t.expect('search: finds by path',
-  t.run('ben', format($q$select string_agg(path, ',') from public.search(%L, 'offsite')$q$, t.id('v1'))),
-  'notes/offsite.md');
-select t.expect('search: an outsider finds nothing in someone else''s vault',
-  t.run('ben', format($q$select count(*) from public.search(%L, 'Acme')$q$, t.id('v2'))), '0');
-select t.expect('search: wildcards in the query match nothing extra',
-  t.run('ben', format($q$select count(*) from public.search(%L, '%%')$q$, t.id('v1'))), '0');
+-- The word match and the ranking run in the servers (web/test/search_unit.test.mjs);
+-- SQL gives a member, or their agent, the vault's files to search, each with its policy.
+select t.expect('search: a member''s agent gets the same files to search as the member',
+  t.run('ben', format($q$select string_agg(path || ':' || policy, ';' order by path) from public.search_files(%L)$q$, t.id('v1')), 'Claude Code'),
+  t.run('ben', format($q$select string_agg(path || ':' || policy, ';' order by path) from public.search_files(%L)$q$, t.id('v1'))));
+select t.expect('search: the files come with their text and policy',
+  t.run('ben', format($q$select path || ':' || policy from public.search_files(%L) where convert_from(body, 'UTF8') like '%%Lisbon%%'$q$, t.id('v1'))), 'notes/offsite.md:open');
+select t.expect('search: an outsider gets nothing of someone else''s vault',
+  t.run('ben', format($q$select count(*) from public.search_files(%L)$q$, t.id('v2'))), '0');
 select t.run('ana', format($q$select public.erase_file(%L, 'clients/acme.md')$q$, t.id('v1')));
-select t.expect('search: erased text is never found',
-  t.run('ben', format($q$select count(*) from public.search(%L, 'Rosa')$q$, t.id('v1'))), '0');
+select t.expect('search: erased text is never given to search',
+  t.run('ben', format($q$select count(*) from public.search_files(%L) where path = 'clients/acme.md'$q$, t.id('v1'))), '0');

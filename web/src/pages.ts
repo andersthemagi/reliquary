@@ -10,7 +10,7 @@ import { authorize } from "./oauth.js";
 import { activityBody } from "./activity.js";
 import { callout, csrfField, emptyState, html, ICON_SEARCH, page, pageHeader, plural, raw, time, type Nav, type Raw, type Shell, type Theme } from "./html.js";
 import { loadShell } from "./inbox.js";
-import { searchAll } from "./search.js";
+import { searchAll } from "./searchpage.js";
 import { accountSettings, changeEmail, deleteAccount, deleteAccountPage, saveDisplayName, saveShownAs, saveThreadEmails, signOutEverywhere } from "./settings.js";
 import { feedbackRoutes } from "./feedback.js";
 import { welcomeLanding, welcomeRoutes } from "./welcome.js";

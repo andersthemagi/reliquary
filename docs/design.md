@@ -31,7 +31,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 13 | [Links](#links) | Built |
 | 14 | [Routines](#routines) | Designed, not built |
 | 15 | [Environment variables](#environment-variables) | Built |
-| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461), the bytea columns (#462) and references from the writer (#464) are built; search, sealing writes and the backfill to come (#238) |
+| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461), the bytea columns (#462), search in the server (#463) and references from the writer (#464) are built; sealing writes and the backfill to come (#238) |
 | 17 | [Continuity](#continuity) | Designed, not built |
 | 18 | [Client engagements](#client-engagements) | Designed, not built |
 | 19 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
@@ -1910,7 +1910,8 @@ refused if it equals a variables key. `deploy/setup.sh` generates it.
 ### 4. Search
 
 Postgres can't match words or rank vectors it can't read, so both halves
-of `search` move up into the server that holds the key:
+of `search` moved up into the server that holds the key (built, #463:
+`public.search_files` and `search.ts`, the same file in both servers):
 
 - **Words:** `search()` keeps RLS and the path match, and returns the
   vault's live files with their current sealed bodies, newest first, up to

@@ -138,7 +138,7 @@ an encrypted backup has restored. Crypto-shredding (#239) and the feedback
 and invite columns (#240) follow it. The IPv6 check left on #221 is
 waived.
 
-Status 2026-10-19: #237 done (#455, #460; first encrypted backup taken and restored). #238 under way: the key set (#461, PR #467), the bytea columns (#462, first PR #468) and references from the writer (#464) built; search in the server (#463), sealing writes, the backfill (#465) and dropping the plaintext path (#466) to come.
+Status 2026-10-19: #237 done (#455, #460; first encrypted backup taken and restored). #238 under way: the key set (#461, PR #467), the bytea columns (#462, first PR #468), search in the server (#463) and references from the writer (#464) built; sealing writes, the backfill (#465) and dropping the plaintext path (#466) to come.
 
 ### 2026-10-19: four Considering items move to Planned; addressed notes are threads
 

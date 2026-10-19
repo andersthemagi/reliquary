@@ -1,44 +1,37 @@
-// The lines a search result shows: up to three lines that hold a searched
-// word, numbered, each cut at 200 characters; the first non-blank line when
-// only the path matched; the first three non-blank lines of its best chunk
-// (`s.line`, from public.search) when it was found by meaning alone. The same shape as the MCP server's SEARCH_SQL
-// (mcp/src/vaultfiles-tools.ts; separate deployables, no shared package),
-// so a person and their agent see the same lines. The database picks them,
-// so no file's whole text leaves it for a snippet.
+// A vault's search for the web app's two search pages, over the shared
+// search.ts (the same file as the MCP server's, so a person and their
+// agent see the same files and lines), and the lines a result shows as HTML.
 
+import type pg from "pg";
+import { openBody } from "./content.js";
+import { minSimilarity } from "./embeddings.js";
 import { html, type Raw } from "./html.js";
+import { capNote, queryTerms, rankFiles, SEARCH_CAP, type Candidate, type Hit, type Vector } from "./search.js";
 
-// mcp/src/vaultfiles-tools.ts queryTerms: the words of a websearch query,
-// quotes, `or` and -exclusions dropped. The database already decided which
-// files match; this only chooses their lines.
-export function queryTerms(q: string): string[] {
-  return q
-    .toLowerCase()
-    .replace(/"/g, " ")
-    .split(/\s+/)
-    .filter((w) => w && w !== "or" && !w.startsWith("-"))
-    .map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
-    .filter(Boolean);
-}
+export { queryTerms };
 
-const LINES = 3;
 const CHARS = 200;
-// JavaScript's trim() whitespace, for "blank".
-const JS_SPACE = "\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
 
-// A select-list column over a search row `s`; the terms are $3 in both
-// callers (search.ts, rules.ts).
-export const LINES_SQL = `
-  coalesce(
-    (select json_agg(json_build_array(m.n, left(m.line, ${CHARS + 1})) order by m.n)
-       from (select l.line, l.n from string_to_table(s.body, E'\\n') with ordinality l(line, n)
-              where exists (select 1 from unnest($3::text[]) t where strpos(lower(l.line), t) > 0)
-              order by l.n limit ${LINES}) m),
-    (select json_agg(json_build_array(m.n, left(m.line, ${CHARS + 1})))
-       from (select l.line, l.n from string_to_table(s.body, E'\\n') with ordinality l(line, n)
-              where l.line ~ '[^${JS_SPACE}]' and l.n >= coalesce(s.line, 1)
-              order by l.n limit case when s.line is null then 1 else ${LINES} end) m),
-    '[]') as lines`;
+// One vault's search, done here (search.ts): public.search_files gives its
+// newest files under RLS, up to SEARCH_CAP, which this server opens; with
+// `vector` (the query's, from queryVector) the stored vectors come too.
+// `note` says when the vault had more files than were read.
+export async function searchVault(c: pg.PoolClient, vault: string, query: string, limit: number, vector: number[] | null): Promise<{ hits: Hit[]; note: string }> {
+  const { rows } = await c.query(`select path, policy, body, updated_at, author, agent, total from public.search_files($1, $2)`, [vault, SEARCH_CAP]);
+  const files: Candidate[] = rows.map((r) => ({ ...r, body: openBody(r.body, vault) }));
+  const vectors: Vector[] = vector
+    ? (
+        await c.query(
+          `select f.path, e.line, e.embedding
+             from public.file_embeddings e
+             join public.files f on f.id = e.file_id and f.current_version_id = e.version_id and f.deleted_at is null
+            where e.vault_id = $1`,
+          [vault],
+        )
+      ).rows
+    : [];
+  return { hits: rankFiles(files, query, limit, vector, minSimilarity(), vectors), note: rows.length ? capNote(Number(rows[0].total), rows.length) : "" };
+}
 
 const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

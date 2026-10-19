@@ -212,25 +212,7 @@ select t.expect('rls variables: through a token: read-write sees the log and pus
   '1/1/0/3,0/0/0/3');
 
 -- ---------------------------------------------------------------------------
--- 3. Search on stored words
-
--- The search as it was (20260924190000_rule_for), for comparing answers.
-create function t.search_before(p_vault uuid, p_query text, p_limit int default 20)
-returns table (path text, policy text, body text, updated_at timestamptz, author uuid, agent text, rank real)
-language sql stable security invoker set search_path = '' as $$
-  select f.path, (private.rule_for(f.vault_id, f.path)).policy, convert_from(v.body, 'UTF8'), f.updated_at,
-         v.author, v.agent,
-         ts_rank(to_tsvector('simple', coalesce(convert_from(v.body, 'UTF8'), '')), websearch_to_tsquery('simple', p_query))
-  from public.files f
-  join public.file_versions v on v.id = f.current_version_id
-  where f.vault_id = p_vault and f.deleted_at is null and v.body is not null
-    and (to_tsvector('simple', coalesce(convert_from(v.body, 'UTF8'), '')) @@ websearch_to_tsquery('simple', p_query)
-         or (length(trim(coalesce(p_query, ''))) > 0 and strpos(lower(f.path), lower(trim(p_query))) > 0))
-  order by 7 desc, f.updated_at desc
-  limit least(greatest(coalesce(p_limit, 20), 1), 100)
-$$;
-grant usage on schema t to authenticated;
-grant execute on function t.search_before(uuid, text, int) to authenticated;
+-- 3. What search reads (the match and the rank are the servers', #463)
 
 insert into t.ids select 'find', t.run('ana', $q$select public.create_vault('Find')$q$)::uuid;
 select t.run('ana', format($q$select public.write_file(%L, %L, %L)$q$, t.id('find'), 'notes/n' || i || '.md',
@@ -243,34 +225,28 @@ select t.run('ana', format($q$select public.write_file(%L, 'erased.md', 'worksho
 select t.run('ana', format($q$select public.erase_file(%L, 'erased.md')$q$, t.id('find')));
 -- notes/ becomes canon after the writes, so answers carry both policies.
 select t.run('ana', format($q$select public.set_policy(%L, 'notes/', 'canon', 1)$q$, t.id('find')));
-
-create function t.answers(p_fn text, p_query text, p_limit int default 20) returns text language sql as $$
-  select t.run('cal', format($q$select coalesce(string_agg(path || ':' || policy || ':' || round(rank::numeric, 6), ' ' order by ord), '(none)')
-    from (select *, row_number() over () as ord from %s(%L, %L, %s)) x$q$, p_fn, t.id('find'), p_query, p_limit))
-$$;
 select test_support.add_member(t.id('find'), t.id('cal'), 'viewer', t.id('ana'));
-select t.expect('search: the same answers as before, in the same order, for words, phrases, or, exclusions, paths and nothing',
-  (select string_agg(q || '=' || (t.answers('public.search', q, 20) = t.answers('t.search_before', q, 20))::text, ',' order by q)
-     from unnest(array['workshop', '"workshop agenda agenda"', 'retainer or pricing', 'workshop -retainer',
-                       'notes/n1', 'RETAINER', 'n1', 'erased', 'secret', '', '   ', 'zzz']) q),
-  (select string_agg(q || '=true', ',' order by q)
-     from unnest(array['workshop', '"workshop agenda agenda"', 'retainer or pricing', 'workshop -retainer',
-                       'notes/n1', 'RETAINER', 'n1', 'erased', 'secret', '', '   ', 'zzz']) q));
-select t.expect('search: limits are clamped as before (1 to 100)',
-  (t.answers('public.search', 'workshop', 0) = t.answers('t.search_before', 'workshop', 0))::text || ','
-  || (t.answers('public.search', 'workshop', 3) = t.answers('t.search_before', 'workshop', 3))::text,
-  'true,true');
-select t.expect('search: a real query finds something (the comparison isn''t empty against empty)',
-  (t.answers('public.search', 'workshop', 20) like 'notes/%')::text || ',' || t.answers('public.search', 'retainer/plan', 20),
-  'true,retainer/plan.md:open:0.000000');
-select t.expect('search: erased text leaves no stored words behind',
-  (select count(*) from public.file_versions where erased_at is not null and body_tsv <> ''::tsvector)::text
-  || ',' || (select count(*) from public.file_versions where vault_id = t.id('find') and erased_at is not null),
-  '0,1');
-select t.expect('search: an outsider and a token scoped to another vault find nothing',
-  t.run('dee', format($q$select count(*) from public.search(%L, 'workshop')$q$, t.id('find')))
-  || ',' || t.run_pat_tok('ana', 'ana-team-rw', format($q$select count(*) from public.search(%L, 'workshop')$q$, t.id('find'))),
+
+-- The notes were written in one statement, so they share a time and come by path.
+select t.expect('search: a reader gets every live file with text, newest first, each with its policy and the vault''s count',
+  t.run('cal', format($q$select string_agg(path || ':' || policy || ':' || total, ' ' order by ord)
+    from (select *, row_number() over () as ord from public.search_files(%L)) x$q$, t.id('find'))),
+  'retainer/plan.md:open:13 notes/n10.md:canon:13 notes/n11.md:canon:13 notes/n12.md:canon:13 notes/n1.md:canon:13 notes/n2.md:canon:13 notes/n3.md:canon:13 notes/n4.md:canon:13 notes/n5.md:canon:13 notes/n6.md:canon:13 notes/n7.md:canon:13 notes/n8.md:canon:13 notes/n9.md:canon:13');
+select t.expect('search: deleted and erased files are never given to search',
+  t.run('cal', format($q$select count(*) from public.search_files(%L) where path in ('gone.md', 'erased.md')$q$, t.id('find'))), '0');
+select t.expect('search: past the cap only the newest files are read, and the count says how many there are',
+  t.run('cal', format($q$select string_agg(path || ':' || total, ' ' order by updated_at desc, path) from public.search_files(%L, 3)$q$, t.id('find'))),
+  'retainer/plan.md:13 notes/n10.md:13 notes/n11.md:13');
+select t.expect('search: the cap is clamped to 1 to 2,000',
+  t.run('cal', format($q$select count(*) from public.search_files(%L, 0)$q$, t.id('find')))
+  || ',' || t.run('cal', format($q$select count(*) from public.search_files(%L, 5000)$q$, t.id('find'))),
+  '1,13');
+select t.expect('search: an outsider and a token scoped to another vault get nothing',
+  t.run('dee', format($q$select count(*) from public.search_files(%L)$q$, t.id('find')))
+  || ',' || t.run_pat_tok('ana', 'ana-team-rw', format($q$select count(*) from public.search_files(%L)$q$, t.id('find'))),
   '0,0');
+select t.expect('search: anonymous callers can''t call it',
+  t.run(null, format($q$select count(*) from public.search_files(%L)$q$, t.id('find'))), 'ERR 42501');
 
 -- ---------------------------------------------------------------------------
 -- 4. Imports: the rate-limit precheck, and cleanup

@@ -182,36 +182,17 @@ select t.expect('rules for pairs: a token scoped to Side answers for Side only; 
   'true:5,ERR 42501');
 
 -- ---------------------------------------------------------------------------
--- 4. Search words for current versions only
+-- 4. Versions stay insert-only (the stored words went with #463)
 
 insert into t.ids select 'words', t.run('ana', $q$select public.create_vault('Words')$q$)::uuid;
 select t.run('ana', format($q$select public.write_file(%L, 'a.md', 'first alpha')$q$, t.id('words')));
 select t.run('ana', format($q$select public.write_file(%L, 'a.md', 'second bravo')$q$, t.id('words')));
-select t.run('ana', format($q$select public.write_file(%L, 'a.md', 'third charlie')$q$, t.id('words')));
 select t.run('ana', format($q$select public.write_file(%L, 'b.md', 'only delta')$q$, t.id('words')));
-create function t.words() returns text language sql as $$
-  select string_agg(coalesce(convert_from(body, 'UTF8'), '(erased)') || '=' || coalesce(body_tsv::text, '-'), ',' order by created_at, body)
-    from public.file_versions where vault_id = t.id('words')
-$$;
-select t.expect('search words: only each file''s current version keeps its words',
-  t.words(), 'first alpha=-,second bravo=-,third charlie=''charlie'':2 ''third'':1,only delta=''delta'':2 ''only'':1');
-select t.expect('search words: the current text is found, superseded text isn''t (as before)',
-  t.run('ana', format($q$select string_agg(path, ',' order by path) from public.search(%L, 'charlie or alpha or delta')$q$, t.id('words'))),
-  'a.md,b.md');
-select t.run('ana', format($q$select public.delete_file(%L, 'b.md')$q$, t.id('words')));
-select t.run('ana', format($q$select public.write_file(%L, 'b.md', 'delta again')$q$, t.id('words')));
-select t.expect('search words: writing a deleted file again moves the words to the new version',
-  t.words(), 'first alpha=-,second bravo=-,third charlie=''charlie'':2 ''third'':1,only delta=-,delta again=''again'':2 ''delta'':1');
-select t.run('ana', format($q$select public.erase_file(%L, 'a.md')$q$, t.id('words')));
-select t.expect('search words: erasing a file erases its words',
-  t.words(), '(erased)=-,(erased)=-,(erased)=-,only delta=-,delta again=''again'':2 ''delta'':1');
--- A proposal applied by approval writes a version the same way.
-select t.run('ana', format($q$select public.set_policy(%L, 'c/', 'canon', 1)$q$, t.id('words')));
-select t.run('ana', format($q$select public.write_file(%L, 'c.md', 'x')$q$, t.id('words')));
-insert into t.ids select 'prop', t.run('ana', format($q$select public.propose(%L, 'c/p.md', 'proposed echo', 'why')$q$, t.id('words')))::uuid;
-select t.run('ana', format($q$select public.decide(%L, 'approve', null)$q$, t.id('prop')));
-select t.expect('search words: an approved proposal''s version is searchable',
-  t.run('ana', format($q$select string_agg(path, ',') from public.search(%L, 'echo')$q$, t.id('words'))), 'c/p.md');
+select t.expect('search words: no column of a version holds its words any more',
+  (select count(*)::text from information_schema.columns where table_schema = 'public' and table_name = 'file_versions' and column_name = 'body_tsv'), '0');
+select t.expect('search words: only each file''s current version is given to search',
+  t.run('ana', format($q$select string_agg(convert_from(body, 'UTF8'), ',' order by path) from public.search_files(%L)$q$, t.id('words'))),
+  'second bravo,only delta');
 
 -- As the table's owner (triggers still apply): the result, or ERR <sqlstate>.
 create function t.try(p_sql text) returns text language plpgsql as $$
@@ -222,34 +203,13 @@ begin
 exception when others then
   return 'ERR ' || sqlstate;
 end $$;
-select t.expect('search words: versions are still insert-only: changing text or author or setting words is refused; only erasing or clearing words',
-  t.try(format($s$update public.file_versions set body = 'changed' where vault_id = %L and body = 'delta again' returning 'x'$s$, t.id('words')))
-  || ',' || t.try(format($s$update public.file_versions set author = %L where vault_id = %L and body = 'delta again' returning 'x'$s$, t.id('dee'), t.id('words')))
-  || ',' || t.try(format($s$update public.file_versions set body_tsv = to_tsvector('simple', 'forged') where vault_id = %L and body = 'delta again' returning 'x'$s$, t.id('words')))
-  || ',' || t.try(format($s$update public.file_versions set body_tsv = null, agent = 'sneaky' where vault_id = %L and body = 'delta again' returning 'x'$s$, t.id('words')))
-  || ',' || t.try(format($s$update public.file_versions set body_tsv = null where vault_id = %L and body = 'delta again' returning 'cleared'$s$, t.id('words')))
+select t.expect('search words: versions are still insert-only: changing text, author or agent is refused; only erasing',
+  t.try(format($s$update public.file_versions set body = 'changed' where vault_id = %L and body = 'only delta' returning 'x'$s$, t.id('words')))
+  || ',' || t.try(format($s$update public.file_versions set author = %L where vault_id = %L and body = 'only delta' returning 'x'$s$, t.id('dee'), t.id('words')))
+  || ',' || t.try(format($s$update public.file_versions set agent = 'sneaky' where vault_id = %L and body = 'only delta' returning 'x'$s$, t.id('words')))
   || ',' || t.try(format($s$delete from public.file_versions where vault_id = %L returning 'deleted'$s$, t.id('words'))),
-  'ERR 42501,ERR 42501,ERR 42501,ERR 42501,cleared,ERR 42501');
+  'ERR 42501,ERR 42501,ERR 42501,ERR 42501');
 select t.expect('search words: API roles can''t change versions: nothing is updated',
-  (coalesce(t.run('ana', format($q$update public.file_versions set body_tsv = null where vault_id = %L returning 'x'$q$, t.id('words'))), 'none')
-    in ('ERR 42501', 'none'))::text
-  || ',' || (select count(*) from public.file_versions where vault_id = t.id('words') and body_tsv is not null)::text,
-  'true,2');
-
--- The backfill: words left on history (as the generated column kept them)
--- are cleared, current versions keep theirs.
-select t.run('ana', format($q$select public.write_file(%L, 'h.md', 'old history words')$q$, t.id('words')));
-select t.run('ana', format($q$select public.write_file(%L, 'h.md', 'new current words')$q$, t.id('words')));
-set session_replication_role = replica;
-update public.file_versions set body_tsv = to_tsvector('simple', coalesce(convert_from(body, 'UTF8'), '')) where vault_id = t.id('words');
-set session_replication_role = origin;
-select t.expect('backfill: it clears history''s and erased versions'' words',
-  private.clear_history_words()::text, '5');
-select t.expect('backfill: what is left is exactly each file''s current version',
-  (select string_agg(convert_from(body, 'UTF8'), ',' order by body) from public.file_versions where vault_id = t.id('words') and body_tsv is not null),
-  'delta again,new current words,proposed echo,x');
-select t.expect('backfill: a second run finds nothing; no app role can run it',
-  private.clear_history_words()::text || ',' || t.run('ana', 'select private.clear_history_words()')
-  || ',' || t.run_role('reliquary_web', 'select private.clear_history_words()')
-  || ',' || t.run_role('reliquary_mcp', 'select private.clear_history_words()'),
-  '0,ERR 42501,ERR 42501,ERR 42501');
+  (coalesce(t.run('ana', format($q$update public.file_versions set agent = 'x' where vault_id = %L returning 'x'$q$, t.id('words'))), 'none')
+    in ('ERR 42501', 'none'))::text,
+  'true');
