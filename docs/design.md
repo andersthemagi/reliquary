@@ -1377,8 +1377,8 @@ reaching Reliquary.)
   member granted a link sees whatever that upstream account returns.
   The link's grant is the control, so grant accordingly.
 - **Shared credentials only in v1** (API keys, service accounts).
-  A vault-wide OAuth sign-in by an owner is proposed below ([OAuth
-  sign-in for a link](#oauth-sign-in-for-a-link-proposed-442)).
+  A vault-wide OAuth sign-in by an owner is designed below ([OAuth
+  sign-in for a link](#oauth-sign-in-for-a-link-442)).
   Per-member OAuth to upstream ("my Gmail") comes later.
 
 ### Implementation plan (schema and discovery)
@@ -1453,11 +1453,11 @@ Open questions this doesn't resolve:
   credential is replaced in place, without deleting and re-adding the
   link (2026-10-18, issue #439, `20261018120000_link_replace_credential.sql`).
 
-### OAuth sign-in for a link (proposed, #442)
+### OAuth sign-in for a link (#442)
 
-Written 2026-10-18 for the owner to approve or amend; nothing here is
-built. Many hosted MCP servers take only OAuth, so today they can't be
-linked at all. This adds one more way to give a link its credential: an
+Written 2026-10-18 and approved by the owner 2026-10-19, with the
+decisions at the end; not built yet. Many hosted MCP servers take only
+OAuth, so today they can't be linked at all. This adds one more way to give a link its credential: an
 owner signs Reliquary in to the upstream server once, in person, and the
 whole vault then uses that one grant exactly as it uses a pasted key now.
 It is still a shared credential (one upstream account for the vault).
@@ -1712,33 +1712,27 @@ without a person. The `client_credentials` grant, `private_key_jwt`, and
 enterprise-managed authorization (Linear and Notion advertise the
 `jwt-bearer` grant for it).
 
-Open questions for the owner:
+Decided by the owner, 2026-10-19:
 
-- **Dynamic client registration.** Linear and Notion support the client
-  document; Atlassian's MCP server supports only registration. Build the
-  document alone first (recommended), or registration too?
-- **Servers without protected resource metadata.** Atlassian serves none
-  at the paths the spec names (checked 2026-10-18), so it fails step 2
-  even with registration. Treat the link's origin as its authorization
-  server, as the 2025-03-26 spec did (not recommended), or leave such
-  servers to a pasted key? Atlassian accepts a service account's API key
-  as a Bearer token once an org admin allows API tokens, and its admins
-  must also allowlist a custom client's domain for OAuth.
-- **Linear, for milestone 3.** Linear's server already takes a Linear API
-  key as `Authorization: Bearer`, so a pasted key links it today. Is that
-  enough for the week of real use, so this is built after, or is OAuth
-  wanted first?
-- **When the owner who signed in leaves.** If they are removed, step down
-  from owner or delete their account, should the link stay signed in as
-  their upstream account? Recommended: deleting the account disconnects
-  and revokes every sign-in they made; leaving or stepping down keeps it
-  and shows owners a warning naming them.
-- **Telling owners about a lost sign-in.** The Links page, the log and
-  the failing call say it. Should it also flag the vault's owners
-  ([Notifications](#notifications))?
-- **Narrower scope.** Request what the server asks for (recommended), or
-  let the owner pick a smaller set (Linear's `read`) on the confirmation
-  page?
+- **Client registration.** The client document only. Dynamic
+  registration waits for an upstream we need that requires it.
+- **Servers without protected resource metadata** (Atlassian, checked
+  2026-10-18) stay on a pasted key; there is no fallback to the link's
+  origin. Atlassian takes a service account's API key as a Bearer token
+  once an org admin allows API tokens.
+- **Linear, for milestone 3.** The week of real use runs on a pasted
+  Linear API key; this is built after it.
+- **When the owner who signed in goes.** Deleting their account
+  disconnects every sign-in they made and revokes it upstream (RFC 7009,
+  best effort). Leaving the vault or stepping down from owner keeps the
+  sign-in, and the link shows owners a warning naming who signed it in
+  until another owner reconnects or disconnects it.
+- **A lost sign-in** also flags the vault's owners
+  ([Notifications](#notifications)), beside the Links page, the log and
+  the failing call.
+- **Scope.** Reliquary requests what the server asks for; the owner
+  doesn't pick a narrower set. Grants still decide which tools an agent
+  can call.
 
 ## Routines
 
