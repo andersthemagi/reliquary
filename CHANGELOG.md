@@ -6,6 +6,23 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.26.0](https://github.com/andersthemagi/reliquary/compare/v0.25.0...v0.26.0) (2026-10-19)
+
+
+### Features
+
+* **legal:** signing in means agreeing to the terms, which now cover copyright and the standard clauses ([#447](https://github.com/andersthemagi/reliquary/issues/447)) ([ece7261](https://github.com/andersthemagi/reliquary/commit/ece7261271513fda5588a52204d282433c5e2ecf))
+* **links:** a link's Calls page shows who used it, with which tool, and how it went ([#448](https://github.com/andersthemagi/reliquary/issues/448)) ([143b959](https://github.com/andersthemagi/reliquary/commit/143b95927059e6e5d169b53bcc8c73785a6fe980))
+* **links:** a link's credential can go in a header other than Authorization ([#451](https://github.com/andersthemagi/reliquary/issues/451)) ([0f0ef73](https://github.com/andersthemagi/reliquary/commit/0f0ef737a354cbef9aebbc5c53aef1a1b6993705))
+* **links:** an owner replaces a link's credential or refreshes its tools, keeping its grants ([#449](https://github.com/andersthemagi/reliquary/issues/449)) ([ba4da52](https://github.com/andersthemagi/reliquary/commit/ba4da5234ee5c5163c7f6f55e0adf02b1b6d09fa))
+* **mcp:** a deploy checks that search by meaning works, and its setup can't break other secrets ([#438](https://github.com/andersthemagi/reliquary/issues/438)) ([6fa49ae](https://github.com/andersthemagi/reliquary/commit/6fa49aeea2225a6dc22eb7c5f57565e9b921fdd9))
+* **plugin:** say how long the oldest proposal has waited in session brief ([#408](https://github.com/andersthemagi/reliquary/issues/408)) ([#413](https://github.com/andersthemagi/reliquary/issues/413)) ([0e4a8b7](https://github.com/andersthemagi/reliquary/commit/0e4a8b7ea1b693a79a3e37a51a6c5ff01b646678))
+
+
+### Bug fixes
+
+* **release:** the other release pull request stays in tiers when one is merged ([#435](https://github.com/andersthemagi/reliquary/issues/435)) ([0b3a040](https://github.com/andersthemagi/reliquary/commit/0b3a040f4d595124c864cc3cafb49769128922bb))
+
 ## [0.25.0](https://github.com/andersthemagi/reliquary/compare/v0.24.0...v0.25.0) (2026-10-18)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
