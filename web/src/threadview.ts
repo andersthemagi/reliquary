@@ -36,7 +36,7 @@ export async function threadIn(c: pg.PoolClient, id: string, tid: string): Promi
 
 async function messagesOf(c: pg.PoolClient, id: string, tid: string, after: string | null): Promise<{ rows: Message[]; more: boolean }> {
   const { rows } = await c.query(
-    `select m.id, m.author, m.agent, m.at, m.body, m.redacted_at, m.redacted_by from public.thread_messages m
+    `select m.id, m.author, m.agent, m.at, convert_from(m.body, 'UTF8') as body, m.redacted_at, m.redacted_by from public.thread_messages m
       where m.vault_id = $1 and m.thread_id = $2 and m.id > coalesce($3::bigint, 0) order by m.id limit ${PAGE + 1}`,
     [id, tid, after],
   );

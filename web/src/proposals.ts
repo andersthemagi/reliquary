@@ -164,12 +164,12 @@ export async function proposalList(ctx: Ctx, id: string): Promise<Reply> {
         // rule_for() per row. Who decided: the approvers of the applied
         // revision, or who rejected it. Decided ones by when, newest first.
         `with page as (
-           select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, p.body,
+           select p.id, p.vault_id, p.kind, p.path, p.proposed_by, p.agent, p.created_at, p.revision, convert_from(p.body, 'UTF8') as body,
                   p.status, p.decided_at, p.base_version_id,
                   row_number() over (order by coalesce(p.decided_at, p.created_at) desc) as ord
              from public.proposals p where p.vault_id = $1 and p.status = any($2::text[])
             order by coalesce(p.decided_at, p.created_at) desc limit 100)
-         select p.*, cur.body as current_body, r.quorum,
+         select p.*, convert_from(cur.body, 'UTF8') as current_body, r.quorum,
                 (select count(*) from public.approvals a where a.proposal_id = p.id and a.decision = 'approve'
                   and a.revision = p.revision)::int as approvals,
                 array(select a.user_id from public.approvals a
@@ -223,7 +223,7 @@ export async function proposalView(ctx: Ctx, id: string, pid: string, refused?: 
     if (!v) return null;
     const p = (
       await c.query(
-        `select p.*, cur.body as current_body, f.current_version_id, base.body as base_body, (private.rule_for(p.vault_id, p.path)).quorum
+        `select p.*, convert_from(p.body, 'UTF8') as body, convert_from(cur.body, 'UTF8') as current_body, f.current_version_id, convert_from(base.body, 'UTF8') as base_body, (private.rule_for(p.vault_id, p.path)).quorum
            from public.proposals p
            left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
            left join public.file_versions cur on cur.id = f.current_version_id
@@ -473,7 +473,7 @@ export async function proposalEdit(ctx: Ctx, id: string, pid: string, refused?: 
 async function loadEditable(c: pg.PoolClient, id: string, pid: string, own: string | null) {
   return (
     await c.query(
-      `select p.*, cur.body as current_body
+      `select p.*, convert_from(p.body, 'UTF8') as body, convert_from(cur.body, 'UTF8') as current_body
          from public.proposals p
          left join public.files f on f.vault_id = p.vault_id and f.path = p.path and f.deleted_at is null
          left join public.file_versions cur on cur.id = f.current_version_id

@@ -34,7 +34,7 @@ $$;
 -- Never private: every member reads every thread -------------------------
 
 select t.expect('read: a viewer who isn''t addressed reads the side thread and its message',
-  t.run('cal', format($q$select count(*) || ' ' || max(m.body) from public.threads th
+  t.run('cal', format($q$select count(*) || ' ' || max(convert_from(m.body, 'UTF8')) from public.threads th
     join public.thread_messages m on m.thread_id = th.id where th.id = %L$q$, t.id('side'))),
   '1 Ben, the invoice is late');
 select t.expect('read: so does the owner who isn''t addressed, through a read-only connection',
@@ -190,7 +190,7 @@ select t.expect('open: a refused open stores and logs nothing',
 
 insert into t.ids select 'plan', t.run('ben', t.open_sql('v1', $a$'Launch plan', 'Who writes the copy?'$a$))::uuid;
 select t.expect('open: an editor opens a vault-wide thread, with its first message, both theirs',
-  (select th.title || ' / ' || th.opened_by || ' / ' || coalesce(th.agent, '-') || ' / ' || m.body || ' / ' || m.author
+  (select th.title || ' / ' || th.opened_by || ' / ' || coalesce(th.agent, '-') || ' / ' || convert_from(m.body, 'UTF8') || ' / ' || m.author
      from public.threads th join public.thread_messages m on m.thread_id = th.id where th.id = t.id('plan')),
   'Launch plan / ' || t.id('ben') || ' / - / Who writes the copy? / ' || t.id('ben'));
 insert into t.ids select 'by_agent', t.run('ben', t.open_sql('v1', $a$'Copy draft', 'Draft is in copy/launch.md'$a$), 'Hermes')::uuid;
@@ -217,7 +217,7 @@ select t.expect('open: a message can''t carry control characters but line breaks
   t.run('ben', t.open_sql('v1', $a$'x', E'clear the screen \x1b[2J'$a$)), 'ERR 22023');
 insert into t.ids select 'code', t.run('ben', t.open_sql('v1', $a$'Code', E'\n\n    indented()\n\tnext\n  \n'$a$))::uuid;
 select t.expect('open: leading blank lines and trailing space go; the first line''s indent and inner tabs stay',
-  (select body from public.thread_messages where thread_id = t.id('code')), E'    indented()\n\tnext');
+  (select convert_from(body, 'UTF8') from public.thread_messages where thread_id = t.id('code')), E'    indented()\n\tnext');
 
 insert into t.ids select 'forged', t.run_claims(jsonb_build_object('sub', t.id('ben'), 'role', 'authenticated',
     'author', t.id('ana'), 'user_id', t.id('ana'), 'act', jsonb_build_object('sub', 'x', 'name', 'Hermes')),
@@ -290,7 +290,7 @@ select t.expect_ok('addressees: 20 is fine',
 select t.save('m_ben', t.run('ben', t.post_sql('plan', 'I can take it')));
 select t.save('m_hermes', t.run('ben', t.post_sql('plan', 'Drafted: copy/launch.md'), 'Hermes'));
 select t.expect('post: messages keep their order, each by its person and agent',
-  (select string_agg(m.body || ' (' || (m.author = t.id('ben'))::text || coalesce(' ' || m.agent, '') || ')', ' | ' order by m.id)
+  (select string_agg(convert_from(m.body, 'UTF8') || ' (' || (m.author = t.id('ben'))::text || coalesce(' ' || m.agent, '') || ')', ' | ' order by m.id)
      from public.thread_messages m where m.thread_id = t.id('plan')),
   'Who writes the copy? (true) | I can take it (true) | Drafted: copy/launch.md (true Hermes)');
 select t.save('log before', (select count(*)::text from public.log));
@@ -519,7 +519,7 @@ select t.expect('redact: nor anyone, about a message that doesn''t exist',
 select t.expect('redact: anonymous can''t call it',
   t.run(null, t.redact_sql(t.val('secret'))), 'ERR 42501');
 select t.expect('redact: a refused redaction changes and logs nothing',
-  (select body from public.thread_messages where id = t.val('secret')::bigint) || ' ' || (select count(*) from public.log),
+  (select convert_from(body, 'UTF8') from public.thread_messages where id = t.val('secret')::bigint) || ' ' || (select count(*) from public.log),
   'Door code: 4417-pelican ' || t.val('log before'));
 
 select t.expect_ok('redact: the owner, in person, redacts a message',
@@ -532,7 +532,7 @@ select t.expect('redact: its thread, author, agent and time stay',
   (select format('%s %s %s %s', thread_id, author, agent, at) from public.thread_messages where id = t.val('secret')::bigint),
   t.val('secret row'));
 select t.expect('redact: the text is in no message and no log entry',
-  (select count(*) from public.thread_messages where body like '%4417-pelican%') || ' '
+  (select count(*) from public.thread_messages where convert_from(body, 'UTF8') like '%4417-pelican%') || ' '
   || (select count(*) from public.log where detail::text like '%4417-pelican%'),
   '0 0');
 select t.expect('redact: logged by the owner, with the thread and the message',

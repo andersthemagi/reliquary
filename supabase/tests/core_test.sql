@@ -48,7 +48,7 @@ select t.expect('open: outsider cannot write',
 select t.expect('open: path traversal refused',
   t.run('ben', format($q$select public.write_file(%L, 'notes/../secret.md', 'x')$q$, t.id('v1'))), 'ERR 22023');
 select t.expect('open: viewer reads the latest version',
-  t.run('cal', $q$select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'notes/standup.md'$q$),
+  t.run('cal', $q$select convert_from(v.body, 'UTF8') from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'notes/standup.md'$q$),
   'Standup at 10:30');
 
 -- Policies
@@ -88,7 +88,7 @@ select t.expect('quorum: nothing is written before quorum',
 select t.expect('quorum: a second person applies it',
   t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('p1'))), 'applied');
 select t.expect('quorum: the applied file has the proposed text',
-  (select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/pricing.md'),
+  (select convert_from(v.body, 'UTF8') from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/pricing.md'),
   'Day rate 800');
 select t.expect('quorum: the write is attributed to the proposer''s agent',
   (select actor::text || ' ' || agent from public.log
@@ -107,13 +107,13 @@ select t.run('ben', format($q$select public.decide(%L, 'approve')$q$, t.id('p3')
 select t.expect('stale: a proposal based on an old version goes stale, not applied',
   t.run('ana', format($q$select public.decide(%L, 'approve')$q$, t.id('p3'))), 'stale');
 select t.expect('stale: the file keeps the version that won',
-  (select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/pricing.md'),
+  (select convert_from(v.body, 'UTF8') from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/pricing.md'),
   'Day rate 900');
 insert into t.ids select 'p4', t.run('ben', format($q$select public.propose(%L, 'canon/pricing.md', 'Free!')$q$, t.id('v1')))::uuid;
 select t.expect('reject: one rejection closes it',
   t.run('ana', format($q$select public.decide(%L, 'reject', 'not free')$q$, t.id('p4'))), 'rejected');
 select t.expect('reject: nothing changed',
-  (select v.body from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/pricing.md'),
+  (select convert_from(v.body, 'UTF8') from public.files f join public.file_versions v on v.id = f.current_version_id where f.path = 'canon/pricing.md'),
   'Day rate 900');
 
 -- Tables are closed to direct writes

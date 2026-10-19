@@ -72,7 +72,7 @@ select t.expect('read: an outsider sees nothing',
 select t.expect('write: Cal, a viewer, writes her owned canon path directly',
   t.run('cal', format($q$select 'ok' from public.write_file(%L, 'canon/cal.md', 'Cal wrote this')$q$, t.id('gone'))), 'ok');
 select t.expect('write: the text landed',
-  (select body from public.file_versions fv join public.files f on f.current_version_id = fv.id
+  (select convert_from(body, 'UTF8') from public.file_versions fv join public.files f on f.current_version_id = fv.id
     where f.vault_id = t.id('gone') and f.path = 'canon/cal.md'),
   'Cal wrote this');
 select t.expect('write: Ben, an editor but not this path''s owner, still can''t',
@@ -97,7 +97,7 @@ select t.run('cal', format($q$select public.create_access_token('cal-else', 30, 
 select t.expect('write: Cal''s read-only token can''t write her owned path',
   t.run_tok('cal', 'cal-ro', format($q$select public.write_file(%L, 'canon/cal.md', 'ro token')::text$q$, t.id('gone'))), 'ERR 42501');
 select t.expect('write: refused, so the text is unchanged',
-  (select body from public.file_versions fv join public.files f on f.current_version_id = fv.id
+  (select convert_from(body, 'UTF8') from public.file_versions fv join public.files f on f.current_version_id = fv.id
     where f.vault_id = t.id('gone') and f.path = 'canon/cal.md'),
   'Cal wrote this');
 select t.expect('write: a token of Cal''s scoped only to another vault can''t write it either, live and write-access or not',
@@ -171,7 +171,7 @@ select t.expect('review: Cal edits the proposal herself and approves it in one s
 select t.expect('review: the proposal record agrees',
   (select status from public.proposals where id = t.id('review_p')), 'applied');
 select t.expect('review: the file carries Cal''s edited text',
-  (select body from public.file_versions fv join public.files f on f.current_version_id = fv.id
+  (select convert_from(body, 'UTF8') from public.file_versions fv join public.files f on f.current_version_id = fv.id
     where f.vault_id = t.id('gone') and f.path = 'canon/shared.md'),
   'Cals edit');
 

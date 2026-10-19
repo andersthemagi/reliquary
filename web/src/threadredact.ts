@@ -26,7 +26,7 @@ type Found = { id: string; author: string; agent: string | null; at: Date; body:
 // or vault is "not in this thread", the answer for one that doesn't exist.
 async function messageIn(c: pg.PoolClient, id: string, tid: string, mid: string): Promise<Found | undefined> {
   if (!/^\d{1,18}$/.test(mid)) return undefined;
-  const { rows } = await c.query(`select id, author, agent, at, body from public.thread_messages where vault_id = $1 and thread_id = $2 and id = $3`, [id, tid, mid]);
+  const { rows } = await c.query(`select id, author, agent, at, convert_from(body, 'UTF8') as body from public.thread_messages where vault_id = $1 and thread_id = $2 and id = $3`, [id, tid, mid]);
   return rows[0];
 }
 

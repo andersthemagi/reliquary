@@ -208,7 +208,7 @@ test("post: a message joins the end of the thread, with a success flash, and the
   const msgs = bodiesOf(after);
   assert.equal(msgs.length, 2);
   assert.match(msgs[1].html, /<p class="small muted">you · .*<\/p>\s*<p>Second line\.\nSecond para\.<\/p>/s);
-  const [row] = await sql("select author, agent, body from public.thread_messages where thread_id = $1 order by id desc limit 1", [t]);
+  const [row] = await sql("select author, agent, convert_from(body, 'UTF8') as body from public.thread_messages where thread_id = $1 order by id desc limit 1", [t]);
   assert.deepEqual({ author: row.author, agent: row.agent, body: row.body }, { author: EDDA, agent: null, body: "Second line.\nSecond para." });
 });
 

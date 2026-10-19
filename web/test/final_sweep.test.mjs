@@ -63,7 +63,7 @@ const bodyOf = async (path) =>
   (
     await asPerson(ANA, (c) =>
       c.query(
-        `select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id
+        `select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null`,
         [vault, path],
       ),

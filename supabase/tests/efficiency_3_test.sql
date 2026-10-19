@@ -190,7 +190,7 @@ select t.run('ana', format($q$select public.write_file(%L, 'a.md', 'second bravo
 select t.run('ana', format($q$select public.write_file(%L, 'a.md', 'third charlie')$q$, t.id('words')));
 select t.run('ana', format($q$select public.write_file(%L, 'b.md', 'only delta')$q$, t.id('words')));
 create function t.words() returns text language sql as $$
-  select string_agg(coalesce(body, '(erased)') || '=' || coalesce(body_tsv::text, '-'), ',' order by created_at, body)
+  select string_agg(coalesce(convert_from(body, 'UTF8'), '(erased)') || '=' || coalesce(body_tsv::text, '-'), ',' order by created_at, body)
     from public.file_versions where vault_id = t.id('words')
 $$;
 select t.expect('search words: only each file''s current version keeps its words',
@@ -241,12 +241,12 @@ select t.expect('search words: API roles can''t change versions: nothing is upda
 select t.run('ana', format($q$select public.write_file(%L, 'h.md', 'old history words')$q$, t.id('words')));
 select t.run('ana', format($q$select public.write_file(%L, 'h.md', 'new current words')$q$, t.id('words')));
 set session_replication_role = replica;
-update public.file_versions set body_tsv = to_tsvector('simple', coalesce(body, '')) where vault_id = t.id('words');
+update public.file_versions set body_tsv = to_tsvector('simple', coalesce(convert_from(body, 'UTF8'), '')) where vault_id = t.id('words');
 set session_replication_role = origin;
 select t.expect('backfill: it clears history''s and erased versions'' words',
   private.clear_history_words()::text, '5');
 select t.expect('backfill: what is left is exactly each file''s current version',
-  (select string_agg(body, ',' order by body) from public.file_versions where vault_id = t.id('words') and body_tsv is not null),
+  (select string_agg(convert_from(body, 'UTF8'), ',' order by body) from public.file_versions where vault_id = t.id('words') and body_tsv is not null),
   'delta again,new current words,proposed echo,x');
 select t.expect('backfill: a second run finds nothing; no app role can run it',
   private.clear_history_words()::text || ',' || t.run('ana', 'select private.clear_history_words()')

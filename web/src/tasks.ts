@@ -82,7 +82,7 @@ async function loadPlans(c: pg.PoolClient, id: string): Promise<Plan[]> {
       `select l.o_path as path, l.o_registered_at as registered_at, l.o_registered_by as registered_by, l.o_file as file,
               l.o_ready as ready, l.o_blocked as blocked, l.o_claimed as claimed, l.o_done as done, l.o_cancelled as cancelled,
               l.o_review as review,
-              substring(left(fv.body, 4000) from '(?n)^#[[:blank:]]+(.*[^[:space:]])') as title
+              substring(left(convert_from(fv.body, 'UTF8'), 4000) from '(?n)^#[[:blank:]]+(.*[^[:space:]])') as title
          from public.list_work_plans($1) l
          left join public.files f on f.vault_id = $1 and f.path = l.o_path and f.deleted_at is null
          left join public.file_versions fv on fv.id = f.current_version_id

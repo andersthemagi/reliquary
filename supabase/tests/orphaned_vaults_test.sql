@@ -74,7 +74,7 @@ select t.expect('orphaned: until someone takes it, it has the Free plan''s limit
 
 select t.expect('orphaned: members keep writing and reading as their roles allow',
   t.run('ben', format($q$select (public.write_file(%L, 'notes/ben.md', 'still here') is not null)::text$q$, t.id('shared')))
-  || ' ' || t.run('cal', format($q$select v.body from public.file_versions v join public.files f on f.current_version_id = v.id
+  || ' ' || t.run('cal', format($q$select convert_from(v.body, 'UTF8') from public.file_versions v join public.files f on f.current_version_id = v.id
                                     where f.vault_id = %L and f.path = 'notes/ben.md'$q$, t.id('shared'))),
   'true still here');
 

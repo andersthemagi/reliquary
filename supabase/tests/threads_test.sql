@@ -19,7 +19,7 @@ select t.expect_ok('comment: an editor comments',
 insert into t.ids select 'c_agent', t.run('ben',
   format($q$select public.comment_on_proposal(%L, '  Market rate went up.  ')$q$, t.id('p1')), 'Hermes')::uuid;
 select t.expect('comment: an editor''s agent replies, as its person, trimmed',
-  (select author::text || ' / ' || agent || ' / ' || body from public.proposal_notes where id = t.id('c_agent')),
+  (select author::text || ' / ' || agent || ' / ' || convert_from(body, 'UTF8') from public.proposal_notes where id = t.id('c_agent')),
   t.id('ben') || ' / Hermes / Market rate went up.');
 select t.expect('comment: a viewer can''t comment',
   t.run('cal', format($q$select public.comment_on_proposal(%L, 'hi')$q$, t.id('p1'))), 'ERR 42501');

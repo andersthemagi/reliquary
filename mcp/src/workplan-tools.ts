@@ -142,7 +142,7 @@ export function registerWorkPlanTools(
     async ({ vault, path }) =>
       run(async (c) => {
         const { rows } = await c.query(
-          `select fv.body, fv.id as version
+          `select convert_from(fv.body, 'UTF8') as body, fv.id as version
              from ${VAULT_REF}
              cross join lateral (select * from public.files f
                                   where f.vault_id = v.id and f.path = $2 and f.deleted_at is null offset 0) f
