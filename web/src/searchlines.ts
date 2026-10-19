@@ -1,6 +1,7 @@
 // The lines a search result shows: up to three lines that hold a searched
 // word, numbered, each cut at 200 characters; the first non-blank line when
-// only the path matched. The same shape as the MCP server's SEARCH_SQL
+// only the path matched; the first three non-blank lines of its best chunk
+// (`s.line`, from public.search) when it was found by meaning alone. The same shape as the MCP server's SEARCH_SQL
 // (mcp/src/vaultfiles-tools.ts; separate deployables, no shared package),
 // so a person and their agent see the same lines. The database picks them,
 // so no file's whole text leaves it for a snippet.
@@ -35,8 +36,8 @@ export const LINES_SQL = `
               order by l.n limit ${LINES}) m),
     (select json_agg(json_build_array(m.n, left(m.line, ${CHARS + 1})))
        from (select l.line, l.n from string_to_table(s.body, E'\\n') with ordinality l(line, n)
-              where l.line ~ '[^${JS_SPACE}]'
-              order by l.n limit 1) m),
+              where l.line ~ '[^${JS_SPACE}]' and l.n >= coalesce(s.line, 1)
+              order by l.n limit case when s.line is null then 1 else ${LINES} end) m),
     '[]') as lines`;
 
 const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

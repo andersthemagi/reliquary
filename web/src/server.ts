@@ -53,6 +53,7 @@ import { configureVariables, missingKeyIds, variablesConfigured } from "./secret
 import { inSession, pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { configureMailer } from "./mailer.js";
+import { configureEmbeddings } from "./embeddings.js";
 import { feedbackTick, flushFeedbackNotices, noticeTarget } from "./feedback.js";
 import { flushSignupNotices } from "./signups.js";
 import { BUILD, versionJson } from "./version.js";
@@ -115,6 +116,7 @@ try {
   configureLinkProxy(process.env);
   configureRateLimits(process.env);
   configureMailer(process.env);
+  configureEmbeddings(process.env);
   // Names the setting, never the address.
   const notices = noticeTarget(process.env);
   if ("off" in notices && process.env.FEEDBACK_EMAIL) console.warn(`Feedback notices are off: ${notices.off}`);

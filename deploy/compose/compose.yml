@@ -191,6 +191,9 @@ services:
       # Optional: vault invites by email through Resend (both, or neither).
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      # Optional: search by meaning, with the embed service below.
+      EMBED_URL: ${EMBED_URL:-}
+      EMBED_SECRET: ${EMBED_SECRET:-}
       # Optional: where feedback notices go (you, this instance's operator).
       FEEDBACK_EMAIL: ${FEEDBACK_EMAIL:-}
       # Only true behind a proxy that overwrites X-Real-IP (caddy below does).

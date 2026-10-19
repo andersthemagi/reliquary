@@ -11,7 +11,7 @@ const WEB = new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791");
 // web/test.sh puts Postgres at 54332 + 10 * slot and the server at 8791 + 10 * slot.
 const PG_PORT = 54332 + (Number(WEB.port) - 8791);
 
-const freePort = () =>
+export const freePort = () =>
   new Promise((resolve, reject) => {
     const s = net.createServer().listen(0, "127.0.0.1", () => {
       const { port } = s.address();
@@ -34,13 +34,18 @@ export async function startAs(user, env = {}) {
       PUBLIC_URL: "",
       ...env,
     },
-    stdio: ["ignore", "ignore", "ignore"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  // Kept for log(): a test checks a failure's ref is there, or that a
+  // secret isn't. Drained always, so a chatty server never blocks on it.
+  let log = "";
+  proc.stdout.on("data", (d) => (log += d));
+  proc.stderr.on("data", (d) => (log += d));
   const url = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 100; i++) {
     if (await fetch(`${url}/healthz`).then((r) => r.ok, () => false)) break;
     await new Promise((r) => setTimeout(r, 100));
   }
   const r = await fetch(readFileSync(loginFile, "utf8").trim(), { redirect: "manual" });
-  return { url, cookie: r.headers.get("set-cookie").split(";")[0], stop: () => proc.kill() };
+  return { url, cookie: r.headers.get("set-cookie").split(";")[0], stop: () => proc.kill(), log: () => log };
 }

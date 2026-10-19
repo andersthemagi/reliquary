@@ -50,13 +50,13 @@ Search takes words, `"a phrase"`, `or`, and `-word` to leave a word out. It look
 
 ### Search by meaning
 
-An agent's `search` also finds files by meaning, so a question finds the file that answers it even when they share no words: "what are we charging" finds `decisions/pricing.md` when it talks about seats and plans. Results found both ways come first. A file found by meaning alone shows the first lines of the part of it that matched.
+An agent's `search`, and the search boxes in the web app, also find files by meaning, so a question finds the file that answers it even when they share no words: "what are we charging" finds `decisions/pricing.md` when it talks about seats and plans. Results found both ways come first. A file found by meaning alone shows the first lines of the part of it that matched.
 
 - **How it works.** Each file's current text is turned into numbers (embeddings) by gte-small, a small model that runs inside Reliquary's database provider, Supabase. No file text goes to any other company, and Reliquary holds no key for one. The numbers are stored beside the text, readable by exactly the people who can read the file, and removed when the file changes, is deleted or erased.
 - **New files.** A file is embedded by the next search of its vault, so a file written moments ago may be found by its words only until then.
 - **Long files.** Meaning covers the first 10 KB or so of a file (8 parts of about 1,200 characters). The rest is still found by its words.
-- **When it's unavailable,** search still answers by words, and its first line says so: `Search by meaning is unavailable right now (...; ref 1a2b3c4d). These results match words only.` The reference finds the detail in the server log ([Errors](../reference/errors.md)).
-- **Where it doesn't apply.** The web app's search boxes match words and file names only. A [self-hosted](../how-to/self-host.md#search-by-meaning) server searches by words unless its operator sets search by meaning up.
+- **When it's unavailable,** search still answers by words, and says so: over MCP on its first line, in the web app in a notice above the results: `Search by meaning is unavailable right now (...; ref 1a2b3c4d). These results match words only.` The reference finds the detail in the server log ([Errors](../reference/errors.md)).
+- **Where it doesn't apply.** A [self-hosted](../how-to/self-host.md#search-by-meaning) server searches by words unless its operator sets search by meaning up.
 
 ## References between files
 

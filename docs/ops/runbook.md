@@ -35,8 +35,8 @@ Production values (`scripts/netlify-env.sh web https://app.reliquary.redmage.cc 
 | `reliquary-web` | `MCP_RESOURCE` | `https://mcp.reliquary.redmage.cc/mcp` |
 | `reliquary-mcp` | `MCP_RESOURCE` | `https://mcp.reliquary.redmage.cc/mcp` |
 | `reliquary-mcp` | `AUTH_ISSUER` | `https://app.reliquary.redmage.cc` |
-| `reliquary-mcp` | `EMBED_URL` | `https://<ref>.supabase.co/functions/v1/embed` ([Search by meaning](#search-by-meaning)) |
-| `reliquary-mcp` | `EMBED_REGION` | `eu-central-1` |
+| `reliquary-web`, `reliquary-mcp` | `EMBED_URL` | `https://<ref>.supabase.co/functions/v1/embed` ([Search by meaning](#search-by-meaning)) |
+| `reliquary-web`, `reliquary-mcp` | `EMBED_REGION` | `eu-central-1` |
 | Supabase Auth, URL Configuration | Site URL | `https://app.reliquary.redmage.cc` |
 | Supabase Auth, URL Configuration | Redirect URLs | `https://app.reliquary.redmage.cc/**` |
 | GitHub, repository variables | `WEB_URL` / `MCP_URL` | `https://app.reliquary.redmage.cc` / `https://mcp.reliquary.redmage.cc` |
@@ -750,10 +750,11 @@ tokens in a URL fragment the server never sees.
 
 ## Search by meaning
 
-`search` embeds text with gte-small in the `embed` Edge Function
-(`supabase/functions/embed`, docs/design.md "Search"). The function is
-stateless and checks one shared secret, `EMBED_SECRET`; the MCP server
-holds the same value and `EMBED_URL`. Nothing deploys the function on a
+`search`, over MCP and on the web app's two search pages, embeds text with
+gte-small in the `embed` Edge Function (`supabase/functions/embed`,
+docs/design.md "Search"). The function is stateless and checks one shared
+secret, `EMBED_SECRET`; the MCP server and the web app hold the same value
+and `EMBED_URL`. Nothing deploys the function on a
 release: it changes rarely, and deploying it is a step by hand.
 
 **First deploy** (in your own terminal). Nothing here prints the secret,
@@ -766,7 +767,7 @@ Netlify for Production only, so the deploy's draft started without it.
    with the real model (needs the network). It must end `smoke: ok`.
 2. `scripts/netlify-env.sh embed`: makes `supabase/.embed-secret` if it
    isn't there, and writes only `EMBED_URL`, `EMBED_SECRET` and
-   `EMBED_REGION` to `supabase/.netlify-mcp-embed.env`. Not `mcp`: that
+   `EMBED_REGION` to `supabase/.netlify-embed.env`, for both sites. Not `mcp`: that
    rewrites every variable, and without `supabase/.link-proxy-secret` it
    makes a new `LINK_PROXY_SECRET`, breaking link calls until both sites
    have it.
@@ -784,8 +785,9 @@ Netlify for Production only, so the deploy's draft started without it.
 4. `npx -y supabase functions deploy embed --project-ref <ref> --no-verify-jwt --use-api`
    (`supabase/config.toml` also turns the JWT check off: the function
    checks its own secret; `--use-api` builds without a local container).
-5. In Netlify, `reliquary-mcp`, **Site configuration**, **Environment
-   variables**, **Import from a .env file**: paste the file's three lines,
+5. In Netlify, for `reliquary-mcp` and then `reliquary-web`, **Site
+   configuration**, **Environment variables**, **Import from a .env
+   file**: paste the file's three lines,
    tick **Contains secret values**, and give them **a value for every
    deploy context**, as `LINK_PROXY_SECRET` has. The deploy smoke-tests a
    draft before publishing it; a variable set for Production only is
@@ -805,8 +807,8 @@ log (`failure ref=...`, where `embedding function`). The function's own
 log is in the Supabase dashboard, Edge Functions, `embed`; it never holds
 text or the secret.
 
-**Turning it off:** remove `EMBED_URL` from the `reliquary-mcp` site and
-redeploy: search goes back to words, silently. Queued files wait in
+**Turning it off:** remove `EMBED_URL` from both sites and redeploy:
+search goes back to words, silently. Queued files wait in
 `private.embedding_queue`; nothing else changes.
 
 **The floor:** `EMBED_MIN_SIMILARITY` (default 0.78) is how alike a file

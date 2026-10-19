@@ -4,8 +4,9 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { minSimilarity, queryVector } from "./embeddings.js";
 import { claimRulesSummary, loadClaimRules } from "./claimrulespage.js";
-import { confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge, time, type CrumbPart, type Raw } from "./html.js";
+import { callout, confirmPage, csrfField, emptyState, html, menu, pageHeader, policyBadge, time, type CrumbPart, type Raw } from "./html.js";
 import { Refusal } from "./failure.js";
 import { ruleFor, vaultShell } from "./files.js";
 import { filePath, message, notFound, q, render, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
@@ -348,7 +349,18 @@ export async function search(ctx: Ctx, id: string): Promise<Reply> {
     const v = await vault(c, ctx, id);
     if (!v) return null;
     const terms = queryTerms(query);
-    const rows = query ? (await c.query(`select s.path, s.policy, ${LINES_SQL} from public.search($1, $2, 30) s`, [id, query, terms])).rows : [];
+    const { vector, note } = query ? await queryVector(c, [id], query) : { vector: null, note: "" };
+    const rows = query
+      ? (
+          await c.query(`select s.path, s.policy, ${LINES_SQL} from public.search($1, $2, 30, $4::extensions.vector, $5::real) s`, [
+            id,
+            query,
+            terms,
+            vector,
+            minSimilarity(),
+          ])
+        ).rows
+      : [];
     // For the vault's owners (20261017140000_missed_searches.sql): the words, never who.
     if (query && rows.length === 0) await c.query(`select private.note_missed_search($1, $2)`, [id, query]);
     const everywhere = `/search${query ? `?q=${q(query)}` : ""}`;
@@ -367,6 +379,7 @@ export async function search(ctx: Ctx, id: string): Promise<Reply> {
         </div>
         <p class="hint">Use quotes for a phrase, or <code>or</code> between words.</p>
       </form>
+      ${note ? callout("warning", note) : ""}
       ${query
         ? rows.length
           ? html`<p class="muted small">${rows.length}${rows.length === 30 ? "+" : ""} result${rows.length > 1 ? "s" : ""} for “${query}” in ${v.name}</p>

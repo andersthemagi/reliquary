@@ -461,8 +461,8 @@ which stays `security invoker`, so RLS gates both halves:
   two lists. A file in both rises above a file in one. Ranks, not scores,
   are blended, because `ts_rank` and cosine aren't on one scale.
 
-Without `p_embedding` (the web app's searches, a server with no function)
-the result is what it was, row for row. The MCP response keeps its shape;
+Without `p_embedding` (a server with no function) the result is what it
+was, row for row. The MCP response keeps its shape;
 a file found by meaning alone shows up to 3 lines from its best chunk.
 
 ### 5. When the function is down
@@ -506,8 +506,6 @@ recorded gap, not a decision to keep vectors in the clear; the design is
 
 ### What this doesn't settle
 
-- The web app's searches (the top bar and a vault's own) stay words only;
-  they call the same function without a vector.
 - Long files past their first 10 KB, and big imports, as above.
 - Model changes: vectors of two models don't mix. Changing the model means
   queuing every file again (one `insert ... select` into the queue).
