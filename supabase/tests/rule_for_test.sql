@@ -21,6 +21,6 @@ select t.expect('rules: a token scoped to another vault gets nothing',
       (select id from public.access_tokens where name = 'side-only'))),
     format($q$select (private.rule_for(%L, 'canon/x.md')).policy$q$, t.id('team'))), null);
 select t.expect('rules: search still reports the policy for members',
-  t.run('ana', format($q$select policy from public.search(%L, 'Alpha')$q$, t.id('team'))), 'open');
+  t.run('ana', format($q$select policy from public.search_files(%L) where convert_from(body, 'UTF8') like '%%Alpha%%'$q$, t.id('team'))), 'open');
 select t.expect('rules: canon writes are still refused (the API still sees policy_for)',
   t.run('ana', format($q$select public.write_file(%L, 'canon/x.md', 'x')$q$, t.id('team'))), 'ERR 42501');

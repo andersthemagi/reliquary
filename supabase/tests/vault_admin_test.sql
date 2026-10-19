@@ -250,7 +250,7 @@ select t.expect('delete: the other vault is untouched, log and all',
   t.alive('keep') || ' '
   || ((select count(*) from public.log where vault_id = t.id('keep')) = (select n from t.before where what = 'keep_log'))::text || ' '
   || ((select count(*) from public.env_access_log where vault_id = t.id('keep')) = (select n from t.before where what = 'keep_env_log'))::text || ' '
-  || t.run('ana', format($q$select body from public.search(%L, 'Kept')$q$, t.id('keep'))),
+  || t.run('ana', format($q$select convert_from(body, 'UTF8') from public.search_files(%L)$q$, t.id('keep'))),
   '1 true true Kept text');
 
 -- Tokens
@@ -259,7 +259,7 @@ select t.expect('delete: tokens whose only vault it was are revoked, anyone''s',
   (select string_agg(name, ', ' order by name) from public.access_tokens where revoked_at is not null),
   'ben-gone, only-gone');
 select t.expect('delete: a token scoped to it and another vault keeps the other',
-  t.run_tok('ana', 'both', format($q$select body from public.search(%L, 'Kept')$q$, t.id('keep'))), 'Kept text');
+  t.run_tok('ana', 'both', format($q$select convert_from(body, 'UTF8') from public.search_files(%L)$q$, t.id('keep'))), 'Kept text');
 select t.expect('delete: a token scoped to it sees nothing of it afterwards',
   t.run_tok('ana', 'both', format($q$select count(*)::text from public.files where vault_id = %L$q$, t.id('gone')))
   || ' ' || t.run_tok('ana', 'both', format($q$select count(*)::text from public.log where vault_id = %L$q$, t.id('gone')))

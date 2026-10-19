@@ -71,10 +71,10 @@ select t.expect('scope: no file of the other vault is visible',
   t.run_tok('ana', 'team-rw', format($q$select count(*) from public.files where vault_id = %L$q$, t.id('side'))), '0');
 select t.expect('scope: no version text of the other vault is visible',
   t.run_tok('ana', 'team-rw', format($q$select count(*) from public.file_versions where vault_id = %L$q$, t.id('side'))), '0');
-select t.expect('scope: search in the other vault finds nothing',
-  t.run_tok('ana', 'team-rw', format($q$select count(*) from public.search(%L, 'Bravo')$q$, t.id('side'))), '0');
+select t.expect('scope: search in the other vault gets nothing',
+  t.run_tok('ana', 'team-rw', format($q$select count(*) from public.search_files(%L)$q$, t.id('side'))), '0');
 select t.expect('scope: search in its own vault still works',
-  t.run_tok('ana', 'team-rw', format($q$select string_agg(path, ',') from public.search(%L, 'Alpha')$q$, t.id('team'))), 'notes/alpha.md');
+  t.run_tok('ana', 'team-rw', format($q$select string_agg(path, ',') from public.search_files(%L) where convert_from(body, 'UTF8') like '%%Alpha%%'$q$, t.id('team'))), 'notes/alpha.md');
 select t.expect('scope: the other vault''s feed is empty',
   t.run_tok('ana', 'team-rw', format($q$select count(*) from public.changes_since(%L, 0)$q$, t.id('side'))), '0');
 select t.expect('scope: the other vault''s log is invisible',

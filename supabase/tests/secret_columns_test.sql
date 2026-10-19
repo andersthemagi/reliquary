@@ -91,7 +91,7 @@ insert into content values
   ('public.proposals.body',           'bytea', 'proposed text; sealed by #238'),
   ('public.proposal_notes.body',      'bytea', 'notes on a proposal; sealed by #238'),
   ('public.thread_messages.body',     'bytea', 'thread messages; sealed by #238'),
-  ('public.file_embeddings.embedding','USER-DEFINED', 'search vectors, which invert to text; sealed by #238'),
+  ('public.file_embeddings.embedding','bytea', 'search vectors, which invert to text; bytes the writer seals (#238)'),
   ('public.feedback.message',         'text', 'feedback to the operator, not vault content; #240'),
   ('public.feedback.reply',           'text', 'the operator''s reply; #240');
 
