@@ -12,6 +12,7 @@ import type { Identity } from "./db.js";
 import { minSimilarity, queryVector } from "./embeddings.js";
 import { Refusal } from "./failure.js";
 import { ADDITIVE, at, DESTRUCTIVE, fenced, fileBlock, freshNonce, makeRun, ok, PATH, READ, refuse, TEXT, type FileRow, VAULT, VAULT_REF, VERSION, via } from "./tools-shared.js";
+import { referencesIn } from "./references.js";
 
 // Sizes as the database words them (private.size_text): decimal units.
 function size(n: number): string {
@@ -344,7 +345,7 @@ export function registerVaultFileTools(
     },
     async ({ vault, path, content, expected_version }) =>
       run(async (c) => {
-        const { rows } = await c.query("select public.write_file(private.vault_ref($1), $2, $3, $4) as version", [vault, path, content, expected_version ?? null]);
+        const { rows } = await c.query("select public.write_file(private.vault_ref($1), $2, $3, $4, $5) as version", [vault, path, content, expected_version ?? null, referencesIn(path, content)]);
         // The version a chained write expects, in read_file's own words.
         return ok(`Wrote ${path}. The change is logged as ${id.agent}.\nversion: ${rows[0].version}`);
       }),

@@ -31,7 +31,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 13 | [Links](#links) | Built |
 | 14 | [Routines](#routines) | Designed, not built |
 | 15 | [Environment variables](#environment-variables) | Built |
-| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461) and the bytea columns (#462) are built; search, references, sealing writes and the backfill to come (#238) |
+| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461), the bytea columns (#462) and references from the writer (#464) are built; search, sealing writes and the backfill to come (#238) |
 | 17 | [Continuity](#continuity) | Designed, not built |
 | 18 | [Client engagements](#client-engagements) | Designed, not built |
 | 19 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
@@ -1934,13 +1934,14 @@ of `search` move up into the server that holds the key:
 - **Reads:** `read_file`, diffs, the editor, proposals, threads, export,
   `changes_since` and the feed's excerpts open bodies in the app. One
   helper, `openBody(row, vaultId)`, so no caller handles an envelope.
-- **References** (`[[path]]`, section Search): the trigger that parses a
-  file's text in SQL goes. The server that writes a version already has
-  the plaintext: it extracts the references and passes them as
-  `p_references text[]` to the write and approve functions, which replace
-  the file's rows. Paths are metadata; the hostile test is that an agent
-  can't name a target its text doesn't contain (the function trusts the
-  list, so the test checks the two servers, not SQL).
+- **References** (`[[path]]`, section Search): the trigger that parsed a
+  file's text in SQL is gone (built, #464). The server that writes a
+  version has the plaintext: it extracts the references
+  (`web/src/references.ts`, the same file as `mcp/src/references.ts`) and
+  passes them as `p_references text[]` to `write_file`, `decide` and
+  `edit_and_approve`, which replace the file's rows; a write without them
+  clears the file's. Paths are metadata; the function trusts the list, so
+  the tests of what a text refers to are the servers' (F914), not SQL's.
 - **Embeddings:** computed from plaintext in the MCP server as now,
   sealed before `store_embeddings`.
 - **Work plans:** parsed in the MCP server already; unchanged.

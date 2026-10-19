@@ -27,6 +27,7 @@ import { byWhom, latestFeedback, person, rowSnooze, snoozeControl, threadSection
 import { Refusal } from "./failure.js";
 import { risks } from "./risk.js";
 import { planPath } from "./tasks.js";
+import { referencesIn } from "./references.js";
 
 export { risks } from "./risk.js";
 
@@ -573,7 +574,14 @@ export async function decide(ctx: Ctx, id: string, pid: string): Promise<Reply> 
   try {
     const result = await asPerson(
       ctx.userId,
-      async (c) => (await c.query(`select public.decide($1, $2, $3, $4) as r`, [pid, decision, note || null, revision])).rows[0].r as string,
+      async (c) => {
+        // The references an approval records: read from the proposal, as
+        // the person sees it, in the transaction that applies it (the
+        // revision check refuses a text that changed in between).
+        const p = (await c.query(`select path, convert_from(body, 'UTF8') as body from public.proposals where id = $1 and kind = 'write'`, [pid])).rows[0];
+        const refs = decision === "approve" && p ? referencesIn(p.path, p.body) : null;
+        return (await c.query(`select public.decide($1, $2, $3, $4, $5) as r`, [pid, decision, note || null, revision, refs])).rows[0].r as string;
+      },
     );
     decidedFlash(ctx, result);
   } catch (err) {
@@ -590,8 +598,11 @@ export async function editAndApprove(ctx: Ctx, id: string, pid: string): Promise
   try {
     const result = await asPerson(
       ctx.userId,
-      async (c) =>
-        (await c.query(`select public.edit_and_approve($1, $2, $3, $4) as r`, [pid, content, note || null, revision])).rows[0].r as string,
+      async (c) => {
+        const p = (await c.query(`select path from public.proposals where id = $1`, [pid])).rows[0];
+        const refs = p ? referencesIn(p.path, content) : null;
+        return (await c.query(`select public.edit_and_approve($1, $2, $3, $4, $5) as r`, [pid, content, note || null, revision, refs])).rows[0].r as string;
+      },
     );
     decidedFlash(ctx, result);
   } catch (err) {
