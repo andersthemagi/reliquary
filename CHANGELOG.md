@@ -6,6 +6,41 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.26.0](https://github.com/andersthemagi/reliquary/compare/v0.25.0...v0.26.0) (2026-10-19)
+
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
+
+Links are easier to keep running: an owner can replace a link's credential or refresh its tools without losing its grants, send the credential in the header its service expects, and see every call agents made through it. Signing in to the hosted service now means agreeing to the terms. This release applies 4 database migrations.
+
+### New
+
+#### A link's Calls page shows who used it, with which tool, and how it went ([#448](https://github.com/andersthemagi/reliquary/issues/448))
+
+A link now has a **Calls** page that shows every call agents made through it: who made it and through which agent, the tool, how it went and how much came back. Arguments and answers are never stored or shown. The Links list shows each link's last call and how many calls it had in the last 7 days. Owners and editors see calls; viewers don't.
+
+#### A link's credential can go in a header other than Authorization ([#451](https://github.com/andersthemagi/reliquary/issues/451))
+
+A link can now send its credential in the header its service expects. The Add and Edit forms on a vault's Links page have a **Header** field: leave it as `Authorization` to send `Bearer <credential>` as before, or type another name, like `X-Api-Key`, to send the credential as that header's whole value. Existing links keep `Authorization`.
+
+#### An owner replaces a link's credential or refreshes its tools, keeping its grants ([#449](https://github.com/andersthemagi/reliquary/issues/449))
+
+An owner can replace a link's credential, or refresh its tools, from the link's menu on the Links page without deleting the link. The link keeps its name, URL and grants, and its call history stays under one link. Either action runs discovery again and says which tools were added and removed.
+
+### Changed
+
+#### Signing in means agreeing to the terms, which now cover copyright and the standard clauses ([#447](https://github.com/andersthemagi/reliquary/issues/447))
+
+Signing in to the hosted service now asks you to tick one box, agreeing to the Terms and Privacy Policy and confirming you're not based in the EU, EEA, UK or Switzerland, where the alpha isn't offered yet. Reliquary keeps a record of which terms version you accepted and when. The terms also say how to report copyright infringement, when anyone at Red Mage looks at your content, and what happens to your data when authorities ask for it.
+
+### Smaller changes
+
+- A deploy checks that search by meaning works, and its setup can't break other secrets ([#438](https://github.com/andersthemagi/reliquary/issues/438))
+- Say how long the oldest proposal has waited in session brief ([#408](https://github.com/andersthemagi/reliquary/issues/408)) ([#413](https://github.com/andersthemagi/reliquary/issues/413))
+
+### Fixes
+
+- The other release pull request stays in tiers when one is merged ([#435](https://github.com/andersthemagi/reliquary/issues/435))
+
 ## [0.25.0](https://github.com/andersthemagi/reliquary/compare/v0.24.0...v0.25.0) (2026-10-18)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
