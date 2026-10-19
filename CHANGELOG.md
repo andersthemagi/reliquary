@@ -6,6 +6,16 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.27.1](https://github.com/andersthemagi/reliquary/compare/v0.27.0...v0.27.1) (2026-10-19)
+
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
+
+### Changed
+
+#### The body writers convert text themselves; no cast for hosted Supabase ([#474](https://github.com/andersthemagi/reliquary/issues/474))
+
+V0.27.0's deploy stopped at a database migration that hosted Supabase refused (a cast it may not create), so production stayed on v0.26.0. The migration is rewritten without it and the functions that store file, proposal, note and message text convert it to bytes themselves. Nothing people or agents see changes; this release's deploy runs v0.27.0's migrations.
+
 ## [0.27.0](https://github.com/andersthemagi/reliquary/compare/v0.26.0...v0.27.0) (2026-10-19)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
