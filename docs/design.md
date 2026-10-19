@@ -1956,8 +1956,8 @@ of `search` moved up into the server that holds the key (built, #463:
    first byte isn't the envelope marker is plaintext), so reads work
    during the backfill.
 2. `alter column body type bytea` per table, with the plaintext bytes
-   kept as they are (built: writes keep taking text through an assignment
-   cast, and every SQL read converts; the type change alone), then, once
+   kept as they are (built: writes keep taking text and each writer
+   converts it, and every SQL read converts; the type change alone), then, once
    search and references have left SQL, every write sealing.
 3. The backfill: `rekey.ts` extended, run as `reliquary_ops` (the role
    that serves no requests), in batches, sealing each plaintext row in

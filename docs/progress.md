@@ -140,6 +140,22 @@ waived.
 
 Status 2026-10-19: #237 done (#455, #460; first encrypted backup taken and restored). #238 under way: the key set (#461, PR #467), the bytea columns (#462, first PR #468), search in the server (#463) and references from the writer (#464) built; sealing writes, the backfill (#465) and dropping the plaintext path (#466) to come.
 
+### 2026-10-19: v0.27.0's deploy stopped at a migration; the file is rewritten, not patched
+
+v0.27.0 was cut with `20261019150000_content_bytea.sql` creating an
+assignment cast (text as bytea) so the write functions could keep
+assigning text. A cast between two built-in types needs their owner, and
+hosted Supabase's `postgres` role is not one, so the deploy failed in its
+migrations step ("must be owner of type text or type bytea") and
+production stayed on v0.26.0; CI and the self-host stack apply migrations
+as a superuser and never saw it. The migration had applied nowhere but
+throwaway databases, so it is edited in place (the cast removed), and the
+writers convert explicitly in `20261019190000_writers_convert.sql`. This
+is the one time a shipped migration is edited: the rule exists because an
+applied migration can't be re-run, and this one never applied. The guard
+(`scripts/check-migrations.sh`) takes a `Migration-never-applied:` trailer
+for it, and refuses `create cast` from now on.
+
 ### 2026-10-19: four Considering items move to Planned; addressed notes are threads
 
 Owner's decision, 2026-10-19: the web app's search by meaning (#395), the

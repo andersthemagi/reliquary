@@ -5,16 +5,14 @@
 -- that reads a body as text converting it, so the sealing step changes
 -- only what it must. Search vectors change type with the search move (#463).
 --
--- Writes keep taking text: an assignment cast turns a text body into its
--- UTF-8 bytes wherever a function assigns one to a column (insert, update
--- set), so the write functions are as they were. Not an implicit cast: that
--- would reach into expressions and function resolution everywhere. The
--- sealing step replaces the writes and drops the cast.
-
-create function private.utf8_bytes(p text) returns bytea
-language sql immutable strict set search_path = '' as $$ select convert_to(p, 'UTF8') $$;
-revoke all on function private.utf8_bytes(text) from public, anon, authenticated;
-create cast (text as bytea) with function private.utf8_bytes(text) as assignment;
+-- Writes keep taking text: every function that stores a body converts it
+-- with convert_to(..., 'UTF8') (20261019190000_writers_convert). This file
+-- first shipped with an assignment cast (text as bytea) doing that for
+-- them, which hosted Supabase refused ("must be owner of type text or type
+-- bytea": a cast between built-in types needs their owner), so v0.27.0's
+-- deploy stopped here and the file was edited before it had applied
+-- anywhere but CI. The one edit of a shipped migration: docs/progress.md,
+-- 2026-10-19.
 
 -- A message's character limit is private.thread_body's to check; the table
 -- keeps a byte ceiling no UTF-8 text within it can pass, and a sealed body
