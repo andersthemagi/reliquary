@@ -5,7 +5,8 @@
 // A vault's own search, from its sidebar, stays at /v/<vault>/search.
 
 import { asPerson } from "./db.js";
-import { emptyState, html, pageHeader } from "./html.js";
+import { minSimilarity, queryVector } from "./embeddings.js";
+import { callout, emptyState, html, pageHeader } from "./html.js";
 import { render, type Ctx, type Reply } from "./pages.js";
 import { LINES_SQL, queryTerms, snippetLines } from "./searchlines.js";
 
@@ -26,15 +27,21 @@ export async function searchAll(ctx: Ctx): Promise<Reply> {
   const searched = `select v.id, v.name from public.vaults v
                        join public.vault_members m on m.vault_id = v.id and m.user_id = $1
                       order by v.name, v.id limit ${VAULTS}`;
+  let note = "";
   const rows: Hit[] = query
     ? await asPerson(ctx.userId, async (c) => {
+        // One embedding of the question serves every vault's search; the
+        // same call embeds what those vaults have queued (embeddings.ts).
+        const ids = (await c.query(`select v.id from (${searched}) v`, [ctx.userId])).rows.map((r) => r.id as string);
+        const embedded = await queryVector(c, ids, query);
+        note = embedded.note;
         const { rows } = await c.query(
           `select v.id as vault_id, v.name as vault, s.path, s.policy, ${LINES_SQL}
              from (${searched}) v
-            cross join lateral public.search(v.id, $2, ${PER_VAULT}) s
+            cross join lateral public.search(v.id, $2, ${PER_VAULT}, $4::extensions.vector, $5::real) s
             order by s.rank desc, s.updated_at desc
             limit ${TOTAL}`,
-          [ctx.userId, query, terms],
+          [ctx.userId, query, terms, embedded.vector, minSimilarity()],
         );
         // Below TOTAL every vault's matches are here, so a vault with none
         // found nothing: noted for its owners (20261017140000_missed_searches.sql).
@@ -59,6 +66,7 @@ export async function searchAll(ctx: Ctx): Promise<Reply> {
       </div>
       <p class="hint">Use quotes for a phrase, or <code>or</code> between words. To search one vault, use the search in its sidebar.</p>
     </form>
+    ${note ? callout("warning", note) : ""}
     ${query
       ? rows.length
         ? html`<p class="muted small">${rows.length}${rows.length === TOTAL ? "+" : ""} result${rows.length === 1 ? "" : "s"} for “${query}” in ${vaults} ${vaults === 1 ? "vault" : "vaults"}</p>

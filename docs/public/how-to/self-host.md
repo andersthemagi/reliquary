@@ -80,14 +80,14 @@ To be emailed about each new item, set `FEEDBACK_EMAIL` in `deploy/compose/.env`
 
 ## Search by meaning
 
-Agents' `search` can also [find files by meaning](../concepts/vaults-and-files.md#search-by-meaning). On your server it is off until you turn it on, and search matches words and file names. To turn it on:
+Agents' `search` and the web app's search pages can also [find files by meaning](../concepts/vaults-and-files.md#search-by-meaning). On your server it is off until you turn it on, and search matches words and file names. To turn it on:
 
-1. In `deploy/compose/.env`, set `EMBED_URL=http://embed:9000/` and `EMBED_SECRET` to a long random value (`openssl rand -hex 32`).
+1. In `deploy/compose/.env`, set `EMBED_URL=http://embed:9000/` and `EMBED_SECRET` to a long random value (`openssl rand -hex 32`). Both the web app and the MCP server read them.
 2. Start with the `embed` profile as well: `docker compose --profile caddy --profile embed up -d`.
 
 The `embed` service is Supabase's open-source edge runtime running Reliquary's embedding function. It downloads the gte-small model (tens of megabytes) the first time it is used, so it needs outbound internet then; no file text goes with that download. Files are embedded as their vaults are searched. If the service stops, search answers by words and says so.
 
-To check it, open `https://<your MCP host>/healthz?embed=1`. It answers `ok` when search by meaning works, `off` when `EMBED_URL` isn't set, and otherwise why not, for example `The embedding function answered 401: its EMBED_SECRET and this server's differ`, when the two copies of the secret don't match. `EMBED_URL` without `EMBED_SECRET` stops the MCP server from starting at all.
+To check it, open `https://<your MCP host>/healthz?embed=1`. It answers `ok` when search by meaning works, `off` when `EMBED_URL` isn't set, and otherwise why not, for example `The embedding function answered 401: its EMBED_SECRET and this server's differ`, when the two copies of the secret don't match. `EMBED_URL` without `EMBED_SECRET` stops the MCP server, and the web app, from starting at all.
 
 ## Connect your agents
 

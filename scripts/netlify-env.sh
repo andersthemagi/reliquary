@@ -42,12 +42,12 @@
 #   scripts/netlify-env.sh variables-keys          the key ids, current first
 #
 # Search by meaning (docs/ops/runbook.md, "Search by meaning") only needs
-# its three variables on the mcp site, and `mcp` rewrites them all (with a
-# new LINK_PROXY_SECRET if supabase/.link-proxy-secret is missing, which
-# would break link calls until both sites have it). So:
+# its three variables, the same on both sites, and `web` and `mcp` rewrite
+# them all (with a new LINK_PROXY_SECRET if supabase/.link-proxy-secret is
+# missing, which would break link calls until both sites have it). So:
 #
 #   scripts/netlify-env.sh embed   writes only EMBED_URL, EMBED_SECRET and
-#                                  EMBED_REGION to supabase/.netlify-mcp-embed.env
+#                                  EMBED_REGION to supabase/.netlify-embed.env
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
@@ -74,13 +74,13 @@ case ${1:-} in
       head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > supabase/.embed-secret
       echo "Made supabase/.embed-secret: a new value, so set it in Supabase too (runbook step 3)."
     fi
-    out=supabase/.netlify-mcp-embed.env
+    out=supabase/.netlify-embed.env
     printf 'EMBED_URL=https://%s.supabase.co/functions/v1/embed\nEMBED_SECRET=%s\nEMBED_REGION=eu-central-1\n' \
       "$ref" "$(cat supabase/.embed-secret)" > "$out"
     chmod 600 "$out"
     echo "Wrote $out (mode 600, gitignored). Names only:"
     cut -d= -f1 "$out" | sed "s/^/  /"
-    echo "Import it into the mcp site with a value for every deploy context, then delete it (docs/ops/runbook.md, \"Search by meaning\")."
+    echo "Import it into the mcp site and the web site with a value for every deploy context, then delete it (docs/ops/runbook.md, \"Search by meaning\")."
     exit 0
     ;;
 esac
@@ -115,6 +115,14 @@ if [[ ! -s $link_secret ]]; then
   (umask 077; head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$link_secret")
 fi
 
+# The search embedding function's secret (docs/ops/runbook.md, "Search by
+# meaning"): the same value goes to both sites and to Supabase's function
+# secrets.
+embed_secret=supabase/.embed-secret
+if [[ ! -s $embed_secret ]]; then
+  (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$embed_secret")
+fi
+
 out=supabase/.netlify-$app.env
 case $app in
   web)
@@ -144,15 +152,12 @@ SESSION_SECRET=$(cat "$secret")
 LINK_PROXY_SECRET=$(cat "$link_secret")
 RESEND_API_KEY=<from Resend: API Keys, sending access only>
 EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>
+EMBED_URL=https://$ref.supabase.co/functions/v1/embed
+EMBED_SECRET=$(cat "$embed_secret")
+EMBED_REGION=eu-central-1
 EOF
     ;;
   mcp)
-    # The search embedding function's secret (docs/ops/runbook.md, "Search
-    # by meaning"): the same value goes to Supabase's function secrets.
-    embed_secret=supabase/.embed-secret
-    if [[ ! -s $embed_secret ]]; then
-      (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$embed_secret")
-    fi
     cat > "$out" <<EOF
 DATABASE_URL=postgres://reliquary_mcp.$ref:$(pw mcp | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
