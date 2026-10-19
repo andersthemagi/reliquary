@@ -1377,6 +1377,8 @@ reaching Reliquary.)
   member granted a link sees whatever that upstream account returns.
   The link's grant is the control, so grant accordingly.
 - **Shared credentials only in v1** (API keys, service accounts).
+  A vault-wide OAuth sign-in by an owner is designed below ([OAuth
+  sign-in for a link](#oauth-sign-in-for-a-link-442)).
   Per-member OAuth to upstream ("my Gmail") comes later.
 
 ### Implementation plan (schema and discovery)
@@ -1450,6 +1452,287 @@ Open questions this doesn't resolve:
   moves link credentials with the values). A compromised upstream
   credential is replaced in place, without deleting and re-adding the
   link (2026-10-18, issue #439, `20261018120000_link_replace_credential.sql`).
+
+### OAuth sign-in for a link (#442)
+
+Written 2026-10-18 and approved by the owner 2026-10-19, with the
+decisions at the end; not built yet. Many hosted MCP servers take only
+OAuth, so today they can't be linked at all. This adds one more way to give a link its credential: an
+owner signs Reliquary in to the upstream server once, in person, and the
+whole vault then uses that one grant exactly as it uses a pasted key now.
+It is still a shared credential (one upstream account for the vault).
+Per-member OAuth ("my Gmail") stays later.
+
+It follows the MCP authorization spec as it stands (2026-07-28):
+protected resource metadata (RFC 9728) to find the authorization server,
+authorization server metadata (RFC 8414, or OpenID Connect discovery),
+the authorization code grant with PKCE S256, a `resource` parameter
+(RFC 8707) on every authorization and token request, and the `iss` check
+of RFC 9207. Reliquary is the OAuth client here, the mirror image of what
+`web/src/oauth.ts` serves.
+
+**Who authorizes.** An owner, signed in to the web app, on the link's
+page. Connecting, reconnecting and disconnecting a sign-in are edits of
+the link, and "add, edit or delete a link" is already on [the
+ceiling](public/concepts/agents.md#the-ceiling), so no agent can do any of
+them through any connection. The database enforces it the way it already
+does for links: every function that starts, completes or removes a
+sign-in calls `private.require_human()` and checks the owner role. When
+built, the ceiling's line says so in words: "add, edit or delete a link,
+sign it in to or out of its server, or set its tool grants". The consent
+step says plainly that everyone granted the link's tools will act as the
+upstream account the owner signs in with.
+
+Refreshing a token is not an action anyone takes: Reliquary does it when
+a granted call needs it, for whoever made the call, under the grants that
+already allowed the call.
+
+**The flow, end to end.**
+
+1. The owner adds a link (or edits one) and leaves the credential empty.
+   The web app sends an unauthenticated `initialize` to the URL. A `401`
+   with a `Bearer` challenge offers **Sign in**; any other answer keeps
+   today's paste-a-credential form.
+2. Protected resource metadata: the `resource_metadata` URL from the
+   challenge if there is one, else the well-known URL with the link's path
+   inserted, else the one at the root (the spec's order). The document's
+   `resource` must equal the link's URL exactly, and the metadata URL must
+   be on the link's own origin. Anything else is refused, naming which.
+3. Authorization server: the first entry of `authorization_servers`. Its
+   metadata comes from the spec's well-known URLs in order; the document's
+   `issuer` must be identical to the issuer used to build the URL. Refused
+   unless `code_challenge_methods_supported` includes `S256`,
+   `response_types_supported` includes `code`, and the authorization and
+   token endpoints are https URLs with no userinfo or fragment.
+4. Client identity: a Client ID Metadata Document that Reliquary serves
+   itself at `<PUBLIC_URL>/links/oauth-client.json` (the same shape as the
+   CLI's `/cli/oauth-client.json`), with `client_name` "Reliquary", one
+   redirect URI, `<PUBLIC_URL>/links/oauth/callback`, `grant_types`
+   `authorization_code` and `refresh_token`, and
+   `token_endpoint_auth_method` `none` (a public client: there is no
+   client secret to keep). It is used when the metadata has
+   `client_id_metadata_document_supported: true`. A self-hosted
+   deployment serves its own at its own `PUBLIC_URL`. Dynamic client
+   registration (RFC 7591) is not built in this step: the spec deprecated
+   it in 2026-07-28, and the servers we need first support the document
+   (see the open questions). A server that offers neither is refused with
+   that reason.
+5. The owner sees a page naming the authorization server's host, the
+   scopes and the warning above. **Continue** redirects the browser to the
+   authorization endpoint with `response_type=code`, the client id, the
+   redirect URI, a fresh `state` (32 random bytes), the S256
+   `code_challenge`, `resource` (the link's URL) and `scope`.
+6. A pending row records what the callback must match: the SHA-256 of
+   `state`, the link, the owner, the issuer, the token endpoint, the
+   resource and the sealed PKCE verifier. It lasts 10 minutes and is used
+   once.
+7. The callback (`GET /links/oauth/callback`) needs the same person signed
+   in, still an owner of the vault, the link's URL unchanged since the
+   pending row, and `iss` checked against the recorded issuer per the
+   spec's table (rejected when the server advertises `iss` and leaves it
+   out). Only then does the code go to the token endpoint, with the
+   verifier, the redirect URI, the client id and `resource`.
+8. The token response must be `token_type` Bearer (any case) with an
+   `access_token`. Both tokens are sealed and stored, and discovery
+   (`tools/list`) runs with the new access token exactly as it does after
+   a pasted key.
+
+**What is stored, and how it is sealed.**
+
+- The access token goes in `private.link_secrets`, the row a pasted
+  credential uses, sealed with `sealLink` as today. `begin_link_call`,
+  `linkproxy.ts` and the egress path are unchanged for it.
+- The refresh token goes in a new `private.link_refresh_secrets(link_id,
+  key_id, nonce, ciphertext)`: no grants, RLS with no policies, reached
+  only through functions granted to `reliquary_web`. It never reaches
+  `mcp/`: `begin_link_call` doesn't return it, and the MCP role can't
+  call the functions that do. Its additional authenticated data is
+  `["reliquary.link.refresh.v1", vault_id, link_id]`, so it can't be
+  opened as an access token, or as another link's, even in the same vault.
+- The PKCE verifier in the pending row is sealed the same way, with its
+  own AAD label.
+- Non-secret state goes in `public.link_oauth(link_id, vault_id, issuer,
+  token_endpoint, revocation_endpoint, client_id, resource, scope,
+  expires_at, generation, refreshing_until, status, status_reason,
+  connected_by, connected_at, refreshed_at)`. Vault members read it (the
+  same RLS as `public.links`); only the functions below write it.
+- Key rotation reuses `VARIABLES_KEYS` and `rotate-variables-key.sh`:
+  `variable_key_ids`, `rekey_vaults` and `sealed_rows` gain the refresh
+  tokens, and pending verifiers count while unexpired, like pending env
+  imports. No new key material.
+- `delete_vault` and deleting the link remove all of it. Disconnecting
+  revokes the refresh token at the server's `revocation_endpoint`
+  (RFC 7009, best effort, and the page says if it failed) and deletes the
+  rows.
+
+**Refresh.**
+
+- Only the web app refreshes, since only it holds the keys. It happens
+  inside `/internal/link-call` and discovery, lazily: before a call when
+  `expires_at` is less than 60 seconds away, or once after the upstream
+  answers `401` (an unauthorized call did nothing, so one retry is safe).
+  There is no background job. A link nobody calls for longer than its
+  refresh token lives will need reconnecting.
+- For an OAuth link, `mcp/` sends the link id and the `generation` it was
+  handed; the web app takes the URL from the database, not from the body,
+  so a refreshed token can only go to the link's own URL, and a refresh
+  token only to the recorded token endpoint.
+- Parallel calls: refresh tokens rotate (OAuth 2.1 requires it for public
+  clients), so two refreshes with the same token lose the grant, and some
+  servers revoke the whole family when they see one reused. So there is
+  one refresh at a time per link. `private.begin_link_refresh(link,
+  generation)` sets `refreshing_until` (15 seconds) only if the generation
+  still matches and no lease is live, and returns the sealed refresh token
+  to the winner alone. The winner calls the token endpoint, then
+  `private.finish_link_refresh` stores the new access token, the new
+  refresh token (or keeps the old one if none came back) and the expiry,
+  and bumps `generation`, in one statement, before the call goes on.
+  Every other call waits up to 3 seconds for the generation to move, then
+  reads the new access token; if it doesn't move, that call fails saying
+  a refresh is in progress.
+- A crash after the server rotated the token but before it was stored
+  leaves the old refresh token, which the server will refuse. That shows
+  as a lost sign-in (below), not a silent failure.
+
+**Failure: a revoked or expired grant.**
+
+- A token endpoint answering `invalid_grant`, a `401` straight after a
+  successful refresh, an expired access token with no refresh token, or
+  the server's metadata naming a different issuer at reconnect all set
+  `status` to `needs_reconnect` with a fixed reason, and write a
+  `link.signin_lost` event to the vault's log.
+- The Links page shows the link as **Sign-in expired**, with the reason,
+  when, and a **Reconnect** button for owners. Others see that an owner
+  can fix it.
+- The agent's call fails through the shared failure model: what (calling
+  `<link>.<tool>`), where (the link), why ("this link's sign-in to
+  mcp.linear.app was revoked or has expired; an owner can reconnect it on
+  the Links page"), and a ref. The server's own `error_description` is
+  never relayed: the server log keeps its error code only, and upstream
+  text is data.
+- Calls while `needs_reconnect` are refused in `begin_link_call` with no
+  egress. `link_calls` gets a nullable `reason` column (fixed vocabulary,
+  starting with `needs_reconnect`), so the call log tells a lost sign-in
+  apart from a refused grant.
+- A `403` with `insufficient_scope` fails the call naming the scopes the
+  server asked for. Asking for more scope needs an owner to reconnect;
+  Reliquary never steps up on its own.
+- Reconnecting replaces the tokens in place: the link, its tools, grants
+  and call log stay. For OAuth links this also answers the open question
+  above about replacing a compromised credential the same day.
+
+**SSRF, for every outbound request.** Every server-side fetch goes through
+`netsafety.ts`'s `safeFetch`: https only, every resolved address public
+and checked at connect time (no rebinding), no redirects, a timeout and a
+byte cap. The protected resource metadata (its URL comes from the
+upstream's own challenge, so it is someone else's choice), the
+authorization server metadata, the token endpoint and the revocation
+endpoint each get it: 5 seconds and 64 KB for metadata, 5 seconds and
+16 KB for token responses, JSON only. The token and revocation endpoints
+are re-checked on every request, not trusted from when the link was
+connected. The authorization endpoint is never fetched by the server: the
+owner's browser goes there, so its rules are the confirmation page naming
+its host before the redirect, and an https URL with no userinfo or
+fragment. Issuers, scopes and endpoint hosts shown to the owner are
+escaped like any other upstream text. The loopback escape hatch for tests
+is the existing `LINK_DISCOVERY_ALLOW_LOOPBACK`.
+
+**Scopes.** The `scope` from the server's `401` challenge, else the
+protected resource metadata's `scopes_supported`, else none, plus
+`offline_access` when the authorization server lists it (some servers
+only issue a refresh token for it). The granted scope is stored and
+shown on the link. The scope is the upstream's coarse ceiling; the link's
+per-role tool grants stay the control inside it.
+
+**With a pasted credential, and with #441's header.** A link has one way
+in: a pasted credential or a sign-in (`links.auth`, `credential` or
+`oauth`). Switching is an owner's edit in person: signing in replaces a
+pasted credential once the token exchange succeeds, and pasting one
+disconnects the sign-in. An OAuth link always sends `Authorization:
+Bearer <access token>`, as the spec requires, so #441's custom header
+doesn't apply to it: a database check refuses a header other than
+`Authorization` on an `oauth` link, and the form hides the field.
+
+**What changes in the access table.** One row, and the ceiling's wording
+above:
+
+| Action | owner | editor | viewer | service agent |
+|---|---|---|---|---|
+| Sign a link in to or out of its server (OAuth) | yes, in person | no | no | never |
+
+Who may call an OAuth link's tools doesn't change; it is the link's
+grants, as for any link.
+
+**Hostile tests it needs.**
+
+- A member's agent, on any connection, an owner's included, starting,
+  completing, reconnecting or disconnecting a sign-in; an editor or viewer
+  in the web app doing any of them.
+- A callback with another person's `state`, another vault's, an expired
+  or reused one, or after the link's URL changed: refused, nothing stored,
+  the code never sent.
+- A callback whose `iss` differs from the recorded issuer, or is missing
+  when the server advertises it: refused before the token request.
+- Metadata whose `issuer` differs from the URL it came from, a resource
+  metadata `resource` that isn't the link's URL or a metadata URL on
+  another origin, and an authorization server without `S256`: refused
+  before any redirect.
+- Every one of the four fetched URLs on a private, loopback or link-local
+  address, over plain http, or redirecting: refused.
+- An access or refresh token in any MCP tool result, log line, change
+  event, `link_calls` row, error or page: never.
+- The MCP role selecting `link_refresh_secrets` or calling the refresh
+  functions; `begin_link_call`'s output containing a refresh token.
+- A refresh token sealed for link A, moved to link B in the same vault,
+  failing to open.
+- Ten parallel calls with an expired access token making exactly one
+  token request (a fixture authorization server counts them).
+- A refreshed token only ever sent to the link's URL from the database,
+  and a refresh token only to the recorded token endpoint, whatever URL
+  `mcp/` sends.
+- An `invalid_grant` turning the link to `needs_reconnect`; the next call
+  refused with no egress and logged with its reason.
+- A `link_calls` row, or a `link.signin_lost` event, updated or deleted,
+  except by `delete_vault`.
+- `rotate-variables-key.sh` moving refresh tokens, and the server refusing
+  to start when one names a key id it doesn't have.
+
+The fixtures are a loopback MCP server, resource metadata and
+authorization server, the way `web/test/discovery.test.mjs` serves an
+upstream today. The public docs that change when it's built:
+`docs/public/how-to/add-a-link.md`, `docs/public/concepts/links.md`, the
+ceiling in `docs/public/concepts/agents.md`, and
+`docs/public/reference/permissions.md`.
+
+**What stays out.** Per-member OAuth ("my Gmail"). Dynamic client
+registration and pasting a pre-registered client id and secret, until an
+upstream we need requires them. A fallback for servers with no protected
+resource metadata. Refreshing in the background. Asking for more scope
+without a person. The `client_credentials` grant, `private_key_jwt`, and
+enterprise-managed authorization (Linear and Notion advertise the
+`jwt-bearer` grant for it).
+
+Decided by the owner, 2026-10-19:
+
+- **Client registration.** The client document only. Dynamic
+  registration waits for an upstream we need that requires it.
+- **Servers without protected resource metadata** (Atlassian, checked
+  2026-10-18) stay on a pasted key; there is no fallback to the link's
+  origin. Atlassian takes a service account's API key as a Bearer token
+  once an org admin allows API tokens.
+- **Linear, for milestone 3.** The week of real use runs on a pasted
+  Linear API key; this is built after it.
+- **When the owner who signed in goes.** Deleting their account
+  disconnects every sign-in they made and revokes it upstream (RFC 7009,
+  best effort). Leaving the vault or stepping down from owner keeps the
+  sign-in, and the link shows owners a warning naming who signed it in
+  until another owner reconnects or disconnects it.
+- **A lost sign-in** also flags the vault's owners
+  ([Notifications](#notifications)), beside the Links page, the log and
+  the failing call.
+- **Scope.** Reliquary requests what the server asks for; the owner
+  doesn't pick a narrower set. Grants still decide which tools an agent
+  can call.
 
 ## Routines
 
