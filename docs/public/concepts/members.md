@@ -4,11 +4,11 @@ People join a vault only by invite, with a role an owner picks, and only the own
 
 ## Members
 
-A vault's members are on **Settings**, **Members**. Every member sees who else is in the vault, by email and role, and how many of the vault's places are filled. Owners also get:
+A vault's members are on **Settings**, **Members**, in three sections: **People**, **Pending invites** and **Agents**. Every member sees who else is in the vault, each with their role and shown as they chose (see [How people are shown](#how-people-are-shown)), and how many of the vault's places are filled. Owners also get:
 
 - **Invite someone**, at the top right: a page with an email address (or blank, for a link anyone may use) and a role (owner, editor or viewer). When the vault has no places left, the button is off and the page says how to make room (see [Plans and limits](plans-and-limits.md)).
-- A role picker for each member, and **Remove** in the row's **⋯** menu, behind a confirm page.
-- Pending invites, with when each was sent and expires, and **Revoke** behind a confirm page.
+- A role menu with **Change** for each member, and **Remove** in the row's **⋯** menu, behind a confirm page.
+- **Pending invites**, with when each was sent and expires, and **Revoke** behind a confirm page.
 - **Agents**: each member's connections that reach this vault (tokens, apps and the Reliquary CLI), with each one's type, when it was created and last used, and **Revoke** behind a confirm page, which cuts that connection off from this vault only. See [Connections](connections.md).
 
 The only owner can't step down, leave or remove themself. Make someone else an owner first. The one way a vault loses its last owner is that owner [deleting their account](../how-to/delete-your-account.md).

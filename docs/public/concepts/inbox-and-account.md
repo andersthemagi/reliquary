@@ -24,11 +24,14 @@ The **Feedback** button, on every page (on a phone, **Send feedback** in the acc
 
 The **Inbox** button counts what needs you. The count is hidden when nothing does. Open it to see the newest few items; **View all** opens the Inbox page (`/inbox`). It holds:
 
-- **Changes to review**: open proposals in vaults where you're an owner or editor that you haven't decided on yet. See [Proposals and review](proposals-and-review.md).
-- **Changes requested on your proposals**: yours, or your agents', sent back by a reviewer. Open one to read the note and choose **Revise**.
-- **.env imports to apply**: imports from the CLI (sent with `reliquary env push`) that your role lets you apply. See [Imports](imports.md).
 - **Invites**: invites to join a vault, made out to your address, with who sent each and when it expires. Choose **Join** to become a member with the invite's role, or **Decline** to turn it down (see below). The link the owner sent you works too.
+- **.env imports waiting to be applied**: imports from the CLI (sent with `reliquary env push`) that your role lets you apply, each with **Review**. See [Imports](imports.md).
+- **Changes requested on your proposals**: yours, or your agents', sent back by a reviewer. Open one to read the note and choose **Revise**.
+- Proposals to review, under a heading for each vault: open proposals in vaults where you're an owner or editor that you haven't decided on yet, in the same rows as the vault's Proposals page. See [Proposals and review](proposals-and-review.md).
+- **Waiting on the proposer**: proposals you sent back, until they're revised.
 - **Deleted vaults**: a vault you were in was deleted by an owner. The notice is counted until the Inbox or Home shows it, then it's gone.
+
+When nothing needs you, the page says **Nothing needs you.**
 
 ### Join or decline an invite
 
@@ -37,7 +40,7 @@ The **Inbox** button counts what needs you. The count is hidden when nothing doe
 
 Only you can answer an invite to your address, signed in to the web app. Nobody else can use it, even with its id, and neither can an agent, token, connected app or CLI sign-in. Your address must be confirmed: until it is, invites don't show in your Inbox, so use the link instead. If the vault is full, **Join** says so and the invite keeps waiting; choose **Join** again once an owner makes room.
 
-A proposal you snoozed leaves the count and the list until the snooze ends. **Show snoozed** on the Inbox page lists them. The Inbox also shows proposals you sent back that are waiting on their proposer. Old links to `/review` open the Inbox.
+A proposal you snoozed leaves the count and the list until the snooze ends. **Show snoozed** on the Inbox page lists them. Old links to `/review` open the Inbox.
 
 ## Your account
 
@@ -53,7 +56,7 @@ It also switches the theme (Auto, Light or Dark) and signs you out.
 
 ## Display name
 
-On **Account settings**, you can give yourself a display name. People who share a vault with you see it next to your email, like "Ana Ruiz (ana@example.com)", in Activity, proposals, threads and on **Members**. Nobody else sees it.
+On **Account settings**, you can give yourself a display name. People who share a vault with you see it, next to your email unless you choose otherwise (below), like "Ana Ruiz (ana@example.com)", in Activity, proposals, threads and on **Members**. Nobody else sees it.
 
 - Up to 80 characters. Spaces at either end are removed.
 - No "@", so a name never looks like an email address, and no control characters, invisible characters or text-direction marks.
@@ -71,7 +74,7 @@ Under the display name on **Account settings**, **Show me to others as** chooses
 
 Choose one and select **Save**. You always see your own email. Agents, yours and everyone else's, never see an email, whatever you choose: a tool that names people (for example `changes_since` or `list_flags`) shows them by display name and tag alone. Your display name is text, never code: a name like `Robert'); DROP TABLE students;--` or `<script>` is shown exactly as written and does nothing.
 
-Your email stays hidden everywhere: on Members, in Activity, in an invite you send and in the notice when you delete a vault. No vault can override your choice.
+With **Display name alone**, your email stays hidden everywhere: on Members, in Activity, in an invite you send and in the notice when you delete a vault. No vault can override your choice.
 
 Only you can change this, signed in to the web app.
 

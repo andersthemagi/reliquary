@@ -35,7 +35,7 @@ Only the person signed in with the invited address, in the web app, can answer f
 
 They appear on **Members** with their role. They can connect their own AI tools, which act as them, not as you. See [Agents and the ceiling](../concepts/agents.md).
 
-- **Change their role** with the role picker on **Members**.
+- **Change their role**: on **Members**, pick the new role in their row and choose **Change**.
 - **Remove them** with **Remove** in their row's **⋯** menu, after a confirm page. They and their agents lose access at once.
 - **Cut off one of their connections** from this vault with **Revoke** under **Agents**, then confirm.
 

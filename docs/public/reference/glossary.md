@@ -48,6 +48,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 
 **Open.** A file policy: owners, editors and their agents write the file directly, each write a new version. See [Canon, open and rules](../concepts/canon-and-rules.md).
 
+**Overview.** The page a vault opens on, first in its sidebar: what waits on you, tasks in progress, recent changes and who is in the vault, built from what the vault records. See [Vaults, files and folders](../concepts/vaults-and-files.md#a-vaults-overview).
+
 **Owners-only environment.** An environment, like `production`, whose values only owners set or read.
 
 **Path owner.** Someone named on a specific path's owner list: open for them there, whatever the path's own rule says for everyone else, and their approval is what its quorum counts. Anyone who is a member may be named, including a viewer, promoted for that one path only. See [Path ownership](../concepts/path-ownership.md).
@@ -79,6 +81,8 @@ The words Reliquary uses, each in one or two sentences, with a link to where it 
 **Thread.** A conversation inside one vault between its members and their agents: a title and messages in order, never private. Not the same as the discussion on a proposal. See [Threads](../concepts/threads.md).
 
 **Token.** A type of connection: a secret you paste into an MCP client that can't sign in, which sends it in a header (`Authorization: Bearer ...`). Made with **New token**, scoped to vaults and access, always expiring. See [Connections](../concepts/connections.md).
+
+**Updates.** A vault's sidebar page for what happened while you were away: **New for you** (your flags) on top, then its **Changes**. See [Changes and the log](../concepts/activity.md#updates).
 
 **Vault.** The container for one team, client or project: files, variables, members and activity. See [Vaults, files and folders](../concepts/vaults-and-files.md).
 

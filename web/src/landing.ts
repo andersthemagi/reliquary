@@ -214,7 +214,7 @@ const shot = (theme: Theme, name: string, alt: string, caption: string, still = 
 
 const screens: Array<[string, string, string]> = [
   ["proposal", "A proposal page: the diff of a runbook change from Claude Code, a note field, and the Approve, Request changes and Reject buttons.", "A change to canon: who proposed it, the diff, and the decision."],
-  ["variables", "The Variables page: four variable names across development, preview and production, with who set each and when, and never a value.", "Secrets per environment. Names and who set them; the value never shows."],
+  ["variables", "The Variables page: four variable names across development, preview and production, each Set or Not set, with what is missing where, and never a value.", "Secrets per environment. Names and where each is set; the value never shows."],
 ];
 
 // Fifteen seconds of the core loop, in both themes. A muted, looping video
@@ -228,7 +228,7 @@ const reel = (theme: Theme) => {
   <h2 id="see-title">What it looks like</h2>
   <figure class="p-frame p-reel">
     ${theme === "auto" ? html`${video("light", true)}${video("dark", true)}` : video(theme, false)}
-    ${shot(theme, "reel", "A proposal page: the diff of a runbook change from Claude Code, with the Approve button.", "A proposal waits in the Inbox. You open the diff and approve it. The file is canon, and the log says who did what.", true)}
+    ${shot(theme, "reel", "A proposal page: the diff of a runbook change from Claude Code, with the Approve button.", "A proposal waits in the Inbox. You open the diff and approve it. The file is canon, and Updates says who did what.", true)}
   </figure>
   <div class="p-shots">${screens.map(([name, alt, caption]) => shot(theme, name, alt, caption))}</div>
 </section>`;
