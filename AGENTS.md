@@ -108,6 +108,12 @@ Policy and sources: [docs/research/testing-strategy.md](docs/research/testing-st
   ./mcp/test.sh` and commit the snapshot with a `Changes-behaviour` trailer.
 - New test files seed their own data or use unique paths; never depend on
   another file's side effects. Flaky means failing: fix, don't retry.
+- **Migrations run as `supabase_postgres` in every suite**
+  (`supabase/tests/schema.sh`): a role shaped like hosted Supabase's
+  `postgres`, not a superuser, so what production would refuse fails here.
+  Security-definer functions run as it too; a test stand-in they must
+  reach (a table, a trigger function) needs a grant to it or
+  `security definer` of its own.
 - **Before adding, changing, or sweeping tests, run the `test-audit` skill**
   (`.claude/skills/test-audit/SKILL.md`): its authoring gate and junk-pattern
   checklist catch low-value or duplicate tests that traceability and the

@@ -101,20 +101,25 @@ volume before buying more.
   that way: their PR-level guard runs had passed, so the test changes were
   declared, but `main` showed three red `test` runs. No blank line between
   them (`AGENTS.md`'s Conventions section).
-- **CI applies migrations as a superuser; production doesn't.** Hosted
-  Supabase's `postgres` role can't own a built-in type, so a migration
-  with `create cast (text as bytea)` passed every suite and the self-host
-  smoke test, then failed v0.27.0's deploy at the migrations step ("must
-  be owner of type text or type bytea", 2026-10-19). The deploy stops
-  before building anything, so production stayed on the previous release.
-  `scripts/check-migrations.sh` refuses `create cast` now; anything else
-  only a superuser can run (`alter system`, an untrusted language, owning
-  a built-in object) is the same trap. So is an extension's setting in a
-  function's `set` clause before anything in that migration has loaded
-  the extension: Postgres then sees a placeholder, and only a superuser
-  may set one there (v0.27.1's deploy, `set hnsw.iterative_scan`,
-  "permission denied to set parameter"; the earlier migration that set it
-  had used pgvector first in the same file). A migration that failed that way
+- **The suites apply migrations as a role shaped like production's, not
+  a superuser.** Hosted Supabase's `postgres` role is not one, and on
+  2026-10-19 two statements passed every suite and the self-host smoke
+  test as the container's superuser, then failed v0.27.0's and v0.27.1's
+  deploys at the migrations step: `create cast (text as bytea)` ("must be
+  owner of type text or type bytea": a cast between built-in types needs
+  their owner) and `set hnsw.iterative_scan` in a function's `set` clause
+  before anything in that file had loaded pgvector (a placeholder, which
+  only a superuser may set there). The deploy stops before building
+  anything, so production stayed on the previous release each time.
+  Since #477 `supabase/tests/schema.sh` applies the migrations as
+  `supabase_postgres` (`tests/stub.sql`: the database's owner with
+  createrole, createdb and bypassrls, a member of the API roles, no
+  superuser) in every suite, so the same statement fails `./test.sh sql`
+  in seconds; security-definer functions run as that role in the tests
+  too, as they do in production. A migration that failed that way never
+  applied anywhere but CI, and is rewritten in place with a
+  `Migration-never-applied:` trailer (`AGENTS.md`, Conventions) rather
+  than fixed forward, because `supabase db push` retries the same file. A migration that failed that way
   never applied anywhere but CI, and is rewritten in place with a
   `Migration-never-applied:` trailer (`AGENTS.md`, Conventions) rather
   than fixed forward, because `supabase db push` retries the same file.
