@@ -193,7 +193,9 @@ select t.run('ben', format($q$select public.leave_queue(%L, 'g/chain.md')::text$
 
 create table t.writes (n bigint not null);
 insert into t.writes values (0);
-create function t.count_write() returns trigger language plpgsql as $$
+-- security definer: it fires inside functions that run as supabase_postgres,
+-- which can't touch schema t; as the superuser's it still can.
+create function t.count_write() returns trigger language plpgsql security definer as $$
 begin update t.writes set n = n + 1; return null; end $$;
 create trigger zz_count after insert or update or delete on public.work_plan_places for each statement execute function t.count_write();
 create trigger zz_count after insert or update or delete on public.work_plan_steps for each statement execute function t.count_write();

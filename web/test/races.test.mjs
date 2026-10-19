@@ -1772,7 +1772,7 @@ test("races, waiting in line under load: 100 agents asking as fast as they can c
   const held = await as(db, OWNER, "select o_fence from public.claim_step($1, 'load/plan.md', 'a')", [v]);
   assert.ok(held.ok, held.message);
   await sql(`create table if not exists test_races.place_writes (vault_id uuid not null);
-    create or replace function test_races.count_place() returns trigger language plpgsql as $f$
+    create or replace function test_races.count_place() returns trigger language plpgsql security definer as $f$
     begin insert into test_races.place_writes values (new.vault_id); return null; end $f$;
     drop trigger if exists zz_races_count on public.work_plan_places;
     create trigger zz_races_count after insert or update on public.work_plan_places

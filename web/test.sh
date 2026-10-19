@@ -58,7 +58,7 @@ source ../scripts/lib/containers.sh
 start_postgres "$pg" $pgport
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
+../supabase/tests/schema.sh | psql >/dev/null
 # Many test files, the same few people: room past Free's limits (plans are
 # tested with plans of their own: web/test/plans.test.mjs).
 echo "select test_support.roomy_free();" | psql >/dev/null
@@ -66,12 +66,12 @@ echo "select test_support.roomy_free();" | psql >/dev/null
 # every stored value and the server checks every stored key id, so it can't
 # share a database with files that seal under keys of their own.
 psql -c "create database keys"
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql -d keys >/dev/null
+../supabase/tests/schema.sh | psql -d keys >/dev/null
 # A third for the rate-limit instance (test/rate_limits.test.mjs): counters
 # are shared by every instance on a database, and the other files sign in
 # as the same people from the same address.
 psql -c "create database ratelimits"
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql -d ratelimits >/dev/null
+../supabase/tests/schema.sh | psql -d ratelimits >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
 # The operator's role, for test/variables_keys.test.mjs's re-encryption.
 echo "alter role reliquary_ops login password 'test';" | psql

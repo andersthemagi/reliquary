@@ -156,6 +156,16 @@ applied migration can't be re-run, and this one never applied. The guard
 (`scripts/check-migrations.sh`) takes a `Migration-never-applied:` trailer
 for it, and refuses `create cast` from now on.
 
+v0.27.1 then failed on the same file's next superuser-only statement, a
+pgvector option in a function's `set` clause (a placeholder to Postgres,
+since nothing in the file had loaded pgvector). Owner's decision,
+2026-10-19: fix the cause rather than patch again (#477). Every suite now
+applies the migrations as `supabase_postgres`, a role `tests/stub.sql`
+shapes like hosted Supabase's `postgres` (`supabase/tests/schema.sh`), and
+both statements fail `./test.sh sql` as they failed the deploys; two test
+stand-ins needed a grant or `security definer` to be reached from
+functions that no longer run as a superuser.
+
 ### 2026-10-19: four Considering items move to Planned; addressed notes are threads
 
 Owner's decision, 2026-10-19: the web app's search by meaning (#395), the

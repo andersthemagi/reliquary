@@ -234,8 +234,13 @@ create or replace function public.search(p_vault uuid, p_query text, p_limit int
                                          p_min_similarity real default 0.78)
 returns table (path text, policy text, body text, updated_at timestamptz,
                author uuid, agent text, rank real, line int)
+-- No "set hnsw.iterative_scan" here, unlike the definition this replaces:
+-- nothing in this file loads pgvector first, so to Postgres the setting is
+-- a placeholder, and only a superuser may put a placeholder in a
+-- function's SET clause (v0.27.1's deploy: "permission denied to set
+-- parameter"). 20261019180000_search_in_server replaces this function
+-- before any search runs, so the scan mode is not missed in between.
 language plpgsql stable security invoker set search_path = ''
-set hnsw.iterative_scan = relaxed_order
 set plan_cache_mode = force_custom_plan as $$
 #variable_conflict use_column
 begin
