@@ -28,9 +28,20 @@ mb=$(git merge-base "$base" HEAD) || { echo "check-migrations: no merge base wit
 
 problems=()
 
+# The one sanctioned edit: a migration that failed on production applied
+# nowhere but CI, so it is rewritten in place (AGENTS.md, Conventions),
+# declared by a trailer naming its stamp (git parses the last paragraph).
+rewritten=$(git log --format='%(trailers:key=Migration-never-applied,valueonly)' "$mb..HEAD" \
+  | grep -oE '^[0-9]{14}' || true)
+
 # 1. History. --no-renames so that a rename reads as a deletion plus an
 # addition: the old name is gone either way.
 while IFS=$'\t' read -r status path; do
+  stamp=$(basename "$path"); stamp=${stamp%%_*}
+  if [ "$status" = M ] && grep -qxF -- "$stamp" <<< "$rewritten"; then
+    echo "check-migrations: $path is rewritten, declared by a Migration-never-applied trailer"
+    continue
+  fi
   case $status in
     M) what="is edited" ;;
     D) what="is deleted or renamed" ;;
@@ -57,6 +68,13 @@ while IFS= read -r path; do
   [[ $name =~ ^[0-9]{14}_[a-z0-9]+(_[a-z0-9]+)*\.sql$ ]] ||
     problems+=("$path: a migration is named <14-digit UTC timestamp>_<snake_case>.sql, like 20261009153417_cas_deleted_files.sql (lowercase letters, digits and single underscores). Rename it with 'git mv'.")
 done < <(git ls-tree --name-only HEAD "$dir/")
+
+# 4. Nothing only a superuser can run: CI applies migrations as one, hosted
+# Supabase's postgres role is not one, and a cast between built-in types
+# needs their owner (v0.27.0's deploy, "must be owner of type text").
+while IFS= read -r path; do
+  problems+=("$path creates a cast, which hosted Supabase's role can't (it owns no built-in type). Convert in the functions that write the column instead.")
+done < <(git grep -l -i -E '^[[:space:]]*create[[:space:]]+cast\b' HEAD -- "$dir" | sed 's/^HEAD://')
 
 if [ ${#problems[@]} -eq 0 ]; then
   echo "check-migrations: ok, $added new migration(s) since $(git rev-parse --short "$mb"); newest on $base is ${newest:-none}"

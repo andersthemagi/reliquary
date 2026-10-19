@@ -305,7 +305,11 @@ like `CL-3.9` only after it, if at all.
   request does. Never tag or publish a release: people merge the release
   pull request.
 - Migrations are numbered SQL files in `supabase/migrations/`, never edited
-  after they ship; fix forward.
+  after they ship; fix forward. The one exception: a migration that failed
+  on production, and so applied nowhere but CI, is rewritten in place,
+  declared with a `Migration-never-applied: <stamp> <why>` trailer and a
+  decision-log entry (`scripts/check-migrations.sh` fails otherwise). No
+  `create cast`: hosted Supabase's role can't own a built-in type.
 - No real client data in fixtures, seeds or tests.
 - **Exploratory research stays out of the repo.** Market and user research,
   interview scripts, survey drafts, legal notes and spike output go in
