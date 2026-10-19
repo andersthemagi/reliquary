@@ -28,6 +28,7 @@ const SECRET_TEXT = "SEKRIT-in-a-message";
 
 const S = {};
 let team = "";
+let MAIL;
 const calls = [];
 const fake = http.createServer((req, res) => {
   let body = "";
@@ -88,7 +89,7 @@ const sentTo = (addr) => calls.filter((c) => c.url === "/emails" && c.body.tags?
 
 before(async () => {
   await new Promise((r) => fake.listen(0, "127.0.0.1", r));
-  const MAIL = { RESEND_API_KEY: KEY, EMAIL_FROM: FROM, RESEND_API_URL: `http://127.0.0.1:${fake.address().port}`, NETLIFY: "", SELF_HOSTED: "" };
+  MAIL = { RESEND_API_KEY: KEY, EMAIL_FROM: FROM, RESEND_API_URL: `http://127.0.0.1:${fake.address().port}`, NETLIFY: "", SELF_HOSTED: "" };
   for (const [id, email] of Object.entries(EMAILS)) await sql("insert into auth.users (id, email) values ($1, $2) on conflict (id) do nothing", [id, email]);
   [{ id: team }] = await as(PIA, "select public.create_vault('Mail Team') as id");
   await sql("select test_support.add_member($1, $2, 'editor', $3)", [team, QUIN, PIA]);
@@ -163,7 +164,10 @@ test("thread emails in the web app: Email me about threads on Account settings t
   calls.length = 0;
   await as(PIA, "select public.open_thread($1, 'After Rae opted out', 'Anyone?') as id", [team]);
   await quiet();
-  await page("pia", "/");
+  // A server sends at most once a minute, and the ones above have; a
+  // fresh one sends on its first page.
+  S.again = await startAs(PIA, MAIL);
+  await page("again", "/");
   await waitFor(async () => sentTo(EMAILS[QUIN]).length === 1, "Quin's email");
   assert.equal(sentTo(EMAILS[RAE]).length, 0);
   await post("rae", "/settings/thread-emails", { thread_emails: "1" });

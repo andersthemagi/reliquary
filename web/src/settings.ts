@@ -69,9 +69,7 @@ export async function accountSettings(ctx: Ctx, d: { name?: Draft; email?: Draft
   // A change of address waiting for its link, as Supabase Auth has it.
   const pending = hosted && ctx.session ? await ctx.session.pendingEmail() : null;
   const showEmail = ctx.shell?.show_email !== false;
-  const threadEmails = await asPerson(ctx.userId, async (c) =>
-    (await c.query("select thread_emails from public.notification_preferences where user_id = $1", [ctx.userId])).rows[0]?.thread_emails !== false,
-  );
+  const threadEmails = ctx.shell?.thread_emails !== false;
   const notifications = html`<section aria-labelledby="notifications">
       <h2 id="notifications">Emails</h2>
       <form method="post" action="/settings/thread-emails" class="panel settings-form" id="thread-emails">
