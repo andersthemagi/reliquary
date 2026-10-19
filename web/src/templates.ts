@@ -90,6 +90,90 @@ Each decision says:
 const clientVars = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "SENTRY_DSN"];
 const productVars = ["DATABASE_URL", "SENTRY_DSN"];
 
+// What a Hackathon README adds after the folders: the two conventions
+// agents kept to in a real event vault, and where keys go.
+const hackathonConventions = `
+## How we work here
+
+- **Corrections first.** The top section of \`research/start-here.md\` lists what turned out to be wrong, newest first. Read it before anything else there, and add to it when you find a mistake, instead of fixing the mistake in place and leaving the old version in other files.
+- **One fact, one owner.** A fact lives in one file, and other files link to it. The rules of the event live in \`event/guidelines.md\`, who does what in \`event/roles.md\`, and the plan in \`plan.md\`; if two files disagree, the one that owns the fact wins, and the other gets fixed.
+- **Keys go on the Variables page, never in chat.** An API key, a token or a password for the demo goes on the vault's **Variables** page, where agents see its name and never its value. Not in a message, a note, a proposal or this file. If one gets pasted anywhere, treat it as leaked and rotate it.
+`;
+
+const hackathonGuidelines = `# Event guidelines
+
+The rules of the event, in our own words, with a link to the organisers' page. Canon: changes are proposals a person approves.
+
+## Rules
+
+What is allowed, what is not, and what we are unsure about.
+
+## Schedule
+
+Start, check-ins, the submission deadline and the demo, with time zones.
+
+## Judging
+
+What the judges score, and how much of it is the demo.
+
+## Open questions for the organisers
+
+One line each, with who asked and the answer when it comes.
+`;
+
+const hackathonRoles = `# Roles
+
+Who does what, so nobody waits on a decision that was theirs to make. Canon: changes are proposals a person approves.
+
+| Role | Who | Decides |
+|---|---|---|
+| Lead | | Scope, what gets cut |
+| Build | | How it is built |
+| Demo | | The pitch and the write-up |
+
+Names or short tags, not emails: agents read this file.
+`;
+
+const hackathonPlan = `# Plan
+
+The steps, in order, as a work plan. Edit this block freely until it is registered; after that, steps can be added but not changed, so register it when the scope has settled. An agent registers it with \`register_work_plan\`, and the vault's **Tasks** page shows it.
+
+\`\`\`work_plan
+- key: scope
+  title: Agree what we build and what we leave out
+  gate: review
+  for: people
+- key: setup
+  title: Set up the repo, the deploy and the keys on the Variables page
+  blocked_by: scope
+- key: build
+  title: Build the demo path end to end
+  blocked_by: setup
+- key: demo
+  title: Rehearse the demo and write the submission
+  blocked_by: build
+  for: people
+\`\`\`
+`;
+
+const hackathonStartHere = `# Start here
+
+## Corrections
+
+Newest first. What a file here got wrong, and what is true instead, with the date. Read this before the rest of the folder.
+
+-
+
+## Research
+
+Notes on the problem, the tools and the competition, one file per topic, named like \`2026-10-03-judging-criteria.md\`. This folder is open: people and agents write here directly. When a finding settles something, propose it to \`event/\` or put it in \`plan.md\`.
+`;
+
+const hackathonOpen = `# Open
+
+Scratch: drafts, dumps, half-ideas and what an agent did in a session. Open: write here directly. Nothing here is a fact until it moves to the file that owns it.
+`;
+
 export const TEMPLATES: readonly Template[] = [
   {
     id: "blank",
@@ -247,6 +331,41 @@ Each spec says:
       { path: "notes/", policy: "open", quorum: 1 },
     ],
     variables: productVars,
+  },
+  {
+    id: "hackathon",
+    name: "Hackathon",
+    summary: "A short team event: the rules, who does what, a plan, research and scratch space.",
+    files: [
+      {
+        path: "README.md",
+        body:
+          readme(
+            "How to use this vault",
+            "This vault holds one team's shared context for a short event: a hackathon, a sprint, a launch week. The rules, who does what, the plan, the research and the scratch work, in one place for the weekend and the write-up afterwards.",
+            [
+              ["event/", "The event's guidelines (rules, schedule, judging, open questions) and roles", CANON],
+              ["research/", "Findings, one file per topic; start-here holds the corrections", OPEN],
+              ["open/", "Scratch: drafts, dumps, agent session notes", OPEN],
+              ["plan.md", "The steps in order, as a work plan an agent registers", "The vault's default"],
+            ],
+            ["event/"],
+            ["research/", "open/"],
+            [],
+          ) + hackathonConventions,
+      },
+      { path: "event/guidelines.md", body: hackathonGuidelines },
+      { path: "event/roles.md", body: hackathonRoles },
+      { path: "plan.md", body: hackathonPlan },
+      { path: "research/start-here.md", body: hackathonStartHere },
+      { path: "open/README.md", body: hackathonOpen },
+    ],
+    rules: [
+      { path: "event/", policy: "canon", quorum: 1 },
+      { path: "research/", policy: "open", quorum: 1 },
+      { path: "open/", policy: "open", quorum: 1 },
+    ],
+    variables: [],
   },
 ];
 
