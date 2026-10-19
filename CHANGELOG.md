@@ -6,6 +6,27 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.27.0](https://github.com/andersthemagi/reliquary/compare/v0.26.0...v0.27.0) (2026-10-19)
+
+
+### Features
+
+* **flags:** a proposal on an owned path waits on its named owners only ([#457](https://github.com/andersthemagi/reliquary/issues/457)) ([fd6a4c8](https://github.com/andersthemagi/reliquary/commit/fd6a4c8dca8fe34a05caf6750fba6c6ad402e3f1))
+* **ops:** off-site database dumps are encrypted with age before they touch disk ([#455](https://github.com/andersthemagi/reliquary/issues/455)) ([44aa1c9](https://github.com/andersthemagi/reliquary/commit/44aa1c9cb633e67921d87e1cb112affde97a21ed))
+* **security:** a content key set, separate from the values key, held by both servers ([#467](https://github.com/andersthemagi/reliquary/issues/467)) ([f063140](https://github.com/andersthemagi/reliquary/commit/f063140ad590e7c6e1b85e808f085f579d77d934)), closes [#461](https://github.com/andersthemagi/reliquary/issues/461)
+* **security:** references are found by the server that writes a file, not a trigger ([#469](https://github.com/andersthemagi/reliquary/issues/469)) ([06dc86a](https://github.com/andersthemagi/reliquary/commit/06dc86ad30d80ae92c72c7d2d3a6c8ed1b1ff901))
+* **security:** search runs in the server, over a vault's newest 2,000 files ([#471](https://github.com/andersthemagi/reliquary/issues/471)) ([9d1f643](https://github.com/andersthemagi/reliquary/commit/9d1f643ba3871a164a5a228c7a6e520a96a895f4))
+* **security:** vault content columns are bytea, their text kept as it is ([#468](https://github.com/andersthemagi/reliquary/issues/468)) ([a1a5714](https://github.com/andersthemagi/reliquary/commit/a1a571492aeab4b39bbef0c73261b0a05ba1d4a4))
+* **web:** a Hackathon template under Start from on New vault ([#454](https://github.com/andersthemagi/reliquary/issues/454)) ([1204873](https://github.com/andersthemagi/reliquary/commit/1204873ab980199a68d99c65ed0744473edbd798))
+* **web:** email a member when a thread is for them or their whole vault ([#458](https://github.com/andersthemagi/reliquary/issues/458)) ([796e45e](https://github.com/andersthemagi/reliquary/commit/796e45e48c6519202aac29fb82b57f0e386991e2))
+* **web:** the web app's search finds files by meaning too ([#456](https://github.com/andersthemagi/reliquary/issues/456)) ([86608db](https://github.com/andersthemagi/reliquary/commit/86608dba098a4dcbd68a65908a7ff997fffa0d49))
+
+
+### Bug fixes
+
+* **ops:** the restore test handles pgvector and rows that point at auth.users ([#460](https://github.com/andersthemagi/reliquary/issues/460)) ([c3f0373](https://github.com/andersthemagi/reliquary/commit/c3f0373d4132e168a5e3cfa2f687b3c8803f9062))
+* **release:** the changelog tiers survive an issue number in a pull request's title ([#452](https://github.com/andersthemagi/reliquary/issues/452)) ([806a2ab](https://github.com/andersthemagi/reliquary/commit/806a2ab0d93dbbf38b4f3e2228c7876f1b64ce22))
+
 ## [0.26.0](https://github.com/andersthemagi/reliquary/compare/v0.25.0...v0.26.0) (2026-10-19)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
