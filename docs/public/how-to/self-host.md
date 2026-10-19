@@ -42,7 +42,7 @@ Everyone on a self-hosted instance has no plan limits: any number of vaults, peo
 
 2. Put your SMTP user name and password in `deploy/compose/.env` (`SMTP_USER` and `SMTP_PASS`) with an editor, so they don't land in your shell history.
 
-3. Keep a copy of `deploy/compose/.env` in a password manager. Without `VARIABLES_KEYS`, no stored variable can ever be read again. Never commit it or paste it anywhere.
+3. Keep a copy of `deploy/compose/.env` in a password manager. Without `VARIABLES_KEYS`, no stored variable can ever be read again, and without `CONTENT_KEYS` no vault content once it is encrypted. Never commit it or paste it anywhere.
 
 4. Start it, with HTTPS:
 

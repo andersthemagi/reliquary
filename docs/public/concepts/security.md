@@ -47,6 +47,12 @@ One test reads the database's own schema rather than its data: a column whose na
 - The key can be rotated without downtime; re-encryption runs as a separate operator role that serves no requests. Link credentials are encrypted with the same key and re-encrypted with the values.
 - Server logs never carry a token, a sign-in code, file text or a value; the test suite checks the logs.
 
+## Vault content
+
+- File text, proposals, notes and thread messages are not yet encrypted at the application level: the database holds them as text, under the provider's disk encryption. Encrypting them is in progress; the key set that will seal them (`CONTENT_KEYS`) is separate from the values key, so no key opens both.
+- Both servers hold the content key set, since the MCP server serves files. The MCP server still refuses to start with the values key.
+- The schema test above also keeps a list of every column that holds content, with its type, so a new content column, or one that changes type, fails the test until it is accounted for.
+
 ## Hosting
 
 The database (Supabase) is in Frankfurt (AWS eu-central-1); the app itself runs in the United States (Netlify, AWS US East), so requests are processed there before anything reaches the database. Connections to the database use TLS verified against Supabase's certificate authority. Data is backed up daily. Email (sign-in codes, account notices and vault invites) is sent through Resend, from Ireland; Resend keeps its delivery records in the US for 30 days. The companies involved are on the [sub-processors](/subprocessors) page.

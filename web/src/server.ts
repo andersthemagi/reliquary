@@ -49,7 +49,8 @@ import { configureOAuth, oauthPublic } from "./oauth.js";
 import { routes, type Ctx, type Download, type Reply } from "./pages.js";
 import { movedConnectionsPath } from "./access.js";
 import { configureDiscovery } from "./discovery.js";
-import { configureVariables, missingKeyIds, variablesConfigured } from "./secrets.js";
+import { configureVariables, isVariablesKey, missingKeyIds, variablesConfigured } from "./secrets.js";
+import { configureContent } from "./content.js";
 import { inSession, pool } from "./db.js";
 import { clientIp, configureRateLimits, limit, tooManyPage } from "./ratelimit.js";
 import { configureMailer } from "./mailer.js";
@@ -113,6 +114,7 @@ try {
   MODE = configureAuth(process.env, { secure: SECURE, host: HOST, port: PORT });
   configureOAuth();
   configureVariables(process.env);
+  configureContent(process.env, isVariablesKey);
   configureDiscovery(process.env);
   configureLinkProxy(process.env);
   configureRateLimits(process.env);

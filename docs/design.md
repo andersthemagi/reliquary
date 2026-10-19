@@ -31,7 +31,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 13 | [Links](#links) | Built |
 | 14 | [Routines](#routines) | Designed, not built |
 | 15 | [Environment variables](#environment-variables) | Built |
-| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | Designed 2026-10-19, not built (#238) |
+| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461); columns, search, references, backfill to come (#238) |
 | 17 | [Continuity](#continuity) | Designed, not built |
 | 18 | [Client engagements](#client-engagements) | Designed, not built |
 | 19 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
@@ -1879,17 +1879,18 @@ the test.
 
 One `bytea` column keeps every SQL path that copies, blanks, counts or
 null-checks a body unchanged. A sealed body is
-`key_id (8 bytes, padded) || nonce (12) || ciphertext || tag (16)`, built
-by `seal()` in `web/src/secrets.ts` with the **vault id as the additional
-data** and nothing else. The vault id alone, not the row, is deliberate:
+`NUL || key_id length (1) || key_id || nonce (12) || ciphertext || tag (16)`,
+built by `sealBody()` in `content.ts` (the same file in `web/src` and
+`mcp/src`) with the **vault id as the additional data** and nothing else.
+Text can't start with a NUL byte, so the marker tells a sealed body from a
+plaintext one during the backfill. The vault id alone, not the row, is deliberate:
 `approve` copies a proposal's body into a new version in SQL, and
 erasure and redaction set it null; neither needs the key. A body moved to
 another vault fails to open, which is the hostile test. The key id is in
-the envelope so rotation can find rows by `substring(body, 1, 8)`; no
-second column.
+the envelope so rotation can find rows by their prefix; no second column.
 
-Storage accounting (`octet_length(body)`) counts the envelope, 36 bytes
-over the text; the 1 MiB check keeps its number. `thread_messages`'
+Storage accounting (`octet_length(body)`) counts the envelope, about 40
+bytes over the text; the 1 MiB check keeps its number. `thread_messages`'
 `(body is null) = (redacted_at is not null)` is unchanged.
 
 ### 3. The key set

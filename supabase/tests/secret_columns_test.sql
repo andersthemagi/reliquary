@@ -79,3 +79,35 @@ select t.expect('secret columns: the rekey functions cover every sealed table',
                        where p.pronamespace = 'private'::regnamespace and p.proname = f
                          and p.prosrc ~ ('\mprivate\.' || s.table_name || '\M'))),
   'none');
+
+-- Content columns (#238, docs/design.md "Encryption at rest: the content
+-- key"): what people and agents write, and anything a model's output can be
+-- turned back into. Each is listed with the type it has today; a step of
+-- #238 that seals one changes its type here to bytea. A text column named
+-- body or message that isn't listed is content nobody accounted for.
+create temp table content (col text primary key, data_type text not null, why text not null);
+insert into content values
+  ('public.file_versions.body',       'text', 'file text; sealed by #238'),
+  ('public.proposals.body',           'text', 'proposed text; sealed by #238'),
+  ('public.proposal_notes.body',      'text', 'notes on a proposal; sealed by #238'),
+  ('public.thread_messages.body',     'text', 'thread messages; sealed by #238'),
+  ('public.file_embeddings.embedding','USER-DEFINED', 'search vectors, which invert to text; sealed by #238'),
+  ('public.feedback.message',         'text', 'feedback to the operator, not vault content; #240'),
+  ('public.feedback.reply',           'text', 'the operator''s reply; #240');
+
+select t.expect('secret columns: every content column is listed with the type it has today',
+  (select coalesce(string_agg(l.col || ' is ' || coalesce(c.data_type, 'gone'), ', ' order by l.col), 'none')
+     from content l
+     left join (select table_schema || '.' || table_name || '.' || column_name as col, data_type
+                  from information_schema.columns where table_schema in ('public', 'private')) c using (col)
+    where c.data_type is distinct from l.data_type),
+  'none');
+
+select t.expect('secret columns: a text column named body or message is a listed content column',
+  (select coalesce(string_agg(c.table_schema || '.' || c.table_name || '.' || c.column_name, ', ' order by 1), 'none')
+     from information_schema.columns c
+     join information_schema.tables t using (table_schema, table_name)
+    where c.table_schema in ('public', 'private') and t.table_type = 'BASE TABLE'
+      and c.column_name in ('body', 'message') and c.data_type = 'text'
+      and c.table_schema || '.' || c.table_name || '.' || c.column_name not in (select col from content)),
+  'none');

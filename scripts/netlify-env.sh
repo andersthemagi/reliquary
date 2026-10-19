@@ -123,6 +123,16 @@ if [[ ! -s $embed_secret ]]; then
   (umask 077; head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' > "$embed_secret")
 fi
 
+# The content key set (docs/design.md, "Encryption at rest: the content
+# key"): one id:key per line like the variables keys, current first, held
+# by both apps (they refuse to start without it on Netlify). Made once with
+# key c1; keep a copy in the password manager too.
+content_keys=supabase/.content-keys-secret
+if [[ ! -s $content_keys ]]; then
+  (umask 077; printf 'c1:%s\n' "$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')" > "$content_keys")
+  echo "Made $content_keys (key c1): set CONTENT_KEYS in both Netlify sites before deploying."
+fi
+
 out=supabase/.netlify-$app.env
 case $app in
   web)
@@ -138,6 +148,7 @@ case $app in
     scripts/variables-keys.sh ensure
     cat > "$out" <<EOF
 VARIABLES_KEYS=$(paste -sd, supabase/.variables-keys-secret)
+CONTENT_KEYS=$(paste -sd, "$content_keys")
 DATABASE_URL=postgres://reliquary_web.$ref:$(pw web | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 PUBLIC_URL=$web
@@ -163,6 +174,7 @@ DATABASE_URL=postgres://reliquary_mcp.$ref:$(pw mcp | enc)@$host:6543/postgres
 DATABASE_CA_FILE=supabase-ca.crt
 MCP_RESOURCE=$mcp/mcp
 AUTH_ISSUER=$web
+CONTENT_KEYS=$(paste -sd, "$content_keys")
 LINK_PROXY_SECRET=$(cat "$link_secret")
 EMBED_URL=https://$ref.supabase.co/functions/v1/embed
 EMBED_SECRET=$(cat "$embed_secret")

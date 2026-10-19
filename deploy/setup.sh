@@ -30,7 +30,7 @@ umask 077
 
 settings=(PUBLIC_URL MCP_RESOURCE SITE_URL SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER SMTP_SENDER_NAME
   RESEND_API_KEY EMAIL_FROM FEEDBACK_EMAIL APP_HOST MCP_HOST SITE_HOST ACME_EMAIL TRUST_PROXY_IP WEB_BIND MCP_BIND)
-secrets=(POSTGRES_PASSWORD AUTH_DB_PASSWORD WEB_DB_PASSWORD MCP_DB_PASSWORD GOTRUE_JWT_SECRET GOTRUE_JWT_KEYS SESSION_SECRET VARIABLES_KEYS LINK_PROXY_SECRET)
+secrets=(POSTGRES_PASSWORD AUTH_DB_PASSWORD WEB_DB_PASSWORD MCP_DB_PASSWORD GOTRUE_JWT_SECRET GOTRUE_JWT_KEYS SESSION_SECRET VARIABLES_KEYS CONTENT_KEYS LINK_PROXY_SECRET)
 
 if [ ! -e "$file" ]; then
   cp "$here/compose/.env.example" "$file"
@@ -94,4 +94,4 @@ done
 if [ ${#todo[@]} -gt 0 ]; then
   echo "  still to set in $file: ${todo[*]}"
 fi
-echo "Keep a copy of $file somewhere safe (a password manager): without VARIABLES_KEYS no stored variable can be read."
+echo "Keep a copy of $file somewhere safe (a password manager): without VARIABLES_KEYS no stored variable can be read, and without CONTENT_KEYS no vault content once it is encrypted."
