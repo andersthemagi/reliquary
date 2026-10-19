@@ -25,6 +25,7 @@ import { needsLinkTools, registerTools } from "./tools.js";
 import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
 import { configureEmbeddings, probe } from "./embeddings.js";
+import { configureContent } from "./content.js";
 import { BUILD, versionJson } from "./version.js";
 import { compact, fail, failure, withRequest, type Failure } from "./failure.js";
 
@@ -103,6 +104,13 @@ for (const name of ["VARIABLES_KEY", "VARIABLES_KEYS"]) {
     console.error(`Refusing to start: ${name} is set, and only the web app may hold it`);
     process.exit(1);
   }
+}
+// The content key set is this app's to hold: it serves files (#238).
+try {
+  configureContent(process.env);
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
 }
 
 const prm = () => ({

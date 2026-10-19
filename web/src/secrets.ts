@@ -29,6 +29,7 @@
 // No error, log line or exception message here contains a value or a key.
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { parseKey as parseKeyText, parseKeySet } from "./content.js";
 
 export type Sealed = { keyId: string; nonce: Buffer; ciphertext: Buffer }; // ciphertext = encrypted bytes || 16-byte tag
 type Slot = { vaultId: string; environment: string; name: string };
@@ -36,7 +37,6 @@ type Slot = { vaultId: string; environment: string; name: string };
 const MAX_VALUE_BYTES = 64 * 1024;
 const TAG_BYTES = 16;
 const KEY_ID = /^[A-Za-z0-9_-]{1,32}$/;
-const KEY_TEXT = /^[A-Za-z0-9_-]{43}$/;
 
 export class SecretsError extends Error {}
 
@@ -57,21 +57,9 @@ export function configureVariables(env: NodeJS.ProcessEnv = process.env): boolea
     CURRENT = null;
     return false;
   }
-  const keys = new Map<string, Buffer>();
-  let current: string | null = null;
-  if (list) {
-    for (const part of list.split(",")) {
-      const pair = part.trim();
-      const colon = pair.indexOf(":");
-      const id = colon > 0 ? pair.slice(0, colon) : "";
-      if (!KEY_ID.test(id)) throw new Error("VARIABLES_KEYS must be comma-separated id:key pairs, each id 1 to 32 letters, digits, - or _");
-      if (keys.has(id)) throw new Error(`VARIABLES_KEYS names key id ${id} twice`);
-      const key = parseKey(pair.slice(colon + 1), `VARIABLES_KEYS (key ${id})`);
-      for (const [other, k] of keys) if (k.equals(key)) throw new Error(`VARIABLES_KEYS gives keys ${other} and ${id} the same key`);
-      keys.set(id, key);
-      current ??= id;
-    }
-  }
+  const set = list ? parseKeySet(list, "VARIABLES_KEYS") : { keys: new Map<string, Buffer>(), current: null as string | null };
+  const keys = set.keys;
+  let current = set.current;
   if (single) {
     const id = env.VARIABLES_KEY_ID ?? "k1";
     if (!KEY_ID.test(id)) throw new Error("VARIABLES_KEY_ID must be 1 to 32 letters, digits, - or _");
@@ -89,13 +77,11 @@ export function configureVariables(env: NodeJS.ProcessEnv = process.env): boolea
   return true;
 }
 
-export function parseKey(raw: string, name = "VARIABLES_KEY"): Buffer {
-  const bad = () => new Error(`${name} must be 32 random bytes in base64url (43 characters, no padding)`);
-  if (!KEY_TEXT.test(raw)) throw bad();
-  const key = Buffer.from(raw, "base64url");
-  if (key.length !== 32) throw bad();
-  return key;
-}
+export const parseKey = (raw: string, name = "VARIABLES_KEY"): Buffer => parseKeyText(raw, name);
+
+// Whether a key is one of the variables keys: the content key set refuses
+// one, so no key ever opens both values and content.
+export const isVariablesKey = (key: Buffer) => [...KEYS.values()].some((k) => k.equals(key));
 
 // The id new values are sealed with, and every id this server can open.
 export const currentKeyId = () => CURRENT;

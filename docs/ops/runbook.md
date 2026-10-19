@@ -865,10 +865,23 @@ The sample's first run, 2026-10-17: words 3 of 12 first, words and meaning
 | `reliquary_ops` DB password (the operator's role, key rotation only) | `supabase/.ops-db-password`; nowhere else (not Netlify) | `scripts/set-role-passwords.sh ops-off` (nologin, file removed), then `scripts/set-role-passwords.sh ops` when next needed | only `rotate-variables-key.sh` uses it; nologin between rotations is fine |
 | `SESSION_SECRET` (web) | `supabase/.web-session-secret`; Netlify | delete the file, run `netlify-env.sh web ...`, update Netlify, redeploy | everyone is signed out of the web UI once; CLI and connectors unaffected |
 | `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Netlify; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values and link credentials are re-encrypted loses them |
+| `CONTENT_KEYS` (web and mcp, the same value on both) | `supabase/.content-keys-secret` (one `id:key` per line, current first, made by `netlify-env.sh`); Netlify (both sites); password manager | not yet: nothing is sealed under it until #238's backfill; then the same add, deploy, re-encrypt, drop cycle as `VARIABLES_KEYS` | both apps refuse to start without it on Netlify, so set it in both sites before deploying a release that has it |
 | `LINK_PROXY_SECRET` (web and mcp, the same value on both) | `supabase/.link-proxy-secret`; Netlify (both sites) | rewrite the file, `scripts/netlify-env.sh web ...` and `scripts/netlify-env.sh mcp ...`, redeploy both at once (a mismatch refuses every proxied link call with 401 until both are live) | proxied `<link>.<tool>` calls fail (401) between the two deploys; nothing else |
 | `EMBED_SECRET` (mcp, and the `embed` function) | `supabase/.embed-secret`; Netlify (`reliquary-mcp`); Supabase function secrets | delete the file, then steps 2, 3, 5 and 6 of "Search by meaning" (`netlify-env.sh embed`, the Supabase secret, the Netlify import for every context, a redeploy) | search answers by words, saying the two secrets differ, between the Supabase and Netlify steps; nothing else |
 | `postgres` password | `supabase/.db-password`; GitHub secret `SUPABASE_DB_PASSWORD` | reset in the dashboard, rewrite the file, `tr -d '[:space:]' < supabase/.db-password \| gh secret set SUPABASE_DB_PASSWORD` | migrations and backups need the new one |
 | A person's agent token or connection | database | Connections page, Revoke | stops within one request |
+
+### Setting CONTENT_KEYS the first time
+
+The content key set (#238) is required by **both** apps on Netlify, and
+they refuse to start without it, so it goes in before the first release
+that has it deploys: `scripts/netlify-env.sh web` and `scripts/netlify-env.sh
+mcp` make `supabase/.content-keys-secret` (one key, `c1`) the first time
+and put `CONTENT_KEYS` in both files; import both into Netlify, marked
+secret, then merge the release. Keep a copy of the key in the password
+manager: it must never equal a variables key (the web app refuses that),
+and until the backfill runs it seals nothing, so a wrong value costs a
+redeploy and nothing else.
 
 ### Setting VARIABLES_KEYS the first time
 
