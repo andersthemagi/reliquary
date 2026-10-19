@@ -709,3 +709,97 @@ test("replace credential and refresh tools: an editor sees neither, and a direct
   const [after] = await sql("select ciphertext from private.link_secrets where link_id = $1", [link.id]);
   assert.deepEqual(after, before);
 });
+
+// A link's header for its credential (issue #441): Authorization by
+// default, or the one the upstream names. The rules themselves are
+// supabase/tests/links_test.sql's; this proves the form says them and that
+// discovery sends the credential where the link says.
+async function startHeaderFixture() {
+  const seen = [];
+  const srv = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    seen.push(req.headers);
+    if (body.method === "initialize") {
+      res.writeHead(200, { "content-type": "application/json" }).end(mcpRpc(body.id, { protocolVersion: body.params.protocolVersion, capabilities: {} }));
+    } else if (body.method === "notifications/initialized") {
+      res.writeHead(202).end();
+    } else {
+      res.writeHead(200, { "content-type": "application/json" }).end(mcpRpc(body.id, { tools: [READ("list_keys")] }));
+    }
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  return { srv, seen, url: `https://127.0.0.1:${srv.address().port}/mcp` };
+}
+let keyed;
+after(() => {
+  keyed?.srv.closeAllConnections();
+  keyed?.srv.close();
+});
+const headerLink = async (v, name) => (await sql("select id, auth_header from public.links where vault_id = $1 and name = $2", [v, name]))[0];
+
+test("header: the Add form has a Header field, Authorization by default, saying what each choice sends", async () => {
+  const h = await page(lp(V.own, "?add=1"));
+  assert.match(h, /<label for="lh">Header<\/label><input id="lh" type="text" name="header" placeholder="Authorization" maxlength="64" value="Authorization" aria-describedby="lh-hint">/);
+  assert.match(h, /<p class="hint" id="lh-hint">The header the service reads its key from\. <code>Authorization<\/code> sends <code>Bearer &lt;credential&gt;<\/code>; any other name, like <code>X-Api-Key<\/code>, sends the credential as it is\.<\/p>/);
+});
+
+test("header: adding a link with its own header stores it, and discovery sends the credential as that header's whole value, never as Authorization", async () => {
+  keyed = await startHeaderFixture();
+  const cred = credential("keyed");
+  const h = await page(lp(V.own), disco);
+  const h2 = await landed(await post(lp(V.own), { op: "save", name: "keyed", url: keyed.url, header: "X-Api-Key", credential: cred }, { s: disco, csrf: csrfOf(h) }), disco);
+  assert.equal(flashOf(h2)?.[2], "Added keyed. Discovered 1 tool.");
+  assert.equal((await headerLink(V.own, "keyed")).auth_header, "X-Api-Key");
+  assert.ok(keyed.seen.length >= 3);
+  for (const headers of keyed.seen) {
+    assert.equal(headers["x-api-key"], cred);
+    assert.equal(headers.authorization, undefined);
+  }
+  noCredentials(h2);
+});
+
+test("header: editing shows and changes the header, and Refresh tools then sends the credential in the new one", async () => {
+  const link = await headerLink(V.own, "keyed");
+  const form = await page(lp(V.own, `?edit=${link.id}`), disco);
+  assert.match(form, /name="header"[^>]*value="X-Api-Key"/);
+  await landed(await post(lp(V.own), { op: "save", link_id: link.id, name: "keyed", url: keyed.url, header: "X-Other-Key" }, { s: disco, csrf: csrfOf(form) }), disco);
+  assert.equal((await headerLink(V.own, "keyed")).auth_header, "X-Other-Key");
+  keyed.seen.length = 0;
+  const h = await page(lp(V.own), disco);
+  await landed(await post(lp(V.own), { op: "refresh", link_id: link.id }, { s: disco, csrf: csrfOf(h) }), disco);
+  assert.ok(keyed.seen.length >= 3);
+  for (const headers of keyed.seen) {
+    assert.match(headers["x-other-key"] ?? "", /^LINKVAL-keyed-/);
+    assert.equal(headers["x-api-key"], undefined);
+    assert.equal(headers.authorization, undefined);
+  }
+});
+
+test("header: an edit from a form without the field keeps the link's header", async () => {
+  const link = await headerLink(V.own, "keyed");
+  const h = await page(lp(V.own), disco);
+  await landed(await post(lp(V.own), { op: "save", link_id: link.id, name: "keyed", url: keyed.url }, { s: disco, csrf: csrfOf(h) }), disco);
+  assert.equal((await headerLink(V.own, "keyed")).auth_header, "X-Other-Key");
+});
+
+test("header: a header that breaks a rule is refused in the form, 400, saying which, with what was typed kept and nothing added", async () => {
+  const [{ id: v }] = await as(LU, "select public.create_vault('Links Refused Header') as id");
+  for (const [header, why] of [
+    ["X Api Key", "A link’s header is a header name like Authorization or X-Api-Key: letters, digits and ! # \\$ % &amp; &#39; \\* \\+ - \\. \\^ _ ` \\| ~, with no spaces or colons\\."],
+    ["a".repeat(65), "A link’s header is at most 64 characters\\."],
+    ["Cookie", "A link’s header can’t be a cookie \\(Cookie\\): its credential goes in a header of its own\\."],
+    ["Host", "A link’s header can’t be Host: Reliquary sets that header itself on every call to the link’s server\\."],
+    ["mcp-session-id", "A link’s header can’t be mcp-session-id: Reliquary sets that header itself on every call to the link’s server\\."],
+  ]) {
+    const r = await post(lp(v), { op: "save", name: "keyed", url: "https://mcp.example.com/mcp", header, credential: credential("refused") }, { csrf: csrfOf(await page(lp(v))) });
+    assert.equal(r.status, 400, header);
+    const h = await r.text();
+    assert.match(refusedForm(h) ?? "", new RegExp(`^${why} Nothing was saved\\. \\(ref [0-9a-f]{8}\\)$`), header);
+    assert.match(h, /name="header"[^>]*aria-invalid="true"/);
+    assert.ok(h.includes(`value="${header}"`), "what was typed is kept");
+    noCredentials(h);
+  }
+  assert.equal(await countLinks(v), 0);
+});

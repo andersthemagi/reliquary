@@ -11,6 +11,7 @@ Only an owner can do this, in the web app. What links are and how calls work: [L
 3. Fill in:
    - **Name**: a short name like `linear`, letters, digits and underscores, not starting with a digit. Agents call its tools as `<name>.<tool>`.
    - **URL**: the address where the service offers its tools to agents, from the service's own setup page. It is `https://`, a host and a path. Everyone in the vault can read it, so a key or token never goes here.
+   - **Header** (optional): the request header the service reads its key from, from its setup page. Leave it as `Authorization` and the credential is sent as `Bearer <credential>`. Type another name, like `X-Api-Key`, and the credential is sent as that header's whole value. It must be a header name (letters, digits and ``! # $ % & ' * + - . ^ _ ` | ~``, no spaces or colons, up to 64 characters), and can't be a cookie or a header Reliquary sets itself on every call (`Host`, `Content-Length`, `Content-Type`, `Accept`, `User-Agent`, `Mcp-Session-Id`, `Mcp-Protocol-Version` and the connection headers); the form says which rule a refused name broke.
    - **Credential**: the service's API key or token. It is stored encrypted and never shown again, to anyone.
 4. Choose **Add link**. The message says how many tools it discovered. If the tools couldn't be discovered, the link is still added with no tools, and the warning says why; fix the cause, then choose **Refresh tools** (below) to retry.
 
@@ -30,7 +31,7 @@ Ask an agent connected to the vault to call `list_links`: it lists the link's na
 
 ## Change or remove it
 
-- **Rename it or change its URL:** open the **⋯** menu, choose **Edit**, then **Save changes**. The credential stays, and is sent to the new URL.
+- **Rename it, change its URL or its header:** open the **⋯** menu, choose **Edit**, then **Save changes**. The credential stays, and is sent to the new URL, in the new header.
 - **Replace the credential:** open the **⋯** menu, choose **Replace credential**, type the new key or token, then choose **Replace credential**. The old one is gone at once. The link keeps its name, URL and grants, and its tools are discovered again with the new credential. The replacement is logged in Activity, without the credential.
 - **Pick up the service's new tools:** open the **⋯** menu and choose **Refresh tools**. Its tools are discovered again with the stored credential. New tools get the usual starting grants, the grants you set stay, and a tool the service no longer offers is removed.
 - **Stop one tool:** untick it on **Grants** and choose **Save grants**. Agents stop calling it at once.

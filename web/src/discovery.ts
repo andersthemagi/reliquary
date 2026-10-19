@@ -22,10 +22,12 @@
 // rather than the official SDK's client: that would be a second HTTP
 // client library and dependency in the web app for one call, where mcp/'s
 // server already needs the SDK for a different reason (serving, not
-// calling). The credential is sent once, as `Authorization: Bearer
-// <credential>`, matching mcp/src/server.ts's own bearer check for
-// Reliquary's remote MCP endpoint -- the shape an upstream MCP server is
-// most likely to expect too.
+// calling). The credential is sent once, in the link's own header:
+// `Authorization: Bearer <credential>` by default, matching
+// mcp/src/server.ts's own bearer check for Reliquary's remote MCP endpoint
+// -- the shape an upstream MCP server is most likely to expect -- or, for
+// an upstream that takes its key elsewhere (`X-Api-Key`), as that header's
+// whole value (20261018160000_link_auth_header.sql).
 //
 // A tool's `annotations.readOnlyHint` decides the starting `is_write` guess
 // (design.md: "a tool discovery can't classify defaults to a write tool
@@ -60,6 +62,8 @@ type DiscoveredTool = { name: string; isWrite: boolean; description: string | nu
 
 export type DiscoveryOptions = {
   allowLoopback?: boolean;
+  // The link's header for its credential (public.links.auth_header).
+  header?: string;
   timeoutMs?: number;
   resolve?: (host: string) => Promise<Resolved[]>;
 };
@@ -181,7 +185,26 @@ function withoutCredential(said: string, credential: string): string {
   return masked;
 }
 
-type CallOptions = Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve">;
+// The rules of private.check_link_auth_header
+// (20261018160000_link_auth_header.sql), in its order, so the form refuses
+// what the database would and says which rule broke. Checked again on
+// every call, so a header that reached here some other way is never sent.
+const SET_BY_RELIQUARY = new Set([
+  "host", "content-length", "transfer-encoding", "connection", "keep-alive", "upgrade", "te", "trailer", "expect",
+  "content-type", "accept", "user-agent", "mcp-session-id", "mcp-protocol-version",
+]);
+export function headerProblem(header: string): string | null {
+  if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(header)) {
+    return "A link’s header is a header name like Authorization or X-Api-Key: letters, digits and ! # $ % & ' * + - . ^ _ ` | ~, with no spaces or colons.";
+  }
+  if (header.length > 64) return "A link’s header is at most 64 characters.";
+  const lower = header.toLowerCase();
+  if (lower === "cookie" || lower === "set-cookie") return `A link’s header can’t be a cookie (${header}): its credential goes in a header of its own.`;
+  if (SET_BY_RELIQUARY.has(lower)) return `A link’s header can’t be ${header}: Reliquary sets that header itself on every call to the link’s server.`;
+  return null;
+}
+
+type CallOptions = Required<Pick<DiscoveryOptions, "allowLoopback" | "timeoutMs">> & Pick<DiscoveryOptions, "resolve" | "header">;
 
 export async function call(
   u: URL,
@@ -194,7 +217,11 @@ export async function call(
   opts: CallOptions,
 ): Promise<{ result: unknown; sessionId?: string; protocolVersion?: string }> {
   const body = JSON.stringify(id === undefined ? { jsonrpc: "2.0", method, params } : { jsonrpc: "2.0", id, method, params });
-  const headers: Record<string, string> = { authorization: `Bearer ${credential}`, "user-agent": "Reliquary (link discovery)" };
+  const header = opts.header ?? "Authorization";
+  const problem = headerProblem(header);
+  if (problem) throw new DiscoveryError(problem);
+  const name = header.toLowerCase();
+  const headers: Record<string, string> = { [name]: name === "authorization" ? `Bearer ${credential}` : credential, "user-agent": "Reliquary (link discovery)" };
   if (sessionId) headers["mcp-session-id"] = sessionId;
   if (protocolVersion) headers["mcp-protocol-version"] = protocolVersion;
   const res = await post(u, body, headers, opts);
@@ -262,7 +289,7 @@ type Handshake = { u: URL; sessionId: string | undefined; protocolVersion: strin
 // just discovery's), so this runs fresh each time, whichever caller needs
 // it.
 export async function handshake(url: string, credential: string, options: DiscoveryOptions = {}): Promise<Handshake> {
-  const opts = { allowLoopback: options.allowLoopback ?? false, timeoutMs: options.timeoutMs ?? TIMEOUT_MS, resolve: options.resolve };
+  const opts = { allowLoopback: options.allowLoopback ?? false, timeoutMs: options.timeoutMs ?? TIMEOUT_MS, resolve: options.resolve, header: options.header };
   let u: URL;
   try {
     u = new URL(url);
