@@ -49,6 +49,7 @@ import {
   type Reply,
   type Vault,
 } from "./pages.js";
+import { referencesIn } from "./references.js";
 
 // Vault shell: sidebar with search, links and the folder tree.
 
@@ -732,12 +733,12 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
         const r = (
           await c.query(
             `select case when x.canon then public.propose(x.id, $2, $3, $4, false) end as pid,
-                    case when not x.canon and not x.taken then public.write_file(x.id, $2, $3) end as written,
+                    case when not x.canon and not x.taken then public.write_file(x.id, $2, $3, null, $5) end as written,
                     not x.canon and x.taken as taken
                from (select v.id, (private.rule_for(v.id, $2)).policy = 'canon' as canon,
                             exists (select 1 from public.files f where f.vault_id = v.id and f.path = $2 and f.deleted_at is null) as taken
                        from ${V} offset 0) x`,
-            [id, path, content, reason],
+            [id, path, content, reason, referencesIn(path, content)],
           )
         ).rows[0];
         if (r.taken) {
@@ -746,7 +747,7 @@ export async function fileAction(ctx: Ctx, id: string): Promise<Reply> {
         return r.pid ? ({ kind: "proposed", pid: r.pid as string } as const) : ({ kind: "write" } as const);
       }
       if (action === "write") {
-        await c.query(`select public.write_file(v.id, $2, $3, $4) from ${V}`, [id, path, content, expectedVersion]);
+        await c.query(`select public.write_file(v.id, $2, $3, $4, $5) from ${V}`, [id, path, content, expectedVersion, referencesIn(path, content)]);
         return { kind: "write" } as const;
       }
       if (action === "delete") {

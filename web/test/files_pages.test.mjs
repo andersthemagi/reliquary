@@ -115,7 +115,7 @@ before(async () => {
   await as(BREE, "select public.write_file($1, 'notes/gone.md', 'Going')", [V.main]);
   await as(BREE, "select public.write_file($1, 'notes/solo.md', 'Once')", [V.main]);
   await as(BREE, "select public.write_file($1, 'refs/target.md', 'Target')", [V.main]);
-  await as(BREE, "select public.write_file($1, 'refs/source.md', $2)", [V.main, "See [[refs/target]], [terms](../canon/terms.md) and [[refs/<b>later</b>]]."]);
+  await as(BREE, "select public.write_file($1, 'refs/source.md', $2, null, $3)", [V.main, "See [[refs/target]], [terms](../canon/terms.md) and [[refs/<b>later</b>]].", ["refs/target.md", "canon/terms.md", "refs/<b>later</b>.md"]]);
   const [{ id: first }] = await as(BREE, "select public.propose($1, 'canon/terms.md', 'Net 30.', 'first') as id", [V.main]);
   await as(BREE, "select public.decide($1, 'approve')", [first]);
   await as(BREE, "select public.propose($1, 'canon/terms.md', 'Net 60.', 'longer terms')", [V.main]);
