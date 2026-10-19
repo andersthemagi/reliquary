@@ -8,24 +8,52 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.27.0](https://github.com/andersthemagi/reliquary/compare/v0.26.0...v0.27.0) (2026-10-19)
 
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
 
-### Features
+### New
 
-* **flags:** a proposal on an owned path waits on its named owners only ([#457](https://github.com/andersthemagi/reliquary/issues/457)) ([fd6a4c8](https://github.com/andersthemagi/reliquary/commit/fd6a4c8dca8fe34a05caf6750fba6c6ad402e3f1))
-* **ops:** off-site database dumps are encrypted with age before they touch disk ([#455](https://github.com/andersthemagi/reliquary/issues/455)) ([44aa1c9](https://github.com/andersthemagi/reliquary/commit/44aa1c9cb633e67921d87e1cb112affde97a21ed))
-* **security:** a content key set, separate from the values key, held by both servers ([#467](https://github.com/andersthemagi/reliquary/issues/467)) ([f063140](https://github.com/andersthemagi/reliquary/commit/f063140ad590e7c6e1b85e808f085f579d77d934)), closes [#461](https://github.com/andersthemagi/reliquary/issues/461)
-* **security:** references are found by the server that writes a file, not a trigger ([#469](https://github.com/andersthemagi/reliquary/issues/469)) ([06dc86a](https://github.com/andersthemagi/reliquary/commit/06dc86ad30d80ae92c72c7d2d3a6c8ed1b1ff901))
-* **security:** search runs in the server, over a vault's newest 2,000 files ([#471](https://github.com/andersthemagi/reliquary/issues/471)) ([9d1f643](https://github.com/andersthemagi/reliquary/commit/9d1f643ba3871a164a5a228c7a6e520a96a895f4))
-* **security:** vault content columns are bytea, their text kept as it is ([#468](https://github.com/andersthemagi/reliquary/issues/468)) ([a1a5714](https://github.com/andersthemagi/reliquary/commit/a1a571492aeab4b39bbef0c73261b0a05ba1d4a4))
-* **web:** a Hackathon template under Start from on New vault ([#454](https://github.com/andersthemagi/reliquary/issues/454)) ([1204873](https://github.com/andersthemagi/reliquary/commit/1204873ab980199a68d99c65ed0744473edbd798))
-* **web:** email a member when a thread is for them or their whole vault ([#458](https://github.com/andersthemagi/reliquary/issues/458)) ([796e45e](https://github.com/andersthemagi/reliquary/commit/796e45e48c6519202aac29fb82b57f0e386991e2))
-* **web:** the web app's search finds files by meaning too ([#456](https://github.com/andersthemagi/reliquary/issues/456)) ([86608db](https://github.com/andersthemagi/reliquary/commit/86608dba098a4dcbd68a65908a7ff997fffa0d49))
+#### Off-site database dumps are encrypted with age before they touch disk ([#455](https://github.com/andersthemagi/reliquary/issues/455))
 
+Off-site database dumps are now encrypted with age before they are written, so a laptop that holds them holds only ciphertext. The restore test decrypts them with an identity the operator keeps outside the repo. Self-hosters get the same recipe in the self-host guide.
 
-### Bug fixes
+#### A content key set, separate from the values key, held by both servers ([#467](https://github.com/andersthemagi/reliquary/issues/467))
 
-* **ops:** the restore test handles pgvector and rows that point at auth.users ([#460](https://github.com/andersthemagi/reliquary/issues/460)) ([c3f0373](https://github.com/andersthemagi/reliquary/commit/c3f0373d4132e168a5e3cfa2f687b3c8803f9062))
-* **release:** the changelog tiers survive an issue number in a pull request's title ([#452](https://github.com/andersthemagi/reliquary/issues/452)) ([806a2ab](https://github.com/andersthemagi/reliquary/commit/806a2ab0d93dbbf38b4f3e2228c7876f1b64ce22))
+A content key set (`CONTENT_KEYS`) is now required by both servers, separate from the values key, ahead of encrypting vault content. Self-hosters: `deploy/setup.sh` generates it; hosted: set it in both Netlify sites before deploying.
+
+#### A Hackathon template under Start from on New vault ([#454](https://github.com/andersthemagi/reliquary/issues/454))
+
+New vault has a **Hackathon** template under **Start from**, for a short team event such as a hackathon, a sprint or a launch week. It sets up the event's rules and roles as canon, a plan file with a `work_plan` block ready to register, a research folder whose start-here file keeps corrections at the top, and a scratch folder, with a README that tells people and agents to keep one fact in one file and to put keys on the Variables page, never in chat.
+
+#### Email a member when a thread is for them or their whole vault ([#458](https://github.com/andersthemagi/reliquary/issues/458))
+
+Reliquary emails you when a thread is opened for a whole vault you're in or addressed to you, and when such a thread gets new messages: one email per thread once it has been quiet for two minutes, with its title, who wrote and a link, never the messages themselves. Turn them off with **Email me about threads** on Account settings.
+
+#### The web app's search finds files by meaning too ([#456](https://github.com/andersthemagi/reliquary/issues/456))
+
+The web app's search finds files by meaning: ask "what are we charging" in the top bar or a vault's search page and it finds the pricing file even when they share no words, as your agent's search already did. If search by meaning is unavailable, the page says so above results that match words only.
+
+### Changed
+
+#### A proposal on an owned path waits on its named owners only ([#457](https://github.com/andersthemagi/reliquary/issues/457))
+
+A proposal on a path with named owners is flagged to, and listed in the Inbox of, those owners only, whatever their role in the vault. The vault's other owners and editors, whose approval doesn't count on that path, are no longer told it waits on them.
+
+#### References are found by the server that writes a file, not a trigger ([#469](https://github.com/andersthemagi/reliquary/issues/469))
+
+The references between files (`[[path]]` and Markdown links to `.md` files) are found by the server that saves a file and recorded with the write, instead of by the database reading the text. What a file's page and `related_files` show is the same. This is a step of vault content encryption (#238).
+
+#### Search runs in the server, over a vault's newest 2,000 files ([#471](https://github.com/andersthemagi/reliquary/issues/471))
+
+Search runs in Reliquary's servers instead of the database, a step of vault content encryption (#238). Words are matched over each file's first 10,000 characters (a longer file is still found by its name and its opening), and a search reads a vault's newest 2,000 files, saying so when there are more. Stored search vectors are rebuilt by the next search of each vault, so a file may be found by its words only until then.
+
+#### Vault content columns are bytea, their text kept as it is ([#468](https://github.com/andersthemagi/reliquary/issues/468))
+
+Vault content is stored as bytes in the database (its text unchanged), the shape the coming encryption of vault content needs. Nothing people or agents see changes.
+
+### Fixes
+
+- The restore test handles pgvector and rows that point at auth.users ([#460](https://github.com/andersthemagi/reliquary/issues/460))
+- The changelog tiers survive an issue number in a pull request's title ([#452](https://github.com/andersthemagi/reliquary/issues/452))
 
 ## [0.26.0](https://github.com/andersthemagi/reliquary/compare/v0.25.0...v0.26.0) (2026-10-19)
 
