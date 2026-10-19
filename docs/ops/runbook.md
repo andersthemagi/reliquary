@@ -368,17 +368,34 @@ match.
 ## Backups and restore
 
 - **Supabase:** daily backups, 7 days on Pro (dashboard, Database, Backups).
-- **Off-site:** `scripts/backup.sh` writes `~/reliquary-backups/*.dump`
-  (mode 600, keeps 14). Variable values are ciphertext only; the key is in
-  Netlify and your password manager.
+- **Off-site:** `scripts/backup.sh` writes `~/reliquary-backups/*.dump.age`
+  (mode 600, keeps 14): `pg_dump` piped through `age`, so no plaintext
+  touches disk. Each dump is sealed to the public key in
+  `scripts/backup.recipient`; the matching identity lives in the password
+  manager (item "Reliquary backup identity"), with a copy at
+  `~/.config/reliquary/backup-identity.txt` (mode 600) on the machine that
+  runs the restore test. Losing the identity loses every dump: back the
+  password manager entry up before you need it. Variable values are, on top
+  of that, ciphertext under the key in Netlify and your password manager.
+- **Rotate the identity:** `age-keygen -o ~/.config/reliquary/backup-identity.txt`
+  in your own terminal (it prints the public key, never run it through an
+  agent), put the new identity in the password manager, the public key in
+  `scripts/backup.recipient`, commit, and keep the old identity until the
+  dumps sealed to it have aged out (14 backups).
 - **Test a restore** after each backup, or at least monthly:
-  `scripts/restore-test.sh` restores the newest dump into a throwaway local
-  Postgres and prints row counts.
+  `scripts/restore-test.sh` decrypts the newest dump with the identity
+  (`RELIQUARY_BACKUP_IDENTITY` to read it from elsewhere) into a throwaway
+  local Postgres and prints row counts. A plain `.dump` from before
+  encryption still restores when named explicitly.
+- **Plaintext dumps from before encryption:** once the first `.dump.age` has
+  passed a restore test, shred them by hand (`shred -u
+  ~/reliquary-backups/*.dump`); the script never touches them.
 - **Real restore:** prefer Supabase's restore (dashboard). From an off-site
-  dump, restore into a new project with `pg_restore --no-owner
-  --no-privileges`, apply any newer migrations with `db push`, set the app
-  role passwords (`set-role-passwords.sh`), then point both Netlify sites'
-  `DATABASE_URL` at it.
+  dump, decrypt and restore into a new project: `age -d -i <identity>
+  <file> | pg_restore --no-owner --no-privileges -d <url>`, apply any newer
+  migrations with `db push`, set the app role passwords
+  (`set-role-passwords.sh`), then point both Netlify sites' `DATABASE_URL`
+  at it.
 
 ## Plans and testers
 
