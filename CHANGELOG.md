@@ -10,6 +10,8 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
 
+This release gives the web app search by meaning, emails members about the threads that reach them, adds a Hackathon vault template, encrypts off-site database dumps, and lays groundwork for encrypting vault content: a content key set both servers need, content stored as bytes, references and search moved from the database into the servers. Hosted: set `CONTENT_KEYS` in both Netlify sites before deploying.
+
 ### New
 
 #### Off-site database dumps are encrypted with age before they touch disk ([#455](https://github.com/andersthemagi/reliquary/issues/455))
