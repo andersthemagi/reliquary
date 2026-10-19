@@ -39,7 +39,7 @@ source ../scripts/lib/containers.sh
 start_postgres "$pg" $pgport
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q "$@"; }
 
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
+../supabase/tests/schema.sh | psql >/dev/null
 echo "alter role reliquary_mcp login password 'test';" | psql
 echo "alter role reliquary_web login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=' )

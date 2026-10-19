@@ -39,7 +39,7 @@ source ../scripts/lib/containers.sh
 
 start_postgres "$pg" $pgport
 psql() { "$engine" exec -i "$pg" psql -U postgres -p $pgport -v ON_ERROR_STOP=1 -q; }
-cat ../supabase/tests/stub.sql ../supabase/migrations/*.sql ../supabase/tests/support.sql | psql >/dev/null
+../supabase/tests/schema.sh | psql >/dev/null
 # Many test files, the same few people: room past Free's limits (plans are
 # tested with plans of their own: web/test/plans.test.mjs).
 echo "select test_support.roomy_free();" | psql >/dev/null

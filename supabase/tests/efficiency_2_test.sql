@@ -344,6 +344,9 @@ select t.expect('cleanup: without pg_cron, requests still sweep (the fallback)',
 create schema cron;
 create table cron.job (jobname text, active boolean);
 insert into cron.job values ('reliquary-expired-imports', true);
+-- As in Supabase, the postgres role (the functions' owner here) may read it.
+grant usage on schema cron to supabase_postgres;
+grant select on cron.job to supabase_postgres;
 select private.sweep_env_imports();
 select t.expect('cleanup: where pg_cron runs the job, a request doesn''t sweep, and the import still reads as expired',
   private.imports_swept_by_cron()::text
