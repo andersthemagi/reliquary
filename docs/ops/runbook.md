@@ -93,6 +93,14 @@ volume before buying more.
   squash-merges with the PR title as the commit subject, and a CI check
   (`.github/workflows/pr-title.yml`) lints that title before merge is even
   possible. See `AGENTS.md`'s Conventions section.
+- **The trailers and the attribution line are one paragraph.** A squash
+  body that puts `Changes-behaviour:` lines in one paragraph and
+  `Co-authored-by:` in the next hides the trailers from git, which reads
+  only the last paragraph, so the `guard` job on the push to `main` fails
+  and the commit can't be amended. On 2026-10-19 #468, #469 and #471 landed
+  that way: their PR-level guard runs had passed, so the test changes were
+  declared, but `main` showed three red `test` runs. No blank line between
+  them (`AGENTS.md`'s Conventions section).
 - **Before merging a release PR, read its `CHANGELOG.md` as a person who
   wasn't in the room would.** release-please only ever emits the raw
   commit subject per entry; the release workflow then rewrites the pending
