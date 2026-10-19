@@ -128,14 +128,26 @@ From the release with search by meaning, `db` runs the `pgvector/pgvector` image
 
 ## Back up
 
-The data is in the `db-data` volume. A dump of the whole database:
+The data is in the `db-data` volume. A dump of the whole database holds every file's text in plaintext, so encrypt it before it touches disk. With [age](https://age-encryption.org) installed, make a key pair once and keep the identity file (the private half) in your password manager:
+
+```sh
+age-keygen -o backup-identity.txt
+```
+
+It prints the public key (a line starting `age1`). Each backup is a dump piped straight into age, sealed to that key:
 
 ```sh
 cd deploy/compose
-docker compose exec -T db pg_dump -U postgres -Fc postgres > reliquary.dump
+docker compose exec -T db pg_dump -U postgres -Fc postgres | age -r age1... -o reliquary.dump.age
 ```
 
-Keep dumps with the same care as `.env`: they hold every file and every encrypted variable. A vault's own export (its **Settings**) is a readable copy of its files, without variable values. See [Export, delete and erase](../concepts/export-delete-erase.md).
+To restore, decrypt with the identity into `pg_restore`:
+
+```sh
+age -d -i backup-identity.txt reliquary.dump.age | docker compose exec -T db pg_restore -U postgres -d postgres --no-owner --no-privileges
+```
+
+Lose the identity and the dumps can't be opened. Keep it with the same care as `.env`: the dumps hold every file and every encrypted variable. A vault's own export (its **Settings**) is a readable copy of its files, without variable values. See [Export, delete and erase](../concepts/export-delete-erase.md).
 
 ## Stop or remove it
 
