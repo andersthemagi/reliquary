@@ -109,7 +109,12 @@ volume before buying more.
   before building anything, so production stayed on the previous release.
   `scripts/check-migrations.sh` refuses `create cast` now; anything else
   only a superuser can run (`alter system`, an untrusted language, owning
-  a built-in object) is the same trap. A migration that failed that way
+  a built-in object) is the same trap. So is an extension's setting in a
+  function's `set` clause before anything in that migration has loaded
+  the extension: Postgres then sees a placeholder, and only a superuser
+  may set one there (v0.27.1's deploy, `set hnsw.iterative_scan`,
+  "permission denied to set parameter"; the earlier migration that set it
+  had used pgvector first in the same file). A migration that failed that way
   never applied anywhere but CI, and is rewritten in place with a
   `Migration-never-applied:` trailer (`AGENTS.md`, Conventions) rather
   than fixed forward, because `supabase db push` retries the same file.
