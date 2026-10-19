@@ -146,6 +146,39 @@ async function createsExactly(id, policy) {
 test("templates: Client engagement creates exactly its files and rules, with the default I chose", () => createsExactly("client", "canon"));
 test("templates: Personal projects creates exactly its files and rules, with the default I chose", () => createsExactly("personal", "open"));
 test("templates: Product team creates exactly its files and rules, with the default I chose", () => createsExactly("product", "open"));
+// Hackathon (issue #259) ---------------------------------------------------------
+
+test("templates: Hackathon creates exactly its files and rules, with the default I chose", () => createsExactly("hackathon", "open"));
+
+test("templates: Hackathon is a card under Start from, with event/ canon and research/ and open/ open", async () => {
+  const h = await page("/vaults/new");
+  assert.match(h, /<input type="radio" name="template" value="hackathon">\s*<span class="choice-card-body"><span class="choice-card-title">Hackathon<\/span>\s*<span class="choice-card-text">A short team event: the rules, who does what, a plan, research and scratch space\.<\/span><span class="choice-card-rules"><span>Canon: <code>event\/<\/code><\/span><span>Open: <code>research\/, open\/<\/code><\/span><span>README for agents<\/span><\/span><\/span><\/label>/);
+});
+
+test("templates: Hackathon's README says corrections first, one fact one owner, and keys go on the Variables page, never in chat", () => {
+  const readme = templateById("hackathon").files.find((f) => f.path === "README.md").body;
+  assert.match(readme, /\*\*Corrections first\.\*\* The top section of `research\/start-here\.md` lists what turned out to be wrong/);
+  assert.match(readme, /\*\*One fact, one owner\.\*\* A fact lives in one file, and other files link to it/);
+  assert.match(readme, /\*\*Keys go on the Variables page, never in chat\.\*\*/);
+});
+
+test("templates: Hackathon's plan.md holds a work_plan block, and research/start-here.md opens with corrections", () => {
+  const t = templateById("hackathon");
+  assert.deepEqual(
+    t.files.map((f) => f.path).sort(),
+    ["README.md", "event/guidelines.md", "event/roles.md", "open/README.md", "plan.md", "research/start-here.md"],
+  );
+  const plan = t.files.find((f) => f.path === "plan.md").body;
+  const block = /```work_plan\n([\s\S]*?)```/.exec(plan);
+  assert.ok(block, "one fenced work_plan block");
+  const keys = [...block[1].matchAll(/^- key: ([a-z0-9-]+)\n  title: .+$/gm)].map((m) => m[1]);
+  assert.ok(keys.length >= 2, "steps with a key and a title");
+  for (const b of block[1].matchAll(/blocked_by: (.+)/g)) assert.ok(keys.includes(b[1].trim()), `${b[1]} is a step`);
+  assert.match(plan, /Edit this block freely until it is registered; after that, steps can be added but not changed/);
+  const start = t.files.find((f) => f.path === "research/start-here.md").body;
+  assert.match(start, /^# Start here\n\n## Corrections\n/);
+  assert.ok(!t.files.some((f) => /friction|token-usage|tokens\//i.test(f.path)), "no friction log or per-person token folders");
+});
 
 test("templates: the canon folders really are canon, and an open folder is written directly", async () => {
   const vault = made.find(([, , n]) => n === "Zz template client")[1];

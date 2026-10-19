@@ -12,6 +12,7 @@ On Home, choose **New vault**. Under **Start from**, pick a template's card, the
 | **Client engagement** | `brief/`, `decisions/` and `canon/` are canon (1 approval); `notes/` is open | `DATABASE_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SENTRY_DSN` |
 | **Personal projects** | `projects/` and `notes/` are open | none |
 | **Product team** | `specs/` and `decisions/` are canon (1 approval); `notes/` is open | `DATABASE_URL`, `SENTRY_DSN` |
+| **Hackathon** | `event/` (guidelines and roles) is canon (1 approval); `research/` (a start-here file with corrections at the top) and `open/` (scratch) are open; `plan.md` at the top holds a `work_plan` block to register when the scope settles | none: the README says keys go on the Variables page, never in chat |
 
 For a way to use the **Client engagement** layout with an agent, keeping transcripts as they came, its notes apart and the decisions in canon, see [Keep call and meeting notes](../how-to/keep-meeting-notes.md).
 
