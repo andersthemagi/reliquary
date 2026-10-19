@@ -594,8 +594,10 @@ approval still counts only as a UI click; agents never count.
 ## Notifications
 
 Written 2026-09-28, alongside [Path ownership](#path-ownership) above,
-settled the same way. Built since: watching, flags and the MCP hint (below);
-not built: addressed notes, working-set staleness and nudges. Agents connect
+settled the same way. Built since: watching, flags, the MCP hint (below),
+thread flags and path owners in "waiting on you"; addressed notes are
+threads (below, settled 2026-10-19); not built: working-set staleness for
+files you read, and tag subscriptions, each waiting on its prerequisite. Agents connect
 over MCP, which is request/response with no push, so "notified" means **flagged on the
 agent's next tool call**, whatever call that happens to be. The web app
 already computes most of this for people, in `shell_summary` (the
@@ -628,6 +630,15 @@ that errors before returning, or a client that discards the response,
 doesn't lose the flag.
 
 ### Addressed notes
+
+Settled 2026-10-19 (issue #196, the owner's decision): this category is
+[threads](#threads). A side thread addressed to members, about a file when
+it is about one, is an addressed note as described below: it names its
+recipients, it is flagged (and emailed) to them and nobody else, and every
+member can still read it. No `to:` field on files: a second way to say the
+same thing, with its own parser, table and flag category, would drift from
+threads the first time either changed. The paragraph that follows is the
+original sketch, kept for the rule it states about privacy.
 
 Not a new object type. An open file (or a log entry, for something
 transient) with a `to:` field naming one or more members. Content is not

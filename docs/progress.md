@@ -140,6 +140,20 @@ waived.
 
 Status 2026-10-19: #237 built (PR pending). #238 designed, not started.
 
+### 2026-10-19: four Considering items move to Planned; addressed notes are threads
+
+Owner's decision, 2026-10-19: the web app's search by meaning (#395), the
+Hackathon template (#259), the flags follow-ups (#196) and emails about
+threads (#260) move from Considering to Planned and are built now, ahead
+of milestone 3's week, as another logged exception. On #196: design.md's
+"direct address" category is threads; no `to:` field on files. Staleness
+for files you read and tag subscriptions stay parked on their
+prerequisites (logging reads; tags on files), each its own decision.
+
+Status 2026-10-19: #454 (template), #456 (web search by meaning) and #457
+(path owners in "waiting on you") are merged; #458 (thread emails) is an
+open pull request; #196 closes with this entry.
+
 ## Milestone 1: core, MCP and UI
 
 Vaults, files with canon/open policies, proposals with quorum, log, gate,
@@ -463,11 +477,14 @@ and isn't part of its exit either. Done so far:
   person and call `advance_flags`. Thread messages are flagged too (#127,
   `20261005100000_thread_flags.sql`).
 
-Not built: category 1, notes addressed `to:` someone (design.md doesn't say
-how `to:` is stored); staleness for files you've read (nothing logs a read);
-tag subscriptions (files have no tags; `create_subscription` refuses the
-kind); path owners in "waiting on you" (follows path ownership above when
-someone does that follow-up).
+Category 1, notes addressed `to:` someone, is threads (the owner's decision,
+2026-10-19, issue #196: a side thread is an addressed note; no `to:` field
+on files). Path owners in "waiting on you" shipped 2026-10-19 (#457,
+`20261019130000_review_path_owners.sql`). Parked, each on its prerequisite:
+staleness for files you've read (nothing logs a read, and the design says
+to reuse what is logged, so it waits on a decision to log reads); tag
+subscriptions (files have no tags; `create_subscription` refuses the kind
+until a migration adds them).
 
 ## Also alongside: docs, plans, limits, admission, concurrency
 
