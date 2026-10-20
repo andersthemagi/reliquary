@@ -551,6 +551,20 @@ docs/public/reference/limits.md ("Rate limits").
   per form post and per sign-in step, OAuth call, invite page and env API
   request (before the request's own work); pages that only read make none.
   The salt is one more round trip per instance, once.
+- **Tokens over a limit are remembered** (2026-10-20, #487). An instance
+  that refused a token's single call keeps answering 429 for calls counted
+  in the same buckets until that window ends, with no begin, token check
+  or count. The simulated load test found a crowd ignoring its 429s
+  overloading the database for everyone, and the counts failing open under
+  that load; a refused batch isn't remembered, since a refused request
+  counts nothing and one call may still fit. A token revoked inside the
+  window is told to wait rather than that it isn't live, until the window
+  ends. Measured with `mcp/load/run.sh`: 100 hostile connections far over
+  their limits beside 10 honest vaults took honest `request_work` from
+  280 ms to 16 ms median and Postgres from 3.7 to 1.9 cores. A crowd mostly
+  within its limits (500 connections in 100 vaults) is unchanged: that
+  load is what an allowed call costs (#488, #489), and the counts failing
+  open under it is #487's open question.
 - **Failing.** Sign-in (asking for a code, entering one, opening a link)
   fails closed: 503, "Sign-in is unavailable", since guessing a 6-digit
   code is what the limit is for. Everything else fails open with a log

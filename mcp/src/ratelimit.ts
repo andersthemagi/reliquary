@@ -152,11 +152,38 @@ export async function limitToolCalls(tokenHash: string, calls: number, threadWri
       names.map((n) => LIMITS[n].limit),
       names.map((n) => (n.startsWith("mcp_thread_") ? threadWrites : n === "mcp_request_work_minute" ? workRequests : calls)),
     ]);
-    return Number(rows[0]?.wait ?? 0);
+    const wait = Number(rows[0]?.wait ?? 0);
+    // A refused call counts nothing, so only a refused single call shows a
+    // count already at its limit: a refused batch may leave room for one.
+    if (wait && calls === 1) remember(limited, limitedKey(tokenHash, threadWrites > 0, workRequests > 0), wait);
+    return wait;
   } catch (err) {
     unavailable(err);
     return 0;
   }
+}
+
+// Tokens whose single call was refused, until that limit's window ends: the
+// same shortcut as `blocked` below, so a crowd ignoring its 429s stops
+// reaching the database (and stops making the counts that fail open when
+// it is overloaded; docs/research/server-load.md, "Waiting in line through
+// the MCP server, simulated"). Keyed by which buckets the refused call was
+// counted in: the refusal came from one of them, so a call counted in all
+// of them is refused too, and any other goes to the database. A token
+// revoked meanwhile is told to wait, not that it isn't live, until then.
+const limited = new Map<string, number>();
+const limitedKey = (tokenHash: string, threadWrite: boolean, workRequest: boolean) =>
+  `${tokenHash}:${threadWrite ? "t" : ""}${workRequest ? "w" : ""}`;
+
+// Seconds this instance already knows the token must wait before a request
+// with these calls, else 0.
+export function knownLimited(tokenHash: string, threadWrites: number, workRequests: number): number {
+  if (!limited.size) return 0;
+  let wait = 0;
+  for (const t of threadWrites > 0 ? [false, true] : [false]) {
+    for (const w of workRequests > 0 ? [false, true] : [false]) wait = Math.max(wait, left(limited, limitedKey(tokenHash, t, w)));
+  }
+  return wait;
 }
 
 // Addresses over their 401 limit, by key, until their window ends: this

@@ -7,6 +7,7 @@
 // ranges; test.sh checks none reaches the log).
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { randomBytes } from "node:crypto";
 import { before, test } from "node:test";
 import pg from "pg";
@@ -108,6 +109,21 @@ test("rate limits: tool calls per token: a batch counts each call, another token
   assert.equal((await call(other)).status, 200);
   for (let i = 0; i < 5; i++) assert.equal((await rpc({ jsonrpc: "2.0", id: ++id, method: "tools/list" }, { tok })).status, 200);
   assert.equal((await call(tok)).status, 200, "the refused batch counted nothing");
+});
+
+test("rate limits: tool calls per token: once a call is refused, the instance refuses the token from memory until the window ends, without asking the database", async () => {
+  const tok = await token();
+  await nextWindow();
+  for (let i = 0; i < 3; i++) assert.equal((await call(tok)).status, 200);
+  await limited(await call(tok), { max: 2, rpcId: id });
+  // Revoked now: the database would answer 401, so a 429 is the instance's memory.
+  const hash = createHash("sha256").update(tok).digest("hex");
+  await sql("update public.access_tokens set revoked_at = now() where token_hash = $1", [hash]);
+  // Retry-After is whole seconds, so the memory can outlast the window by
+  // under a second: wait out what it said.
+  const wait = await limited(await call(tok), { max: 2, rpcId: id });
+  await new Promise((r) => setTimeout(r, wait * 1000 + 100));
+  assert.equal((await call(tok)).status, 401, "the memory ends with the window");
 });
 
 test("rate limits: thread writes per token: the 2nd in a window is refused, and other tool calls still go through", async () => {

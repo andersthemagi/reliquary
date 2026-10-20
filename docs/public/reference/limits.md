@@ -144,6 +144,8 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 
 "Per app" counts every person's use of one app together (one client id). "Per token or connection" counts a personal token, or an OAuth connection across its hourly access tokens.
 
+Once a token or connection is refused over MCP, the server that refused it keeps refusing its calls under that limit until the window ends, without counting them again. Calls under other limits, such as tools other than `request_work` after asking for work is spent, still go through.
+
 Addresses and emails are never stored: each is counted under a keyed hash that can't be turned back into the address. An IPv6 address counts by its /64. If the counters can't be reached, sign-in stops and says it is unavailable, so codes can't be guessed while they are down; everything else carries on without limits.
 
 
