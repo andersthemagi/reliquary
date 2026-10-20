@@ -613,6 +613,85 @@ up saves nothing; `flag_caller` is 0.9 ms. `list_flags` was not changed
 here (another open change rewrites it in place); the numbers are recorded
 so a fix there can be measured against them (Still to do, item 5).
 
+## Waiting in line through the MCP server, simulated
+
+2026-10-20, issue #486, `mcp/load/run.sh`. F827 runs its crowds straight
+against Postgres; this runs them the way agents arrive, over MCP's HTTP
+endpoint, through the servers' rate limits and the per-vault budget as they
+ship, and through a transaction-mode pooler. Everything is local: a
+throwaway Postgres 17, PgBouncer 1.26 in transaction mode sized like
+Supabase's pooler on Nano and Micro (15 server connections, 200 clients),
+and 4 MCP servers standing in for warm function instances (`DB_POOL_MAX` 5
+each, so at most 20 pooler clients). One machine, 12 cores.
+
+Each vault has 5 people, 2 of them with an agent, and a 100-step chain
+plan under a rule with the 10 second floor as its minimum gap, so one agent
+works while the other waits in line. An honest agent spends 30 seconds on
+a step and comes back when it is told to. Stages grow from 100 to 300 to
+1,000 vaults, 90 seconds each, the first 20 left out of the numbers.
+
+**Honest agents only** (agents start at random through the warm-up):
+
+| Vaults | Agents | `request_work`/s | p50 | p95 | p99 | Pooler clients | Clients waiting | Errors |
+|---|---|---|---|---|---|---|---|---|
+| 100 | 200 | 2.9 | 24 ms | 30 ms | 145 ms | 14 | 0 | 0 |
+| 300 | 600 | 8.6 | 47 ms | 59 ms | 100 ms | 19 | 0 | 0 |
+| 1,000 | 2,000 | 27.9 | 12 ms | 16 ms | 31 ms | 20 | 0 | 0 |
+
+Postgres used about one core (median 78%), the servers 4% each and the
+pooler under 1%. 2,000 agents ask 28 times a second, not the 200 the
+model's table gives for the floor: a waiting agent is told to come back in
+up to the rule's longest hint (a minute here), not at the gap, so the
+gap is the worst case, not the usual one.
+
+**All at once.** Started in the same second instead, the 1,400 agents new
+to the 1,000-vault stage made their first calls together, and 545 of them
+were answered 503 (`MCP (token check): database`, no pooled connection
+within the servers' 5 seconds), all on that first call. Real agents arrive
+spread out, but after an outage they come back together; more instances
+(the hosted path, #82) spread the same queue wider.
+
+**With a hostile crowd** (in 5 of the vaults, 5 more people with 20
+connections each, 500 in all, asking as fast as they can, ignoring every
+hint and 429, never finishing a step):
+
+| Vaults | Honest p50 | p95 | p99 | Honest errors | Hostile calls/s |
+|---|---|---|---|---|---|
+| 100 | 1,744 ms | 5,005 ms | 5,265 ms | 1,209 | 813 |
+| 300 | 4,624 ms | 5,069 ms | 5,118 ms | 959 | 118 |
+| 1,000 | 28 ms | 961 ms | 1,015 ms | 1,195 | 2,036 |
+
+The crowd slowed honest agents in every vault, not only its own: the
+honest errors are 503s, no pooled connection in time. Postgres ran at
+about 6 cores; the servers at 25% and the pooler at 5%, so neither the
+pooler's 15 connections nor the servers are the limit, the database's work
+per call is. Three things make that work:
+
+- **The rate limits fail open.** In one 60-second stage at 100 vaults,
+  1,372 counts couldn't reach the database in time and let the call
+  through (see "Rate limits": failing open is deliberate). Under overload
+  the crowd isn't limited at all, which overloads the database further. By
+  the 1,000-vault stage the crowd's counts were made and most of its calls
+  were 429s, which is why honest p50 recovers there; a 429 still costs a
+  count and a token check each time (#487).
+- **An early ask isn't one read over MCP.** With nothing ready,
+  `request_work` lists every unfinished step and what holds it up, and
+  builds the list from `work_plan_status` for the whole plan, even for an
+  agent back before its gap (#488). Sampled during the run, this and the
+  flags hint were nearly every busy query.
+- **The flags hint reads the vault's log** on every call that names a
+  vault ("Still to do", item 5); it ran past its 250 ms budget dozens of
+  times a run, so those calls went out without it (#489).
+
+Tightening the `request_work` bucket, which #486 named as the remedy if
+honest agents slowed, wouldn't help: the crowd's calls got past the
+bucket by failing open, and the ones it refused still cost a count. The
+fixes are #487, #488 and #489; rerun the script after each.
+
+What a local run can't show is the hosted path's own: Netlify Functions'
+cold starts and how many instances they scale to, Supabase's real pooler
+and connection caps on the plan, and the network between them (#82).
+
 ## Still to do
 
 1. **Confirm the pg_cron jobs after the next `db push`** (`select jobname,
@@ -635,4 +714,4 @@ so a fix there can be measured against them (Still to do, item 5).
    vault's paths, with an index on `log (proposal_id)` (none exists
    today), would bound it by the proposals.
    Change it in `list_flags` itself, where the rule lives, and measure
-   with the hint's table above.
+   with the hint's table above. Issue #489.
