@@ -707,6 +707,14 @@ honest agents slowed, wouldn't help: the crowd's calls got past the
 bucket by failing open, and the ones it refused still cost a count. The
 fixes are #487, #488 and #489; rerun the script after each.
 
+**After the first fixes** (2026-10-20: tokens over a limit remembered,
+#491; asking for work told to wait when its count can't be made, #492; an
+early ask no longer reading the plan, #488), the 100-vault stage with the
+crowd: honest p50 657 ms, p95 2,677 ms, 223 honest errors, Postgres at 2.7
+cores, the crowd's calls mostly answered 429 from memory. Still well above
+the 24 ms without the crowd; the flags hint (#489) is the cost left that
+is known.
+
 What a local run can't show is the hosted path's own: Netlify Functions'
 cold starts and how many instances they scale to, Supabase's real pooler
 and connection caps on the plan, and the network between them (#82).
