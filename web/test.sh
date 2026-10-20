@@ -76,6 +76,9 @@ echo "alter role reliquary_web login password 'test';" | psql
 # The operator's role, for test/variables_keys.test.mjs's re-encryption.
 echo "alter role reliquary_ops login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=')
+# Every server seals content under this key (src/content.ts); tests that read
+# a row directly open it with the same key.
+content_keys="t1:$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')"
 
 # A fresh checkout (CI, a new worktree) has no node_modules yet.
 [ -x node_modules/.bin/tsc ] || "$engine" run --rm --network host -v "$PWD":/app:Z -w /app "$node" npm ci --no-audit --no-fund
@@ -87,14 +90,14 @@ seed=$(psql -A -t < test/seed.sql | grep '=')
 "$engine" run -d --name "$srv" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/app/.login-test-$slot \
-  -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
+  -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
 wait_until "$srv" "the web server to answer /healthz" curl -sf "http://127.0.0.1:$port/healthz"
 # The hosted instance runs a copy of dist/ in /app, so /app/public doesn't
 # exist; node_modules is linked, not copied.
 "$engine" run -d --name "$hosted" --network host -v "$PWD":/src:Z \
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e LOCAL_USER_ID=00000000-0000-0000-0000-00000000000a -e LOGIN_FILE=/src/.login-test-hosted-$slot \
-  -e PUBLIC_URL="$hosted_url" -e RATE_LIMIT_SCALE=1000 -e PORT=$hosted_port "$node" sh -c \
+  -e PUBLIC_URL="$hosted_url" -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT=$hosted_port "$node" sh -c \
   'mkdir -p /app && cp -r /src/dist /src/docs-build /src/package.json /app/ && ln -s /src/node_modules /app/node_modules && cd /app && exec node dist/server.js' >/dev/null
 wait_until "$hosted" "the hosted web server to answer /healthz" curl -sf "http://127.0.0.1:$hosted_port/healthz"
 
@@ -109,7 +112,7 @@ for inst in "$auth_a:$auth_a_port" "$auth_b:$auth_b_port"; do
   "$engine" run -d --name "${inst%%:*}" --network host -v "$PWD":/app:Z -w /app \
     -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
     -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e GITHUB_API_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
-    -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e RATE_LIMIT_SCALE=1000 -e PORT="${inst##*:}" "$node" node dist/server.js >/dev/null
+    -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$hosted_url" -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT="${inst##*:}" "$node" node dist/server.js >/dev/null
 done
 wait_until "$auth_a" "supabase-mode server A to answer /healthz" curl -sf "http://127.0.0.1:$auth_a_port/healthz"
 wait_until "$auth_b" "supabase-mode server B to answer /healthz" curl -sf "http://127.0.0.1:$auth_b_port/healthz"
@@ -117,7 +120,7 @@ wait_until "$auth_b" "supabase-mode server B to answer /healthz" curl -sf "http:
   -e DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e AUTH_MODE=supabase -e SUPABASE_URL=$fake_url -e GITHUB_API_URL=$fake_url -e SUPABASE_PUBLISHABLE_KEY=$fake_key -e JWT_ALG=ES256 \
   -e SESSION_SECRET="$session_secret" -e PUBLIC_URL="$split_app_url" -e SITE_URL="$split_site_url" \
-  -e RATE_LIMIT_SCALE=1000 -e PORT=$split_port "$node" node dist/server.js >/dev/null
+  -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT=$split_port "$node" node dist/server.js >/dev/null
 # Asked as the app host: on the site host /healthz is a redirect.
 wait_until "$split" "the split-host server to answer /healthz" curl -sf -H "Host: ${split_app_url#https://}" "http://127.0.0.1:$split_port/healthz"
 
@@ -136,7 +139,7 @@ wait_until "$rl" "the rate-limit server to answer /healthz" curl -sf "http://127
 
 env_args=()
 while IFS= read -r line; do env_args+=(-e "$line"); done <<< "$seed"
-"$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/..":/repo:ro,z -e REPO_DIR=/repo -w /app "${env_args[@]}" \
+"$engine" run --rm --network host -v "$PWD":/app:Z -v "$PWD/..":/repo:ro,z -e REPO_DIR=/repo -w /app "${env_args[@]}" -e CONTENT_KEYS="$content_keys" \
   -e WEB_URL="http://127.0.0.1:$port" -e LOGIN_FILE=/app/.login-test-$slot \
   -e TEST_DATABASE_URL="postgres://reliquary_web:test@127.0.0.1:$pgport/postgres" \
   -e WEB_HOSTED_URL="http://127.0.0.1:$hosted_port" -e WEB_HOSTED_PUBLIC_URL="$hosted_url" \

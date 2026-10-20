@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import pg from "pg";
 import { asPerson, usePool } from "../dist/db.js";
+import { openBody } from "./open-row.mjs";
 import { applyTemplate, templateById, TEMPLATES } from "../dist/templates.js";
 
 const BASE = process.env.WEB_URL ?? "http://127.0.0.1:8791";
@@ -51,11 +52,11 @@ const contents = (user, id) =>
   asPerson(user, async (c) => ({
     files: (
       await c.query(
-        `select f.path, convert_from(v.body, 'UTF8') as body from public.files f join public.file_versions v on v.id = f.current_version_id
+        `select f.path, v.body from public.files f join public.file_versions v on v.id = f.current_version_id
           where f.vault_id = $1 and f.deleted_at is null order by f.path collate "C"`,
         [id],
       )
-    ).rows,
+    ).rows.map((r) => ({ ...r, body: openBody(r.body, id) })),
     rules: (await c.query(`select path, policy, quorum from public.path_policies where vault_id = $1 order by path collate "C"`, [id])).rows,
     def: (await c.query(`select default_policy from public.vaults where id = $1`, [id])).rows[0].default_policy,
     proposals: (await c.query(`select count(*)::int as n from public.proposals where vault_id = $1`, [id])).rows[0].n,

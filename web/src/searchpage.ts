@@ -8,7 +8,7 @@ import { asPerson } from "./db.js";
 import { minSimilarity, queryVector } from "./embeddings.js";
 import { callout, emptyState, html, pageHeader } from "./html.js";
 import { render, type Ctx, type Reply } from "./pages.js";
-import { openBody } from "./content.js";
+import { openBody, openBytes } from "./content.js";
 import { capNote, rankFiles, SEARCH_CAP, type Candidate } from "./search.js";
 import { queryTerms, snippetLines } from "./searchlines.js";
 
@@ -63,7 +63,8 @@ export async function searchAll(ctx: Ctx): Promise<Reply> {
           const cap = capNote(Number(own[0].total), own.length);
           if (cap) caps.push(`In ${own[0].vault}: ${cap}`);
           const candidates: Candidate[] = own.map((f) => ({ ...f, body: openBody(f.body, id) }));
-          for (const h of rankFiles(candidates, query, PER_VAULT, embedded.vector, minSimilarity(), vectors.filter((v) => v.vault_id === id))) {
+          const own_vectors = vectors.filter((v) => v.vault_id === id).map((v) => ({ ...v, embedding: openBytes(v.embedding, id) }));
+          for (const h of rankFiles(candidates, query, PER_VAULT, embedded.vector, minSimilarity(), own_vectors)) {
             rows.push({ vault_id: id, vault: own[0].vault, path: h.path, policy: h.policy, lines: h.lines, rank: h.rank, updated_at: h.updated_at });
           }
         }

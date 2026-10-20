@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import net from "node:net";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { openBody } from "./open-row.mjs";
 
 const WEB = new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791");
 // web/test.sh puts Postgres at 54332 + 10 * slot and the server at 8791 + 10 * slot.
@@ -362,10 +363,10 @@ test("edit: a text that starts with a newline comes back from the box, and saves
   const r = await post(`/v/${V.main}/file`, { csrf: csrfOf(h), action: "write", path: "notes/lead.md", content: shown, expected_version: formFields(h, "Save").fields.expected_version });
   assert.equal(r.status, 303);
   const [{ body: saved }] = await sql(
-    "select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/lead.md'",
+    "select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/lead.md'",
     [V.main],
   );
-  assert.equal(saved, body);
+  assert.equal(openBody(saved, V.main), body);
 });
 
 test("new file: in a canon folder the page shows the rule, asks why, and the button says Propose file", async () => {
@@ -510,7 +511,7 @@ test("refused: a save the database refuses answers the editor again (400), the t
     assert.match(h, /<textarea id="content" name="content">My edit &lt;i&gt;kept&lt;\/i&gt;<\/textarea>/);
     assert.match(h, /<input id="r" type="text" name="reason" required/);
     assert.doesNotMatch(h, /name="expected_version"/);
-    assert.equal((await sql("select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/flip.md'", [V.main]))[0].body, "Before");
+    assert.equal(openBody((await sql("select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'notes/flip.md'", [V.main]))[0].body, V.main), "Before");
   } finally {
     await as(BREE, "select public.set_policy($1, 'notes/flip.md', null, 1)", [V.main]);
   }

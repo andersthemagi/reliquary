@@ -40,7 +40,7 @@ select t.run('ben', format($q$select public.revise_proposal(%L, 'Fee 12', 'First
 select t.run('ben', format($q$select public.revise_proposal(%L, 'Fee 15', 'Second try.')$q$, t.id('p3')), 'Hermes');
 
 create function t.notes(p_user text, p_vault text, p_agent text default null) returns text language sql as $$
-  select t.run(p_user, format($q$select string_agg(kind || ':' || coalesce(body, '-'), ' | ' order by seq)
+  select t.run(p_user, format($q$select string_agg(kind || ':' || coalesce(convert_from(body, 'UTF8'), '-'), ' | ' order by seq)
     from public.change_notes(%L, 0, 1000000)$q$, t.id(p_vault)), p_agent)
 $$;
 
@@ -99,7 +99,7 @@ select t.expect('outsider: nor from the feed',
 select t.expect('outsider: a member of Team can''t read Dee''s comments',
   t.run('ana', format($q$select count(*) from public.change_notes(%L, 0, 1000000)$q$, t.id('v2'))), '0');
 select t.expect('outsider: asking with your own vault id doesn''t reach another vault''s notes',
-  t.run('dee', format($q$select coalesce(string_agg(body, ','), '') from public.change_notes(%L, 0, 1000000)$q$, t.id('v2'))),
+  t.run('dee', format($q$select coalesce(string_agg(convert_from(body, 'UTF8'), ','), '') from public.change_notes(%L, 0, 1000000)$q$, t.id('v2'))),
   'Dee secret remark');
 select t.expect('anonymous: can''t call it',
   t.run(null, format($q$select count(*) from public.change_notes(%L, 0, 1000000)$q$, t.id('v1'))), 'ERR 42501');
@@ -116,11 +116,11 @@ select t.expect('token: a revoked token sees none',
 
 select t.run('ana', format($q$select public.erase_file(%L, 'canon/rate.md')$q$, t.id('v1')));
 select t.expect('erased: the erased file''s notes come back erased, without text',
-  t.run('ana', format($q$select string_agg(kind || ':' || coalesce(body, '-') || ':' || erased, ' | ' order by seq)
+  t.run('ana', format($q$select string_agg(kind || ':' || coalesce(convert_from(body, 'UTF8'), '-') || ':' || erased, ' | ' order by seq)
     from public.change_notes(%L, 0, 1000000) where path = 'canon/rate.md'$q$, t.id('v1'))),
   'comment:-:true | request_changes:-:true | comment:-:true | revise:-:true | edit:-:true');
 select t.expect('erased: other files'' notes are untouched',
-  t.run('ana', format($q$select string_agg(body, ' | ' order by seq)
+  t.run('ana', format($q$select string_agg(convert_from(body, 'UTF8'), ' | ' order by seq)
     from public.change_notes(%L, 0, 1000000) where path = 'canon/terms.md'$q$, t.id('v1'))),
   'Net 30, please. | We have terms already.');
 select t.expect('erased: the events stay in the feed',

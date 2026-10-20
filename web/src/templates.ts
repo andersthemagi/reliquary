@@ -15,6 +15,7 @@
 
 import type pg from "pg";
 import { html, type Raw } from "./html.js";
+import { storeBody } from "./content.js";
 import { referencesIn } from "./references.js";
 
 type TemplateFile = { path: string; body: string };
@@ -380,7 +381,7 @@ export const templateById = (id: string): Template | undefined => TEMPLATES.find
 export async function applyTemplate(c: pg.ClientBase, name: string, policy: "canon" | "open", t: Template): Promise<string> {
   const staged = t.files.length > 0 && policy === "canon";
   const id = (await c.query(`select public.create_vault($1, $2) as id`, [name, staged ? "open" : policy])).rows[0].id as string;
-  for (const f of t.files) await c.query(`select public.write_file($1, $2, $3, null, $4)`, [id, f.path, f.body, referencesIn(f.path, f.body)]);
+  for (const f of t.files) await c.query(`select public.write_file($1, $2, $3::bytea, null, $4)`, [id, f.path, storeBody(f.body, id), referencesIn(f.path, f.body)]);
   for (const r of t.rules) await c.query(`select public.set_policy($1, $2, $3, $4)`, [id, r.path, r.policy, r.quorum]);
   if (staged) await c.query(`select public.set_default_policy($1, 'canon')`, [id]);
   return id;

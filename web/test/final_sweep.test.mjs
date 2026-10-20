@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { openBody } from "./open-row.mjs";
 import { asPerson, usePool } from "../dist/db.js";
 import { routes } from "../dist/pages.js";
 
@@ -63,12 +64,12 @@ const bodyOf = async (path) =>
   (
     await asPerson(ANA, (c) =>
       c.query(
-        `select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id
+        `select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id
           where f.vault_id = $1 and f.path = $2 and f.deleted_at is null`,
         [vault, path],
       ),
     )
-  ).rows[0]?.body;
+  ).rows.map((r) => ({ ...r, body: openBody(r.body, vault) }))[0]?.body;
 
 test("file saves: a save is one query in its transaction (begin, the write with its vault check, commit)", async () => {
   const w = await save(ANA, { action: "write", path: "notes/a.md", content: "A" });

@@ -268,14 +268,15 @@ test("limits: an invite past the vault's people limit is refused with the databa
 
 test("limits: a save that fits is counted; one past the storage limit is refused with the reason, and nothing is saved", async () => {
   assert.equal((await post("pia", `/v/${V.one}/file`, { action: "create", path: "notes/a.md", content: "a".repeat(300) })).status, 303);
-  assert.equal(await bytes(V.one), 300);
+  // Storage counts the sealed body: the 32-byte envelope over the text (test.sh's key id is two characters).
+  assert.equal(await bytes(V.one), 332);
   const r = await post("pia", `/v/${V.one}/file`, { action: "create", path: "notes/b.md", content: "b".repeat(200) });
   assert.equal(r.status, 400);
   assert.match(unescape(/<div class="callout danger" role="alert"><p>([^<]*)<\/p><\/div>/.exec(await r.text())?.[1] ?? ""),
-    /^Plans One has 300 bytes of its 400 bytes storage limit on the Web small plan, and this needs 200 bytes more\. Erase files you no longer need \(deleting a file keeps its history\) or delete variables, then try again\. \(ref [0-9a-f]{8}\)$/);
+    /^Plans One has 332 bytes of its 400 bytes storage limit on the Web small plan, and this needs 232 bytes more\. Erase files you no longer need \(deleting a file keeps its history\) or delete variables, then try again\. \(ref [0-9a-f]{8}\)$/);
   const [{ n }] = await sql("select count(*)::int as n from public.files where vault_id = $1 and path = 'notes/b.md'", [V.one]);
   assert.equal(n, 0);
-  assert.match(await page("pia", `/v/${V.one}/config/usage`), /<th scope="row">Storage<\/th><td>300 bytes of 400 bytes \(75%\)<meter /);
+  assert.match(await page("pia", `/v/${V.one}/config/usage`), /<th scope="row">Storage<\/th><td>332 bytes of 400 bytes \(83%\)<meter /);
 });
 
 test("limits: a save past the storage limit answers the editor again, with the text as typed and the version it loaded", async () => {
@@ -286,7 +287,7 @@ test("limits: a save past the storage limit answers the editor again, with the t
   const h = await r.text();
   assert.ok(h.includes(`<input type="hidden" name="expected_version" value="${version}">`), "the version it loaded, so a save from it is still checked");
   assert.ok(h.includes(`>${"c".repeat(450)}</textarea>`), "the text as typed");
-  assert.equal(await bytes(V.one), 300);
+  assert.equal(await bytes(V.one), 332);
 });
 
 test("limits: an Edit, then approve that the storage limit refuses answers its page again, with the text and note as typed, and the proposal stays as it was", async () => {
@@ -309,7 +310,7 @@ test("limits: an Edit, then approve that the storage limit refuses answers its p
 test("limits: setting a variable past the storage limit is refused on the form with the reason, and nothing is set", async () => {
   const r = await post("pia", `/v/${V.one}/variables/set`, { name: "BIG_KEY", environment: "development", value: "v".repeat(100) });
   assert.equal(r.status, 400);
-  assert.match(alertOf(await r.text()), /^Plans One has 300 bytes of its 400 bytes storage limit on the Web small plan, and this needs 116 bytes more\./);
+  assert.match(alertOf(await r.text()), /^Plans One has 332 bytes of its 400 bytes storage limit on the Web small plan, and this needs 116 bytes more\./);
   const [{ n }] = await sql("select count(*)::int as n from public.variables where vault_id = $1", [V.one]);
   assert.equal(n, 0);
 });
@@ -317,7 +318,7 @@ test("limits: setting a variable past the storage limit is refused on the form w
 test("limits: a pasted .env past the storage limit is refused on the form with the reason, and nothing is kept", async () => {
   const r = await post("pia", `/v/${V.one}/variables/import`, [["dotenv", `BIG=${"x".repeat(150)}`], ["environment", "development"]]);
   assert.equal(r.status, 400);
-  assert.match(alertOf(await r.text()), /^Plans One has 300 bytes of its 400 bytes storage limit on the Web small plan, and this needs 166 bytes more\./);
+  assert.match(alertOf(await r.text()), /^Plans One has 332 bytes of its 400 bytes storage limit on the Web small plan, and this needs 166 bytes more\./);
   const [{ n }] = await sql("select count(*)::int as n from public.env_imports where vault_id = $1", [V.one]);
   assert.equal(n, 0);
 });
@@ -326,14 +327,14 @@ test("limits: an import can't be applied in a vault already over its storage lim
   const r = await post("pia", `/v/${V.one}/variables/import`, [["dotenv", "SMALL=tiny"], ["environment", "development"]]);
   assert.equal(r.status, 303);
   const location = r.headers.get("location");
-  assert.equal(await bytes(V.one), 320);
+  assert.equal(await bytes(V.one), 352);
   await sql("update private.plans set max_storage_bytes = 310 where id = 'web_small'");
   try {
     const flash = await flashAfter("pia", await post("pia", `${location}/apply`, {}));
     assert.match(flash, /^Plans One has \d+ bytes of its 310 bytes storage limit on the Web small plan, and this needs \d+ bytes more\..* \(ref [0-9a-f]{8}\)$/);
     const [{ status }] = await sql("select status from public.env_imports where vault_id = $1", [V.one]);
     assert.equal(status, "pending");
-    assert.equal(await bytes(V.one), 320);
+    assert.equal(await bytes(V.one), 352);
   } finally {
     await sql("update private.plans set max_storage_bytes = 400 where id = 'web_small'");
   }

@@ -14,6 +14,8 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { CONTROL_CHARS, openText, storeBody, threadText } from "./content.js";
+import { Refusal } from "./failure.js";
 import { callout, csrfField, html, pageHeader, time, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { canWrite, message, notFound, render, UUID, vault, vaultPath, who, type Ctx, type Reply, type Vault } from "./pages.js";
@@ -36,11 +38,11 @@ export async function threadIn(c: pg.PoolClient, id: string, tid: string): Promi
 
 async function messagesOf(c: pg.PoolClient, id: string, tid: string, after: string | null): Promise<{ rows: Message[]; more: boolean }> {
   const { rows } = await c.query(
-    `select m.id, m.author, m.agent, m.at, convert_from(m.body, 'UTF8') as body, m.redacted_at, m.redacted_by from public.thread_messages m
+    `select m.id, m.author, m.agent, m.at, m.body, m.redacted_at, m.redacted_by from public.thread_messages m
       where m.vault_id = $1 and m.thread_id = $2 and m.id > coalesce($3::bigint, 0) order by m.id limit ${PAGE + 1}`,
     [id, tid, after],
   );
-  return { rows: rows.slice(0, PAGE), more: rows.length > PAGE };
+  return { rows: rows.slice(0, PAGE).map((r) => ({ ...r, body: openText(r.body, id) })), more: rows.length > PAGE };
 }
 
 // The newest message the person was shown, kept for the Threads page's
@@ -143,7 +145,9 @@ export async function threadPost(ctx: Ctx, id: string, tid: string): Promise<Rep
   try {
     const posted = await asPerson(ctx.userId, async (c) => {
       if (!(await vault(c, ctx, id)) || !(await threadIn(c, id, tid))) return null;
-      return (await c.query(`select public.post_message($1, $2) as id`, [tid, text])).rows[0].id as string;
+      const body = threadText(text);
+      if (body === null) throw new Refusal({ status: 400, where: "web app (the message form)", why: CONTROL_CHARS });
+      return (await c.query(`select public.post_message($1, $2::bytea, $3) as id`, [tid, body && storeBody(body, id), body.length])).rows[0].id as string;
     });
     if (posted === null) return notFound(ctx);
     ctx.setFlash("Message posted.", "success");

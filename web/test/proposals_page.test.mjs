@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import net from "node:net";
 import { after, before, test } from "node:test";
 import pg from "pg";
+import { openBody } from "./open-row.mjs";
 
 const WEB = new URL(process.env.WEB_URL ?? "http://127.0.0.1:8791");
 // web/test.sh puts Postgres at 54332 + 10 * slot and the server at 8791 + 10 * slot.
@@ -361,7 +362,7 @@ test("revise: a text that starts with a newline comes back from the box, and sav
   assert.equal(boxOf(h), body);
   const r = await post("sol", pp(pid, "/revise"), { content: boxOf(h) });
   assert.equal(r.status, 303);
-  assert.equal((await sql("select convert_from(body, 'UTF8') as body from public.proposals where id = $1", [pid]))[0].body, body);
+  assert.equal(openBody((await sql("select body from public.proposals where id = $1", [pid]))[0].body, V), body);
   // Not left waiting: the Inbox tests below count what waits for Rhea.
   await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
 });
@@ -374,10 +375,10 @@ test("edit, then approve: a text that starts with a newline comes back from the 
   const r = await post("rhea", pp(pid, "/edit"), { content: boxOf(h) });
   assert.equal(r.status, 303);
   const [{ body: written }] = await sql(
-    "select convert_from(fv.body, 'UTF8') as body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'canon/lead-approve.md'",
+    "select fv.body from public.files f join public.file_versions fv on fv.id = f.current_version_id where f.vault_id = $1 and f.path = 'canon/lead-approve.md'",
     [V],
   );
-  assert.equal(written, body);
+  assert.equal(openBody(written, V), body);
 });
 
 // ---------------------------------------------------------------------------
@@ -471,7 +472,7 @@ test("read revision: Edit, then approve on a revision the agent replaced is refu
   assert.match(h, /This proposal was revised while you were editing it: you started from revision 1, and it is now revision 2\. Your edit is not saved; read revision 2 before you save it again\. \(ref [0-9a-f]{8}\)/);
   assert.match(h, /<textarea id="content" name="content">An edit by Rhea\.<\/textarea>/);
   assert.equal(revisionOf(h), "2");
-  assert.equal((await sql("select convert_from(body, 'UTF8') as body from public.proposals where id = $1", [pid]))[0].body, "What the agent swapped in.");
+  assert.equal(openBody((await sql("select body from public.proposals where id = $1", [pid]))[0].body, V), "What the agent swapped in.");
   // Not left waiting: the Inbox tests below count what waits for Rhea.
   await as(RHEA, "select public.decide($1, 'reject', 'Test over.')", [pid]);
 });

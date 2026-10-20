@@ -225,7 +225,7 @@ create table t.exports (name text primary key, h jsonb);
 insert into t.exports select 'first', t.run('dee', format($q$select public.export_vault(%L)::text$q$, t.id('exp')))::jsonb;
 create function t.eid(p_name text) returns uuid language sql as $$ select (h ->> 'export')::uuid from t.exports where name = p_name $$;
 create function t.files(p_user text, p_vault text, p_export uuid default null) returns text language sql as $$
-  select t.run(p_user, format($q$select coalesce(string_agg(path || '=' || body, ', ' order by path), '(none)')
+  select t.run(p_user, format($q$select coalesce(string_agg(path || '=' || convert_from(body, 'UTF8'), ', ' order by path), '(none)')
                                    from public.export_files(%L, '', 200, %L)$q$, t.id(p_vault), p_export))
 $$;
 
