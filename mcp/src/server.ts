@@ -20,7 +20,7 @@ import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
-import { clientIp, configureRateLimits, knownBlocked, knownLimited, limitToolCalls, limitUnauthorized, rateLimitedBody, THREAD_WRITES, WORK_REQUESTS } from "./ratelimit.js";
+import { clientIp, configureRateLimits, knownBlocked, knownLimited, limitToolCalls, limitUnauthorized, rateLimitedBody, busyBody, busyWait, THREAD_WRITES, WORK_REQUESTS } from "./ratelimit.js";
 import { needsLinkTools, registerTools } from "./tools.js";
 import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
@@ -345,7 +345,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
   let session: Session | null = null;
   let identity: Identity | null;
   // Tool calls per token (ratelimit.ts), counted while the token resolves.
-  let wait = 0;
+  let wait: number | "unavailable" = 0;
   // A token that can't be checked (the database is down, or timed out) is
   // not a bad token: a 503 with the reason, never a 401 that would send the
   // client to sign in again.
@@ -376,7 +376,14 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
     await unauthorized();
     return;
   }
-  if (wait) {
+  if (wait === "unavailable" && workRequests) {
+    await session?.close();
+    const busy = busyWait();
+    send(res, 503, busyBody(busy, Array.isArray(body) ? null : (body as { id?: unknown } | null)?.id), { "Retry-After": String(busy), "cache-control": "no-store" });
+    console.info(`mcp 503 busy user=${identity.userId.slice(0, 8)}`);
+    return;
+  }
+  if (wait && wait !== "unavailable") {
     await session?.close();
     tooMany(wait, Array.isArray(body) ? null : (body as { id?: unknown } | null)?.id);
     console.info(`mcp 429 user=${identity.userId.slice(0, 8)}`);

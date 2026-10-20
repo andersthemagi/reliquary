@@ -193,6 +193,31 @@ test("rate limits: with the counter out of reach, tool calls go through (fail op
   }
 });
 
+test("rate limits: with the counter out of reach, asking for work is told Reliquary is busy and to wait 5 to 15 seconds, and other tool calls still go through", async () => {
+  const tok = await token();
+  const ask = (name) =>
+    rpc({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name, arguments: { vault: "Nowhere", path: "plan.md", key: "a" } } }, { tok });
+  await sql("revoke execute on function private.rate_limit_token(text, text[], int[], int[], int[]) from reliquary_mcp");
+  try {
+    for (const name of ["request_work", "claim_step"]) {
+      const r = await ask(name);
+      assert.equal(r.status, 503);
+      const wait = Number(r.headers.get("retry-after"));
+      assert.ok(Number.isInteger(wait) && wait >= 5 && wait <= 15, `Retry-After ${r.headers.get("retry-after")}`);
+      const body = await r.json();
+      assert.equal(body.id, id);
+      assert.equal(body.error.code, -32029);
+      assert.equal(body.error.message, `Reliquary is busy. Wait ${wait} seconds, then ask for work again.`);
+      assert.equal(body.error.data.retry_after, wait);
+      assert.equal(body.error.data.where, "rate limit");
+      assert.match(body.error.data.ref, /^[0-9a-f]{8}$/);
+    }
+    assert.equal((await call(tok)).status, 200, "a tool call that isn't asking for work fails open");
+  } finally {
+    await sql("grant execute on function private.rate_limit_token(text, text[], int[], int[], int[]) to reliquary_mcp");
+  }
+});
+
 test("rate limits: counters hold no token, hash or address: every key is 64 hex digits", async () => {
   const rows = await sql("select key from private.rate_limits");
   assert.ok(rows.length > 0);
