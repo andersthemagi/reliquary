@@ -152,11 +152,38 @@ export async function limitToolCalls(tokenHash: string, calls: number, threadWri
       names.map((n) => LIMITS[n].limit),
       names.map((n) => (n.startsWith("mcp_thread_") ? threadWrites : n === "mcp_request_work_minute" ? workRequests : calls)),
     ]);
-    return Number(rows[0]?.wait ?? 0);
+    const wait = Number(rows[0]?.wait ?? 0);
+    // A refused call counts nothing, so only a refused single call shows a
+    // count already at its limit: a refused batch may leave room for one.
+    if (wait && calls === 1) remember(limited, limitedKey(tokenHash, threadWrites > 0, workRequests > 0), wait);
+    return wait;
   } catch (err) {
     unavailable(err);
     return 0;
   }
+}
+
+// Tokens whose single call was refused, until that limit's window ends: the
+// same shortcut as `blocked` below, so a crowd ignoring its 429s stops
+// reaching the database (and stops making the counts that fail open when
+// it is overloaded; docs/research/server-load.md, "Waiting in line through
+// the MCP server, simulated"). Keyed by which buckets the refused call was
+// counted in: the refusal came from one of them, so a call counted in all
+// of them is refused too, and any other goes to the database. A token
+// revoked meanwhile is told to wait, not that it isn't live, until then.
+const limited = new Map<string, number>();
+const limitedKey = (tokenHash: string, threadWrite: boolean, workRequest: boolean) =>
+  `${tokenHash}:${threadWrite ? "t" : ""}${workRequest ? "w" : ""}`;
+
+// Seconds this instance already knows the token must wait before a request
+// with these calls, else 0.
+export function knownLimited(tokenHash: string, threadWrites: number, workRequests: number): number {
+  if (!limited.size) return 0;
+  let wait = 0;
+  for (const t of threadWrites > 0 ? [false, true] : [false]) {
+    for (const w of workRequests > 0 ? [false, true] : [false]) wait = Math.max(wait, left(limited, limitedKey(tokenHash, t, w)));
+  }
+  return wait;
 }
 
 // Addresses over their 401 limit, by key, until their window ends: this
@@ -164,6 +191,21 @@ export async function limitToolCalls(tokenHash: string, calls: number, threadWri
 // database. Bounded; the database stays the authority.
 const blocked = new Map<string, number>();
 const BLOCKED_MAX = 10_000;
+
+function remember(map: Map<string, number>, key: string, wait: number): void {
+  if (map.size >= BLOCKED_MAX) map.delete(map.keys().next().value!);
+  map.set(key, Date.now() + wait * 1000);
+}
+
+// Seconds left of what `map` remembers for `key`, else 0.
+function left(map: Map<string, number>, key: string): number {
+  const until = map.get(key);
+  if (!until) return 0;
+  const s = Math.ceil((until - Date.now()) / 1000);
+  if (s > 0) return s;
+  map.delete(key);
+  return 0;
+}
 
 // The address's key: an HMAC, or undefined if the salt can't be read.
 async function ipKey(ip: string): Promise<string | undefined> {
@@ -179,12 +221,7 @@ async function ipKey(ip: string): Promise<string | undefined> {
 export async function knownBlocked(ip: string): Promise<number> {
   if (!blocked.size) return 0;
   const key = await ipKey(ip);
-  const until = key ? blocked.get(key) : undefined;
-  if (!until) return 0;
-  const left = Math.ceil((until - Date.now()) / 1000);
-  if (left > 0) return left;
-  blocked.delete(key!);
-  return 0;
+  return key ? left(blocked, key) : 0;
 }
 
 // A 401 answer, counted per address. 0, or the seconds to wait (then the
@@ -198,10 +235,7 @@ export async function limitUnauthorized(ip: string): Promise<number> {
       ["mcp_unauth_ip"], [key], [l.window], [l.limit], [1],
     ]);
     const wait = Number(rows[0]?.wait ?? 0);
-    if (wait) {
-      if (blocked.size >= BLOCKED_MAX) blocked.delete(blocked.keys().next().value!);
-      blocked.set(key, Date.now() + wait * 1000);
-    }
+    if (wait) remember(blocked, key, wait);
     return wait;
   } catch (err) {
     unavailable(err);
