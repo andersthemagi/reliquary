@@ -179,6 +179,6 @@ test("round trips: request_work is five, granted or told to wait with nothing re
   };
   const five = ["begin;", "select", "select", "savepoint", "commit"];
   assert.deepEqual(await queries("plan.md"), ["Wait:", ...five]);
-  assert.deepEqual(await queries("plan.md"), ["Wait:", ...five], "asked again before its gap");
+  assert.deepEqual(await queries("plan.md"), ["Wait:", "begin;", "select", "savepoint", "commit"], "asked again before its gap: four, the plan not read again");
   assert.deepEqual(await queries("solo.md"), ["Granted", ...five]);
 });

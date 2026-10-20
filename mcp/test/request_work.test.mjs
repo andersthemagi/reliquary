@@ -114,6 +114,24 @@ test("request work: with everything blocked, the agent is told to wait and come 
   assert.match(again.text, /^Wait: you are number 1 in line for work\.md; 0 steps are ready/);
 });
 
+test("request work: asked again before the gap, the wait repeats the last answer without listing the plan again, and says so", async () => {
+  const t = await team();
+  await plan(t, "work.md", [
+    { key: "draft", title: "Draft it" },
+    { key: "review", title: "Review it", blocked_by: "draft" },
+  ]);
+  assert.equal((await ask(t, t.ownerTok, "work.md")).isError, false);
+  const first = await ask(t, t.editorTok, "work.md");
+  assert.match(first.text, /\nNothing is ready\./);
+
+  const again = await ask(t, t.editorTok, "work.md");
+  assert.equal(again.isError, false, again.text);
+  const lines = again.text.split("\n");
+  assert.equal(lines.length, 2, again.text);
+  assert.match(lines[0], /^Wait: you are number 1 in line for work\.md; 0 steps are ready, none free for you yet\. Stop now, and call request_work again in \d+ seconds/);
+  assert.equal(lines[1], "This repeats your last answer: you asked before your time, so nothing was looked at again. What holds the plan up was listed then.");
+});
+
 test("request work: a plan blocked by a cancelled step says a person has to act, and names it", async () => {
   const t = await team();
   await plan(t, "work.md", [

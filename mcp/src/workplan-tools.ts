@@ -325,7 +325,7 @@ export function registerWorkPlanTools(
       run(async (c) => {
         if (label?.includes("\u0000")) throw new ToolError("The label has a NUL character in it, which a claim can't hold. Remove it and send again.");
         const a = (
-          await c.query("select * from public.request_work(private.vault_ref($1), $2, $3, $4)", [vault, path, label ?? null, ttl_minutes ?? null])
+          await c.query("select * from public.ask_for_work(private.vault_ref($1), $2, $3, $4)", [vault, path, label ?? null, ttl_minutes ?? null])
         ).rows[0];
         const when = (secs: number) => `${secs} second${secs === 1 ? "" : "s"} (at ${at(new Date(Date.now() + secs * 1000))})`;
         switch (a.o_state) {
@@ -362,6 +362,9 @@ export function registerWorkPlanTools(
             const lead =
               `Wait: you are number ${a.o_place} in line for ${path}; ${a.o_ready} step${a.o_ready === 1 ? " is" : "s are"} ready, none free for you yet. ` +
               `Stop now, and call request_work again in ${when(a.o_wait_seconds)}. Asking sooner gets this same answer. Your place lasts while you come back in time; call leave_queue if you no longer want a step here.`;
+            // Back before its gap: the database answered from one read, so
+            // the plan isn't read again either (20261020130000_ask_for_work.sql).
+            if (a.o_repeat) return ok(`${lead}\nThis repeats your last answer: you asked before your time, so nothing was looked at again.${a.o_ready === 0 ? " What holds the plan up was listed then." : ""}`);
             return ok(a.o_ready === 0 ? await whyNothingReady(c, vault, path, lead) : lead);
           }
           case "blocked_by_cancelled":
