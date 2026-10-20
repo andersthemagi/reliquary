@@ -165,6 +165,21 @@ export async function limitToolCalls(tokenHash: string, calls: number, threadWri
 const blocked = new Map<string, number>();
 const BLOCKED_MAX = 10_000;
 
+function remember(map: Map<string, number>, key: string, wait: number): void {
+  if (map.size >= BLOCKED_MAX) map.delete(map.keys().next().value!);
+  map.set(key, Date.now() + wait * 1000);
+}
+
+// Seconds left of what `map` remembers for `key`, else 0.
+function left(map: Map<string, number>, key: string): number {
+  const until = map.get(key);
+  if (!until) return 0;
+  const s = Math.ceil((until - Date.now()) / 1000);
+  if (s > 0) return s;
+  map.delete(key);
+  return 0;
+}
+
 // The address's key: an HMAC, or undefined if the salt can't be read.
 async function ipKey(ip: string): Promise<string | undefined> {
   try {
@@ -179,12 +194,7 @@ async function ipKey(ip: string): Promise<string | undefined> {
 export async function knownBlocked(ip: string): Promise<number> {
   if (!blocked.size) return 0;
   const key = await ipKey(ip);
-  const until = key ? blocked.get(key) : undefined;
-  if (!until) return 0;
-  const left = Math.ceil((until - Date.now()) / 1000);
-  if (left > 0) return left;
-  blocked.delete(key!);
-  return 0;
+  return key ? left(blocked, key) : 0;
 }
 
 // A 401 answer, counted per address. 0, or the seconds to wait (then the
@@ -198,10 +208,7 @@ export async function limitUnauthorized(ip: string): Promise<number> {
       ["mcp_unauth_ip"], [key], [l.window], [l.limit], [1],
     ]);
     const wait = Number(rows[0]?.wait ?? 0);
-    if (wait) {
-      if (blocked.size >= BLOCKED_MAX) blocked.delete(blocked.keys().next().value!);
-      blocked.set(key, Date.now() + wait * 1000);
-    }
+    if (wait) remember(blocked, key, wait);
     return wait;
   } catch (err) {
     unavailable(err);
