@@ -8,6 +8,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pg from "pg";
 import { z } from "zod";
+import { openB64, openText, storeBody } from "./content.js";
 import type { Identity } from "./db.js";
 import { ADDITIVE, at, DESTRUCTIVE, freshNonce, makeRun, oneLine, ok, PATH, peopleLabeler, PROPOSAL, READ, REASON, refuse, TEXT, ToolError, VAULT, VAULT_REF } from "./tools-shared.js";
 
@@ -60,10 +61,11 @@ export function registerProposalsTools(
     async ({ vault, path, content, reason, delete: del }) =>
       run(async (c) => {
         if (!del && content === undefined) throw new ToolError("Give content, or set delete to true.");
-        const { rows } = await c.query("select public.propose(private.vault_ref($1), $2, $3, $4, $5) as id", [
-          vault,
+        const v = (await c.query("select private.vault_ref($1) as id", [vault])).rows[0].id as string;
+        const { rows } = await c.query("select public.propose($1::uuid, $2, $3::bytea, $4, $5) as id", [
+          v,
           path,
-          del ? null : content,
+          del ? null : storeBody(content ?? "", v),
           reason,
           del ?? false,
         ]);
@@ -102,7 +104,7 @@ export function registerProposalsTools(
                   (select count(*) from public.approvals a
                     where a.proposal_id = p.id and a.decision = 'approve' and a.revision = p.revision) as approvals,
                   r.quorum,
-                  coalesce((select json_agg(json_build_object('kind', n.kind, 'body', convert_from(n.body, 'UTF8'), 'revision', n.revision) order by n.at)
+                  coalesce((select json_agg(json_build_object('kind', n.kind, 'body', encode(n.body, 'base64'), 'revision', n.revision) order by n.at)
                               from public.proposal_notes n
                              where n.proposal_id = p.id and n.body is not null
                                and n.kind in ('request_changes', 'reject', 'edit')), '[]') as notes,
@@ -118,6 +120,7 @@ export function registerProposalsTools(
         const more = rows.length > PROPOSALS_PAGE;
         if (more) rows.length = PROPOSALS_PAGE;
         type Note = { kind: string; body: string; revision: number };
+        for (const r of rows) r.notes = (r.notes as Note[]).map((n) => ({ ...n, body: openB64(n.body, r.vault_id) ?? "" }));
         // Reasons and reviewers' notes are people's or agents' words, so they
         // are fenced as data too.
         const nonce = freshNonce(rows.flatMap((r) => [r.reason, ...(r.notes as Note[]).map((n) => n.body)]));
@@ -157,10 +160,15 @@ export function registerProposalsTools(
     },
     async ({ proposal_id, content, reason }) =>
       run(async (c) => {
-        const { rows } = await c.query("select public.revise_proposal($1, $2, $3) as r", [
+        // The proposal's vault is the sealed body's additional data; a
+        // proposal the caller can't see is refused by the function as before.
+        const v = ((await c.query("select vault_id from public.proposals where id = $1", [proposal_id])).rows[0]?.vault_id ?? proposal_id) as string;
+        const why = (reason ?? "").trim();
+        const { rows } = await c.query("select public.revise_proposal($1, $2::bytea, $3, $4::bytea) as r", [
           proposal_id,
-          content,
+          storeBody(content, v),
           reason ?? null,
+          why ? storeBody(why, v) : null,
         ]);
         return ok(`Revised. Proposal ${proposal_id} is now at revision ${rows[0].r} and waiting for review again.`);
       }),
@@ -187,9 +195,9 @@ export function registerProposalsTools(
         // and erased notes come back without text. The log itself never
         // holds note text. The notes' seq window ends at the last event
         // returned, so the two stay in step.
-        const { events, notes: noteRows } = (
+        const { events, notes: sealedNotes, vault_id: vaultId } = (
           await c.query(
-            `select e.events, n.notes
+            `select e.events, n.notes, v.id as vault_id
                from ${VAULT_REF}
                cross join lateral (
                  select coalesce(json_agg(json_build_object('seq', c.seq::text, 'at', c.at, 'event', c.event,
@@ -199,12 +207,13 @@ export function registerProposalsTools(
                cross join lateral (
                  select coalesce(json_agg(json_build_object('seq', n.seq::text, 'proposal_id', n.proposal_id,
                           'kind', n.kind, 'revision', n.revision, 'author', n.author, 'agent', n.agent,
-                          'body', n.body, 'erased', n.erased) order by n.seq), '[]') as notes
+                          'body', encode(n.body, 'base64'), 'erased', n.erased) order by n.seq), '[]') as notes
                    from public.change_notes(v.id, $2, e.last) n
                   where e.last is not null) n`,
             [vault, after, limit ?? 100],
           )
-        ).rows[0] as { events: { seq: string; at: string; event: string; path: string | null; actor: string | null; agent: string | null }[]; notes: NoteRow[] };
+        ).rows[0] as { events: { seq: string; at: string; event: string; path: string | null; actor: string | null; agent: string | null }[]; notes: NoteRow[]; vault_id: string };
+        const noteRows = sealedNotes.map((n) => ({ ...n, body: openB64(n.body, vaultId) }));
         const rows = events.map((r) => ({ ...r, at: new Date(r.at) }));
         if (rows.length === 0) return ok(`No changes after ${after}.`);
         const last = rows[rows.length - 1].seq;
@@ -254,11 +263,11 @@ export function registerProposalsTools(
       run(async (c) => {
         // The proposal and its thread in one round trip.
         const { rows } = await c.query(
-          `select p.*, convert_from(p.body, 'UTF8') as body, v.name as vault_name, (private.rule_for(p.vault_id, p.path)).quorum,
+          `select p.*, v.name as vault_name, (private.rule_for(p.vault_id, p.path)).quorum,
                   (select count(*) from public.approvals a where a.proposal_id = p.id
                      and a.decision = 'approve' and a.revision = p.revision)::int as approvals,
                   (select coalesce(json_agg(e order by e.at), '[]') from (
-                     select kind, convert_from(body, 'UTF8') as body, author, agent, revision, at, erased_at from public.proposal_notes
+                     select kind, encode(body, 'base64') as body, author, agent, revision, at, erased_at from public.proposal_notes
                       where proposal_id = p.id
                      union all
                      select 'approve', null, user_id, null, revision, at, null from public.approvals
@@ -267,10 +276,10 @@ export function registerProposalsTools(
             where p.id = $1`,
           [proposal_id],
         );
-        const p = rows[0];
+        const p = rows[0] ? { ...rows[0], body: openText(rows[0].body, rows[0].vault_id) } : undefined;
         if (!p) return refuse("No proposal with that id is available to you. Use list_proposals to see a vault's.");
         const entries = (p.entries as { kind: string; body: string | null; author: string; agent: string | null; revision: number; at: string; erased_at: string | null }[])
-          .map((e) => ({ ...e, at: new Date(e.at) }));
+          .map((e) => ({ ...e, body: openB64(e.body, p.vault_id), at: new Date(e.at) }));
         const nonce = freshNonce([p.reason, p.body, ...entries.map((e) => e.body)]);
         const by = (author: string, agent: string | null) =>
           `${author}${author === id.userId ? " (you)" : ""}${agent ? ` via ${oneLine(agent)}` : ""}`;
@@ -322,7 +331,9 @@ export function registerProposalsTools(
     },
     async ({ proposal_id, comment }) =>
       run(async (c) => {
-        await c.query("select public.comment_on_proposal($1, $2)", [proposal_id, comment]);
+        const v = ((await c.query("select vault_id from public.proposals where id = $1", [proposal_id])).rows[0]?.vault_id ?? proposal_id) as string;
+        const text = comment.trim();
+        await c.query("select public.comment_on_proposal($1, $2::bytea)", [proposal_id, text ? storeBody(text, v) : null]);
         return ok(`Commented on proposal ${proposal_id} as ${id.agent}. Reviewers see it in the proposal's thread.`);
       }),
   );

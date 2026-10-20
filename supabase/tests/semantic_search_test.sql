@@ -35,7 +35,7 @@ select t.expect('queue: a write queues the file at its current version',
   (select version_id::text from private.embedding_queue where file_id = t.file('v1', 'decisions/pricing.md')),
   t.cur('v1', 'decisions/pricing.md')::text);
 select t.expect('queue: a member gets the vault''s queued files with their text',
-  t.run('cal', format($q$select string_agg(body, '|' order by body) from private.embedding_pending(%L, 8)$q$, t.id('v1'))),
+  t.run('cal', format($q$select string_agg(convert_from(body, 'UTF8'), '|' order by body) from private.embedding_pending(%L, 8)$q$, t.id('v1'))),
   'Seats and plans: priced per seat.|Tomatoes need sun.');
 select t.expect('queue: an outsider gets nothing queued in another vault',
   t.run('dee', format($q$select count(*) from private.embedding_pending(%L, 8)$q$, t.id('v1'))), '0');

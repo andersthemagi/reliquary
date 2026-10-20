@@ -41,6 +41,7 @@
 // these are refused by the database (20260926130000_portable_paths.sql);
 // this keeps files saved before that safe too.
 
+import { openBody, openText } from "./content.js";
 import { createHash } from "node:crypto";
 import type { Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -219,7 +220,7 @@ const dbPages = (userId: string, h: ExportHeader): FilePages => (after, limit) =
         limit,
         h.export,
       ])
-    ).rows,
+    ).rows.map((r) => ({ ...r, body: openBody(r.body, h.vault.id) })),
   );
 
 // ---------------------------------------------------------------------------
@@ -252,7 +253,7 @@ const dbThreads = (userId: string, h: ExportHeader): ThreadSource => ({
           after,
           limit,
         ])
-      ).rows,
+      ).rows.map((r) => ({ ...r, body: openText(r.body, h.vault.id) })),
     ),
   people: (ids) => peopleLabels(userId, ids),
 });

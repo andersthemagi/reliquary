@@ -12,6 +12,7 @@
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { openBody } from "./open-row.mjs";
 import { addPeople, as, csrfOf, EDDA, flashOf, get, landed, NOA, OLA, page, post, REX, sql, start, visibleText } from "./threads-harness.mjs";
 
 const { describe } = await import("../dist/errorpage.js");
@@ -208,8 +209,8 @@ test("post: a message joins the end of the thread, with a success flash, and the
   const msgs = bodiesOf(after);
   assert.equal(msgs.length, 2);
   assert.match(msgs[1].html, /<p class="small muted">you · .*<\/p>\s*<p>Second line\.\nSecond para\.<\/p>/s);
-  const [row] = await sql("select author, agent, convert_from(body, 'UTF8') as body from public.thread_messages where thread_id = $1 order by id desc limit 1", [t]);
-  assert.deepEqual({ author: row.author, agent: row.agent, body: row.body }, { author: EDDA, agent: null, body: "Second line.\nSecond para." });
+  const [row] = await sql("select author, agent, vault_id, body from public.thread_messages where thread_id = $1 order by id desc limit 1", [t]);
+  assert.deepEqual({ author: row.author, agent: row.agent, body: openBody(row.body, row.vault_id) }, { author: EDDA, agent: null, body: "Second line.\nSecond para." });
 });
 
 test("post: an empty message or one with a control character is refused with its reason and reference, and what was typed stays in the box", async () => {

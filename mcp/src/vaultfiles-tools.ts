@@ -12,7 +12,7 @@ import type { Identity } from "./db.js";
 import { minSimilarity, queryVector } from "./embeddings.js";
 import { Refusal } from "./failure.js";
 import { ADDITIVE, at, DESTRUCTIVE, fenced, fileBlock, freshNonce, makeRun, ok, PATH, READ, refuse, TEXT, type FileRow, VAULT, VAULT_REF, VERSION, via } from "./tools-shared.js";
-import { openBody } from "./content.js";
+import { openBody, openBytes, openText, storeBody } from "./content.js";
 import { referencesIn } from "./references.js";
 import { capNote, rankFiles, SEARCH_CAP, type Candidate, type Vector } from "./search.js";
 
@@ -68,7 +68,7 @@ export async function searchHits(c: pg.PoolClient, vault: string, query: string,
              join public.files f on f.id = e.file_id and f.current_version_id = e.version_id and f.deleted_at is null`,
           [vault],
         )
-      ).rows
+      ).rows.map((v: Vector) => ({ ...v, embedding: openBytes(v.embedding, rows[0].vault_id) }))
     : [];
   const hits = rankFiles(files, query, limit, vector, minSimilarity(), vectors).map(({ lines, rank: _rank, line: _line, ...r }) => ({
     ...r,
@@ -199,7 +199,7 @@ export function registerVaultFileTools(
     async ({ vault, path, from_line, to_line, max_bytes }) =>
       run(async (c) => {
         const { rows } = await c.query(
-          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, convert_from(fv.body, 'UTF8') as body,
+          `select f.path, (private.rule_for(f.vault_id, f.path)).policy, fv.body, v.id as vault_id,
                   fv.author, fv.agent, f.updated_at, fv.id as version,
                   pc.holder as claim_holder, pc.holder_label as claim_label, pc.expires_at as claim_expires
              from ${VAULT_REF}
@@ -210,7 +210,7 @@ export function registerVaultFileTools(
           [vault, path],
         );
         if (rows.length === 0) return refuse("No file at that path. Use list_files to see the vault's.");
-        const r = rows[0];
+        const r = { ...rows[0], body: openText(rows[0].body, rows[0].vault_id) };
         const claim = r.claim_holder ? { holder: r.claim_holder, label: r.claim_label, expires: r.claim_expires } : null;
         return ok(fileBlock({ ...r, claim }, { from: from_line, to: to_line, maxBytes: max_bytes ?? READ_DEFAULT_BYTES }));
       }),
@@ -309,7 +309,9 @@ export function registerVaultFileTools(
     },
     async ({ vault, path, content, expected_version }) =>
       run(async (c) => {
-        const { rows } = await c.query("select public.write_file(private.vault_ref($1), $2, $3, $4, $5) as version", [vault, path, content, expected_version ?? null, referencesIn(path, content)]);
+        // The vault first: its id is the sealed body's additional data.
+        const v = (await c.query("select private.vault_ref($1) as id", [vault])).rows[0].id as string;
+        const { rows } = await c.query("select public.write_file($1::uuid, $2, $3::bytea, $4, $5) as version", [v, path, storeBody(content, v), expected_version ?? null, referencesIn(path, content)]);
         // The version a chained write expects, in read_file's own words.
         return ok(`Wrote ${path}. The change is logged as ${id.agent}.\nversion: ${rows[0].version}`);
       }),

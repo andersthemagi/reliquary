@@ -19,7 +19,8 @@ const functionAnswers = (status) =>
   fetch(`${EMBED_DOUBLE_URL}/_status`, { method: "POST", body: JSON.stringify({ status }) }).then((r) => assert.equal(r.status, 200));
 
 before(async () => {
-  assert.equal((await call(MCP_SEM_URL, GUS_RW, "create_vault", { name: VAULT })).isError, false);
+  const created = await call(MCP_SEM_URL, GUS_RW, "create_vault", { name: VAULT });
+  assert.equal(created.isError, false, created.text);
   await write("decisions/pricing.md", "# Pricing\n\nSeats and plans: priced per seat.");
   await write("notes/garden.md", "Tomatoes need sun.");
 });

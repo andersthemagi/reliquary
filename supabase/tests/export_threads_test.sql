@@ -40,7 +40,7 @@ select t.save('x', t.val('h')::jsonb ->> 'export');
 
 -- What the export sees, as SQL: export_messages for a thread.
 create function t.msgs_sql(p_thread text, p_export text default null, p_vault text default 'v1') returns text language sql as $$
-  select format($q$select coalesce(string_agg(coalesce(body, '<redacted>'), ' | ' order by id), '') from public.export_messages(%L, %L, %L)$q$,
+  select format($q$select coalesce(string_agg(coalesce(convert_from(body, 'UTF8'), '<redacted>'), ' | ' order by id), '') from public.export_messages(%L, %L, %L)$q$,
     t.id(p_vault), coalesce(p_export, t.val('x')), t.id(p_thread))
 $$;
 
@@ -77,7 +77,7 @@ select t.expect('export threads: a redacted message keeps its place, author, age
 select t.expect('export threads: no redacted text comes back',
   t.run('ana', t.msgs_sql('wide')), 'Who takes the copy? | I will. | <redacted> | Thanks.');
 select t.expect('export threads: messages page after an id, with a limit',
-  t.run('ana', format($q$select string_agg(coalesce(body, '<redacted>'), ' | ' order by id) from public.export_messages(%L, %L, %L, %s, 1)$q$,
+  t.run('ana', format($q$select string_agg(coalesce(convert_from(body, 'UTF8'), '<redacted>'), ' | ' order by id) from public.export_messages(%L, %L, %L, %s, 1)$q$,
     t.id('v1'), t.val('x'), t.id('wide'), t.val('m2'))),
   '<redacted>');
 select t.expect('export threads: another vault''s thread has no messages through this export',

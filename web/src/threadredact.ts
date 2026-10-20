@@ -14,6 +14,7 @@
 
 import type pg from "pg";
 import { asPerson } from "./db.js";
+import { openText } from "./content.js";
 import { confirmPage, html, type Raw } from "./html.js";
 import { vaultShell } from "./files.js";
 import { message, notFound, render, vault, vaultPath, who, type Ctx, type Reply } from "./pages.js";
@@ -26,8 +27,8 @@ type Found = { id: string; author: string; agent: string | null; at: Date; body:
 // or vault is "not in this thread", the answer for one that doesn't exist.
 async function messageIn(c: pg.PoolClient, id: string, tid: string, mid: string): Promise<Found | undefined> {
   if (!/^\d{1,18}$/.test(mid)) return undefined;
-  const { rows } = await c.query(`select id, author, agent, at, convert_from(body, 'UTF8') as body from public.thread_messages where vault_id = $1 and thread_id = $2 and id = $3`, [id, tid, mid]);
-  return rows[0];
+  const { rows } = await c.query(`select id, author, agent, at, body from public.thread_messages where vault_id = $1 and thread_id = $2 and id = $3`, [id, tid, mid]);
+  return rows.map((r) => ({ ...r, body: openText(r.body, id) }))[0];
 }
 
 type Out = { shell: Raw } | { back: string; note: string };

@@ -13,6 +13,7 @@
 
 import type pg from "pg";
 import { fail, Refusal } from "./failure.js";
+import { openBody, storeBytes } from "./content.js";
 import { vectorBytes } from "./search.js";
 
 const DIMENSIONS = 384;
@@ -114,21 +115,21 @@ export async function queryVector(c: pg.PoolClient, vaults: string[], query: str
   await c.query("savepoint embed");
   try {
     const { rows } = await c.query(
-      `select p.file_id, p.version_id, p.body from unnest($1::uuid[]) v(id) cross join lateral private.embedding_pending(v.id, $2) p limit $2`,
+      `select p.file_id, p.version_id, p.vault_id, p.body from unnest($1::uuid[]) v(id) cross join lateral private.embedding_pending(v.id, $2) p limit $2`,
       [vaults, MAX_FILES],
     );
-    const batch: { file: string; version: string; parts: { line: number; text: string }[] }[] = [];
+    const batch: { file: string; version: string; vault: string; parts: { line: number; text: string }[] }[] = [];
     let n = 1;
     for (const r of rows) {
-      const parts = chunks(r.body);
+      const parts = chunks(openBody(r.body, r.vault_id));
       if (n + parts.length > MAX_INPUTS) break;
-      batch.push({ file: r.file_id, version: r.version_id, parts });
+      batch.push({ file: r.file_id, version: r.version_id, vault: r.vault_id, parts });
       n += parts.length;
     }
     const vectors = await embed([query, ...batch.flatMap((b) => b.parts.map((p) => p.text))]);
     let i = 1;
     for (const b of batch) {
-      const stored = b.parts.map((p, chunk) => ({ chunk, line: p.line, embedding: vectorBytes(vectors[i++]).toString("base64") }));
+      const stored = b.parts.map((p, chunk) => ({ chunk, line: p.line, embedding: storeBytes(vectorBytes(vectors[i++]), b.vault).toString("base64") }));
       await c.query("select private.store_embeddings($1, $2, $3::jsonb)", [b.file, b.version, JSON.stringify(stored)]);
     }
     await c.query("release savepoint embed");

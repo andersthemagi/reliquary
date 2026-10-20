@@ -465,7 +465,7 @@ select t.expect('list: an outsider reads no thread''s summary either',
   t.run('dee', format($q$select count(*) from public.thread_summaries where vault_id = %L$q$, t.id('v1'))), '0');
 
 select t.expect('read thread: its messages in order, each with its author, agent and time',
-  t.run('cal', format($q$select string_agg(m ->> 'body' || ' (' || coalesce(m ->> 'agent', '-') || ')', ' | ' order by (m ->> 'id')::bigint)
+  t.run('cal', format($q$select string_agg(convert_from(decode(m ->> 'body', 'base64'), 'UTF8') || ' (' || coalesce(m ->> 'agent', '-') || ')', ' | ' order by (m ->> 'id')::bigint)
       || ' ' || bool_and(m ->> 'author' = %L and m ? 'at')
     from jsonb_array_elements(public.read_thread(%L) -> 'messages') m$q$, t.id('ben'), t.id('plan'))),
   'Who writes the copy? (-) | I can take it (-) | Drafted: copy/launch.md (Hermes) | Back on it (-) | Still room here (-) true');
@@ -475,7 +475,7 @@ select t.expect('read thread: the thread reads as it is listed',
   'true');
 select t.expect('read thread: a page at a time, after the last message read',
   t.run('cal', format($q$select jsonb_array_length(a -> 'messages') || ' ' || (a ->> 'more') || ' / '
-      || (select string_agg(m ->> 'body', ',') from jsonb_array_elements(public.read_thread(%1$L, (a -> 'messages' -> 1 ->> 'id')::bigint, 2) -> 'messages') m)
+      || (select string_agg(convert_from(decode(m ->> 'body', 'base64'), 'UTF8'), ',') from jsonb_array_elements(public.read_thread(%1$L, (a -> 'messages' -> 1 ->> 'id')::bigint, 2) -> 'messages') m)
       || ' / ' || (public.read_thread(%1$L, (a -> 'messages' -> 1 ->> 'id')::bigint, 3) ->> 'more')
     from public.read_thread(%1$L, null, 2) a$q$, t.id('plan'))),
   '2 true / Drafted: copy/launch.md,Back on it / false');
