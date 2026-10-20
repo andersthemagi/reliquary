@@ -715,6 +715,20 @@ cores, the crowd's calls mostly answered 429 from memory. Still well above
 the 24 ms without the crowd; the flags hint (#489) is the cost left that
 is known.
 
+**And the flags hint** (#489): `list_flags`' review part now looks up each
+open proposal's latest event through `log (proposal_id, seq)`, its
+watched part starts from the caller's subscriptions, and its thread part
+is skipped in a vault with no open thread. Each of them used to walk the
+log in `seq` order and filter by vault, reading every vault's entries.
+`flags_waiting`, 200 runs as Ana on this section's data shape (Big: 16,102
+log entries, 100 of Ben's proposals waiting; Small: 3 waiting): Big from
+12.2 ms to 0.48 ms median, Small from 2.9 ms to 0.21 ms, and the log rows
+one count reads in Big from 16,312 to 202. The 100-vault stage with the
+crowd: honest p50 23 ms, the same as without the crowd, p95 2,571 ms,
+Postgres at 2.3 cores. The p95 and the 187 errors left are the stage's
+first seconds, 700 connections asking at once ("All at once", above), and
+mostly the crowd's own.
+
 What a local run can't show is the hosted path's own: Netlify Functions'
 cold starts and how many instances they scale to, Supabase's real pooler
 and connection caps on the plan, and the network between them (#82).
@@ -741,4 +755,5 @@ and connection caps on the plan, and the network between them (#82).
    vault's paths, with an index on `log (proposal_id)` (none exists
    today), would bound it by the proposals.
    Change it in `list_flags` itself, where the rule lives, and measure
-   with the hint's table above. Issue #489.
+   with the hint's table above. Done 2026-10-20 (#489): see "After the
+   first fixes" under the simulated load test.
