@@ -137,9 +137,10 @@ function getSalt(): Promise<string> {
 
 // A token's tool calls against its grant, `threadWrites` of them counted
 // again as thread writes and `workRequests` as asking for work. The hash is
-// the token's SHA-256, as the database stores it. 0, or the seconds to
-// wait. Fails open.
-export async function limitToolCalls(tokenHash: string, calls: number, threadWrites = 0, workRequests = 0): Promise<number> {
+// the token's SHA-256, as the database stores it. 0, the seconds to wait,
+// or "unavailable" when the count couldn't be made: the caller fails open,
+// except for asking for work (busyWait).
+export async function limitToolCalls(tokenHash: string, calls: number, threadWrites = 0, workRequests = 0): Promise<number | "unavailable"> {
   if (calls < 1) return 0;
   const names: LimitName[] = ["mcp_token_minute", "mcp_token_day"];
   if (threadWrites > 0) names.push("mcp_thread_post_minute", "mcp_thread_post_day");
@@ -159,9 +160,17 @@ export async function limitToolCalls(tokenHash: string, calls: number, threadWri
     return wait;
   } catch (err) {
     unavailable(err);
-    return 0;
+    return "unavailable";
   }
 }
+
+// Asking for work with its count out of reach is told to wait instead of
+// going ahead uncounted: under overload the counts time out, and a crowd let
+// through then is what overloads the database further
+// (docs/research/server-load.md, "Waiting in line through the MCP server,
+// simulated"). Other tool calls still fail open. Spread over 5 to 15
+// seconds, so the agents told together don't come back together.
+export const busyWait = () => 5 + Math.floor(Math.random() * 11);
 
 // Tokens whose single call was refused, until that limit's window ends: the
 // same shortcut as `blocked` below, so a crowd ignoring its 429s stops
@@ -245,6 +254,7 @@ export async function limitUnauthorized(ip: string): Promise<number> {
 
 // The answer over a limit: 429, Retry-After, and a JSON-RPC error that tells
 // the agent to wait. Short, and nothing about what was counted or how.
+// Busy uses the same code: either way the agent's next step is to wait.
 const RATE_LIMITED_CODE = -32029;
 export function rateLimitedBody(wait: number, id: unknown = null): object {
   // The error model's where and reference (failure.ts), logged like any failure.
@@ -255,6 +265,21 @@ export function rateLimitedBody(wait: number, id: unknown = null): object {
     error: {
       code: RATE_LIMITED_CODE,
       message: `Rate limit reached. Wait ${wait} seconds, then retry.`,
+      data: { retry_after: wait, where: f.where, ref: f.ref },
+    },
+  };
+}
+
+// The answer when asking for work couldn't be counted: 503, Retry-After,
+// and the same JSON-RPC error to wait as a rate limit, saying why.
+export function busyBody(wait: number, id: unknown = null): object {
+  const f = failure({ status: 503, where: "rate limit", why: `The database is too busy to count asking for work; retry after ${wait} seconds`, code: "busy" });
+  return {
+    jsonrpc: "2.0",
+    id: typeof id === "string" || typeof id === "number" ? id : null,
+    error: {
+      code: RATE_LIMITED_CODE,
+      message: `Reliquary is busy. Wait ${wait} seconds, then ask for work again.`,
       data: { retry_after: wait, where: f.where, ref: f.ref },
     },
   };

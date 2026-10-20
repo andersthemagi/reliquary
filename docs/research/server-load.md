@@ -567,9 +567,14 @@ docs/public/reference/limits.md ("Rate limits").
   open under it is #487's open question.
 - **Failing.** Sign-in (asking for a code, entering one, opening a link)
   fails closed: 503, "Sign-in is unavailable", since guessing a 6-digit
-  code is what the limit is for. Everything else fails open with a log
-  line (`rate limit unavailable`), since it needs the same database
-  anyway.
+  code is what the limit is for. Asking for work over MCP (`request_work`,
+  `claim_step`) is told to wait instead (2026-10-20, #487): 503, a
+  `Retry-After` of 5 to 15 seconds at random, and the JSON-RPC error to
+  wait, "Reliquary is busy". Under overload the counts time out, and the
+  simulated load test found a crowd let through uncounted then is what
+  kept the database overloaded; the spread keeps the agents told together
+  from coming back together. Everything else fails open with a log line
+  (`rate limit unavailable`), since it needs the same database anyway.
 - **Client IP.** On Vercel, `x-real-ip` (else the first `x-forwarded-for`
   entry): Vercel's edge sets both and overwrites what the client sent.
   That holds only while nothing sits in front of Vercel; a CDN or proxy in

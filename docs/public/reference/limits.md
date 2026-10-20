@@ -146,7 +146,7 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 
 Once a token or connection is refused over MCP, the server that refused it keeps refusing its calls under that limit until the window ends, without counting them again. Calls under other limits, such as tools other than `request_work` after asking for work is spent, still go through.
 
-Addresses and emails are never stored: each is counted under a keyed hash that can't be turned back into the address. An IPv6 address counts by its /64. If the counters can't be reached, sign-in stops and says it is unavailable, so codes can't be guessed while they are down; everything else carries on without limits.
+Addresses and emails are never stored: each is counted under a keyed hash that can't be turned back into the address. An IPv6 address counts by its /64. If the counters can't be reached, sign-in stops and says it is unavailable, so codes can't be guessed while they are down. Asking for work over MCP (`request_work`, `claim_step`) is answered "Reliquary is busy. Wait N seconds, then ask for work again.", with N between 5 and 15, the same JSON-RPC error a rate limit gives (code -32029) and status 503 with `Retry-After`. Everything else carries on without limits.
 
 
 ### What asking for work costs
