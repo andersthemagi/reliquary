@@ -19,11 +19,14 @@
 #   scripts/netlify-env.sh mcp https://app.reliquary.redmage.cc https://mcp.reliquary.redmage.cc
 #
 # The web app also needs SUPABASE_PUBLISHABLE_KEY, from the Supabase dashboard
-# (Project Settings -> API Keys); it is printed as a placeholder. So is
-# RESEND_API_KEY (optional: vault invites by email; from Resend -> API Keys,
-# sending access only), with EMAIL_FROM, the sender on the verified domain
-# (docs/ops/runbook.md, "Email sender"). Leave both out to keep invites by
-# link only; with the placeholder left in, nothing is emailed.
+# (Project Settings -> API Keys), and RESEND_API_KEY (optional: vault invites
+# by email; from Resend -> API Keys, sending access only) with EMAIL_FROM, the
+# sender on the verified domain (docs/ops/runbook.md, "Email sender"). The
+# two keys are set by hand in Netlify and the file names them in a comment,
+# never as a line with a placeholder value: importing the whole file once
+# replaced the real publishable key with the placeholder and the web app
+# couldn't sign anyone in (v0.27.2's first deploy, 2026-10-19). Leave
+# RESEND_API_KEY out to keep invites by link only.
 #
 # LINK_PROXY_SECRET (mcp/'s own calls to the web app's internal
 # link-call endpoint, web/src/linkproxy.ts) comes from
@@ -157,11 +160,11 @@ ${site:+SITE_URL=$site
 MCP_RESOURCE=$mcp/mcp
 AUTH_MODE=supabase
 SUPABASE_URL=https://$ref.supabase.co
-SUPABASE_PUBLISHABLE_KEY=<from Supabase: Project Settings -> API Keys>
+# SUPABASE_PUBLISHABLE_KEY: set by hand, from Supabase: Project Settings -> API Keys
 JWT_ALG=ES256
 SESSION_SECRET=$(cat "$secret")
 LINK_PROXY_SECRET=$(cat "$link_secret")
-RESEND_API_KEY=<from Resend: API Keys, sending access only>
+# RESEND_API_KEY: set by hand, from Resend: API Keys, sending access only
 EMAIL_FROM=Reliquary <no-reply@mail.reliquary.redmage.cc>
 EMBED_URL=https://$ref.supabase.co/functions/v1/embed
 EMBED_SECRET=$(cat "$embed_secret")
@@ -185,4 +188,5 @@ EOF
 esac
 chmod 600 "$out"
 echo "Wrote $out (mode 600, gitignored). Names only:"
-cut -d= -f1 "$out" | sed "s/^/  /"
+grep -v '^#' "$out" | cut -d= -f1 | sed "s/^/  /"
+grep '^# [A-Z_]*: set by hand' "$out" | sed 's/^# \([A-Z_]*\):.*/  \1 (set by hand in Netlify; a comment in the file, so an import leaves it alone)/'

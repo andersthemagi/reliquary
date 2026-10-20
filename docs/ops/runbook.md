@@ -123,6 +123,14 @@ volume before buying more.
   never applied anywhere but CI, and is rewritten in place with a
   `Migration-never-applied:` trailer (`AGENTS.md`, Conventions) rather
   than fixed forward, because `supabase db push` retries the same file.
+- **Importing a `.env` file into Netlify writes every line in it.** On
+  2026-10-19, v0.27.2's first deploy failed its web smoke checks because a
+  whole-file import of `supabase/.netlify-web.env` had replaced the real
+  `SUPABASE_PUBLISHABLE_KEY` and `RESEND_API_KEY` with the placeholders the
+  script printed for them, and the web app could sign nobody in.
+  `scripts/netlify-env.sh` now names the hand-set keys in a comment, which
+  an import skips. After any import, check the variables the file doesn't
+  know against the dashboard before redeploying.
 - **Before merging a release PR, read its `CHANGELOG.md` as a person who
   wasn't in the room would.** release-please only ever emits the raw
   commit subject per entry; the release workflow then rewrites the pending
@@ -708,7 +716,7 @@ end of this section).
    Site configuration > Environment variables, add `RESEND_API_KEY` = the
    `reliquary-web` key (secret) and `EMAIL_FROM` =
    `Reliquary <no-reply@mail.reliquary.redmage.cc>`. `scripts/netlify-env.sh web ...`
-   lists both (the key as a placeholder). Never in `reliquary-mcp`. Then
+   names both (the key in a comment, set by hand). Never in `reliquary-mcp`. Then
    redeploy the live release (see "Redeploy or roll back").
 9. **Check**: sign out and sign in with a code (the email comes from
    `no-reply@mail.reliquary.redmage.cc`, and Resend > Emails lists it). Then invite

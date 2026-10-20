@@ -70,6 +70,16 @@ t "the env file is mode 600" mode_is "$env_file" 600
 t "only names are printed, never the password" test "$(grep -cF "$fake_pw" <<< "$out" || true)" = 0
 t "the names printed include DATABASE_URL" grep -qx '  DATABASE_URL' <<< "$out"
 
+fresh
+printf '%s\n' "$fake_pw" > "$repo/supabase/.web-db-password"
+run web https://app.example.test https://mcp.example.test
+env_file=$repo/supabase/.netlify-web.env
+t "web's file has no line that would overwrite the publishable key or the Resend key on import" \
+  test "$(grep -cE '^(SUPABASE_PUBLISHABLE_KEY|RESEND_API_KEY)=' "$env_file" || true)" = 0
+t "web's file names both keys in a comment as set by hand" \
+  test "$(grep -cE '^# (SUPABASE_PUBLISHABLE_KEY|RESEND_API_KEY): set by hand' "$env_file" || true)" = 2
+t "the names printed say the publishable key is set by hand" grep -qF 'SUPABASE_PUBLISHABLE_KEY (set by hand' <<< "$out"
+
 if [ $fails = 0 ]; then
   echo "netlify-env.test: all passed"
 else
