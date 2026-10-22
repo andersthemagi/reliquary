@@ -45,8 +45,9 @@ create function t.hits(p_vault text) returns bigint language sql as $$
 $$;
 create function t.fill(p_vault text) returns void language sql as $$
   insert into private.rate_limits (bucket, key, window_start, expires_at, hits)
-  select 'vault_request_work_minute', t.key(p_vault), to_timestamp(w), to_timestamp(w + 60), (select per_minute from private.request_budget)
-    from (select floor(extract(epoch from clock_timestamp()) / 60) * 60 + k * 60 as w from generate_series(0, 1) k) x
+  select 'vault_request_work_minute', t.key(p_vault), w, w + interval '60 seconds', (select per_minute from private.request_budget)
+    from (select private.rate_limit_window_start(t.key(p_vault), 60, extract(epoch from clock_timestamp())) + k * interval '60 seconds' as w
+            from generate_series(0, 1) k) x
   on conflict (bucket, key, window_start) do update set hits = excluded.hits
 $$;
 -- A refusal's message, as p_user.

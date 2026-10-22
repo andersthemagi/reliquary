@@ -120,7 +120,7 @@ Every tool argument has a ceiling; they are in [MCP tools](mcp-tools.md).
 
 ## Rate limits
 
-How many requests Reliquary takes in a window of time. Counts are shared by every server, so they hold however requests are spread. A request over a limit is refused with status 429 and a `Retry-After` header giving the seconds to wait; a refused request doesn't count. Web pages say when to try again; the MCP endpoint answers with a JSON-RPC error that says how long to wait.
+How many requests Reliquary takes in a window of time. Counts are shared by every server, so they hold however requests are spread. A request over a limit is refused with status 429 and a `Retry-After` header giving the seconds to wait; a refused request doesn't count. Web pages say when to try again; the MCP endpoint answers with a JSON-RPC error that says how long to wait. Windows are fixed, but each counter's windows start at its own second past the minute rather than on the minute, so counters over a limit don't all reset together. `Retry-After` is always the end of your own window.
 
 | What | Limit |
 |---|---|

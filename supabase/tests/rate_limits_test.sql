@@ -123,13 +123,57 @@ select t.expect('count: several buckets in one call; one refusing refuses the re
   || ',' || t.hits('multi_email', t.sha('victim@')) || ',' || t.hits('multi_ip', t.sha('ip1')),
   '0,0,true,2,2');
 
+-- The second of the minute a key's whole-minute windows start at
+-- (20261022110100_rate_limit_offset): its first 8 hex digits, mod 60.
+create function t.offset(p_key text) returns numeric language sql as
+$$ select (('x' || left(p_key, 8))::bit(32)::bigint % 60)::numeric $$;
+-- Seconds from now to the end of p_key's window of p_window seconds.
+create function t.left_in(p_key text, p_window int) returns int language sql as
+$$ select ceil(p_window - mod(extract(epoch from now())::numeric - t.offset(p_key), p_window))::int $$;
+
 create function t.two(p_key text) returns text language sql as $$
   select t.run_role('reliquary_web', format($q$select private.rate_limit_hit(array['wa','wb'], array[%L,%L], array[60,86400], array[1,1], array[1,1])$q$, p_key, p_key))
 $$;
 -- In one statement, so one transaction and one now().
 select t.expect('count: the Retry-After is the fullest refusing window''s end',
   t.two(t.sha('w')) || ',' || t.two(t.sha('w')),
-  '0,' || greatest(ceil(60 - mod(extract(epoch from now())::numeric, 60)), ceil(86400 - mod(extract(epoch from now())::numeric, 86400)))::int);
+  '0,' || greatest(t.left_in(t.sha('w'), 60), t.left_in(t.sha('w'), 86400)));
+
+-- ---------------------------------------------------------------------------
+-- Offsets: each key's windows start at its own second of the minute
+
+-- Two keys whose offsets differ: the keys of 'o' || n for the first two n
+-- with different offsets.
+create table t.okeys as
+  select k from (select t.sha('o' || n) as k from generate_series(1, 60) n) x
+   where t.offset(k) <> t.offset(t.sha('o1')) limit 1;
+insert into t.okeys values (t.sha('o1'));
+
+create function t.over(p_key text, p_window int) returns text language sql as $$
+  select t.run_role('reliquary_mcp', format($q$select private.rate_limit_hit(array['ofs'], array[%L], array[%s], array[1], array[1])$q$, p_key, p_window))
+$$;
+
+-- In one statement, so one now().
+select t.expect('offset: a refusal''s Retry-After is the key''s own window end, at its offset in the minute',
+  (select string_agg(t.over(k, 60) || ',' || t.over(k, 60), ';' order by k) from t.okeys),
+  (select string_agg('0,' || t.left_in(k, 60), ';' order by k) from t.okeys));
+
+select t.expect('offset: two keys'' windows end at different seconds of the minute',
+  (select count(distinct extract(second from expires_at)) from private.rate_limits r join t.okeys o on o.k = r.key where r.bucket = 'ofs')::text,
+  '2');
+
+select t.over(t.sha('hour'), 3600), t.over(t.sha('day'), 86400), t.over(t.sha('short'), 7);
+
+select t.expect('offset: a window lasts as long as before, an hour or a day, and starts at its key''s offset',
+  (select string_agg(extract(epoch from expires_at - window_start)::int || ':'
+            || (mod(extract(epoch from window_start)::numeric, 60) = t.offset(key))::text, ',' order by expires_at - window_start)
+     from private.rate_limits where bucket = 'ofs' and key in (t.sha('hour'), t.sha('day'))),
+  '3600:true,86400:true');
+
+select t.expect('offset: a window that isn''t whole minutes starts on its multiple, as before',
+  (select (window_start = to_timestamp(floor(extract(epoch from now()) / 7) * 7))::text
+     from private.rate_limits where bucket = 'ofs' and key = t.sha('short')),
+  'true');
 
 -- ---------------------------------------------------------------------------
 -- Tokens: counted against the grant

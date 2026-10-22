@@ -102,7 +102,9 @@ test("rate limits: tool calls per token per day: past the day's 5, Retry-After w
   for (let i = 0; i < 2; i++) assert.equal((await call(tok)).status, 200);
   const wait = await limited(await call(tok), { max: 86400, rpcId: id });
   const toMidnight = 86400 - (Math.floor(Date.now() / 1000) % 86400);
-  assert.ok(Math.abs(wait - toMidnight) <= 2, `waits for the day's end (${wait} s, ${toMidnight} s to midnight UTC)`);
+  // The token's day starts at its own second past midnight UTC (0 to 59 s).
+  const past = (((wait - toMidnight) % 86400) + 86400) % 86400;
+  assert.ok(past <= 61 || past >= 86398, `waits for the day's end (${wait} s, ${toMidnight} s to midnight UTC)`);
 });
 
 test("rate limits: tool calls per token: a batch counts each call, another token is unaffected, and listing tools isn't counted", async () => {
