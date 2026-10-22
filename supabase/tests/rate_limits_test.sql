@@ -1,7 +1,8 @@
 -- Hostile tests for 20260925200000_rate_limits: nobody but the apps' roles
 -- counts, nobody reads or resets a counter, a key is never a raw address,
 -- the limit and its Retry-After, a refused request counting nothing, a
--- token's grant as its key, and pruning.
+-- token's grant as its key, pruning, and (20261022110000_rate_limit_person)
+-- a person's tokens counted together.
 
 -- A call of private.rate_limit_hit as SQL text, one bucket.
 create function t.hit(p_bucket text, p_key text, p_window int, p_limit int, p_cost int default 1) returns text
@@ -193,3 +194,55 @@ select t.expect('prune: ended windows go, open ones stay',
 select t.expect('prune: without pg_cron here the job isn''t found, so hits prune now and then',
   private.rate_limits_pruned_by_cron()::text,
   'false');
+
+-- ---------------------------------------------------------------------------
+-- People: one count across all their tokens (20261022110000_rate_limit_person)
+
+insert into t.raw select 'ana1', t.run('ana', $q$select public.create_access_token('p1', 30)$q$);
+insert into t.raw select 'ana2', t.run('ana', $q$select public.create_access_token('p2', 30)$q$);
+insert into t.raw select 'ben1', t.run('ben', $q$select public.create_access_token('p3', 30)$q$);
+
+-- One call: the token's own bucket (limit p_tok) and the person's (limit
+-- p_person). Answers "wait/person".
+create function t.rate_person(p_raw text, p_tok int, p_person int, p_role text default 'reliquary_mcp') returns text language sql as $$
+  select t.run_role(p_role, format($q$select o_wait || '/' || o_person from private.rate_limit_token_and_person(%L,
+      array['ptok_minute'], array[3600], array[%s], array[1], array['pperson_minute'], array[3600], array[%s], array[1])$q$,
+    t.sha((select value from t.raw where name = p_raw)), p_tok, p_person))
+$$;
+
+select t.expect('person: a person''s tokens share one count: past it, any of their tokens is refused and the refusal is the person''s',
+  t.rate_person('ana1', 10, 3) || ',' || t.rate_person('ana2', 10, 3) || ',' || t.rate_person('ana1', 10, 3)
+  || ',' || (t.rate_person('ana2', 10, 3) ~ '^[1-9][0-9]*/true$')::text
+  || ',' || (t.rate_person('ana1', 10, 3) ~ '^[1-9][0-9]*/true$')::text,
+  '0/false,0/false,0/false,true,true');
+
+select t.expect('person: another person''s tokens have a count of their own',
+  t.rate_person('ben1', 10, 3),
+  '0/false');
+
+select t.expect('person: a refused call counts nothing, against the person or the token',
+  t.hits('pperson_minute', encode(sha256(convert_to('person:' || t.id('ana')::text, 'UTF8')), 'hex'))
+  || ',' || t.hits('ptok_minute', encode(sha256(convert_to('grant:' || (select id from public.access_tokens
+       where token_hash = t.sha((select value from t.raw where name = 'ana2')))::text, 'UTF8')), 'hex')),
+  '3,1');
+
+select t.expect('person: a token past its own limit is refused, and the refusal isn''t the person''s',
+  t.rate_person('ben1', 2, 100) || ',' || (t.rate_person('ben1', 2, 100) ~ '^[1-9][0-9]*/false$')::text,
+  '0/false,true');
+
+-- Ana's personal token from the tokens section, revoked there; her person
+-- count is already past 1.
+select t.expect('person: a revoked token counts nothing against its person',
+  t.rate_person('pat', 1, 1) || ',' || t.rate_person('pat', 1, 1),
+  '0/false,0/false');
+
+select t.expect('person: people, agents, anonymous callers and the web app can''t count for a person',
+  t.run('ana', format($q$select o_wait from private.rate_limit_token_and_person(%L, '{}', '{}', '{}', '{}', array['p'], array[60], array[5], array[1])$q$, t.sha('x')))
+  || ',' || t.run('ana', format($q$select o_wait from private.rate_limit_token_and_person(%L, '{}', '{}', '{}', '{}', array['p'], array[60], array[5], array[1])$q$, t.sha('x')), 'Claude')
+  || ',' || t.run(null, format($q$select o_wait from private.rate_limit_token_and_person(%L, '{}', '{}', '{}', '{}', array['p'], array[60], array[5], array[1])$q$, t.sha('x')))
+  || ',' || t.rate_person('ana1', 10, 3, 'reliquary_web'),
+  'ERR 42501,ERR 42501,ERR 42501,ERR 42501');
+
+select t.expect_true('person: the person count pins its search_path',
+  (select p.proconfig @> array['search_path=""'] from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private' and p.proname = 'rate_limit_token_and_person'));

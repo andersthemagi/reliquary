@@ -20,7 +20,7 @@ import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { pool, recordClient, resolveOAuthToken, resolveToken, Session, tokenRef, type Identity } from "./db.js";
-import { clientIp, configureRateLimits, knownBlocked, knownLimited, limitToolCalls, limitUnauthorized, rateLimitedBody, busyBody, busyWait, THREAD_WRITES, WORK_REQUESTS } from "./ratelimit.js";
+import { clientIp, configureRateLimits, knownBlocked, knownLimited, limitToolCalls, noteOwner, limitUnauthorized, rateLimitedBody, busyBody, busyWait, THREAD_WRITES, WORK_REQUESTS } from "./ratelimit.js";
 import { needsLinkTools, registerTools } from "./tools.js";
 import { INSTRUCTIONS } from "./tools-shared.js";
 import { configureLinkProxy } from "./linkproxy.js";
@@ -376,6 +376,7 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
     await unauthorized();
     return;
   }
+  if (calls) noteOwner(ref.hash, identity.userId);
   if (wait === "unavailable" && workRequests) {
     await session?.close();
     const busy = busyWait();

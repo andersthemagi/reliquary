@@ -1,7 +1,8 @@
 // Rate limits on the MCP endpoint (src/ratelimit.ts,
 // supabase/migrations/20260925200000_rate_limits.sql), against mcp/test.sh's
 // rate-limit server: 3 tool calls per 2-second window and 5 a day per token,
-// 1 thread write and 1 request for work per window, 3 401s a minute per
+// 1 thread write and 1 request for work per window, per person across their
+// tokens 5 tool calls and 2 requests for work per window, 3 401s a minute per
 // address, addresses from x-real-ip. Each test makes its own person's tokens (in the database, as
 // the Tokens page does) and sends from addresses of its own (documentation
 // ranges; test.sh checks none reaches the log).
@@ -29,7 +30,10 @@ async function sql(q, params = []) {
 }
 
 // A personal token for a fresh person with a vault of their own.
-async function token() {
+const token = async () => (await tokens(1))[0];
+
+// `count` personal tokens for one fresh person with a vault of their own.
+async function tokens(count) {
   const user = `00000000-0000-4000-8000-${randomBytes(6).toString("hex")}`;
   const db = new pg.Client({ connectionString: SUPER });
   await db.connect();
@@ -38,9 +42,10 @@ async function token() {
     await db.query("set local role authenticated");
     await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: user, role: "authenticated" })]);
     await db.query("select public.create_vault($1)", [`Rate ${user.slice(-6)}`]);
-    const { rows } = await db.query("select public.create_access_token('Rate limits', 7) as t");
+    const made = [];
+    for (let i = 0; i < count; i++) made.push((await db.query("select public.create_access_token($1, 7) as t", [`Rate limits ${i}`])).rows[0].t);
     await db.query("commit");
-    return rows[0].t;
+    return made;
   } finally {
     await db.end();
   }
@@ -161,6 +166,42 @@ test("rate limits: my_places counts only against the tool call limit, so it stil
   assert.equal(r.status, 200);
 });
 
+test("rate limits: tool calls per person: a person's tokens share one count, so past it each of their tokens is refused, and another person's token is unaffected", async () => {
+  const [a, b] = await tokens(2);
+  const other = await token();
+  await nextWindow();
+  for (let i = 0; i < 3; i++) assert.equal((await call(a)).status, 200);
+  for (let i = 0; i < 2; i++) assert.equal((await call(b)).status, 200);
+  await limited(await call(b), { max: 2, rpcId: id });
+  assert.equal((await call(other)).status, 200);
+});
+
+test("rate limits: asking for work per person: past it request_work is refused from any of their tokens, and their other tool calls still go through", async () => {
+  const [a, b, c] = await tokens(3);
+  const ask = (tok) =>
+    rpc({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name: "request_work", arguments: { vault: "Nowhere", path: "plan.md", key: "a" } } }, { tok });
+  await nextWindow();
+  assert.equal((await ask(a)).status, 200);
+  assert.equal((await ask(b)).status, 200);
+  await limited(await ask(c), { max: 2, rpcId: id });
+  assert.equal((await call(c)).status, 200, "the refused request counted nothing against the person's tool calls");
+});
+
+test("rate limits: tool calls per person: once the person is refused, the instance refuses their other tokens it has seen from memory until the window ends, without asking the database", async () => {
+  const [a, b, c] = await tokens(3);
+  await nextWindow();
+  for (let i = 0; i < 2; i++) assert.equal((await call(a)).status, 200);
+  for (let i = 0; i < 2; i++) assert.equal((await call(b)).status, 200);
+  assert.equal((await call(c)).status, 200);
+  // a's own count is 2 of 3: this refusal is the person's.
+  await limited(await call(a), { max: 2, rpcId: id });
+  // Revoked now: the database would answer 401, so a 429 is the instance's memory.
+  await sql("update public.access_tokens set revoked_at = now() where token_hash = $1", [createHash("sha256").update(b).digest("hex")]);
+  const wait = await limited(await call(b), { max: 2, rpcId: id });
+  await new Promise((r) => setTimeout(r, wait * 1000 + 100));
+  assert.equal((await call(b)).status, 401, "the memory ends with the window");
+});
+
 test("rate limits: 401s per address: the 4th request without a live token from one address is a 429; other addresses still get 401", async () => {
   const from = addr();
   const bogus = `rlq_${"0".repeat(64)}`;
@@ -184,12 +225,12 @@ test("rate limits: IPv6 addresses count by their /64", async () => {
 
 test("rate limits: with the counter out of reach, tool calls go through (fail open)", async () => {
   const tok = await token();
-  await sql("revoke execute on function private.rate_limit_token(text, text[], int[], int[], int[]) from reliquary_mcp");
+  await sql("revoke execute on function private.rate_limit_token_and_person(text, text[], int[], int[], int[], text[], int[], int[], int[]) from reliquary_mcp");
   try {
     await nextWindow();
     for (let i = 0; i < 6; i++) assert.equal((await call(tok)).status, 200);
   } finally {
-    await sql("grant execute on function private.rate_limit_token(text, text[], int[], int[], int[]) to reliquary_mcp");
+    await sql("grant execute on function private.rate_limit_token_and_person(text, text[], int[], int[], int[], text[], int[], int[], int[]) to reliquary_mcp");
   }
 });
 
@@ -197,7 +238,7 @@ test("rate limits: with the counter out of reach, asking for work is told Reliqu
   const tok = await token();
   const ask = (name) =>
     rpc({ jsonrpc: "2.0", id: ++id, method: "tools/call", params: { name, arguments: { vault: "Nowhere", path: "plan.md", key: "a" } } }, { tok });
-  await sql("revoke execute on function private.rate_limit_token(text, text[], int[], int[], int[]) from reliquary_mcp");
+  await sql("revoke execute on function private.rate_limit_token_and_person(text, text[], int[], int[], int[], text[], int[], int[], int[]) from reliquary_mcp");
   try {
     for (const name of ["request_work", "claim_step"]) {
       const r = await ask(name);
@@ -214,7 +255,7 @@ test("rate limits: with the counter out of reach, asking for work is told Reliqu
     }
     assert.equal((await call(tok)).status, 200, "a tool call that isn't asking for work fails open");
   } finally {
-    await sql("grant execute on function private.rate_limit_token(text, text[], int[], int[], int[]) to reliquary_mcp");
+    await sql("grant execute on function private.rate_limit_token_and_person(text, text[], int[], int[], int[], text[], int[], int[], int[]) to reliquary_mcp");
   }
 });
 

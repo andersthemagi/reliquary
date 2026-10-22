@@ -138,13 +138,14 @@ How many requests Reliquary takes in a window of time. Counts are shared by ever
 | MCP tool calls | 120 a minute and 10000 a day per token or connection; a batch counts each call; listing tools and starting a session don't count |
 | Opening threads and posting in them over MCP (`open_thread`, `post_message`) | 20 a minute and 300 a day per token or connection, counted within the tool call limit above |
 | Asking for work over MCP (`request_work`, and `claim_step`) | 30 a minute per token or connection, counted within the tool call limit above |
+| MCP tool calls and asking for work, per person | 1200 tool calls and 120 requests for work (`request_work`, `claim_step`) a minute per person, across all their tokens and connections together, counted on top of the limits above. Connect as many agents as you like: their calls share this count |
 | Asking for work, everyone in a vault together | 300 a minute per vault, counted in the database. Over it, `request_work` answers `wait` with the seconds to come back and `claim_step` is refused saying when; see [What asking for work costs](#what-asking-for-work-costs) |
 | MCP requests without a valid token | 30 a minute per IP address |
 | The env API (the CLI) | 60 a minute and 5000 a day per Reliquary CLI connection |
 
 "Per app" counts every person's use of one app together (one client id). "Per token or connection" counts a personal token, or an OAuth connection across its hourly access tokens.
 
-Once a token or connection is refused over MCP, the server that refused it keeps refusing its calls under that limit until the window ends, without counting them again. Calls under other limits, such as tools other than `request_work` after asking for work is spent, still go through.
+Once a token or connection is refused over MCP, the server that refused it keeps refusing its calls under that limit until the window ends, without counting them again. When the refusal was the person's limit, that server refuses the person's other tokens and connections it has already seen the same way. Calls under other limits, such as tools other than `request_work` after asking for work is spent, still go through.
 
 Addresses and emails are never stored: each is counted under a keyed hash that can't be turned back into the address. An IPv6 address counts by its /64. If the counters can't be reached, sign-in stops and says it is unavailable, so codes can't be guessed while they are down. Asking for work over MCP (`request_work`, `claim_step`) is answered "Reliquary is busy. Wait N seconds, then ask for work again.", with N between 5 and 15, the same JSON-RPC error a rate limit gives (code -32029) and status 503 with `Retry-After`. Everything else carries on without limits.
 

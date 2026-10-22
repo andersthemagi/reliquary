@@ -20,6 +20,12 @@
 //    An agent told to wait that asks again at once is answered cheaply by
 //    the database, but it is still a request; this keeps a careless one
 //    from costing everyone.
+//  - Per person, tool calls and asking for work a minute, across all their
+//    tokens, inside the same count (private.rate_limit_token_and_person,
+//    20261022110000_rate_limit_person.sql). A person may connect as many
+//    agents as they like; their calls count together, so many tokens are
+//    no more allowance than one person's (issue #487: 500 connections
+//    asking at once each got their own 30 before any was refused).
 //  - Per address, for requests answered 401 (no token, or one that isn't
 //    live): HMAC-SHA256 of the address under the database's salt
 //    (private.rate_limit_salt()); never the address itself, in the
@@ -56,6 +62,8 @@ export const DEFAULT_LIMITS = {
   mcp_thread_post_minute: { limit: 20, window: 60 }, // thread writes per token (grant)
   mcp_thread_post_day: { limit: 300, window: 86400 },
   mcp_request_work_minute: { limit: 30, window: 60 }, // asking for work per token (grant)
+  mcp_person_minute: { limit: 1200, window: 60 }, // tool calls per person, all their tokens
+  mcp_person_request_work_minute: { limit: 120, window: 60 }, // asking for work per person: 20 agents at the 10 s floor
 } satisfies Record<string, Limit>;
 
 // The tools whose calls also count as thread writes.
@@ -135,28 +143,35 @@ function getSalt(): Promise<string> {
   return salt;
 }
 
-// A token's tool calls against its grant, `threadWrites` of them counted
-// again as thread writes and `workRequests` as asking for work. The hash is
-// the token's SHA-256, as the database stores it. 0, the seconds to wait,
-// or "unavailable" when the count couldn't be made: the caller fails open,
-// except for asking for work (busyWait).
+// A token's tool calls against its grant and its person, `threadWrites` of
+// them counted again as thread writes and `workRequests` as asking for
+// work. The hash is the token's SHA-256, as the database stores it. 0, the
+// seconds to wait, or "unavailable" when the count couldn't be made: the
+// caller fails open, except for asking for work (busyWait).
 export async function limitToolCalls(tokenHash: string, calls: number, threadWrites = 0, workRequests = 0): Promise<number | "unavailable"> {
   if (calls < 1) return 0;
   const names: LimitName[] = ["mcp_token_minute", "mcp_token_day"];
   if (threadWrites > 0) names.push("mcp_thread_post_minute", "mcp_thread_post_day");
   if (workRequests > 0) names.push("mcp_request_work_minute");
+  const person: LimitName[] = workRequests > 0 ? ["mcp_person_minute", "mcp_person_request_work_minute"] : ["mcp_person_minute"];
+  const cost = (n: LimitName) => (n.startsWith("mcp_thread_") ? threadWrites : n.endsWith("request_work_minute") ? workRequests : calls);
   try {
-    const { rows } = await pool.query("select private.rate_limit_token($1, $2, $3, $4, $5) as wait", [
-      tokenHash,
-      names,
-      names.map((n) => LIMITS[n].window),
-      names.map((n) => LIMITS[n].limit),
-      names.map((n) => (n.startsWith("mcp_thread_") ? threadWrites : n === "mcp_request_work_minute" ? workRequests : calls)),
-    ]);
-    const wait = Number(rows[0]?.wait ?? 0);
+    const { rows } = await pool.query(
+      "select o_wait, o_person from private.rate_limit_token_and_person($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      [
+        tokenHash,
+        names, names.map((n) => LIMITS[n].window), names.map((n) => LIMITS[n].limit), names.map(cost),
+        person, person.map((n) => LIMITS[n].window), person.map((n) => LIMITS[n].limit), person.map(cost),
+      ],
+    );
+    const wait = Number(rows[0]?.o_wait ?? 0);
     // A refused call counts nothing, so only a refused single call shows a
     // count already at its limit: a refused batch may leave room for one.
-    if (wait && calls === 1) remember(limited, limitedKey(tokenHash, threadWrites > 0, workRequests > 0), wait);
+    if (wait && calls === 1) {
+      remember(limited, limitedKey(tokenHash, threadWrites > 0, workRequests > 0), wait);
+      const owner = owners.get(tokenHash);
+      if (rows[0]?.o_person && owner) remember(limited, personKey(owner, workRequests > 0), wait);
+    }
     return wait;
   } catch (err) {
     unavailable(err);
@@ -184,6 +199,20 @@ const limited = new Map<string, number>();
 const limitedKey = (tokenHash: string, threadWrite: boolean, workRequest: boolean) =>
   `${tokenHash}:${threadWrite ? "t" : ""}${workRequest ? "w" : ""}`;
 
+// A person refused, the same way: their tokens this instance has seen
+// (`owners`, learned as each token resolves) are refused from memory too, so
+// a person's crowd of connections costs the database one refusal, not one
+// per connection. A token not seen yet goes to the database once.
+const personKey = (userId: string, workRequest: boolean) => `person:${userId}:${workRequest ? "w" : ""}`;
+const owners = new Map<string, string>();
+
+// Called once a token resolves: whose it is, for the person shortcut.
+export function noteOwner(tokenHash: string, userId: string): void {
+  if (owners.get(tokenHash) === userId) return;
+  if (owners.size >= BLOCKED_MAX) owners.delete(owners.keys().next().value!);
+  owners.set(tokenHash, userId);
+}
+
 // Seconds this instance already knows the token must wait before a request
 // with these calls, else 0.
 export function knownLimited(tokenHash: string, threadWrites: number, workRequests: number): number {
@@ -191,6 +220,10 @@ export function knownLimited(tokenHash: string, threadWrites: number, workReques
   let wait = 0;
   for (const t of threadWrites > 0 ? [false, true] : [false]) {
     for (const w of workRequests > 0 ? [false, true] : [false]) wait = Math.max(wait, left(limited, limitedKey(tokenHash, t, w)));
+  }
+  const owner = owners.get(tokenHash);
+  if (owner) {
+    for (const w of workRequests > 0 ? [false, true] : [false]) wait = Math.max(wait, left(limited, personKey(owner, w)));
   }
   return wait;
 }
