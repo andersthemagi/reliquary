@@ -59,7 +59,11 @@ Everything runs in containers (podman or docker); no Node on the host.
   sanctioned exception is `delete_vault` (an owner, in person, typed name):
   it removes a whole vault for erasure and leaves a record in
   `private.vault_deletions`. Any new append-only table must let that path
-  through, and nothing else.
+  through, and nothing else. Content bodies (versions, proposal notes,
+  thread messages) have one more, owner's decision 2026-10-22 (#465):
+  `private.seal_content`, which only `reliquary_ops` can call, may swap a
+  plaintext or old-key body for its sealed form, with every other column
+  unchanged, so nothing readable is left in the database.
 - **Nothing becomes canon without a person.** Agents and routines write notes
   or proposals; people approve or write canon.
 - **A run is only `ok` with an artifact.** A run that reports nothing it
