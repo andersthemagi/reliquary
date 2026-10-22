@@ -900,10 +900,10 @@ The sample's first run, 2026-10-17: words 3 of 12 first, words and meaning
 | Secret | Where it lives | How to rotate | Effect |
 |---|---|---|---|
 | `reliquary_web` / `reliquary_mcp` DB passwords | `supabase/.web-db-password`, `.mcp-db-password`; Netlify `DATABASE_URL` | delete the file, run `scripts/set-role-passwords.sh`, run `scripts/netlify-env.sh <app> ...`, import the new `DATABASE_URL` into that Netlify site, redeploy | that app can't reach the database until redeployed |
-| `reliquary_ops` DB password (the operator's role, key rotation only) | `supabase/.ops-db-password`; nowhere else (not Netlify) | `scripts/set-role-passwords.sh ops-off` (nologin, file removed), then `scripts/set-role-passwords.sh ops` when next needed | only `rotate-variables-key.sh` uses it; nologin between rotations is fine |
+| `reliquary_ops` DB password (the operator's role, key rotation only) | `supabase/.ops-db-password`; nowhere else (not Netlify) | `scripts/set-role-passwords.sh ops-off` (nologin, file removed), then `scripts/set-role-passwords.sh ops` when next needed | only `rotate-variables-key.sh` and `seal-content.sh` use it; nologin between runs is fine |
 | `SESSION_SECRET` (web) | `supabase/.web-session-secret`; Netlify | delete the file, run `netlify-env.sh web ...`, update Netlify, redeploy | everyone is signed out of the web UI once; CLI and connectors unaffected |
 | `VARIABLES_KEYS` (web; formerly `VARIABLES_KEY`) | `supabase/.variables-keys-secret` (one `id:key` per line, current first; an older `.variables-secret` is taken over as `k1`); Netlify; password manager | [Rotating VARIABLES_KEY](#rotating-variables_key), below: add a key, deploy, re-encrypt, drop the old key, deploy | no downtime; losing a key before its values and link credentials are re-encrypted loses them |
-| `CONTENT_KEYS` (web and mcp, the same value on both) | `supabase/.content-keys-secret` (one `id:key` per line, current first, made by `netlify-env.sh`); Netlify (both sites); password manager | not yet: nothing is sealed under it until #238's backfill; then the same add, deploy, re-encrypt, drop cycle as `VARIABLES_KEYS` | both apps refuse to start without it on Netlify, so set it in both sites before deploying a release that has it |
+| `CONTENT_KEYS` (web and mcp, the same value on both) | `supabase/.content-keys-secret` (one `id:key` per line, current first, made by `netlify-env.sh`); Netlify (both sites); password manager | [Sealing content and rotating CONTENT_KEYS](#sealing-content-and-rotating-content_keys), below: the same add, deploy, re-encrypt, drop cycle as `VARIABLES_KEYS`, on both sites | both apps refuse to start without it on Netlify, so set it in both sites before deploying a release that has it |
 | `LINK_PROXY_SECRET` (web and mcp, the same value on both) | `supabase/.link-proxy-secret`; Netlify (both sites) | rewrite the file, `scripts/netlify-env.sh web ...` and `scripts/netlify-env.sh mcp ...`, redeploy both at once (a mismatch refuses every proxied link call with 401 until both are live) | proxied `<link>.<tool>` calls fail (401) between the two deploys; nothing else |
 | `EMBED_SECRET` (mcp, and the `embed` function) | `supabase/.embed-secret`; Netlify (`reliquary-mcp`); Supabase function secrets | delete the file, then steps 2, 3, 5 and 6 of "Search by meaning" (`netlify-env.sh embed`, the Supabase secret, the Netlify import for every context, a redeploy) | search answers by words, saying the two secrets differ, between the Supabase and Netlify steps; nothing else |
 | `postgres` password | `supabase/.db-password`; GitHub secret `SUPABASE_DB_PASSWORD` | reset in the dashboard, rewrite the file, `tr -d '[:space:]' < supabase/.db-password \| gh secret set SUPABASE_DB_PASSWORD` | migrations and backups need the new one |
@@ -917,9 +917,60 @@ that has it deploys: `scripts/netlify-env.sh web` and `scripts/netlify-env.sh
 mcp` make `supabase/.content-keys-secret` (one key, `c1`) the first time
 and put `CONTENT_KEYS` in both files; import both into Netlify, marked
 secret, then merge the release. Keep a copy of the key in the password
-manager: it must never equal a variables key (the web app refuses that),
-and until the backfill runs it seals nothing, so a wrong value costs a
-redeploy and nothing else.
+manager: it must never equal a variables key (the web app refuses that).
+Every write is sealed with it (since #484), so losing it loses that content:
+from then on it is changed only by rotating it, below.
+
+### Sealing content and rotating CONTENT_KEYS
+
+`scripts/seal-content.sh` seals every stored body (file text, proposed
+text, notes, thread messages, search vectors) under the current key of
+`CONTENT_KEYS`, as `reliquary_ops`, in batches of 100, each its own
+transaction. It prints counts and key ids, never a key or a body, so it is
+safe to run from a chat; never open the key files in one. It changes no
+version, author, time or feed entry. It can be stopped and run again at any
+point: what is sealed is skipped. It needs migration
+`20261022100000_seal_content.sql` applied (`scripts/db-push.sh --apply`),
+and step 0 of [Rotating VARIABLES_KEY](#rotating-variables_key) (the
+operator's role with a password).
+
+**When to run it:**
+
+- **Once, for the backfill** (#465): rows written before writes sealed are
+  still plain bytes, which the servers open as they are. After the release
+  with the migration deploys, run `scripts/seal-content.sh --check` (it says
+  `plaintext: N file versions, ...`), then `scripts/seal-content.sh`. Exit
+  0 ("Everything is on c1") means done.
+- **To rotate the content key:**
+  1. `scripts/netlify-env.sh new-content-key` adds `c2` (the next id) to
+     `supabase/.content-keys-secret` as the current key. Copy it into the
+     password manager, yourself.
+  2. `scripts/netlify-env.sh web ...` and `scripts/netlify-env.sh mcp ...`,
+     set `CONTENT_KEYS` in **both** Netlify sites (secret), redeploy both
+     and check both are up. New writes are now sealed with `c2`.
+  3. `scripts/seal-content.sh`: every body sealed under `c1` moves to `c2`.
+     Exit 0 means done.
+  4. Only after that: `scripts/netlify-env.sh drop-content-key c1`, then
+     both `netlify-env.sh` runs, both Netlify imports and both redeploys
+     again. `scripts/seal-content.sh --check` should still exit 0.
+
+**Checking nothing is left:** `scripts/seal-content.sh --check` exits 0 and
+says `Everything is on <current key>` only when no body is plaintext and
+none is under another key. It exits 1 with the count otherwise:
+
+- `No key for c1`: a stored body names a key the file lacks; put it back
+  (from the password manager) after the current key, and run it again.
+- `N changed meanwhile`: a body was edited, erased or redacted while the
+  run read it; run it again.
+- `N could not be decrypted with their key and stay as they are`: those
+  bodies were already unreadable (altered, or moved between vaults). Keep
+  their key, and find them by key id with `select content, key_id, n from
+  private.content_key_ids()` as `reliquary_ops`; it never shows a body.
+
+Each batch has the operator's 60 s statement timeout. A run that stops
+with `Failed: 57014` is resumed by running it again. Keep a retired key in
+the password manager until backups taken before the rotation have aged out
+(7 days on Supabase, 14 for `backup.sh`).
 
 ### Setting VARIABLES_KEYS the first time
 

@@ -67,13 +67,18 @@ echo "select test_support.roomy_free();" | psql >/dev/null
 # share a database with files that seal under keys of their own.
 psql -c "create database keys"
 ../supabase/tests/schema.sh | psql -d keys >/dev/null
+# Another for test/seal_content.test.mjs: the backfill seals every body in
+# its database.
+psql -c "create database sealing"
+../supabase/tests/schema.sh | psql -d sealing >/dev/null
 # A third for the rate-limit instance (test/rate_limits.test.mjs): counters
 # are shared by every instance on a database, and the other files sign in
 # as the same people from the same address.
 psql -c "create database ratelimits"
 ../supabase/tests/schema.sh | psql -d ratelimits >/dev/null
 echo "alter role reliquary_web login password 'test';" | psql
-# The operator's role, for test/variables_keys.test.mjs's re-encryption.
+# The operator's role, for the re-encryption in test/variables_keys.test.mjs
+# and test/seal_content.test.mjs.
 echo "alter role reliquary_ops login password 'test';" | psql
 seed=$(psql -A -t < test/seed.sql | grep '=')
 # Every server seals content under this key (src/content.ts); tests that read

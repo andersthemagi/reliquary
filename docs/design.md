@@ -31,7 +31,7 @@ the rules for working in the repo are in [AGENTS.md](../AGENTS.md).
 | 13 | [Links](#links) | Built |
 | 14 | [Routines](#routines) | Designed, not built |
 | 15 | [Environment variables](#environment-variables) | Built |
-| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461), the bytea columns and sealing writes (#462), search in the server (#463) and references from the writer (#464) are built; the backfill (#465) and dropping the plaintext path (#466) to come (#238) |
+| 16 | [Encryption at rest: the content key](#encryption-at-rest-the-content-key) | In progress: the key set and envelope (#461), the bytea columns and sealing writes (#462), search in the server (#463), references from the writer (#464) and the backfill (#465) are built; dropping the plaintext path (#466) to come (#238) |
 | 17 | [Continuity](#continuity) | Designed, not built |
 | 18 | [Client engagements](#client-engagements) | Designed, not built |
 | 19 | [Git mirror and export](#git-mirror-and-export) | Export built; the git mirror is designed |
@@ -1963,7 +1963,11 @@ of `search` moved up into the server that holds the key (built, #463:
    the text forms stay for the SQL tests until step 4).
 3. The backfill: `rekey.ts` extended, run as `reliquary_ops` (the role
    that serves no requests), in batches, sealing each plaintext row in
-   place and reporting counts only.
+   place and reporting counts only (built, #465: `scripts/seal-content.sh`
+   runs `web/src/seal-content.ts`; the same run reseals rows under a
+   retired key when `CONTENT_KEYS` rotates; the append-only tables let a
+   body be swapped for a sealed one, nothing else, inside the operator's
+   function only).
 4. The plaintext read path is dropped only after `scripts/restore-test.sh`
    has restored an encrypted backup taken after the backfill, and the
    guard then fails on any unsealed row.
