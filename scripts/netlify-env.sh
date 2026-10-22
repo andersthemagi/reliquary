@@ -44,6 +44,14 @@
 #   scripts/netlify-env.sh drop-variables-key <id> after re-encrypting; then `web`
 #   scripts/netlify-env.sh variables-keys          the key ids, current first
 #
+# The content keys (CONTENT_KEYS, both sites) rotate the same way, from
+# supabase/.content-keys-secret (docs/ops/runbook.md, "Sealing content and
+# rotating CONTENT_KEYS"); after each, run both `web` and `mcp`:
+#
+#   scripts/netlify-env.sh new-content-key         a new current key
+#   scripts/netlify-env.sh drop-content-key <id>   after scripts/seal-content.sh exits 0
+#   scripts/netlify-env.sh content-keys            the key ids, current first
+#
 # Search by meaning (docs/ops/runbook.md, "Search by meaning") only needs
 # its three variables, the same on both sites, and `web` and `mcp` rewrite
 # them all (with a new LINK_PROXY_SECRET if supabase/.link-proxy-secret is
@@ -69,6 +77,20 @@ case ${1:-} in
     ;;
   variables-keys)
     scripts/variables-keys.sh list
+    exit 0
+    ;;
+  new-content-key)
+    KEY_SET=content scripts/variables-keys.sh new
+    echo "Next: scripts/netlify-env.sh web ... and scripts/netlify-env.sh mcp ..., import CONTENT_KEYS into both Netlify sites and redeploy both. Then run scripts/seal-content.sh."
+    exit 0
+    ;;
+  drop-content-key)
+    KEY_SET=content scripts/variables-keys.sh drop "${2:?which key id to drop}"
+    echo "Next: scripts/netlify-env.sh web ... and scripts/netlify-env.sh mcp ..., import CONTENT_KEYS into both Netlify sites and redeploy both."
+    exit 0
+    ;;
+  content-keys)
+    KEY_SET=content scripts/variables-keys.sh list
     exit 0
     ;;
   embed)

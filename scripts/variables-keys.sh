@@ -19,12 +19,24 @@
 # The first time, a key from before rotation (supabase/.variables-secret,
 # the single VARIABLES_KEY, whose values carry id k1) is taken over as k1;
 # with none, a new k1 is made.
+#
+# With KEY_SET=content it keeps the content key set instead
+# (supabase/.content-keys-secret, ids c1, c2, ...; docs/ops/runbook.md,
+# "Sealing content and rotating CONTENT_KEYS"), which has no older key to
+# take over, and whose rotation script is scripts/seal-content.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
 
-file=supabase/.variables-keys-secret
-legacy=supabase/.variables-secret
+if [[ ${KEY_SET:-variables} == content ]]; then
+  file=supabase/.content-keys-secret
+  legacy=
+  prefix=c
+else
+  file=supabase/.variables-keys-secret
+  legacy=supabase/.variables-secret
+  prefix=k
+fi
 
 genkey() { head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n'; }
 ids() { cut -d: -f1 "$file"; }
@@ -32,12 +44,12 @@ show() { echo "Keys in $file (current first):"; ids | sed 's/^/  /'; }
 
 ensure() {
   if [[ ! -s $file ]]; then
-    if [[ -s $legacy ]]; then
+    if [[ -n $legacy && -s $legacy ]]; then
       printf 'k1:%s\n' "$(tr -d '[:space:]' < "$legacy")" > "$file"
       echo "Took over the key in $legacy as k1."
     else
-      printf 'k1:%s\n' "$(genkey)" > "$file"
-      echo "Made a new key k1."
+      printf '%s1:%s\n' "$prefix" "$(genkey)" > "$file"
+      echo "Made a new key ${prefix}1."
     fi
     chmod 600 "$file"
   fi
@@ -68,8 +80,8 @@ case ${1:-} in
     ;;
   new)
     ensure
-    n=$(ids | sed -n 's/^k\([0-9]\{1,9\}\)$/\1/p' | sort -n | tail -1)
-    id=k$((${n:-0} + 1))
+    n=$(ids | sed -n "s/^$prefix\\([0-9]\\{1,9\\}\\)\$/\\1/p" | sort -n | tail -1)
+    id=$prefix$((${n:-0} + 1))
     { printf '%s:%s\n' "$id" "$(genkey)"; cat "$file"; } | replace
     echo "Added $id; it is now the current key. Copy it from $file to your password manager yourself (never through a chat)."
     show
