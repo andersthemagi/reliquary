@@ -608,10 +608,25 @@ repo and out of any chat.
    curl -s "https://registry.modelcontextprotocol.io/v0.1/servers?search=cc.redmage/reliquary"
    ```
 
-For the next release, check out its tag and run step 3 again (a publish
-that says the token expired needs the login line again). A rotated key means a new TXT record and removing the old one, which
-the registry would otherwise try first and fail on. Publishing from the
-release workflow on each release is the rest of #241.
+For the next release, the `publish-mcp-registry` workflow publishes it
+itself. Store `MCP_PRIVATE_KEY` (the hex string the `openssl ... | tr`
+line in step 3 prints) on the `mcp-registry` environment (Settings >
+Secrets and variables > Actions > Environments > mcp-registry), not as a
+repo secret: the DNS private key can publish or overwrite any
+`cc.redmage/*` server, so scope it to that environment, restrict the
+environment to the default branch and release tags, and add a required
+reviewer only if you want a person to approve each publish. Until the
+secret is there the workflow skips with a notice on every release, so
+nothing publishes by accident; with `RELEASE_PLEASE_TOKEN` the release
+event starts it, and without it `release.yml` starts it itself, like the
+deploy. The workflow pins `mcp-publisher` to one version and checks its
+sha256, so bumping it is a deliberate change to the workflow.
+
+Steps 1 to 3 above are the first publish (run them once to confirm, or
+skip to the secret and let the next release do it) and the manual retry
+path: Actions > publish-mcp-registry > Run workflow on main, with the
+tag. A rotated key means a new TXT record and removing the old one,
+which the registry would otherwise try first and fail on.
 
 ## Feedback
 

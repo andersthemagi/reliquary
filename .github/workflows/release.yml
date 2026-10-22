@@ -122,6 +122,19 @@ jobs:
           gh workflow run publish-cli.yml -R "$GITHUB_REPOSITORY" --ref "$TAG"
           echo "CLI publish of $TAG started: Actions > publish-cli" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Start the MCP registry publish
+        # publish-mcp-registry.yml also runs on the release:published event
+        # itself with RELEASE_PLEASE_TOKEN; without it, nothing fires, so this
+        # starts it, like the deploy and CLI publish above. The workflow
+        # skips with a notice until MCP_PRIVATE_KEY is set (runbook).
+        if: steps.rp.outputs.release_created == 'true' && env.HAS_RELEASE_TOKEN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rp.outputs.tag_name }}
+        run: |
+          gh workflow run publish-mcp-registry.yml -R "$GITHUB_REPOSITORY" --ref main -f tag="$TAG"
+          echo "MCP registry publish of $TAG started: Actions > publish-mcp-registry" >> "$GITHUB_STEP_SUMMARY"
+
       - name: "Hotfix alert (a pushed commit carries a Hotfix: trailer)"
         if: github.event_name == 'push' && steps.rp.outputs.release_created != 'true'
         env:

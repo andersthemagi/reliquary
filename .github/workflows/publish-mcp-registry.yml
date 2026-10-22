@@ -1,0 +1,130 @@
+# Publishes the Reliquary entry (server.json at the repo root) to the
+# official MCP registry (registry.modelcontextprotocol.io) for a product
+# release vX.Y.Z. The entry itself is in the repo; release-please bumps its
+# version with version.txt (release-please-config.json, extra-files) and
+# web/test/docs.test.mjs ("mcp registry:") keeps its MCP URL, docs URL and
+# description tied to the docs. This workflow only does the publish the
+# registry's API requires: it takes no pull requests, so metadata is
+# published from this repo with the mcp-publisher CLI. How to set it up, and
+# the manual first publish / retry path, are in docs/ops/runbook.md,
+# "The MCP registry". Part of #235.
+#
+# The name cc.redmage/reliquary is a domain (reverse-DNS) namespace, so the
+# only auth that can publish it is DNS: an Ed25519 keypair whose public half
+# is a TXT record at the apex of redmage.cc, whose private half is the
+# MCP_PRIVATE_KEY secret. GitHub OIDC or a PAT authorize only io.github.*/*
+# and cannot publish cc.redmage/*. Versions are immutable in the registry,
+# so each release publishes a new one, never overwriting.
+#
+# Runs when a product release (tag vX.Y.Z, not cli-v...) is published, by
+# release-please with RELEASE_PLEASE_TOKEN or by a person; and release.yml
+# starts it without that token (a release made with GITHUB_TOKEN triggers no
+# workflow), or a person does: Actions > publish-mcp-registry > Run workflow
+# on main, with the tag. server.json's version already matches the tag
+# (release-please and the drift test), so the publish is `mcp-publisher
+# publish` at the tagged checkout.
+#
+# Skips with a notice until MCP_PRIVATE_KEY is set (the owner's one-time DNS
+# proof, runbook). It is on the mcp-registry environment, so add or rotate it
+# there; the only secret, it is set or absent.
+name: publish-mcp-registry
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (vX.Y.Z). CLI tags publish nothing
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mcp-registry
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v'))
+    environment:
+      name: mcp-registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Which release
+        id: tag
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          if ! [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::not a product release tag: '$TAG' (want vX.Y.Z); CLI tags publish nothing"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: MCP_PRIVATE_KEY is set
+        # DNS is the only auth for cc.redmage/*; until the owner completes the
+        # one-time proof and stores MCP_PRIVATE_KEY on this environment, there
+        # is nothing to publish. Runs anyway (so the release records it
+        # skipped), like deploy's stages that skip with a notice.
+        id: key
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$MCP_PRIVATE_KEY" ]; then
+            echo "::notice::skipping MCP registry publish: MCP_PRIVATE_KEY is not set on the mcp-registry environment (docs/ops/runbook.md, \"The MCP registry\")"
+            echo "has=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "has=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout the tagged release
+        if: steps.key.outputs.has == '1'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: server.json version matches the tag
+        if: steps.key.outputs.has == '1'
+        run: |
+          want="${{ steps.tag.outputs.tag }}"
+          want="${want#v}"
+          have=$(jq -r .version server.json)
+          if [ "$have" != "$want" ]; then
+            echo "::error::tag ${{ steps.tag.outputs.tag }}, but server.json is version $have"
+            exit 1
+          fi
+
+      - name: Install mcp-publisher (pinned, sha256-checked)
+        # v1.8.1; bump the version in the URL and recompute EXPECTED together,
+        # so the binary can't change under a pull request (the actionlint
+        # image in lint.yml is pinned the same way). linux_amd64: ubuntu-latest.
+        if: steps.key.outputs.has == '1'
+        run: |
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          EXPECTED="a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc"
+          curl -fsSL -o "$archive" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/$archive"
+          got=$(sha256sum "$archive" | cut -d' ' -f1)
+          if [ "$got" != "$EXPECTED" ]; then
+            echo "::error::mcp-publisher v1.8.1 sha256 mismatch: got $got, want $EXPECTED; recompute EXPECTED after bumping the version"
+            exit 1
+          fi
+          tar xzf "$archive" mcp-publisher
+
+      - name: Authenticate (DNS, domain cc.redmage)
+        if: steps.key.outputs.has == '1'
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+        run: ./mcp-publisher login dns --domain redmage.cc --private-key "$MCP_PRIVATE_KEY"
+
+      - name: Publish
+        if: steps.key.outputs.has == '1'
+        run: |
+          ./mcp-publisher publish
+          echo "Published ${{ steps.tag.outputs.tag }} to the MCP registry: Actions > publish-mcp-registry" >> "$GITHUB_STEP_SUMMARY"
