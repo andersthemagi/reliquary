@@ -590,6 +590,14 @@ docs/public/reference/limits.md ("Rate limits").
   already seen from memory until the window ends, as it does a refused
   token's calls. A token it hasn't seen yet costs one count. The web app
   still calls `rate_limit_token`: its limits are per grant.
+- **Each key's window at its own second** (2026-10-22, #487, the
+  owner's decision). Whole-minute windows start 0 to 59 seconds into the
+  minute, from the key's first 8 hex digits
+  (`private.rate_limit_window_start`, the one place a window's start is
+  computed), so keys over a limit aren't all let back at :00. A window is
+  as long as before; Retry-After, and so the MCP server's memory of a
+  refusal, is the key's own window end. Windows that aren't whole minutes
+  (the test suites' 2 second ones) keep starting on their multiple.
 - **Client IP.** On Vercel, `x-real-ip` (else the first `x-forwarded-for`
   entry): Vercel's edge sets both and overwrites what the client sent.
   That holds only while nothing sits in front of Vercel; a CDN or proxy in
@@ -788,8 +796,47 @@ Two variations measured, not shipped, since each is a decision:
   shrinks the boundary burst, but it is 5 agents at the floor per person,
   which limits how many agents a person can run.
 
-A sliding or per-token-offset window would remove the shared boundary
-itself. What's next is the owner's call (#487).
+A sliding or per-key-offset window would remove the shared boundary
+itself. The owner chose the offset the same day.
+
+**And each key's window at its own second** (2026-10-22, #487,
+`20261022110100_rate_limit_offset.sql`). A key's whole-minute windows now
+start at an offset of 0 to 59 seconds within the minute, from the key's
+first 8 hex digits, for every key (tokens, people, vault budgets, the web
+app's), so the crowd's 25 people and 500 tokens come back spread over the
+minute instead of at :00. `Retry-After` and the servers' memory of a
+refusal come from the window's own end. Person limits unchanged (120 and
+1,200 a minute), no random extra wait.
+
+The 100-vault stage with the crowd, seven runs (six alone, one as the
+first stage of a full run):
+
+| Run | Honest p50 | p95 | p99 | Honest errors |
+|---|---|---|---|---|
+| 1 | 21 ms | 35 ms | 55 ms | 0 |
+| 2 | 21 ms | 33 ms | 47 ms | 0 |
+| 3 | 20 ms | 43 ms | 112 ms | 0 |
+| 4 | 21 ms | 63 ms | 139 ms | 0 |
+| 5 | 20 ms | 48 ms | 83 ms | 0 |
+| 6 | 20 ms | 27 ms | 67 ms | 0 |
+| Full run | 21 ms | 48 ms | 153 ms | 1 |
+
+The full run's other stages: 300 vaults p50 22 ms, p95 323 ms, no
+errors; 1,000 vaults p50 10 ms, p95 17 ms, no errors. Without the crowd,
+the same build: p50 23, 43 and 11 ms, p95 26, 53 and 13 ms, no errors.
+Postgres ran at 1.3 to 1.4 cores with the crowd (1.9 over the full run),
+against 0.7 without it; 98 to 182 counts failed open per run.
+
+Against the criterion (p95 within 2x of the no-crowd 26 ms, so 52 ms, with
+no honest 503s): six of the seven runs are within it, against three of
+six before the offset, and the worst p95 fell from 4,333 ms to 63 ms. Not
+every run: run 4's p95 was 63 ms, and the full run had one honest 503, an
+agent's first `request_work` in the stage's first seconds (no pooled
+connection in time), while the 500 crowd connections were starting
+together ("All at once", above). The crowd's own first calls still
+time out there, about 100 to 170 a run. That start-up herd, not the
+minute boundary, is what is left at 100 vaults; at 300 vaults the p95
+(323 ms against 53) says the boundary isn't the only cost either.
 
 What a local run can't show is the hosted path's own: Netlify Functions'
 cold starts and how many instances they scale to, Supabase's real pooler
