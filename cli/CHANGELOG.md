@@ -4,6 +4,13 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.5.1](https://github.com/andersthemagi/reliquary/compare/cli-v0.5.0...cli-v0.5.1) (2026-10-23)
+
+
+### Bug fixes
+
+* **security:** the bytea migration sets no pgvector option, and the suites apply migrations as production's role ([#476](https://github.com/andersthemagi/reliquary/issues/476)) ([8881073](https://github.com/andersthemagi/reliquary/commit/8881073a8bf8517abc3a2c34a034665c3ed9edd6))
+
 ## [0.5.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.2...cli-v0.5.0) (2026-10-18)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
