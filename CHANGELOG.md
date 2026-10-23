@@ -8,25 +8,34 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.28.0](https://github.com/andersthemagi/reliquary/compare/v0.27.2...v0.28.0) (2026-10-23)
 
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
 
-### Features
+### New
 
-* **mcp:** a person's agents share one rate limit across all their tokens ([#497](https://github.com/andersthemagi/reliquary/issues/497)) ([164625a](https://github.com/andersthemagi/reliquary/commit/164625a778c2776f86dc1ce461d0910829ab9662))
-* **security:** every write seals its body under the content key ([#484](https://github.com/andersthemagi/reliquary/issues/484)) ([eb23f74](https://github.com/andersthemagi/reliquary/commit/eb23f746f1a7a460c9509e5c195a172aed5bb8a0))
-* **security:** the operator can seal every plaintext vault body in place, and rotate the content key ([#496](https://github.com/andersthemagi/reliquary/issues/496)) ([83ba64b](https://github.com/andersthemagi/reliquary/commit/83ba64bd637d677f06d958f0424bbbad286dc510))
+#### The operator can seal every plaintext vault body in place, and rotate the content key ([#496](https://github.com/andersthemagi/reliquary/issues/496))
 
+The operator can now encrypt vault content written before writes were sealed, in place, a batch at a time, and rotate the content key the same way as the variables key. Until the backfill runs on the hosted service, older content stays as plain bytes in the database.
 
-### Bug fixes
+### Changed
 
-* **mcp:** asking for work waits when the database is too busy to count it ([#492](https://github.com/andersthemagi/reliquary/issues/492)) ([78844b4](https://github.com/andersthemagi/reliquary/commit/78844b4ca5cc18965cb07869d30417b380f8875f))
-* **scripts:** the Netlify env file names the hand-set keys in a comment, never as a placeholder value ([#480](https://github.com/andersthemagi/reliquary/issues/480)) ([4f6f13f](https://github.com/andersthemagi/reliquary/commit/4f6f13f2d970d1d1add5ea7fbf248d42983caea4))
+#### A person's agents share one rate limit across all their tokens ([#497](https://github.com/andersthemagi/reliquary/issues/497))
 
+Over MCP, a person's tool calls and requests for work now count together across all their tokens and connections: 1,200 tool calls and 120 requests for work a minute per person, on top of each token's limits. You can still connect as many agents as you like; they share this allowance. Rate limit windows also no longer start on the clock minute: each counter's windows start at its own second past the minute, and `Retry-After` is always the end of your own window.
+
+#### Every write seals its body under the content key ([#484](https://github.com/andersthemagi/reliquary/issues/484))
+
+File text, proposals, review notes, thread messages and search vectors are now encrypted by Reliquary's servers before they reach the database, under the content key (`CONTENT_KEYS`) and bound to their vault; the database holds ciphertext and never the key. Content written before this release stays as it was until the backfill (#465) seals it. Storage usage counts the small envelope around each sealed body.
+
+### Fixes
+
+- Asking for work waits when the database is too busy to count it ([#492](https://github.com/andersthemagi/reliquary/issues/492))
+- The Netlify env file names the hand-set keys in a comment, never as a placeholder value ([#480](https://github.com/andersthemagi/reliquary/issues/480))
 
 ### Performance
 
-* **db:** the flags hint reads what waits for the caller, not the whole log ([#494](https://github.com/andersthemagi/reliquary/issues/494)) ([e6aa0df](https://github.com/andersthemagi/reliquary/commit/e6aa0df609ed8f8ec3f3b48c34ebeea468872820))
-* **mcp:** a token over its rate limit is refused without reaching the database ([#491](https://github.com/andersthemagi/reliquary/issues/491)) ([4fa83d1](https://github.com/andersthemagi/reliquary/commit/4fa83d1987538534ae3d5644783b021455b31681))
-* **mcp:** asking for work again before the gap no longer reads the plan ([#493](https://github.com/andersthemagi/reliquary/issues/493)) ([c653e87](https://github.com/andersthemagi/reliquary/commit/c653e8712ab08324250a47513e3be0e471ae81f4))
+- The flags hint reads what waits for the caller, not the whole log ([#494](https://github.com/andersthemagi/reliquary/issues/494))
+- A token over its rate limit is refused without reaching the database ([#491](https://github.com/andersthemagi/reliquary/issues/491))
+- Asking for work again before the gap no longer reads the plan ([#493](https://github.com/andersthemagi/reliquary/issues/493))
 
 ## [0.27.2](https://github.com/andersthemagi/reliquary/compare/v0.27.1...v0.27.2) (2026-10-19)
 
