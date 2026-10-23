@@ -4,6 +4,16 @@ What changed in `@reliquary-ai/cli`, release by release. Each release is a
 Git tag `cli-vX.Y.Z` and a GitHub Release; entries after 0.1.0 are written by
 release-please from conventional commits that touch `cli/`.
 
+## [0.5.1](https://github.com/andersthemagi/reliquary/compare/cli-v0.5.0...cli-v0.5.1) (2026-10-23)
+
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
+
+### Changed
+
+#### The bytea migration sets no pgvector option, and the suites apply migrations as production's role ([#476](https://github.com/andersthemagi/reliquary/issues/476))
+
+V0.27.1's deploy stopped at the same database migration, this time on a pgvector option the hosted database's role may not set at that point. The option is dropped from the intermediate definition it was in; the final search function never had it. Nothing people or agents see changes; this release's deploy runs v0.27.0's migrations. From now on the test suites apply migrations as a role shaped like the hosted database's, so a statement production would refuse fails before a release is cut.
+
 ## [0.5.0](https://github.com/andersthemagi/reliquary/compare/cli-v0.4.2...cli-v0.5.0) (2026-10-18)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
