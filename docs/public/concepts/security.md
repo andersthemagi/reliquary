@@ -49,7 +49,7 @@ One test reads the database's own schema rather than its data: a column whose na
 
 ## Vault content
 
-- File text, proposals, notes, thread messages and search vectors are sealed by the server that writes them (AES-256-GCM under the content key set, `CONTENT_KEYS`, with the vault's id bound in, so a body moved to another vault does not open). The database holds ciphertext and never the key; the server opens a body when a member or their agent reads it. Content written before this was switched on is still plain bytes until the backfill seals it, which is in progress. The content key set is separate from the values key, so no key opens both.
+- File text, proposals, notes, thread messages and search vectors are sealed by the server that writes them (AES-256-GCM under the content key set, `CONTENT_KEYS`, with the vault's id bound in, so a body moved to another vault does not open). The database holds ciphertext and never the key; the server opens a body when a member or their agent reads it. Content written before this was switched on is plain bytes until the operator's backfill seals it in place, a batch at a time, changing nothing else about it; the same run moves every body to a new key when the content key set is rotated. Only the operator's database role can run it, not either server. The content key set is separate from the values key, so no key opens both.
 - Both servers hold the content key set, since the MCP server serves files. The MCP server still refuses to start with the values key.
 - The schema test above also keeps a list of every column that holds content, with its type, so a new content column, or one that changes type, fails the test until it is accounted for.
 

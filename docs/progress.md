@@ -138,7 +138,7 @@ an encrypted backup has restored. Crypto-shredding (#239) and the feedback
 and invite columns (#240) follow it. The IPv6 check left on #221 is
 waived.
 
-Status 2026-10-19: #237 done (#455, #460; first encrypted backup taken and restored). #238 under way: the key set (#461, PR #467), the bytea columns and sealing writes (#462), search in the server (#463) and references from the writer (#464) built; the backfill (#465) and dropping the plaintext path (#466) to come.
+Status 2026-10-19: #237 done (#455, #460; first encrypted backup taken and restored). #238 under way: the key set (#461, PR #467), the bytea columns and sealing writes (#462), search in the server (#463) and references from the writer (#464) built; the backfill (#465) built 2026-10-22 (`scripts/seal-content.sh`, also the content key's rotation), to be run on production; dropping the plaintext path (#466) to come, after a restore test of a backup taken after the backfill.
 
 ### 2026-10-19: v0.27.0's deploy stopped at a migration; the file is rewritten, not patched
 
