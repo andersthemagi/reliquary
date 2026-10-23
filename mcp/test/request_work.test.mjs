@@ -241,9 +241,9 @@ test("request work: over the vault's budget, the agent is told to stop and when 
   // Full for this minute and the next, so the call lands over it whenever it runs.
   await sql(
     `insert into private.rate_limits (bucket, key, window_start, expires_at, hits)
-     select 'vault_request_work_minute', encode(sha256(convert_to('vault:' || $1::text, 'UTF8')), 'hex'), to_timestamp(w), to_timestamp(w + 60),
-            (select per_minute from private.request_budget)
-       from (select floor(extract(epoch from clock_timestamp()) / 60) * 60 + k * 60 as w from generate_series(0, 1) k) x`,
+     select 'vault_request_work_minute', key, w, w + interval '60 seconds', (select per_minute from private.request_budget)
+       from (select key, private.rate_limit_window_start(key, 60, extract(epoch from clock_timestamp())) + k * interval '60 seconds' as w
+               from (select encode(sha256(convert_to('vault:' || $1::text, 'UTF8')), 'hex') as key) v, generate_series(0, 1) k) x`,
     [t.id],
   );
   const r = await ask(t, t.editorTok, "work.md");

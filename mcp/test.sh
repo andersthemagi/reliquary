@@ -84,11 +84,12 @@ content_keys="t1:$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n'
   -e CONTENT_KEYS="$content_keys" -e RATE_LIMIT_SCALE=1000 -e PORT=$port "$node" node dist/server.js >/dev/null
 wait_until "$srv" "the MCP server to answer /healthz" curl -sf "http://127.0.0.1:$port/healthz"
 # Tool calls: 3 per 2-second window (so a test can wait one out) and 5 a
-# day per token, 1 of them a thread write; 3 401s a minute per address.
+# day per token, 1 of them a thread write; per person across tokens, 5
+# per window, 2 of them asking for work; 3 401s a minute per address.
 "$engine" run -d --name "$rl" --network host -v "$PWD":/app:Z -w /app \
   -e DATABASE_URL="postgres://reliquary_mcp:test@127.0.0.1:$pgport/postgres" \
   -e MCP_RESOURCE="http://127.0.0.1:$rlport/mcp" -e AUTH_ISSUER="http://127.0.0.1:$webport" \
-  -e CONTENT_KEYS="$content_keys" -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2,mcp_request_work_minute=1/2" \
+  -e CONTENT_KEYS="$content_keys" -e TRUST_PROXY_IP=1 -e RATE_LIMITS="mcp_token_minute=3/2,mcp_token_day=5/86400,mcp_unauth_ip=3/60,mcp_thread_post_minute=1/2,mcp_request_work_minute=1/2,mcp_person_minute=5/2,mcp_person_request_work_minute=2/2" \
   -e PORT=$rlport "$node" node dist/server.js >/dev/null
 wait_until "$rl" "the rate-limit MCP server to answer /healthz" curl -sf "http://127.0.0.1:$rlport/healthz"
 # Search by meaning (test/semantic_search.test.mjs): the other servers have

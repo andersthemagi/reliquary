@@ -1,7 +1,8 @@
 -- Hostile tests for 20260925200000_rate_limits: nobody but the apps' roles
 -- counts, nobody reads or resets a counter, a key is never a raw address,
 -- the limit and its Retry-After, a refused request counting nothing, a
--- token's grant as its key, and pruning.
+-- token's grant as its key, pruning, and (20261022110000_rate_limit_person)
+-- a person's tokens counted together.
 
 -- A call of private.rate_limit_hit as SQL text, one bucket.
 create function t.hit(p_bucket text, p_key text, p_window int, p_limit int, p_cost int default 1) returns text
@@ -122,13 +123,57 @@ select t.expect('count: several buckets in one call; one refusing refuses the re
   || ',' || t.hits('multi_email', t.sha('victim@')) || ',' || t.hits('multi_ip', t.sha('ip1')),
   '0,0,true,2,2');
 
+-- The second of the minute a key's whole-minute windows start at
+-- (20261022110100_rate_limit_offset): its first 8 hex digits, mod 60.
+create function t.offset(p_key text) returns numeric language sql as
+$$ select (('x' || left(p_key, 8))::bit(32)::bigint % 60)::numeric $$;
+-- Seconds from now to the end of p_key's window of p_window seconds.
+create function t.left_in(p_key text, p_window int) returns int language sql as
+$$ select ceil(p_window - mod(extract(epoch from now())::numeric - t.offset(p_key), p_window))::int $$;
+
 create function t.two(p_key text) returns text language sql as $$
   select t.run_role('reliquary_web', format($q$select private.rate_limit_hit(array['wa','wb'], array[%L,%L], array[60,86400], array[1,1], array[1,1])$q$, p_key, p_key))
 $$;
 -- In one statement, so one transaction and one now().
 select t.expect('count: the Retry-After is the fullest refusing window''s end',
   t.two(t.sha('w')) || ',' || t.two(t.sha('w')),
-  '0,' || greatest(ceil(60 - mod(extract(epoch from now())::numeric, 60)), ceil(86400 - mod(extract(epoch from now())::numeric, 86400)))::int);
+  '0,' || greatest(t.left_in(t.sha('w'), 60), t.left_in(t.sha('w'), 86400)));
+
+-- ---------------------------------------------------------------------------
+-- Offsets: each key's windows start at its own second of the minute
+
+-- Two keys whose offsets differ: the keys of 'o' || n for the first two n
+-- with different offsets.
+create table t.okeys as
+  select k from (select t.sha('o' || n) as k from generate_series(1, 60) n) x
+   where t.offset(k) <> t.offset(t.sha('o1')) limit 1;
+insert into t.okeys values (t.sha('o1'));
+
+create function t.over(p_key text, p_window int) returns text language sql as $$
+  select t.run_role('reliquary_mcp', format($q$select private.rate_limit_hit(array['ofs'], array[%L], array[%s], array[1], array[1])$q$, p_key, p_window))
+$$;
+
+-- In one statement, so one now().
+select t.expect('offset: a refusal''s Retry-After is the key''s own window end, at its offset in the minute',
+  (select string_agg(t.over(k, 60) || ',' || t.over(k, 60), ';' order by k) from t.okeys),
+  (select string_agg('0,' || t.left_in(k, 60), ';' order by k) from t.okeys));
+
+select t.expect('offset: two keys'' windows end at different seconds of the minute',
+  (select count(distinct extract(second from expires_at)) from private.rate_limits r join t.okeys o on o.k = r.key where r.bucket = 'ofs')::text,
+  '2');
+
+select t.over(t.sha('hour'), 3600), t.over(t.sha('day'), 86400), t.over(t.sha('short'), 7);
+
+select t.expect('offset: a window lasts as long as before, an hour or a day, and starts at its key''s offset',
+  (select string_agg(extract(epoch from expires_at - window_start)::int || ':'
+            || (mod(extract(epoch from window_start)::numeric, 60) = t.offset(key))::text, ',' order by expires_at - window_start)
+     from private.rate_limits where bucket = 'ofs' and key in (t.sha('hour'), t.sha('day'))),
+  '3600:true,86400:true');
+
+select t.expect('offset: a window that isn''t whole minutes starts on its multiple, as before',
+  (select (window_start = to_timestamp(floor(extract(epoch from now()) / 7) * 7))::text
+     from private.rate_limits where bucket = 'ofs' and key = t.sha('short')),
+  'true');
 
 -- ---------------------------------------------------------------------------
 -- Tokens: counted against the grant
@@ -193,3 +238,55 @@ select t.expect('prune: ended windows go, open ones stay',
 select t.expect('prune: without pg_cron here the job isn''t found, so hits prune now and then',
   private.rate_limits_pruned_by_cron()::text,
   'false');
+
+-- ---------------------------------------------------------------------------
+-- People: one count across all their tokens (20261022110000_rate_limit_person)
+
+insert into t.raw select 'ana1', t.run('ana', $q$select public.create_access_token('p1', 30)$q$);
+insert into t.raw select 'ana2', t.run('ana', $q$select public.create_access_token('p2', 30)$q$);
+insert into t.raw select 'ben1', t.run('ben', $q$select public.create_access_token('p3', 30)$q$);
+
+-- One call: the token's own bucket (limit p_tok) and the person's (limit
+-- p_person). Answers "wait/person".
+create function t.rate_person(p_raw text, p_tok int, p_person int, p_role text default 'reliquary_mcp') returns text language sql as $$
+  select t.run_role(p_role, format($q$select o_wait || '/' || o_person from private.rate_limit_token_and_person(%L,
+      array['ptok_minute'], array[3600], array[%s], array[1], array['pperson_minute'], array[3600], array[%s], array[1])$q$,
+    t.sha((select value from t.raw where name = p_raw)), p_tok, p_person))
+$$;
+
+select t.expect('person: a person''s tokens share one count: past it, any of their tokens is refused and the refusal is the person''s',
+  t.rate_person('ana1', 10, 3) || ',' || t.rate_person('ana2', 10, 3) || ',' || t.rate_person('ana1', 10, 3)
+  || ',' || (t.rate_person('ana2', 10, 3) ~ '^[1-9][0-9]*/true$')::text
+  || ',' || (t.rate_person('ana1', 10, 3) ~ '^[1-9][0-9]*/true$')::text,
+  '0/false,0/false,0/false,true,true');
+
+select t.expect('person: another person''s tokens have a count of their own',
+  t.rate_person('ben1', 10, 3),
+  '0/false');
+
+select t.expect('person: a refused call counts nothing, against the person or the token',
+  t.hits('pperson_minute', encode(sha256(convert_to('person:' || t.id('ana')::text, 'UTF8')), 'hex'))
+  || ',' || t.hits('ptok_minute', encode(sha256(convert_to('grant:' || (select id from public.access_tokens
+       where token_hash = t.sha((select value from t.raw where name = 'ana2')))::text, 'UTF8')), 'hex')),
+  '3,1');
+
+select t.expect('person: a token past its own limit is refused, and the refusal isn''t the person''s',
+  t.rate_person('ben1', 2, 100) || ',' || (t.rate_person('ben1', 2, 100) ~ '^[1-9][0-9]*/false$')::text,
+  '0/false,true');
+
+-- Ana's personal token from the tokens section, revoked there; her person
+-- count is already past 1.
+select t.expect('person: a revoked token counts nothing against its person',
+  t.rate_person('pat', 1, 1) || ',' || t.rate_person('pat', 1, 1),
+  '0/false,0/false');
+
+select t.expect('person: people, agents, anonymous callers and the web app can''t count for a person',
+  t.run('ana', format($q$select o_wait from private.rate_limit_token_and_person(%L, '{}', '{}', '{}', '{}', array['p'], array[60], array[5], array[1])$q$, t.sha('x')))
+  || ',' || t.run('ana', format($q$select o_wait from private.rate_limit_token_and_person(%L, '{}', '{}', '{}', '{}', array['p'], array[60], array[5], array[1])$q$, t.sha('x')), 'Claude')
+  || ',' || t.run(null, format($q$select o_wait from private.rate_limit_token_and_person(%L, '{}', '{}', '{}', '{}', array['p'], array[60], array[5], array[1])$q$, t.sha('x')))
+  || ',' || t.rate_person('ana1', 10, 3, 'reliquary_web'),
+  'ERR 42501,ERR 42501,ERR 42501,ERR 42501');
+
+select t.expect_true('person: the person count pins its search_path',
+  (select p.proconfig @> array['search_path=""'] from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private' and p.proname = 'rate_limit_token_and_person'));

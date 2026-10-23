@@ -563,18 +563,41 @@ docs/public/reference/limits.md ("Rate limits").
   their limits beside 10 honest vaults took honest `request_work` from
   280 ms to 16 ms median and Postgres from 3.7 to 1.9 cores. A crowd mostly
   within its limits (500 connections in 100 vaults) is unchanged: that
-  load is what an allowed call costs (#488, #489), and the counts failing
-  open under it is #487's open question.
+  load is what an allowed call costs (#488, #489). Whether a count that
+  fails under that load lets the call through was #487's open question,
+  settled by the owner the same day: see "Failing", below.
 - **Failing.** Sign-in (asking for a code, entering one, opening a link)
   fails closed: 503, "Sign-in is unavailable", since guessing a 6-digit
   code is what the limit is for. Asking for work over MCP (`request_work`,
-  `claim_step`) is told to wait instead (2026-10-20, #487): 503, a
+  `claim_step`) is told to wait instead (2026-10-20, #487, the owner's
+  decision on failing open, shipped in #492): 503, a
   `Retry-After` of 5 to 15 seconds at random, and the JSON-RPC error to
   wait, "Reliquary is busy". Under overload the counts time out, and the
   simulated load test found a crowd let through uncounted then is what
   kept the database overloaded; the spread keeps the agents told together
   from coming back together. Everything else fails open with a log line
   (`rate limit unavailable`), since it needs the same database anyway.
+- **One limit per person** (2026-10-22, #487, the owner's decision). On
+  top of each token's limits, a person's tool calls (1,200 a minute) and
+  asking for work (120 a minute, 20 agents at the 10 second floor) count
+  together across every token they hold, keyed by a hash of the person's
+  id. A person may connect as many agents as they like; more tokens are
+  no more allowance. The owner chose this over capping how many tokens a
+  person may hold. `private.rate_limit_token_and_person` counts the
+  token's buckets and the person's in one `rate_limit_hit`, so a refusal
+  still counts nothing anywhere, and says whether the refusal was the
+  person's; the instance then refuses that person's other tokens it has
+  already seen from memory until the window ends, as it does a refused
+  token's calls. A token it hasn't seen yet costs one count. The web app
+  still calls `rate_limit_token`: its limits are per grant.
+- **Each key's window at its own second** (2026-10-22, #487, the
+  owner's decision). Whole-minute windows start 0 to 59 seconds into the
+  minute, from the key's first 8 hex digits
+  (`private.rate_limit_window_start`, the one place a window's start is
+  computed), so keys over a limit aren't all let back at :00. A window is
+  as long as before; Retry-After, and so the MCP server's memory of a
+  refusal, is the key's own window end. Windows that aren't whole minutes
+  (the test suites' 2 second ones) keep starting on their multiple.
 - **Client IP.** On Vercel, `x-real-ip` (else the first `x-forwarded-for`
   entry): Vercel's edge sets both and overwrites what the client sent.
   That holds only while nothing sits in front of Vercel; a CDN or proxy in
@@ -728,6 +751,92 @@ crowd: honest p50 23 ms, the same as without the crowd, p95 2,571 ms,
 Postgres at 2.3 cores. The p95 and the 187 errors left are the stage's
 first seconds, 700 connections asking at once ("All at once", above), and
 mostly the crowd's own.
+
+**And one limit per person** (2026-10-22, #487). Rerun with the person
+limit (120 requests for work a minute per person; the crowd is 25 people
+with 20 connections each), same machine:
+
+| Vaults | Honest p50 | p95 | p99 | Honest errors | Hostile calls/s |
+|---|---|---|---|---|---|
+| 100 | 23 ms | 4,064 ms | 4,601 ms | 1 | 3,577 |
+| 300 | 19 ms | 3,276 ms | 3,417 ms | 0 | 4,487 |
+| 1,000 | 13 ms | 746 ms | 851 ms | 0 | 4,584 |
+
+Without the crowd (`LOAD_HOSTILE_VAULTS=0`) the same build gave p50 21,
+43 and 11 ms and p95 24, 48 and 14 ms, with no errors. Postgres ran at
+1.8 cores with the crowd (2.3 before), 259 counts failed open, nearly all
+of the crowd's 3,577 calls a second were 429s answered from the servers'
+memory, and the crowd's allowed calls fell from up to 15,000 a minute (30
+per connection) to about 3,000 (120 per person). The one honest error was
+a 503 on an agent's first call (`initialize`, no pooled connection in
+time) in the stage's first seconds.
+
+The criterion (honest p95 within 2x of the no-crowd p95 at 100 vaults,
+so under 48 ms, with no honest 503s) is **not met reliably**. Six runs of
+the 100-vault stage alone gave p95 4,064, 26, 28, 1,117, 4,333 and 26 ms:
+met in three. Timing each slow honest call showed why, and it isn't the
+start-up herd: that falls inside the 20 second warm-up. It is the minute
+boundary. Every limit is a fixed window aligned to the minute, and every
+server remembers a refused token or person until that window ends, so at
+:00 the whole crowd is let back at once, spends its people's allowance in
+the first second and queues the pooler's 15 connections for 3 to 5
+seconds. Honest calls in those seconds are the slow 5%. Whether a run
+meets the criterion depends on where the minute falls in the measured 70
+seconds.
+
+Two variations measured, not shipped, since each is a decision:
+
+- **Spreading the return.** Adding 0 to 10 seconds at random to the
+  remembered wait and the `Retry-After` (a sixth of the time left, at most
+  10), as the busy answer does: p95 28 and 477 ms in two runs. Better, not
+  enough alone, and it refuses a token or person past a limit for up to 10
+  seconds after its window ends.
+- **A tighter person limit.** 30 requests for work a minute per person
+  instead of 120: p95 77, 26 and 91 ms, with 1 or 2 honest 503s a run. It
+  shrinks the boundary burst, but it is 5 agents at the floor per person,
+  which limits how many agents a person can run.
+
+A sliding or per-key-offset window would remove the shared boundary
+itself. The owner chose the offset the same day.
+
+**And each key's window at its own second** (2026-10-22, #487,
+`20261022110100_rate_limit_offset.sql`). A key's whole-minute windows now
+start at an offset of 0 to 59 seconds within the minute, from the key's
+first 8 hex digits, for every key (tokens, people, vault budgets, the web
+app's), so the crowd's 25 people and 500 tokens come back spread over the
+minute instead of at :00. `Retry-After` and the servers' memory of a
+refusal come from the window's own end. Person limits unchanged (120 and
+1,200 a minute), no random extra wait.
+
+The 100-vault stage with the crowd, seven runs (six alone, one as the
+first stage of a full run):
+
+| Run | Honest p50 | p95 | p99 | Honest errors |
+|---|---|---|---|---|
+| 1 | 21 ms | 35 ms | 55 ms | 0 |
+| 2 | 21 ms | 33 ms | 47 ms | 0 |
+| 3 | 20 ms | 43 ms | 112 ms | 0 |
+| 4 | 21 ms | 63 ms | 139 ms | 0 |
+| 5 | 20 ms | 48 ms | 83 ms | 0 |
+| 6 | 20 ms | 27 ms | 67 ms | 0 |
+| Full run | 21 ms | 48 ms | 153 ms | 1 |
+
+The full run's other stages: 300 vaults p50 22 ms, p95 323 ms, no
+errors; 1,000 vaults p50 10 ms, p95 17 ms, no errors. Without the crowd,
+the same build: p50 23, 43 and 11 ms, p95 26, 53 and 13 ms, no errors.
+Postgres ran at 1.3 to 1.4 cores with the crowd (1.9 over the full run),
+against 0.7 without it; 98 to 182 counts failed open per run.
+
+Against the criterion (p95 within 2x of the no-crowd 26 ms, so 52 ms, with
+no honest 503s): six of the seven runs are within it, against three of
+six before the offset, and the worst p95 fell from 4,333 ms to 63 ms. Not
+every run: run 4's p95 was 63 ms, and the full run had one honest 503, an
+agent's first `request_work` in the stage's first seconds (no pooled
+connection in time), while the 500 crowd connections were starting
+together ("All at once", above). The crowd's own first calls still
+time out there, about 100 to 170 a run. That start-up herd, not the
+minute boundary, is what is left at 100 vaults; at 300 vaults the p95
+(323 ms against 53) says the boundary isn't the only cost either.
 
 What a local run can't show is the hosted path's own: Netlify Functions'
 cold starts and how many instances they scale to, Supabase's real pooler
