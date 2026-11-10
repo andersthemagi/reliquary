@@ -71,3 +71,52 @@ test("plugin nudge: silent for other commands, and for a push in a project not l
   for (const command of ["git status", "git pushd", "git commit -m push"]) assert.equal(hook("push-nudge.sh", linked, bash(command)), "", command);
   assert.equal(hook("push-nudge.sh", project(), bash("git push")), "");
 });
+
+// Codex runs the same hooks (hooks/hooks.json, found by default) with no
+// project variable: in the session's folder, with its own stdin shape.
+const codexHook = (script, cwd, stdin = "") => {
+  const { CLAUDE_PROJECT_DIR, ...env } = process.env;
+  return execFileSync("sh", [join(PLUGIN, "scripts", script)], { cwd, input: stdin, encoding: "utf8", env: { ...env, PLUGIN_ROOT: PLUGIN, CLAUDE_PLUGIN_ROOT: PLUGIN } });
+};
+const codexBash = (cwd, command) =>
+  JSON.stringify({ session_id: "s", cwd, hook_event_name: "PostToolUse", tool_name: "Bash", tool_use_id: "t", tool_input: { command }, tool_response: {} });
+
+test("codex plugin: the Codex marketplace installs the same plugin, with the same connection, skill and hooks", () => {
+  const entry = json(".agents/plugins/marketplace.json").plugins.find((p) => p.name === "reliquary");
+  assert.deepEqual(entry.source, { source: "local", path: "./plugins/reliquary" });
+  assert.ok(entry.policy.installation && entry.policy.authentication && entry.category, "Codex wants policy and category");
+  const manifest = json("plugins/reliquary/.codex-plugin/plugin.json");
+  assert.equal(manifest.name, "reliquary");
+  assert.equal(manifest.mcpServers, "./.mcp.json", "the connection Claude Code's plugin uses, which carries no credential");
+  assert.equal(manifest.skills, "./skills/");
+  assert.equal(manifest.hooks, undefined, "Codex finds hooks/hooks.json by default");
+  assert.match(readFileSync(join(PLUGIN, "hooks/hooks.json"), "utf8"), /\$\{CLAUDE_PLUGIN_ROOT\}/, "a variable Codex sets too");
+});
+
+test("codex plugin brief: in a project linked to a vault, the session starts with list_flags, list_proposals, and my_places for it, from a subfolder too", () => {
+  const out = codexHook("session-brief.sh", join(project('{"vault": "acme-docs"}'), "src"));
+  assert.match(out, /Reliquary vault acme-docs\./);
+  for (const tool of ["list_flags", "advance_flags", "list_proposals", "my_places"]) assert.match(out, new RegExp(tool));
+});
+
+test("codex plugin brief: says nothing in a project with no .reliquary.json", () => {
+  assert.equal(codexHook("session-brief.sh", join(project(), "src")), "");
+});
+
+test("codex plugin nudge: after git push in a linked project, a reminder to propose, as hook JSON, whether the command is a string or an argv array", () => {
+  const dir = project('{"vault": "acme-docs"}');
+  for (const command of ["git push origin main", ["bash", "-lc", "git push"], ["zsh", "-lc", "cd x && git -C repo push --tags"]]) {
+    const out = JSON.parse(codexHook("push-nudge.sh", dir, codexBash(dir, command)));
+    assert.equal(out.hookSpecificOutput.hookEventName, "PostToolUse", String(command));
+    assert.match(out.hookSpecificOutput.additionalContext, /vault acme-docs\..*propose/, String(command));
+  }
+});
+
+test("codex plugin nudge: silent for other commands, and for a push in a project not linked to a vault", () => {
+  const linked = project('{"vault": "acme-docs"}');
+  for (const command of [["bash", "-lc", "git status"], ["bash", "-lc", "git commit -m push"], ["git", "pushd"]]) {
+    assert.equal(codexHook("push-nudge.sh", linked, codexBash(linked, command)), "", String(command));
+  }
+  const unlinked = project();
+  assert.equal(codexHook("push-nudge.sh", unlinked, codexBash(unlinked, ["bash", "-lc", "git push"])), "");
+});

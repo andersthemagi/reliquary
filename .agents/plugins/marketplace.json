@@ -1,0 +1,12 @@
+{
+  "name": "reliquary",
+  "interface": { "displayName": "Reliquary" },
+  "plugins": [
+    {
+      "name": "reliquary",
+      "source": { "source": "local", "path": "./plugins/reliquary" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

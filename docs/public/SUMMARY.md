@@ -37,6 +37,7 @@ the build (web/scripts/gen-docs.mjs) and the tests fail otherwise.
 - [Connect Claude Code](how-to/connect-claude-code.md)
 - [Connect Claude.ai](how-to/connect-claude-ai.md)
 - [Connect ChatGPT](how-to/connect-chatgpt.md)
+- [Connect Codex](how-to/connect-codex.md)
 - [Connect Cursor](how-to/connect-cursor.md)
 - [Connect VS Code](how-to/connect-vs-code.md)
 - [Connect another client](how-to/connect-other-clients.md)

@@ -69,6 +69,7 @@ flowchart LR
    your browser opens a consent page, no token to copy. Other clients:
    [Claude.ai](docs/public/how-to/connect-claude-ai.md),
    [ChatGPT](docs/public/how-to/connect-chatgpt.md),
+   [Codex](docs/public/how-to/connect-codex.md),
    [Cursor](docs/public/how-to/connect-cursor.md),
    [VS Code](docs/public/how-to/connect-vs-code.md),
    [anything else over MCP](docs/public/how-to/connect-other-clients.md).
@@ -122,9 +123,9 @@ Those need the person, signed in. [How security works](docs/public/concepts/secu
 
 **1. Connect any AI tool with one URL.** Paste the MCP URL into Claude,
 ChatGPT, Cursor or VS Code and sign in; no token to copy (the command is
-above). Claude Code can also take the
-[plugin](docs/public/how-to/connect-claude-code.md#with-the-plugin), which
-adds the connection and a skill for working in a vault.
+above). Claude Code and [Codex](docs/public/how-to/connect-codex.md) can also
+take the [plugin](docs/public/how-to/connect-claude-code.md#with-the-plugin),
+which adds the connection and a skill for working in a vault.
 
 **2. Agents read and propose.** Open folders take notes directly. Canon
 folders change only when a person approves, with a quorum if you want one.

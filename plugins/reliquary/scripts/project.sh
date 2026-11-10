@@ -6,6 +6,7 @@
 # reaches the agent's context only as one word (no spaces), so a crafted one
 # can't carry a sentence of instructions; anything else gets generic wording.
 
+# Codex sets no project variable; it runs hooks in the session's folder.
 dir=${CLAUDE_PROJECT_DIR:-$PWD}
 while [ ! -f "$dir/.reliquary.json" ]; do
   [ "$dir" = / ] || [ -z "$dir" ] && exit 0

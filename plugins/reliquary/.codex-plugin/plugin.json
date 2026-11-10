@@ -1,0 +1,20 @@
+{
+  "name": "reliquary",
+  "version": "0.1.0",
+  "description": "Connect Codex to Reliquary: the MCP connection, a skill for working in a vault, and a brief of what changed when a session starts in a project linked to a vault.",
+  "author": { "name": "Red Mage", "url": "https://reliquary.redmage.cc" },
+  "homepage": "https://reliquary.redmage.cc/docs/how-to/connect-codex",
+  "repository": "https://github.com/andersthemagi/reliquary",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Reliquary",
+    "shortDescription": "The shared vault of context for people and their agents.",
+    "longDescription": "Connects Codex to Reliquary with OAuth sign-in, adds a skill for working in a vault, and in a project whose .reliquary.json names a vault, starts each session with a short brief and reminds the agent to propose an update after git push.",
+    "developerName": "Red Mage",
+    "category": "Productivity",
+    "capabilities": [],
+    "websiteURL": "https://reliquary.redmage.cc"
+  }
+}
