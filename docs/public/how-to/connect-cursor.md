@@ -6,8 +6,8 @@ Cursor connects with an access token that it reads from an environment variable,
 
 Claude Code and Codex install the Reliquary plugin and sign in through your browser (see [Connect Claude Code](connect-claude-code.md) and [Connect Codex](connect-codex.md)). Cursor can't yet do either:
 
-- **Sign-in:** Cursor signs in to an MCP server by registering itself with the server first. Reliquary has no registration: it knows a client by an https address that describes it (see [Connect another client](connect-other-clients.md)), and Cursor doesn't use one. So Cursor needs a token.
-- **The plugin:** a plugin can't carry your token, and Cursor installs plugins only from its own marketplace or a team's. So the steps below set Cursor up by hand.
+- **Sign-in:** Cursor's MCP docs say it signs in by registering itself with the server first, or with a client ID you set. Reliquary has no registration: it knows a client by an https address that describes it (see [Connect another client](connect-other-clients.md)), and Cursor's docs don't mention one. So Cursor needs a token.
+- **The plugin:** a plugin can't carry your token, and Cursor's plugin docs describe installing from Cursor's marketplace or a team's, not from a repository you add yourself. So the steps below set Cursor up by hand.
 
 ## Steps
 

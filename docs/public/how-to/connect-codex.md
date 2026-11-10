@@ -13,7 +13,7 @@ The Reliquary plugin adds the connection and teaches Codex how to work in a vaul
    ```
 
 2. Start Codex, run `/plugins`, choose **Reliquary** and install it. Then start a new session.
-3. Sign in. Codex opens your browser when it installs the plugin; if it doesn't, run `codex mcp login reliquary` in a terminal. Sign in to Reliquary if you need to, then choose:
+3. Sign in: in a terminal, run `codex mcp login reliquary`. Your browser opens Reliquary. Sign in if you need to, then choose:
    - **All my vaults, including ones I join later**, or **Only the vaults I tick** (if you belong to more than one vault, nothing is chosen for you: see [Keep client work separate](keep-client-work-separate.md));
    - **Read only** (read, search and follow changes) or **Read and write** (also write open files and propose changes).
 4. Choose **Allow**. Back in Codex, `/mcp` shows reliquary as connected.
