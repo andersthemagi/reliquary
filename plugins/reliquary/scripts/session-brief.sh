@@ -1,4 +1,5 @@
-# SessionStart: what Claude Code prints here becomes context for the session.
+# SessionStart: what this prints becomes context for the session, in Claude
+# Code and in Codex alike.
 . "$(dirname "$0")/project.sh"
 cat <<EOF
 This project is linked to the Reliquary $vault. Before other work, give your person a short brief from Reliquary:
