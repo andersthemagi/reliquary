@@ -8,20 +8,21 @@ own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
 ## [0.29.0](https://github.com/andersthemagi/reliquary/compare/v0.28.0...v0.29.0) (2026-11-12)
 
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
 
-### Features
+### New
 
-* **plugin:** install the Reliquary plugin in Codex, signing in with OAuth ([#513](https://github.com/andersthemagi/reliquary/issues/513)) ([4041640](https://github.com/andersthemagi/reliquary/commit/4041640476cb29dee3f62d62f35aa50d329f9b83))
+#### Install the Reliquary plugin in Codex, signing in with OAuth ([#513](https://github.com/andersthemagi/reliquary/issues/513))
 
+Codex can now install the Reliquary plugin: `codex plugin marketplace add andersthemagi/reliquary`, install Reliquary from `/plugins`, and sign in through your browser with no token. It brings the vault skill, the session brief and the push reminder, as in Claude Code.
 
-### Bug fixes
+### Fixes
 
-* **release:** a PR's footer under a --- rule stays out of its release note ([#518](https://github.com/andersthemagi/reliquary/issues/518)) ([36c58f5](https://github.com/andersthemagi/reliquary/commit/36c58f5193d5e6b4252e445d52f0f804c0489e1a))
-
+- A PR's footer under a --- rule stays out of its release note ([#518](https://github.com/andersthemagi/reliquary/issues/518))
 
 ### Security
 
-* **mcp:** patch body-parser, fast-uri, ip-address and qs so npm audit passes ([#515](https://github.com/andersthemagi/reliquary/issues/515)) ([2bd101b](https://github.com/andersthemagi/reliquary/commit/2bd101b643cae4706f7aa65a20e7b9e583162083))
+- Patch body-parser, fast-uri, ip-address and qs so npm audit passes ([#515](https://github.com/andersthemagi/reliquary/issues/515))
 
 ## [0.28.0](https://github.com/andersthemagi/reliquary/compare/v0.27.2...v0.28.0) (2026-10-23)
 
