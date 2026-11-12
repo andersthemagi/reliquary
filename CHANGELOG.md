@@ -6,6 +6,24 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.29.0](https://github.com/andersthemagi/reliquary/compare/v0.28.0...v0.29.0) (2026-11-12)
+
+<!-- tiers: web/scripts/changelog-tiers.mjs -->
+
+### New
+
+#### Install the Reliquary plugin in Codex, signing in with OAuth ([#513](https://github.com/andersthemagi/reliquary/issues/513))
+
+Codex can now install the Reliquary plugin: `codex plugin marketplace add andersthemagi/reliquary`, install Reliquary from `/plugins`, and sign in through your browser with no token. It brings the vault skill, the session brief and the push reminder, as in Claude Code.
+
+### Fixes
+
+- A PR's footer under a --- rule stays out of its release note ([#518](https://github.com/andersthemagi/reliquary/issues/518))
+
+### Security
+
+- Patch body-parser, fast-uri, ip-address and qs so npm audit passes ([#515](https://github.com/andersthemagi/reliquary/issues/515))
+
 ## [0.28.0](https://github.com/andersthemagi/reliquary/compare/v0.27.2...v0.28.0) (2026-10-23)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
