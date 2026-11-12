@@ -6,6 +6,23 @@ footer and `GET /version` on both apps say which). Entries after 0.1.0 are
 written by release-please from conventional commits. The command line has its
 own changelog: [cli/CHANGELOG.md](cli/CHANGELOG.md).
 
+## [0.29.0](https://github.com/andersthemagi/reliquary/compare/v0.28.0...v0.29.0) (2026-11-12)
+
+
+### Features
+
+* **plugin:** install the Reliquary plugin in Codex, signing in with OAuth ([#513](https://github.com/andersthemagi/reliquary/issues/513)) ([4041640](https://github.com/andersthemagi/reliquary/commit/4041640476cb29dee3f62d62f35aa50d329f9b83))
+
+
+### Bug fixes
+
+* **release:** a PR's footer under a --- rule stays out of its release note ([#518](https://github.com/andersthemagi/reliquary/issues/518)) ([36c58f5](https://github.com/andersthemagi/reliquary/commit/36c58f5193d5e6b4252e445d52f0f804c0489e1a))
+
+
+### Security
+
+* **mcp:** patch body-parser, fast-uri, ip-address and qs so npm audit passes ([#515](https://github.com/andersthemagi/reliquary/issues/515)) ([2bd101b](https://github.com/andersthemagi/reliquary/commit/2bd101b643cae4706f7aa65a20e7b9e583162083))
+
 ## [0.28.0](https://github.com/andersthemagi/reliquary/compare/v0.27.2...v0.28.0) (2026-10-23)
 
 <!-- tiers: web/scripts/changelog-tiers.mjs -->
