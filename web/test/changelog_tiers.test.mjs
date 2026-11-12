@@ -109,6 +109,12 @@ test("changelog tiers: the attribution footer after a release note is not part o
   assert.equal(releaseNote("## Release note\n\nA note.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n"), "A note.");
 });
 
+test("changelog tiers: a footer under a --- rule after a release note is not part of it", () => {
+  const footer = "\n\n---\nOpened by the Red Mage software factory, run `r`.\n";
+  assert.equal(releaseNote("## Release note\n\nA note." + footer), "A note.");
+  assert.equal(releaseNote("## Release note\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)" + footer), "");
+});
+
 test("changelog tiers: a note that started with Changed: starts with a capital once the prefix is dropped", () => {
   const section = "## [0.26.0](u) (2026-10-19)\n\n\n### Features\n\n* sign in ([#447](u/447)) ([ece7261](u/c))\n";
   assert.ok(tierSection(section, new Map([[447, "Changed: signing in asks."]])).includes("\n\nSigning in asks."));

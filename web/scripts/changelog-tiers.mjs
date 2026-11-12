@@ -51,7 +51,9 @@ export function releaseNote(body) {
     const end = note.indexOf("-->", i + 4);
     note = note.slice(0, i) + (end === -1 ? "" : note.slice(end + 3));
   }
-  // The attribution footer agents end a PR body with isn't part of the note.
+  // The attribution footer agents end a PR body with isn't part of the note,
+  // nor anything under a "---" rule: the factory's footer sits there (#517).
+  note = note.split(/^---[ \t]*$/m)[0];
   note = note.replace(/^🤖 Generated with \[Claude Code\].*$/gm, "").trim();
   return /^(none|n\/a|-|no)\.?$/i.test(note) ? "" : note;
 }
