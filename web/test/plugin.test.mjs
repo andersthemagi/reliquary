@@ -90,7 +90,10 @@ const codexBash = (cwd, command) =>
 test("codex plugin: the Codex marketplace installs the same plugin, with the same connection, skill and hooks file", () => {
   const entry = json(".agents/plugins/marketplace.json").plugins.find((p) => p.name === "reliquary");
   assert.deepEqual(entry.source, { source: "local", path: "./plugins/reliquary" });
-  assert.ok(entry.policy.installation && entry.policy.authentication && entry.category, "Codex wants policy and category");
+  // ON_INSTALL is the only authentication value Codex's plugin docs show
+  // (developers.openai.com/codex/plugins/build, read 2026-11-12).
+  assert.deepEqual(entry.policy, { installation: "AVAILABLE", authentication: "ON_INSTALL" });
+  assert.ok(entry.category, "Codex wants a category");
   const manifest = json("plugins/reliquary/.codex-plugin/plugin.json");
   assert.equal(manifest.name, "reliquary");
   assert.equal(manifest.mcpServers, "./.mcp.json", "the connection Claude Code's plugin uses, which carries no credential");

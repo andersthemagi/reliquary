@@ -265,3 +265,30 @@ test("redirect: a loopback URI matches on any port, same host and path only", ()
   assert.equal(redirectAllowed(meta, "http://user@127.0.0.1:53124/callback"), false);
   assert.equal(redirectAllowed({ ...meta, redirectUris: ["https://claude.ai/cb"] }, "http://127.0.0.1:5000/cb"), false);
 });
+
+// Codex's own document, as https://chatgpt.com/oauth/codex/client.json served
+// it on 2026-11-12. Codex uses this shared one because our metadata advertises
+// authorization_response_iss_parameter_supported, and comes back to
+// http://127.0.0.1:<a free port>/callback (openai/codex,
+// codex-rs/rmcp-client/src/oauth_callback.rs). Only client_id is swapped for
+// the fixture's address, since a document must name the URL it is served at.
+test("redirect: Codex's hosted client document is read, and its callback on any port is allowed", async () => {
+  const id = serve("/codex-client.json", "");
+  serve("/codex-client.json", JSON.stringify({
+    client_id: id,
+    client_uri: "https://chatgpt.com/codex",
+    application_type: "native",
+    redirect_uris: ["http://127.0.0.1/callback", "http://localhost/callback"],
+    token_endpoint_auth_method: "none",
+    token_endpoint_auth_methods_supported: ["none"],
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    client_name: "Codex",
+    logo_uri: "https://persistent.oaistatic.com/sonic/misc/openai-logo.png",
+  }));
+  const meta = await fetchClientMetadata(id, loopbackOk);
+  assert.equal(meta.clientName, "Codex");
+  assert.equal(redirectAllowed(meta, "http://127.0.0.1:53682/callback"), true);
+  assert.equal(redirectAllowed(meta, "http://localhost:1455/callback"), true);
+  assert.equal(redirectAllowed(meta, "http://127.0.0.1:53682/callback/other"), false);
+});
