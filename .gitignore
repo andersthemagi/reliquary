@@ -22,6 +22,8 @@ supabase/.access-token
 supabase/.*-db-password
 supabase/.*-secret
 supabase/.netlify-*.env
+# Env files left from the Vercel hosting days (#228); some checkouts still have one.
+supabase/.vercel-*.env
 cli/.test-*
 # Exploratory research, interview and survey notes, legal notes and spike
 # output that nothing in the repo cites: local only (AGENTS.md, Conventions).
